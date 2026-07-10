@@ -1,15 +1,21 @@
 """Notas de trabajo del equipo sobre hallazgos, fuentes y recomendaciones."""
 from __future__ import annotations
 
+import csv
+import io
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from .. import gemini_service
 from ..database import get_db
 from ..deps import get_current_user, require_role
 from ..events import bump_state_version
 from ..models import Finding, Note, Recommendation, Source, User
-from ..schemas import NoteCreate, NoteOut, NoteUpdate
+from ..schemas import AiEnhanceOut, NoteCreate, NoteOut, NoteUpdate
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
 
@@ -64,6 +70,44 @@ def list_notes(
     return [_to_out(db, n) for n in notes]
 
 
+@router.get("/export")
+def export_notes(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    fmt: str = Query("csv", alias="format"),
+):
+    """Descarga todas las notas en CSV o JSON."""
+    notes = db.query(Note).order_by(Note.updated_at.desc()).all()
+    if fmt == "json":
+        payload = [_to_out(db, n).model_dump(mode="json") for n in notes]
+        content = json.dumps(payload, ensure_ascii=False, indent=2)
+        return StreamingResponse(
+            iter([content]),
+            media_type="application/json; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="notas_iets.json"'},
+        )
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["id", "titulo", "contenido", "tipo", "entidad_id", "autor", "fijada", "actualizada"])
+    for n in notes:
+        writer.writerow([
+            n.id,
+            n.title,
+            n.content,
+            n.entity_type,
+            n.entity_id or "",
+            n.author_name or n.author_email,
+            "si" if n.pinned else "no",
+            n.updated_at.isoformat() if n.updated_at else "",
+        ])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="notas_iets.csv"'},
+    )
+
+
 @router.get("/{note_id}", response_model=NoteOut)
 def get_note(
     note_id: int,
@@ -96,6 +140,27 @@ def create_note(
         pinned=payload.pinned,
     )
     db.add(note)
+    db.commit()
+    db.refresh(note)
+    bump_state_version(db)
+    return _to_out(db, note)
+
+
+@router.post("/{note_id}/enhance-ai", response_model=NoteOut)
+def enhance_note_ai(
+    note_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role("editor")),
+):
+    """Mejora el contenido de una nota con Gemini y la guarda."""
+    if not gemini_service.is_enabled():
+        raise HTTPException(status_code=400, detail="IA no configurada. Configure el token de Gemini en Configuracion.")
+    note = db.get(Note, note_id)
+    if not note:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nota no encontrada")
+    ctx = _entity_label(db, note.entity_type, note.entity_id)
+    improved, model = gemini_service.enhance_note_content(note.title, note.content, ctx)
+    note.content = improved
     db.commit()
     db.refresh(note)
     bump_state_version(db)

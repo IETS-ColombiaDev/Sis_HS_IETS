@@ -67,6 +67,12 @@ class SourceCreate(SourceBase):
     pass
 
 
+class SourceQuickCreate(BaseModel):
+    """Alta rapida: solo nombre y URL."""
+    title: str
+    url: str
+
+
 class SourceUpdate(BaseModel):
     title: str | None = None
     url: str | None = None
@@ -204,6 +210,12 @@ class NoteOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     entity_label: str = ""
+
+
+class AiEnhanceOut(BaseModel):
+    ok: bool
+    message: str = ""
+    model_used: str = ""
 
 
 # --------------------------------------------------------------------------- #

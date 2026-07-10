@@ -5,6 +5,7 @@ import { useToast } from "../components/Toast";
 import { PageHeader, Card, SectionTitle } from "../components/Card";
 import { LoadingBlock } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
+import HelpNote from "../components/HelpNote";
 import Button from "../components/Button";
 import {
   BarChart,
@@ -35,7 +36,7 @@ const tooltipStyle = { borderRadius: 8, border: "1px solid #E2E8F0", fontSize: 1
 export default function Dashboards() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { version } = useRealtime();
+  const { version, updatedAt } = useRealtime();
   const toast = useToast();
 
   const load = useCallback(async () => {
@@ -65,8 +66,23 @@ export default function Dashboards() {
       <PageHeader
         title="Dashboards"
         subtitle="Visualizacion analitica del inventario de fuentes y de los hallazgos del escaneo de horizonte."
-        actions={<Button variant="secondary" onClick={() => window.print()}>🖨️ Imprimir</Button>}
+        actions={
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {updatedAt && (
+              <span className="chart-live-badge" title={`Ultima sync: ${new Date(updatedAt).toLocaleString()}`}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981" }} />
+                Graficas en vivo
+              </span>
+            )}
+            <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
+          </div>
+        }
       />
+
+      <HelpNote id="dashboards-live">
+        Estas graficas se <strong>actualizan automaticamente</strong> cuando alguien escanea fuentes, agrega hallazgos
+        o modifica datos. El indicador verde confirma la sincronizacion en tiempo real con el resto del equipo.
+      </HelpNote>
 
       <div
         style={{
@@ -74,6 +90,7 @@ export default function Dashboards() {
           gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
           gap: 16,
         }}
+        key={`charts-${version}`}
       >
         <ChartCard title="Fuentes por categoria" hasData={anyData(stats.by_category)}>
           <ResponsiveContainer width="100%" height={300}>

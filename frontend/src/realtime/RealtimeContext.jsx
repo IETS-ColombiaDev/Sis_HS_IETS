@@ -4,7 +4,7 @@ import { useAuth } from "../auth/AuthContext";
 
 const RealtimeContext = createContext({ version: 0, updatedAt: null });
 
-const POLL_MS = 7000;
+const POLL_MS = 4000;
 
 export function RealtimeProvider({ children }) {
   const { user } = useAuth();
