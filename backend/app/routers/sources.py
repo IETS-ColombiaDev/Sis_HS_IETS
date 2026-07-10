@@ -1,7 +1,11 @@
 """CRUD de fuentes de informacion (inventario de escaneo de horizonte)."""
 from __future__ import annotations
 
+import csv
+import io
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -9,7 +13,7 @@ from ..database import get_db
 from ..deps import get_current_user, require_role
 from ..events import bump_state_version
 from ..models import Finding, Source, User
-from ..schemas import SourceCreate, SourceOut, SourceUpdate
+from ..schemas import SourceCreate, SourceOut, SourceQuickCreate, SourceUpdate
 
 router = APIRouter(prefix="/api/sources", tags=["sources"])
 
@@ -46,6 +50,35 @@ def list_categories(db: Session = Depends(get_db), user: User = Depends(get_curr
     return sorted({r[0] for r in rows if r[0]})
 
 
+@router.get("/export")
+def export_sources(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Exporta el listado maestro de fuentes en CSV."""
+    sources = db.query(Source).order_by(Source.category, Source.title).all()
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["id", "titulo", "url", "categoria", "vigilada", "hallazgos", "ultimo_escaneo"])
+    for s in sources:
+        count = db.query(func.count(Finding.id)).filter(Finding.source_id == s.id).scalar() or 0
+        writer.writerow([
+            s.id,
+            s.title,
+            s.url,
+            s.category,
+            "si" if s.scrape_enabled else "no",
+            count,
+            s.last_scraped_at.isoformat() if s.last_scraped_at else "",
+        ])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="fuentes_iets.csv"'},
+    )
+
+
 @router.get("/{source_id}", response_model=SourceOut)
 def get_source(source_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     source = db.get(Source, source_id)
@@ -61,6 +94,35 @@ def create_source(
     user: User = Depends(require_role("editor")),
 ):
     source = Source(**payload.model_dump())
+    db.add(source)
+    db.commit()
+    db.refresh(source)
+    bump_state_version(db)
+    return _to_out(db, source)
+
+
+@router.post("/quick", response_model=SourceOut, status_code=status.HTTP_201_CREATED)
+def create_source_quick(
+    payload: SourceQuickCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role("editor")),
+):
+    """Alta rapida: solo nombre y URL. Vigilancia habilitada por defecto."""
+    title = payload.title.strip()
+    url = payload.url.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="El nombre es obligatorio")
+    if not url.lower().startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="La URL debe iniciar con http:// o https://")
+    source = Source(
+        title=title[:590],
+        url=url[:1020],
+        category="Referente internacional",
+        description=f"Fuente agregada manualmente: {title}",
+        scrape_enabled=True,
+        language="Espanol",
+        link_status="Activo",
+    )
     db.add(source)
     db.commit()
     db.refresh(source)

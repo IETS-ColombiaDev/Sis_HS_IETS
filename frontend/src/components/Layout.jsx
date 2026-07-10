@@ -4,13 +4,14 @@ import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import Icon from "./Icon";
 import Tooltip from "./Tooltip";
+import SafeAvatar from "./SafeAvatar";
 
 const NAV = [
   { section: "Panel" },
   { to: "/", label: "Resumen", icon: "home", end: true },
   { to: "/dashboards", label: "Dashboards", icon: "chart" },
   { section: "Escaneo de horizonte" },
-  { to: "/fuentes", label: "Fuentes", icon: "globe" },
+  { to: "/fuentes", label: "Listado de fuentes", icon: "globe" },
   { to: "/hallazgos", label: "Hallazgos", icon: "telescope" },
   { to: "/escaneo", label: "Escaneo web", icon: "radar" },
   { to: "/notas", label: "Notas", icon: "note" },
@@ -221,7 +222,7 @@ function Header({ onToggle }) {
   const titles = {
     "/": "Resumen general",
     "/dashboards": "Dashboards",
-    "/fuentes": "Fuentes de informacion",
+    "/fuentes": "Listado maestro de fuentes",
     "/hallazgos": "Hallazgos de escaneo",
     "/escaneo": "Escaneo web",
     "/notas": "Notas del equipo",
@@ -316,7 +317,7 @@ function Header({ onToggle }) {
               padding: 4,
             }}
           >
-            <Avatar user={user} />
+            <SafeAvatar user={user} />
             <div style={{ textAlign: "left" }} className="user-meta">
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{user?.name}</div>
               <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "capitalize" }}>
@@ -371,42 +372,6 @@ function Header({ onToggle }) {
         </div>
       </div>
     </header>
-  );
-}
-
-function Avatar({ user }) {
-  if (user?.picture) {
-    return (
-      <img
-        src={user.picture}
-        alt={user.name}
-        style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }}
-      />
-    );
-  }
-  const initials = (user?.name || user?.email || "?")
-    .split(" ")
-    .map((s) => s[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-  return (
-    <div
-      style={{
-        width: 36,
-        height: 36,
-        borderRadius: "50%",
-        background: "linear-gradient(135deg,#6366F1,#3B82F6)",
-        color: "#fff",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 13,
-        fontWeight: 700,
-      }}
-    >
-      {initials}
-    </div>
   );
 }
 

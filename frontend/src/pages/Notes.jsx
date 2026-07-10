@@ -14,6 +14,7 @@ import Modal from "../components/Modal";
 import { Textarea } from "../components/Field";
 import { LoadingBlock } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
+import { downloadFromApi } from "../utils/download";
 import { ENTITY_LABELS } from "../components/NotesPanel";
 
 const FILTERS = [
@@ -37,6 +38,20 @@ export default function Notes() {
   const [detail, setDetail] = useState(null);
   const [form, setForm] = useState({ title: "", content: "", entity_type: "general" });
   const [saving, setSaving] = useState(false);
+
+  const [exporting, setExporting] = useState(false);
+
+  const exportNotes = async () => {
+    setExporting(true);
+    try {
+      await downloadFromApi(api, "/notes/export?format=csv", "notas_iets.csv");
+      toast.success("Notas descargadas");
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo descargar"));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -142,19 +157,23 @@ export default function Notes() {
         title="Notas del equipo"
         subtitle="Observaciones, seguimientos y decisiones documentadas por el equipo de escaneo de horizonte."
         actions={
-          isEditor && (
-            <Button onClick={() => setCreateOpen(true)}>
-              <Icon name="plus" size={16} /> Nueva nota
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button variant="secondary" onClick={exportNotes} loading={exporting}>
+              <Icon name="doc" size={16} /> Descargar CSV
             </Button>
-          )
+            {isEditor && (
+              <Button onClick={() => setCreateOpen(true)}>
+                <Icon name="plus" size={16} /> Nueva nota
+              </Button>
+            )}
+          </div>
         }
       />
 
       <HelpNote id="notes-intro">
-        Las <strong>notas</strong> permiten documentar observaciones del equipo sobre hallazgos, fuentes o
-        recomendaciones. Tambien puede crear <strong>notas generales</strong> para temas transversales.
-        Fije las importantes con 📌 para que aparezcan primero. Todos los usuarios pueden leerlas; editores y
-        administradores pueden crearlas y editarlas.
+        Las <strong>notas</strong> documentan observaciones del equipo. Puede <strong>comentar</strong>,{" "}
+        <strong>editar</strong>, <strong>fijar</strong> (📌), <strong>descargar</strong> (CSV o nota individual) y{" "}
+        <strong>mejorar con IA</strong> (si Gemini esta configurado). Todos leen; editores y admins crean y modifican.
       </HelpNote>
 
       <Card style={{ marginBottom: 16 }} padding={16}>

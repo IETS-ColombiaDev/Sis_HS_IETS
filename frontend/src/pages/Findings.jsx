@@ -21,7 +21,7 @@ const TYPES = ["medicamento", "dispositivo", "digital", "otro"];
 const STATUSES = ["nuevo", "revisado", "priorizado", "descartado"];
 
 export default function Findings() {
-  const { isEditor } = useAuth();
+  const { isEditor, status } = useAuth();
   const { version } = useRealtime();
   const toast = useToast();
 
@@ -34,6 +34,7 @@ export default function Findings() {
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [genId, setGenId] = useState(null);
+  const [enhancingId, setEnhancingId] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -104,6 +105,24 @@ export default function Findings() {
       toast.error(apiError(e, "No se pudo generar la recomendacion"));
     } finally {
       setGenId(null);
+    }
+  };
+
+  const enhanceFinding = async (f) => {
+    if (!status?.gemini_enabled) {
+      toast.warning("Configure el token de Gemini en Configuracion");
+      return;
+    }
+    setEnhancingId(f.id);
+    try {
+      const { data } = await api.post(`/findings/${f.id}/enhance-ai`);
+      toast.success("Hallazgo enriquecido con IA");
+      setDetail(data);
+      load();
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo enriquecer con IA"));
+    } finally {
+      setEnhancingId(null);
     }
   };
 
@@ -286,6 +305,11 @@ export default function Findings() {
                 <a href={detail.url} target="_blank" rel="noreferrer">
                   <Button variant="secondary" size="sm"><Icon name="external" size={14} /> Abrir enlace original</Button>
                 </a>
+                {status?.gemini_enabled && isEditor && (
+                  <Button variant="outline" size="sm" loading={enhancingId === detail.id} onClick={() => enhanceFinding(detail)}>
+                    <Icon name="spark" size={14} /> Enriquecer con IA
+                  </Button>
+                )}
                 {detail.source_url && detail.source_url !== detail.url && (
                   <a href={detail.source_url} target="_blank" rel="noreferrer">
                     <Button variant="ghost" size="sm"><Icon name="globe" size={14} /> Ver fuente</Button>

@@ -10,7 +10,10 @@ import Icon from "../components/Icon";
 import Tooltip from "../components/Tooltip";
 import Modal from "../components/Modal";
 import HelpNote from "../components/HelpNote";
+import DataTable from "../components/DataTable";
+import NotesPanel from "../components/NotesPanel";
 import { ietsTag } from "../utils/iets";
+import { downloadFromApi } from "../utils/download";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { Input, Textarea, Select } from "../components/Field";
 import { LoadingBlock } from "../components/Spinner";
@@ -48,18 +51,22 @@ export default function Sources() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("");
+  const [viewMode, setViewMode] = useState("table");
 
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickForm, setQuickForm] = useState({ title: "", url: "" });
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [scanningId, setScanningId] = useState(null);
+  const [detailSource, setDetailSource] = useState(null);
 
   const [confirmDel, setConfirmDel] = useState(null);
   const [deleting, setDeleting] = useState(false);
-
   const [previewing, setPreviewing] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -80,26 +87,44 @@ export default function Sources() {
   const filtered = useMemo(() => {
     return sources.filter((s) => {
       const okCat = !catFilter || s.category === catFilter;
+      const q = search.toLowerCase();
       const okSearch =
-        !search ||
-        s.title.toLowerCase().includes(search.toLowerCase()) ||
-        s.description.toLowerCase().includes(search.toLowerCase());
+        !q ||
+        s.title.toLowerCase().includes(q) ||
+        s.url.toLowerCase().includes(q) ||
+        s.description.toLowerCase().includes(q);
       return okCat && okSearch;
     });
   }, [sources, search, catFilter]);
 
-  const openCreate = () => {
-    setEditing(null);
-    setForm(EMPTY);
+  const openQuick = () => {
+    setQuickForm({ title: "", url: "" });
+    setQuickOpen(true);
+  };
+
+  const openAdvanced = (s = null) => {
+    setEditing(s);
+    setForm(s ? { ...EMPTY, ...s } : EMPTY);
     setPreview(null);
     setModalOpen(true);
   };
 
-  const openEdit = (s) => {
-    setEditing(s);
-    setForm({ ...EMPTY, ...s });
-    setPreview(null);
-    setModalOpen(true);
+  const saveQuick = async () => {
+    if (!quickForm.title.trim() || !quickForm.url.trim()) {
+      toast.warning("Nombre y URL son obligatorios");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.post("/sources/quick", quickForm);
+      toast.success("Fuente agregada al listado maestro");
+      setQuickOpen(false);
+      load();
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo agregar la fuente"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const save = async () => {
@@ -163,7 +188,7 @@ export default function Sources() {
     setScanningId(s.id);
     try {
       const { data } = await api.post(`/scan/source/${s.id}`);
-      toast.success(`Escaneo de "${s.title}": ${data.items_new} nuevos de ${data.items_found}`);
+      toast.success(`Escaneo: ${data.items_new} nuevos de ${data.items_found}`);
       load();
     } catch (e) {
       toast.error(apiError(e, "No se pudo escanear la fuente"));
@@ -172,66 +197,151 @@ export default function Sources() {
     }
   };
 
-  if (loading) return <LoadingBlock label="Cargando fuentes..." />;
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      await downloadFromApi(api, "/sources/export", "fuentes_iets.csv");
+      toast.success("Listado maestro descargado");
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo exportar"));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const tableColumns = useMemo(
+    () => [
+      {
+        key: "title",
+        label: "Nombre / titulo",
+        render: (s) => (
+          <div>
+            <button
+              type="button"
+              onClick={() => setDetailSource(s)}
+              style={{ border: "none", background: "none", padding: 0, fontWeight: 600, color: "#0F172A", cursor: "pointer", textAlign: "left" }}
+            >
+              {s.title}
+            </button>
+            {ietsTag(s.category) && (
+              <Badge tone={ietsTag(s.category).tone} style={{ marginLeft: 6 }}>{ietsTag(s.category).label}</Badge>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: "url",
+        width: 220,
+        label: "URL",
+        render: (s) =>
+          s.url ? (
+            <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, wordBreak: "break-all" }} title={s.url}>
+              {s.url.replace(/^https?:\/\//, "").slice(0, 45)}{s.url.length > 50 ? "…" : ""}
+            </a>
+          ) : (
+            <span style={{ color: "#CBD5E1" }}>—</span>
+          ),
+      },
+      {
+        key: "category",
+        width: 160,
+        label: "Categoria",
+        render: (s) => <Badge>{s.category || "—"}</Badge>,
+      },
+      {
+        key: "watch",
+        width: 100,
+        label: "Vigilada",
+        render: (s) => (s.scrape_enabled ? <Badge tone="ok">Si</Badge> : <Badge tone="viewer">No</Badge>),
+      },
+      {
+        key: "findings",
+        width: 90,
+        label: "Hallazgos",
+        render: (s) => <span style={{ fontWeight: 600 }}>{s.findings_count || 0}</span>,
+      },
+      {
+        key: "actions",
+        width: isEditor ? 200 : 80,
+        align: "right",
+        label: "Acciones",
+        render: (s) => (
+          <div style={{ whiteSpace: "nowrap" }}>
+            {s.url && (
+              <a href={s.url} target="_blank" rel="noreferrer">
+                <Button size="sm" variant="ghost"><Icon name="external" size={14} /></Button>
+              </a>
+            )}
+            {isEditor && (
+              <>
+                <Tooltip text="Escanear esta fuente">
+                  <Button size="sm" variant="outline" loading={scanningId === s.id} disabled={!s.scrape_enabled} onClick={() => scanOne(s)}>
+                    <Icon name="radar" size={14} />
+                  </Button>
+                </Tooltip>
+                <Button size="sm" variant="ghost" onClick={() => openAdvanced(s)}><Icon name="edit" size={14} /></Button>
+              </>
+            )}
+          </div>
+        ),
+      },
+    ],
+    [isEditor, scanningId]
+  );
+
+  if (loading) return <LoadingBlock label="Cargando listado maestro de fuentes..." />;
 
   return (
     <div>
       <PageHeader
-        title="Fuentes de informacion"
-        subtitle="Inventario de documentos, plataformas y repositorios de escaneo de horizonte relevantes para el IETS."
+        title="Listado maestro de fuentes"
+        subtitle="Inventario central de URLs y documentos vigilados. Agregue fuentes en modo rapido (nombre + URL) o avanzado (metadatos completos)."
         actions={
-          isEditor && (
-            <Tooltip text="Agregue una nueva URL / fuente al inventario. Podra vigilarla y escanearla como las demas.">
-              <Button onClick={openCreate}>
-                <Icon name="plus" size={16} /> Agregar URL / fuente
-              </Button>
-            </Tooltip>
-          )
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Button variant="secondary" onClick={exportCsv} loading={exporting}>
+              <Icon name="doc" size={16} /> Descargar CSV
+            </Button>
+            {isEditor && (
+              <>
+                <Button variant="outline" onClick={openQuick}>
+                  <Icon name="plus" size={16} /> Agregar rapido
+                </Button>
+                <Button onClick={() => openAdvanced()}>
+                  <Icon name="layers" size={16} /> Agregar avanzado
+                </Button>
+              </>
+            )}
+          </div>
         }
       />
 
-      <HelpNote id="sources-intro">
-        Las <strong>fuentes</strong> son los sitios y documentos que el sistema vigila. Al crear una, escriba la URL
-        y pulse <strong>Previsualizar extraccion</strong> para ver que informacion se obtiene antes de guardar.
-        Marque <strong>Habilitar vigilancia</strong> para incluirla en los escaneos. El boton <strong>Escanear</strong> de
-        cada tarjeta la procesa individualmente.
+      <HelpNote id="sources-master">
+        Este es el <strong>listado maestro</strong> de todas las fuentes del sistema. Proviene del inventario inicial
+        del IETS (Excel) y de fuentes que usted agregue. Use <strong>Agregar rapido</strong> para solo nombre + URL, o{" "}
+        <strong>Agregar avanzado</strong> para categoria, descripcion y mas opciones. Las fuentes vigiladas se incluyen
+        en el escaneo automatico.
       </HelpNote>
 
       <Card style={{ marginBottom: 16 }} padding={16}>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
           <input
-            placeholder="🔎 Buscar por titulo o descripcion..."
+            placeholder="Buscar por nombre o URL..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{
-              flex: 1,
-              minWidth: 220,
-              padding: "9px 12px",
-              border: "2px solid #E2E8F0",
-              borderRadius: 8,
-              fontSize: 14,
-              outline: "none",
-            }}
+            className="filter-input"
+            style={{ flex: 1, minWidth: 200 }}
           />
-          <select
-            value={catFilter}
-            onChange={(e) => setCatFilter(e.target.value)}
-            style={{
-              padding: "9px 12px",
-              border: "2px solid #E2E8F0",
-              borderRadius: 8,
-              fontSize: 14,
-              cursor: "pointer",
-            }}
-          >
+          <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="filter-select">
             <option value="">Todas las categorias</option>
             {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
+              <option key={c} value={c}>{c}</option>
             ))}
           </select>
-          <span style={{ fontSize: 13, color: "#64748B" }}>{filtered.length} fuentes</span>
+          <div style={{ display: "flex", gap: 4, background: "#F1F5F9", padding: 4, borderRadius: 8 }}>
+            <button type="button" onClick={() => setViewMode("table")} className={`view-toggle${viewMode === "table" ? " active" : ""}`}>Tabla</button>
+            <button type="button" onClick={() => setViewMode("cards")} className={`view-toggle${viewMode === "cards" ? " active" : ""}`}>Tarjetas</button>
+          </div>
+          <span style={{ fontSize: 13, color: "#64748B" }}>{filtered.length} de {sources.length} fuentes</span>
         </div>
       </Card>
 
@@ -239,75 +349,34 @@ export default function Sources() {
         <Card>
           <EmptyState icon="🌐" title="Sin fuentes" message="No hay fuentes que coincidan con el filtro." />
         </Card>
+      ) : viewMode === "table" ? (
+        <Card padding={0}>
+          <DataTable columns={tableColumns} rows={filtered.map((s) => ({ key: s.id, data: s }))} minWidth={980} />
+        </Card>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 16 }}>
           {filtered.map((s) => (
             <Card key={s.id} padding={20} style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  <Badge>{s.category}</Badge>
-                  {ietsTag(s.category) && (
-                    <Tooltip text="Fuente producida por el IETS.">
-                      <Badge tone={ietsTag(s.category).tone}>{ietsTag(s.category).label}</Badge>
-                    </Tooltip>
-                  )}
-                </div>
-                {s.scrape_enabled ? (
-                  <Badge tone="ok">Vigilada</Badge>
-                ) : (
-                  <Badge tone="viewer">Sin vigilar</Badge>
-                )}
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                <Badge>{s.category}</Badge>
+                {s.scrape_enabled ? <Badge tone="ok">Vigilada</Badge> : <Badge tone="viewer">Sin vigilar</Badge>}
               </div>
-              <h3 style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3 }}>{s.title}</h3>
-              <div style={{ fontSize: 12, color: "#94A3B8", margin: "6px 0" }}>
-                {s.authors} {s.year && `· ${s.year}`} · {s.language}
-              </div>
-              <p
-                style={{
-                  fontSize: 13,
-                  color: "#64748B",
-                  flex: 1,
-                  display: "-webkit-box",
-                  WebkitLineClamp: 3,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                }}
-              >
-                {s.description}
-              </p>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0", fontSize: 12 }}>
-                <span style={{ color: "#64748B" }}>🔭 {s.findings_count} hallazgos</span>
-                {s.last_scraped_at && (
-                  <span style={{ color: "#94A3B8" }}>
-                    · {new Date(s.last_scraped_at).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", borderTop: "1px solid #F1F5F9", paddingTop: 12 }}>
-                {s.url && (
-                  <a href={s.url} target="_blank" rel="noreferrer">
-                    <Button size="sm" variant="secondary">
-                      🔗 Abrir
-                    </Button>
-                  </a>
-                )}
+              <h3 style={{ fontSize: 15, fontWeight: 700 }}>{s.title}</h3>
+              {s.url && (
+                <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, marginTop: 4, wordBreak: "break-all" }}>
+                  {s.url}
+                </a>
+              )}
+              <p style={{ fontSize: 13, color: "#64748B", marginTop: 8, flex: 1 }}>{s.description?.slice(0, 120)}</p>
+              <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 8 }}>{s.findings_count || 0} hallazgos</div>
+              <div style={{ display: "flex", gap: 8, marginTop: 12, borderTop: "1px solid #F1F5F9", paddingTop: 12 }}>
+                <Button size="sm" variant="ghost" onClick={() => setDetailSource(s)}>Ver</Button>
                 {isEditor && (
                   <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      loading={scanningId === s.id}
-                      disabled={!s.scrape_enabled}
-                      onClick={() => scanOne(s)}
-                    >
-                      🛰️ Escanear
+                    <Button size="sm" variant="outline" loading={scanningId === s.id} disabled={!s.scrape_enabled} onClick={() => scanOne(s)}>
+                      Escanear
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => openEdit(s)}>
-                      ✏️ Editar
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setConfirmDel(s)} style={{ color: "#EF4444" }}>
-                      🗑️
-                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => openAdvanced(s)}>Editar</Button>
                   </>
                 )}
               </div>
@@ -316,157 +385,77 @@ export default function Sources() {
         </div>
       )}
 
+      {/* Agregar rapido */}
       <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={editing ? "Editar fuente" : "Nueva fuente"}
-        width={640}
+        open={quickOpen}
+        onClose={() => setQuickOpen(false)}
+        title="Agregar fuente (modo rapido)"
+        width={480}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button onClick={save} loading={saving}>
-              {editing ? "Guardar cambios" : "Crear fuente"}
-            </Button>
+            <Button variant="secondary" onClick={() => setQuickOpen(false)} disabled={saving}>Cancelar</Button>
+            <Button onClick={saveQuick} loading={saving}>Agregar al listado</Button>
           </>
         }
       >
-        <Input
-          label="Titulo"
-          required
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-        />
-        <Input
-          label="URL / enlace"
-          value={form.url}
-          onChange={(e) => setForm({ ...form, url: e.target.value })}
-          placeholder="https://..."
-        />
-        <div style={{ marginTop: -6, marginBottom: 14 }}>
-          <Tooltip text="Descarga el enlace y muestra que informacion se extraeria (titulo, resumen y hallazgos potenciales), sin guardar nada.">
-            <Button variant="secondary" size="sm" onClick={previewUrl} loading={previewing} disabled={!form.url.trim()}>
-              <Icon name="compass" size={15} /> Previsualizar extraccion
-            </Button>
-          </Tooltip>
+        <HelpNote id="quick-add" tone="tip" dismissible={false}>
+          Solo necesita el <strong>nombre</strong> y la <strong>URL</strong>. La fuente queda vigilada y lista para escanear.
+        </HelpNote>
+        <Input label="Nombre del sitio / fuente" required value={quickForm.title} onChange={(e) => setQuickForm({ ...quickForm, title: e.target.value })} placeholder="Ej. NIHR Innovation Observatory" />
+        <Input label="URL" required value={quickForm.url} onChange={(e) => setQuickForm({ ...quickForm, url: e.target.value })} placeholder="https://..." />
+      </Modal>
+
+      {/* Agregar avanzado */}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? "Editar fuente (avanzado)" : "Agregar fuente (avanzado)"} width={640}
+        footer={<><Button variant="secondary" onClick={() => setModalOpen(false)} disabled={saving}>Cancelar</Button><Button onClick={save} loading={saving}>{editing ? "Guardar" : "Crear"}</Button></>}
+      >
+        <Input label="Titulo" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        <Input label="URL / enlace" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://..." />
+        <div style={{ marginBottom: 14 }}>
+          <Button variant="secondary" size="sm" onClick={previewUrl} loading={previewing} disabled={!form.url.trim()}>
+            <Icon name="compass" size={15} /> Previsualizar extraccion
+          </Button>
           {preview && (
-            <div
-              style={{
-                marginTop: 10,
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: `1px solid ${preview.ok ? "#BBF7D0" : "#FECACA"}`,
-                background: preview.ok ? "#F0FDF4" : "#FEF2F2",
-                fontSize: 13,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <Icon name={preview.ok ? "check" : "alert"} size={16} color={preview.ok ? "#16A34A" : "#DC2626"} />
-                <strong style={{ color: preview.ok ? "#166534" : "#991B1B" }}>
-                  {preview.ok ? `${preview.candidates_count} hallazgo(s) detectable(s)` : "No se pudo extraer"}
-                </strong>
-                {preview.content_type && (
-                  <span style={{ fontSize: 11, color: "#64748B" }}>· {preview.content_type.split(";")[0]}</span>
-                )}
-              </div>
-              <div style={{ color: "#475569" }}>{preview.message}</div>
-              {preview.description && (
-                <p style={{ color: "#64748B", marginTop: 8, fontStyle: "italic" }}>
-                  “{preview.description.slice(0, 260)}{preview.description.length > 260 ? "…" : ""}”
-                </p>
-              )}
-              {preview.candidates && preview.candidates.length > 0 && (
-                <ul style={{ margin: "8px 0 0", paddingLeft: 18, color: "#334155" }}>
-                  {preview.candidates.slice(0, 6).map((c, idx) => (
-                    <li key={idx} style={{ marginBottom: 3 }}>
-                      <Badge>{c.technology_type}</Badge>{" "}
-                      <span>{c.title.slice(0, 70)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <div style={{ marginTop: 10, padding: 12, borderRadius: 10, border: `1px solid ${preview.ok ? "#BBF7D0" : "#FECACA"}`, background: preview.ok ? "#F0FDF4" : "#FEF2F2", fontSize: 13 }}>
+              <strong>{preview.ok ? `${preview.candidates_count} hallazgo(s) detectables` : "Error"}</strong>
+              <div>{preview.message}</div>
             </div>
           )}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <Select
-            label="Categoria"
-            value={form.category}
-            onChange={(e) => setForm({ ...form, category: e.target.value })}
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
+          <Select label="Categoria" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </Select>
-          <Input
-            label="Ano"
-            value={form.year}
-            onChange={(e) => setForm({ ...form, year: e.target.value })}
-          />
+          <Input label="Ano" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} />
         </div>
-        <Input
-          label="Autores / entidad"
-          value={form.authors}
-          onChange={(e) => setForm({ ...form, authors: e.target.value })}
-        />
-        <Textarea
-          label="Descripcion"
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-          rows={3}
-        />
-        <Input
-          label="Relacion con IETS"
-          value={form.relation_iets}
-          onChange={(e) => setForm({ ...form, relation_iets: e.target.value })}
-        />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <Input
-            label="Idioma"
-            value={form.language}
-            onChange={(e) => setForm({ ...form, language: e.target.value })}
-          />
-          <Input
-            label="Tipo de recurso"
-            value={form.resource_type}
-            onChange={(e) => setForm({ ...form, resource_type: e.target.value })}
-          />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <Input
-            label="Estado del enlace"
-            value={form.link_status}
-            onChange={(e) => setForm({ ...form, link_status: e.target.value })}
-          />
-          <Input
-            label="Etiquetas (coma)"
-            value={form.tags}
-            onChange={(e) => setForm({ ...form, tags: e.target.value })}
-          />
-        </div>
+        <Input label="Autores / entidad" value={form.authors} onChange={(e) => setForm({ ...form, authors: e.target.value })} />
+        <Textarea label="Descripcion" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />
         <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, marginTop: 6 }}>
-          <input
-            type="checkbox"
-            checked={form.scrape_enabled}
-            onChange={(e) => setForm({ ...form, scrape_enabled: e.target.checked })}
-            style={{ width: 18, height: 18 }}
-          />
-          Habilitar vigilancia (web scraping) de esta fuente
+          <input type="checkbox" checked={form.scrape_enabled} onChange={(e) => setForm({ ...form, scrape_enabled: e.target.checked })} style={{ width: 18, height: 18 }} />
+          Habilitar vigilancia (web scraping)
         </label>
       </Modal>
 
-      <ConfirmDialog
-        open={!!confirmDel}
-        onClose={() => setConfirmDel(null)}
-        onConfirm={doDelete}
-        loading={deleting}
-        title="Eliminar fuente"
-        message={`Se eliminara "${confirmDel?.title}" y todos sus hallazgos asociados. Esta accion no se puede deshacer.`}
-        confirmLabel="Eliminar"
-      />
+      {/* Detalle fuente + notas */}
+      <Modal open={!!detailSource} onClose={() => setDetailSource(null)} title={detailSource?.title || "Fuente"} width={680}>
+        {detailSource && (
+          <div>
+            <Badge>{detailSource.category}</Badge>
+            {detailSource.url && (
+              <div style={{ marginTop: 12 }}>
+                <a href={detailSource.url} target="_blank" rel="noreferrer">
+                  <Button variant="secondary" size="sm"><Icon name="external" size={14} /> Abrir URL</Button>
+                </a>
+              </div>
+            )}
+            <p style={{ marginTop: 12, fontSize: 14, color: "#475569" }}>{detailSource.description || "Sin descripcion."}</p>
+            <NotesPanel entityType="source" entityId={detailSource.id} />
+          </div>
+        )}
+      </Modal>
+
+      <ConfirmDialog open={!!confirmDel} onClose={() => setConfirmDel(null)} onConfirm={doDelete} loading={deleting}
+        title="Eliminar fuente" message={`Se eliminara "${confirmDel?.title}" y sus hallazgos.`} confirmLabel="Eliminar" />
     </div>
   );
 }

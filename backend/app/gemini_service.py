@@ -306,3 +306,58 @@ def _fallback_chat(question: str, context: str) -> str:
         "Modo sin IA. No se encontro contexto especifico para su consulta en la base de datos. "
         "Configure `GEMINI_API_KEY` y ejecute un escaneo de las fuentes para enriquecer la informacion."
     )
+
+
+def enhance_note_content(title: str, content: str, context: str = "") -> tuple[str, str]:
+    """Mejora el texto de una nota del equipo con IA."""
+    prompt = f"""Mejora la siguiente nota del equipo de escaneo de horizonte del IETS (Colombia).
+Mantén el sentido original, hazla más clara, profesional y accionable. Usa Markdown breve si ayuda.
+
+Titulo: {title or '(sin titulo)'}
+Contexto vinculado: {context or 'nota general'}
+Contenido actual:
+{content}
+
+Devuelve SOLO el contenido mejorado (sin repetir el titulo)."""
+    text, model = _generate(prompt, system=SYSTEM_ANALYST, temperature=0.35)
+    if not text or text.startswith("[Error"):
+        return (content, "fallback (sin Gemini)")
+    return (text, model)
+
+
+def enrich_finding(finding, source) -> tuple[dict, str]:
+    """Enriquece resumen y clasificacion de un hallazgo con IA."""
+    import json
+    import re
+
+    prompt = f"""Analiza este hallazgo de escaneo de horizonte sanitario y responde SOLO con JSON valido (sin markdown):
+{{
+  "summary": "resumen claro max 400 caracteres",
+  "technology": "nombre corto de la tecnologia",
+  "technology_type": "medicamento|dispositivo|digital|otro",
+  "horizon": "emergente|transicional|inminente|",
+  "therapeutic_area": "area terapeutica o vacio",
+  "phase": "fase de desarrollo o vacio"
+}}
+
+Hallazgo: {finding.title}
+Resumen actual: {finding.summary or 'sin resumen'}
+Tecnologia: {finding.technology or ''}
+Fuente: {source.title if source else ''} ({getattr(source, 'url', '') or ''})
+Contenido raw: {(finding.raw_content or '')[:800]}"""
+    text, model = _generate(prompt, system=SYSTEM_ANALYST, temperature=0.3)
+    if not text or text.startswith("[Error"):
+        return ({}, model or "fallback (sin Gemini)")
+    try:
+        # extraer JSON aunque venga envuelto en ``` 
+        m = re.search(r"\{[\s\S]*\}", text)
+        data = json.loads(m.group(0) if m else text)
+        allowed_types = {"medicamento", "dispositivo", "digital", "otro"}
+        allowed_horizons = {"emergente", "transicional", "inminente", ""}
+        if data.get("technology_type") not in allowed_types:
+            data["technology_type"] = finding.technology_type or "otro"
+        if data.get("horizon") not in allowed_horizons:
+            data["horizon"] = finding.horizon or ""
+        return (data, model)
+    except Exception:  # noqa: BLE001
+        return ({}, model)

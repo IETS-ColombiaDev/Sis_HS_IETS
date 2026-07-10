@@ -18,7 +18,7 @@ const ENTITY_LABELS = {
  * Panel de notas reutilizable: se incrusta en modales de hallazgos, fuentes, etc.
  */
 export default function NotesPanel({ entityType, entityId, compact = false }) {
-  const { isEditor } = useAuth();
+  const { isEditor, status } = useAuth();
   const { version } = useRealtime();
   const toast = useToast();
 
@@ -29,7 +29,7 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState(null);
   const [editContent, setEditContent] = useState("");
-  const [editTitle, setEditTitle] = useState("");
+  const [enhancingId, setEnhancingId] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -106,6 +106,34 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
     } catch (e) {
       toast.error(apiError(e, "No se pudo eliminar"));
     }
+  };
+
+  const enhanceNote = async (note) => {
+    if (!status?.gemini_enabled) {
+      toast.warning("Configure el token de Gemini en Configuracion para usar IA");
+      return;
+    }
+    setEnhancingId(note.id);
+    try {
+      await api.post(`/notes/${note.id}/enhance-ai`);
+      toast.success("Nota mejorada con IA");
+      load();
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo mejorar con IA"));
+    } finally {
+      setEnhancingId(null);
+    }
+  };
+
+  const downloadNote = (note) => {
+    const text = `# ${note.title || "Nota"}\n\n${note.content}\n\n---\nAutor: ${note.author_name}\nActualizada: ${note.updated_at}`;
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `nota_${note.id}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -191,6 +219,12 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
                     <span style={{ fontSize: 11, color: "#94A3B8" }}>{n.author_name || n.author_email}</span>
                     {isEditor && (
                       <div style={{ display: "flex", gap: 4 }}>
+                        <button type="button" title="Descargar nota" onClick={() => downloadNote(n)} style={iconBtn}><Icon name="doc" size={13} /></button>
+                        {status?.gemini_enabled && (
+                          <button type="button" title="Mejorar con IA" onClick={() => enhanceNote(n)} disabled={enhancingId === n.id} style={iconBtn}>
+                            <Icon name="spark" size={13} />
+                          </button>
+                        )}
                         <button type="button" title="Fijar" onClick={() => togglePin(n)} style={iconBtn}>{n.pinned ? "📌" : "📍"}</button>
                         <button type="button" title="Editar" onClick={() => { setEditId(n.id); setEditContent(n.content); setEditTitle(n.title || ""); }} style={iconBtn}><Icon name="edit" size={13} /></button>
                         <button type="button" title="Eliminar" onClick={() => remove(n)} style={{ ...iconBtn, color: "#EF4444" }}><Icon name="trash" size={13} /></button>

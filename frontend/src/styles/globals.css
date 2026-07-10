@@ -308,3 +308,32 @@ h4 {
   vertical-align: middle;
 }
 
+.view-toggle {
+  border: none;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+}
+.view-toggle.active {
+  background: #fff;
+  color: #4f46e5;
+  box-shadow: var(--shadow-sm);
+}
+
+.chart-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 3px 10px;
+  border-radius: 9999px;
+}
+

@@ -9,6 +9,7 @@ import Badge from "../components/Badge";
 import Button from "../components/Button";
 import Icon from "../components/Icon";
 import Accordion from "../components/Accordion";
+import ToolGuide from "../components/ToolGuide";
 import Tooltip from "../components/Tooltip";
 import { LoadingBlock } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
@@ -31,7 +32,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { version } = useRealtime();
+  const { version, updatedAt } = useRealtime();
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -112,6 +113,8 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <ToolGuide />
+
       {/* Contexto: que es el escaneo de horizonte (acordeon) */}
       <Card style={{ marginBottom: 24 }}>
         <SectionTitle
@@ -163,9 +166,20 @@ export default function Dashboard() {
         className="dash-grid"
       >
         <Card>
-          <SectionTitle>Hallazgos por horizonte temporal</SectionTitle>
+          <SectionTitle
+            right={
+              updatedAt && (
+                <span className="chart-live-badge" title="Grafica sincronizada en tiempo real">
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981" }} />
+                  En vivo
+                </span>
+              )
+            }
+          >
+            Hallazgos por horizonte temporal
+          </SectionTitle>
           {horizonData.some((d) => d.value > 0) ? (
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={280} key={`horizon-${version}`}>
               <BarChart data={horizonData} margin={{ top: 10, right: 10, left: -12, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#64748B" }} />
@@ -186,7 +200,7 @@ export default function Dashboard() {
         <Card>
           <SectionTitle>Tipo de tecnologia</SectionTitle>
           {stats.by_technology_type.some((d) => d.value > 0) ? (
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={280} key={`type-${version}`}>
               <PieChart>
                 <Pie
                   data={stats.by_technology_type.map((d) => ({

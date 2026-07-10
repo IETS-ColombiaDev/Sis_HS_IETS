@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from .. import gemini_service
 from ..database import get_db
 from ..deps import get_current_user, require_role
 from ..events import bump_state_version
@@ -105,6 +106,31 @@ def update_finding(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hallazgo no encontrado")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(finding, key, value)
+    db.commit()
+    db.refresh(finding)
+    bump_state_version(db)
+    return _to_out(db, finding)
+
+
+@router.post("/{finding_id}/enhance-ai", response_model=FindingOut)
+def enhance_finding_ai(
+    finding_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role("editor")),
+):
+    """Enriquece resumen y clasificacion de un hallazgo con Gemini."""
+    if not gemini_service.is_enabled():
+        raise HTTPException(status_code=400, detail="IA no configurada. Configure el token de Gemini en Configuracion.")
+    finding = db.get(Finding, finding_id)
+    if not finding:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hallazgo no encontrado")
+    updates, _model = gemini_service.enrich_finding(finding, finding.source)
+    if not updates:
+        raise HTTPException(status_code=502, detail="La IA no pudo enriquecer el hallazgo. Intente de nuevo.")
+    for key in ("summary", "technology", "technology_type", "horizon", "therapeutic_area", "phase"):
+        val = updates.get(key)
+        if val is not None and str(val).strip():
+            setattr(finding, key, str(val)[:1000] if key == "summary" else str(val)[:390])
     db.commit()
     db.refresh(finding)
     bump_state_version(db)
