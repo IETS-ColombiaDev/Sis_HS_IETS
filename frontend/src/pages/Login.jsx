@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
 import { apiError } from "../api/client";
@@ -240,6 +241,12 @@ export default function Login() {
               </p>
             </>
           )}
+          <p style={{ fontSize: 13, color: "#64748B", marginTop: 18, textAlign: "center" }}>
+            ¿Desarrollador o sociedad cientifica?{" "}
+            <Link to="/postular" style={{ fontWeight: 700, color: "#4F46E5" }}>
+              Postule una tecnologia
+            </Link>
+          </p>
         </div>
       </div>
     </div>

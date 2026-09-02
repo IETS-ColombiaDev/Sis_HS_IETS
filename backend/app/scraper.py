@@ -18,6 +18,8 @@ from bs4 import BeautifulSoup
 from sqlalchemy.orm import Session
 
 from .models import Finding, ScrapeLog, Source
+from .priority import compute_screening_score
+from .technology_service import sync_technology_from_finding
 
 try:  # extraccion robusta de contenido principal de paginas web
     import trafilatura
@@ -435,6 +437,7 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             findings_data = extract_candidates(source, text)
 
         new_count = 0
+        new_findings: list[Finding] = []
         for data in findings_data:
             content_hash = _hash(data["title"], data["url"])
             exists = (
@@ -450,8 +453,24 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                 status="nuevo",
                 **data,
             )
+            finding.screening_score = compute_screening_score(
+                horizon=finding.horizon,
+                technology_type=finding.technology_type,
+                phase=finding.phase,
+                therapeutic_area=finding.therapeutic_area,
+                summary=finding.summary,
+                technology=finding.technology,
+                title=finding.title,
+            )
             db.add(finding)
+            new_findings.append(finding)
             new_count += 1
+
+        # Cada senal capturada se proyecta al staging metodologico (RF03/RF04).
+        if new_findings:
+            db.flush()
+            for finding in new_findings:
+                sync_technology_from_finding(db, finding, captured_by=triggered_by or "scraper")
 
         log.items_found = len(findings_data)
         log.items_new = new_count

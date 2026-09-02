@@ -8,18 +8,18 @@ import { Select } from "../components/Field";
 import Button from "../components/Button";
 import { LoadingBlock } from "../components/Spinner";
 
-const ROLES = ["viewer", "editor", "admin"];
-
 export default function Users() {
   const { user: me } = useAuth();
   const toast = useToast();
   const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const { data } = await api.get("/users");
-      setUsers(data);
+      const [u, r] = await Promise.all([api.get("/users"), api.get("/users/roles")]);
+      setUsers(u.data);
+      setRoles(r.data);
     } catch (e) {
       toast.error(apiError(e, "No se pudieron cargar los usuarios"));
     } finally {
@@ -34,11 +34,11 @@ export default function Users() {
 
   const changeRole = async (u, role) => {
     try {
-      await api.put(`/users/${u.id}/role`, { role });
-      toast.success(`Rol de ${u.name} actualizado a ${role}`);
+      const { data } = await api.put(`/users/${u.id}/role`, { role });
+      toast.success(`${u.name}: perfil actualizado a ${data.role_label}`);
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cambiar el rol"));
+      toast.error(apiError(e, "No se pudo cambiar el perfil"));
     }
   };
 
@@ -57,9 +57,24 @@ export default function Users() {
   return (
     <div>
       <PageHeader
-        title="Gestion de usuarios"
-        subtitle="Administre los roles y el acceso de los usuarios institucionales. Viewer consulta, Editor gestiona datos y escaneos, Admin controla usuarios."
+        title="Usuarios y perfiles"
+        subtitle="Matriz RBAC de cinco perfiles. Los permisos se otorgan por modulo y, en la matriz de priorizacion, por criterio: el evaluador tecnico califica P1, P5 y P6; el evaluador clinico califica P2, P3 y P4."
       />
+
+      <Card style={{ marginBottom: 18 }} padding={16}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {roles.map((r) => (
+            <div key={r.code} style={{ display: "flex", gap: 12, alignItems: "baseline", flexWrap: "wrap" }}>
+              <Badge tone={r.code} style={{ minWidth: 170, textAlign: "center" }}>
+                {r.label}
+              </Badge>
+              <span style={{ fontSize: 12, color: "#64748B", fontFamily: "ui-monospace, Menlo, monospace" }}>
+                {r.permissions.join(" · ")}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       <Card padding={0}>
         <div style={{ overflowX: "auto" }}>
@@ -68,7 +83,7 @@ export default function Users() {
               <tr style={{ background: "#3B82F6", color: "#fff", textAlign: "left" }}>
                 <th style={th}>Usuario</th>
                 <th style={th}>Correo</th>
-                <th style={th}>Rol</th>
+                <th style={th}>Perfil</th>
                 <th style={th}>Estado</th>
                 <th style={th}>Ultimo acceso</th>
                 <th style={{ ...th, textAlign: "right" }}>Acciones</th>
@@ -92,12 +107,19 @@ export default function Users() {
                       value={u.role}
                       onChange={(e) => changeRole(u, e.target.value)}
                       disabled={u.id === me.id}
-                      style={{ marginBottom: 0, width: 130 }}
+                      style={{ marginBottom: 0, width: 190 }}
                     >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>{r}</option>
+                      {roles.map((r) => (
+                        <option key={r.code} value={r.code}>
+                          {r.label}
+                        </option>
                       ))}
                     </Select>
+                    {u.rateable_criteria?.length > 0 && (
+                      <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>
+                        Califica {u.rateable_criteria.join(", ")}
+                      </div>
+                    )}
                   </td>
                   <td style={td}>
                     <Badge tone={u.is_active ? "ok" : "error"}>{u.is_active ? "Activo" : "Inactivo"}</Badge>

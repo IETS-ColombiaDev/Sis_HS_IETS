@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api, { apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { useToast } from "../components/Toast";
-import { PageHeader, Card } from "../components/Card";
+import ModuleHeader from "../components/ModuleHeader";
+import PhaseGuide, { ModuleStatsRow } from "../components/PhaseGuide";
+import { Card, SectionTitle } from "../components/Card";
 import Button from "../components/Button";
 import Badge from "../components/Badge";
 import Icon from "../components/Icon";
 import Tooltip from "../components/Tooltip";
 import Modal from "../components/Modal";
-import HelpNote from "../components/HelpNote";
 import DataTable from "../components/DataTable";
 import NotesPanel from "../components/NotesPanel";
 import { ietsTag } from "../utils/iets";
@@ -46,12 +48,13 @@ export default function Sources() {
   const { isEditor } = useAuth();
   const { version } = useRealtime();
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("");
-  const [viewMode, setViewMode] = useState("table");
+  const [viewMode, setViewMode] = useState("registry");
 
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickForm, setQuickForm] = useState({ title: "", url: "" });
@@ -90,12 +93,29 @@ export default function Sources() {
       const q = search.toLowerCase();
       const okSearch =
         !q ||
-        s.title.toLowerCase().includes(q) ||
-        s.url.toLowerCase().includes(q) ||
-        s.description.toLowerCase().includes(q);
+        (s.title || "").toLowerCase().includes(q) ||
+        (s.url || "").toLowerCase().includes(q) ||
+        (s.description || "").toLowerCase().includes(q);
       return okCat && okSearch;
     });
   }, [sources, search, catFilter]);
+
+  const grouped = useMemo(() => {
+    const map = new Map();
+    filtered.forEach((s) => {
+      const cat = s.category || "Sin categoria";
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat).push(s);
+    });
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filtered]);
+
+  const stats = useMemo(() => ({
+    total: sources.length,
+    vigiladas: sources.filter((s) => s.scrape_enabled).length,
+    senales: sources.reduce((n, s) => n + (s.findings_count || 0), 0),
+    iets: sources.filter((s) => ietsTag(s.category)).length,
+  }), [sources]);
 
   const openQuick = () => {
     setQuickForm({ title: "", url: "" });
@@ -257,7 +277,7 @@ export default function Sources() {
       {
         key: "findings",
         width: 90,
-        label: "Hallazgos",
+        label: "Senales",
         render: (s) => <span style={{ fontWeight: 600 }}>{s.findings_count || 0}</span>,
       },
       {
@@ -293,9 +313,10 @@ export default function Sources() {
 
   return (
     <div>
-      <PageHeader
-        title="Listado maestro de fuentes"
-        subtitle="Inventario central de URLs y documentos vigilados. Agregue fuentes en modo rapido (nombre + URL) o avanzado (metadatos completos)."
+      <ModuleHeader
+        step="identificacion"
+        title="Inventario de fuentes"
+        purpose="Fase 1 IETS: registro maestro de URLs y documentos vigilados (NIHR IO, EuroScan, IETS y referentes internacionales)."
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Button variant="secondary" onClick={exportCsv} loading={exporting}>
@@ -315,12 +336,25 @@ export default function Sources() {
         }
       />
 
-      <HelpNote id="sources-master">
-        Este es el <strong>listado maestro</strong> de todas las fuentes del sistema. Proviene del inventario inicial
-        del IETS (Excel) y de fuentes que usted agregue. Use <strong>Agregar rapido</strong> para solo nombre + URL, o{" "}
-        <strong>Agregar avanzado</strong> para categoria, descripcion y mas opciones. Las fuentes vigiladas se incluyen
-        en el escaneo automatico.
-      </HelpNote>
+      <PhaseGuide
+        phase="Fase 1 · Inventario"
+        tasks={[
+          "Mantener el registro maestro de referentes internacionales de horizon scanning.",
+          "Clasificar por tipo (IETS, regional, Colombia, referente internacional).",
+          "Activar vigilancia en referentes que deben rastrearse periodicamente.",
+        ]}
+        nextLabel="Ejecutar vigilancia"
+        onNext={() => navigate("/vigilancia")}
+      />
+
+      <ModuleStatsRow
+        items={[
+          { label: "Referentes registrados", value: stats.total },
+          { label: "Con vigilancia activa", value: stats.vigiladas },
+          { label: "Senales acumuladas", value: stats.senales },
+          { label: "Produccion IETS", value: stats.iets, sub: "Producto o participacion" },
+        ]}
+      />
 
       <Card style={{ marginBottom: 16 }} padding={16}>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
@@ -338,10 +372,10 @@ export default function Sources() {
             ))}
           </select>
           <div style={{ display: "flex", gap: 4, background: "#F1F5F9", padding: 4, borderRadius: 8 }}>
+            <button type="button" onClick={() => setViewMode("registry")} className={`view-toggle${viewMode === "registry" ? " active" : ""}`}>Registro</button>
             <button type="button" onClick={() => setViewMode("table")} className={`view-toggle${viewMode === "table" ? " active" : ""}`}>Tabla</button>
-            <button type="button" onClick={() => setViewMode("cards")} className={`view-toggle${viewMode === "cards" ? " active" : ""}`}>Tarjetas</button>
           </div>
-          <span style={{ fontSize: 13, color: "#64748B" }}>{filtered.length} de {sources.length} fuentes</span>
+          <span style={{ fontSize: 13, color: "#64748B" }}>{filtered.length} referentes</span>
         </div>
       </Card>
 
@@ -349,41 +383,57 @@ export default function Sources() {
         <Card>
           <EmptyState icon="🌐" title="Sin fuentes" message="No hay fuentes que coincidan con el filtro." />
         </Card>
+      ) : viewMode === "registry" ? (
+        <div className="registry-groups">
+          {grouped.map(([cat, items]) => (
+            <div key={cat} className="registry-group">
+              <div className="registry-group-head">
+                <h3>{cat}</h3>
+                <Badge>{items.length} referente{items.length !== 1 ? "s" : ""}</Badge>
+              </div>
+              <div className="registry-group-grid">
+                {items.map((s) => {
+                  const tag = ietsTag(s.category);
+                  return (
+                    <Card key={s.id} padding={16} className="registry-card">
+                      <div className="registry-card-top">
+                        {s.scrape_enabled ? <Badge tone="ok">Vigilancia ON</Badge> : <Badge tone="viewer">Sin vigilar</Badge>}
+                        {tag && <Badge tone={tag.tone}>{tag.label}</Badge>}
+                      </div>
+                      <h4>{s.title}</h4>
+                      {s.url && (
+                        <a href={s.url} target="_blank" rel="noreferrer" className="registry-url">
+                          {s.url.replace(/^https?:\/\//, "").slice(0, 50)}…
+                        </a>
+                      )}
+                      <p>{s.description?.slice(0, 100) || "Sin descripcion."}</p>
+                      <div className="registry-card-stats">
+                        <span><strong>{s.findings_count || 0}</strong> senales</span>
+                        {s.language && <span>{s.language}</span>}
+                      </div>
+                      <div className="registry-card-actions">
+                        <Button size="sm" variant="ghost" onClick={() => setDetailSource(s)}>Ficha</Button>
+                        {isEditor && s.scrape_enabled && (
+                          <Button size="sm" variant="outline" loading={scanningId === s.id} onClick={() => scanOne(s)}>
+                            Rastrear
+                          </Button>
+                        )}
+                        {isEditor && (
+                          <Button size="sm" variant="ghost" onClick={() => openAdvanced(s)}>Editar</Button>
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : viewMode === "table" ? (
         <Card padding={0}>
           <DataTable columns={tableColumns} rows={filtered.map((s) => ({ key: s.id, data: s }))} minWidth={980} />
         </Card>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 16 }}>
-          {filtered.map((s) => (
-            <Card key={s.id} padding={20} style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-                <Badge>{s.category}</Badge>
-                {s.scrape_enabled ? <Badge tone="ok">Vigilada</Badge> : <Badge tone="viewer">Sin vigilar</Badge>}
-              </div>
-              <h3 style={{ fontSize: 15, fontWeight: 700 }}>{s.title}</h3>
-              {s.url && (
-                <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, marginTop: 4, wordBreak: "break-all" }}>
-                  {s.url}
-                </a>
-              )}
-              <p style={{ fontSize: 13, color: "#64748B", marginTop: 8, flex: 1 }}>{s.description?.slice(0, 120)}</p>
-              <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 8 }}>{s.findings_count || 0} hallazgos</div>
-              <div style={{ display: "flex", gap: 8, marginTop: 12, borderTop: "1px solid #F1F5F9", paddingTop: 12 }}>
-                <Button size="sm" variant="ghost" onClick={() => setDetailSource(s)}>Ver</Button>
-                {isEditor && (
-                  <>
-                    <Button size="sm" variant="outline" loading={scanningId === s.id} disabled={!s.scrape_enabled} onClick={() => scanOne(s)}>
-                      Escanear
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => openAdvanced(s)}>Editar</Button>
-                  </>
-                )}
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
+      ) : null}
 
       {/* Agregar rapido */}
       <Modal
@@ -398,9 +448,9 @@ export default function Sources() {
           </>
         }
       >
-        <HelpNote id="quick-add" tone="tip" dismissible={false}>
-          Solo necesita el <strong>nombre</strong> y la <strong>URL</strong>. La fuente queda vigilada y lista para escanear.
-        </HelpNote>
+        <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 14px" }}>
+          Solo nombre y URL. La fuente queda vigilada y lista para escanear.
+        </p>
         <Input label="Nombre del sitio / fuente" required value={quickForm.title} onChange={(e) => setQuickForm({ ...quickForm, title: e.target.value })} placeholder="Ej. NIHR Innovation Observatory" />
         <Input label="URL" required value={quickForm.url} onChange={(e) => setQuickForm({ ...quickForm, url: e.target.value })} placeholder="https://..." />
       </Modal>

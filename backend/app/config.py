@@ -32,8 +32,14 @@ class Settings(BaseSettings):
     gemini_model: str = ""
 
     # General
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:8000,http://localhost:8000"
     database_url: str = "sqlite:///./iets_horizonte.db"
+
+    # Fase 4: cola de ingesta y portal publico
+    ingest_worker_enabled: bool = True
+    ingest_worker_interval_seconds: int = 20
+    recaptcha_secret: str = ""
+    recaptcha_site_key: str = ""
 
     @property
     def cors_origins_list(self) -> list[str]:

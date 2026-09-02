@@ -1,51 +1,33 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { apiError } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { useToast } from "../components/Toast";
-import { PageHeader, Card, SectionTitle } from "../components/Card";
+import { Card, SectionTitle } from "../components/Card";
 import KPICard from "../components/KPICard";
 import Badge from "../components/Badge";
 import Button from "../components/Button";
 import Icon from "../components/Icon";
-import Accordion from "../components/Accordion";
-import ToolGuide from "../components/ToolGuide";
-import Tooltip from "../components/Tooltip";
 import { LoadingBlock } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
-import { ietsTag } from "../utils/iets";
-import {
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-  Tooltip as ChartTooltip,
-  CartesianGrid,
-} from "recharts";
-import { chartColors, horizonColors } from "../styles/theme";
+import { ScreeningScore } from "../components/TriageBoard";
+import { IETS_PHASES, SCREENING_QUEUE_THRESHOLD } from "../constants/methodology";
 
 export default function Dashboard() {
-  const [stats, setStats] = useState(null);
-  const [sources, setSources] = useState([]);
+  const [wb, setWb] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { version, updatedAt } = useRealtime();
+  const { version } = useRealtime();
+  const { isEditor } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
 
   const load = useCallback(async () => {
     try {
-      const [s, src] = await Promise.all([
-        api.get("/dashboard/stats"),
-        api.get("/sources"),
-      ]);
-      setStats(s.data);
-      setSources(src.data);
+      const { data } = await api.get("/dashboard/workbench");
+      setWb(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar las metricas"));
+      toast.error(apiError(e, "No se pudo cargar la bandeja de trabajo"));
     } finally {
       setLoading(false);
     }
@@ -56,426 +38,166 @@ export default function Dashboard() {
     load();
   }, [load, version]);
 
-  if (loading) return <LoadingBlock label="Cargando resumen..." />;
-  if (!stats) return null;
-
-  const horizonData = stats.by_horizon.map((d) => ({
-    name: d.label === "" ? "Sin clasificar" : d.label,
-    value: d.value,
-  }));
-
-  const sortedSources = [...sources].sort((a, b) => {
-    const ia = ietsTag(a.category) ? 1 : 0;
-    const ib = ietsTag(b.category) ? 1 : 0;
-    if (ia !== ib) return ib - ia;
-    return (b.findings_count || 0) - (a.findings_count || 0);
-  });
+  if (loading) return <LoadingBlock label="Cargando bandeja de trabajo..." />;
+  if (!wb) return null;
 
   return (
     <div>
-      <PageHeader
-        title="Resumen general"
-        subtitle="Panorama del escaneo de horizonte del IETS: fuentes vigiladas, tecnologias emergentes detectadas y recomendaciones de adopcion para Colombia."
-        actions={
-          <Button onClick={() => navigate("/escaneo")}>
-            <Icon name="radar" size={17} /> Ejecutar escaneo
+      <div className="bandeja-header">
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>Bandeja de trabajo</h1>
+          <p style={{ color: "#64748B", fontSize: 14, margin: 0 }}>
+            Operacion diaria del escaneo de horizonte IETS — alerta temprana de tecnologias sanitarias para Colombia.
+          </p>
+        </div>
+        {isEditor && (
+          <Button onClick={() => navigate("/vigilancia")}>
+            <Icon name="radar" size={17} /> Ejecutar vigilancia
           </Button>
-        }
-      />
-
-      {/* Hero */}
-      <div
-        style={{
-          background: "linear-gradient(135deg,#4F46E5 0%,#3B82F6 100%)",
-          borderRadius: 16,
-          padding: "26px 28px",
-          color: "#fff",
-          marginBottom: 24,
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        <div style={{ position: "relative", zIndex: 2, maxWidth: 680 }}>
-          <div style={{ fontSize: 12, letterSpacing: 1, textTransform: "uppercase", opacity: 0.85, fontWeight: 600 }}>
-            Alerta temprana de tecnologias sanitarias
-          </div>
-          <div style={{ fontSize: 22, fontWeight: 800, marginTop: 6, color: "#fff" }}>
-            {stats.total_findings > 0
-              ? `${stats.total_findings} señales en vigilancia · ${stats.findings_last_7d} nuevas esta semana`
-              : "Aún no hay hallazgos: ejecute un escaneo para poblar el sistema"}
-          </div>
-          <div style={{ fontSize: 14, opacity: 0.92, marginTop: 6 }}>
-            {stats.total_sources} fuentes internacionales monitoreadas · {stats.total_recommendations} recomendaciones de adopción para Colombia
-          </div>
-        </div>
-        <div style={{ position: "absolute", right: -30, top: -30, opacity: 0.15 }}>
-          <Icon name="radar" size={190} strokeWidth={1} color="#fff" />
-        </div>
+        )}
       </div>
 
-      <ToolGuide />
-
-      {/* Contexto: que es el escaneo de horizonte (acordeon) */}
-      <Card style={{ marginBottom: 24 }}>
-        <SectionTitle
-          right={
-            <a href="https://io.nihr.ac.uk/" target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#6366F1", fontWeight: 600 }}>
-              Referente: NIHR IO <Icon name="external" size={12} />
-            </a>
-          }
-        >
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <Icon name="book" size={18} /> Que es el escaneo de horizonte?
-          </span>
-        </SectionTitle>
-        <Accordion defaultOpen={["def"]} items={CONTEXT_ITEMS} />
-      </Card>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 16,
-          marginBottom: 24,
-        }}
-      >
-        <KPICard label="Fuentes vigiladas" value={stats.total_sources} icon={<Icon name="globe" />} accent="#6366F1" />
-        <KPICard
-          label="Hallazgos"
-          value={stats.total_findings}
-          icon={<Icon name="telescope" />}
-          accent="#3B82F6"
-          sub={`${stats.findings_last_7d} en los ultimos 7 dias`}
-        />
-        <KPICard
-          label="Recomendaciones"
-          value={stats.total_recommendations}
-          icon={<Icon name="bulb" />}
-          accent="#06B6D4"
-        />
-        <KPICard label="Escaneos realizados" value={stats.total_scrapes} icon={<Icon name="radar" />} accent="#10B981" />
+      <div className="methodology-cards" style={{ marginBottom: 24 }}>
+        {IETS_PHASES.map((phase) => (
+          <button
+            key={phase.key}
+            type="button"
+            className="methodology-card"
+            onClick={() => navigate(phase.to)}
+          >
+            <span className="methodology-card-phase">{phase.phase}</span>
+            <strong>{phase.label}</strong>
+            <span>{phase.short}</span>
+          </button>
+        ))}
       </div>
 
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1.4fr 1fr",
-          gap: 16,
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: 14,
           marginBottom: 24,
         }}
-        className="dash-grid"
       >
+        <KPICard label="En bandeja de entrada" value={wb.staging_unassigned} icon={<Icon name="inbox" />} accent="#6366F1" sub="Sin asignar a ciclo" />
+        <KPICard label="Cribado alto" value={wb.high_priority} icon={<Icon name="pulse" />} accent="#EF4444" sub={`Puntaje >${SCREENING_QUEUE_THRESHOLD}`} />
+        <KPICard label="Me toca calificar" value={wb.cycle_pending_for_me} icon={<Icon name="layers" />} accent="#3B82F6" sub={wb.my_criteria?.length ? wb.my_criteria.join(", ") : "Sin criterios asignados"} />
+        <KPICard label="Priorizadas" value={wb.cycle_prioritized} icon={<Icon name="check" />} accent="#10B981" sub="Ciclo activo" />
+        <KPICard label="Bajo vigilancia" value={wb.cycle_watchlist} icon={<Icon name="clock" />} accent="#F59E0B" sub="Monitoreo activo" />
+      </div>
+
+      {wb.active_cycle_id ? (
+        <Card style={{ marginBottom: 24 }} padding={16}>
+          <div className="cycle-banner">
+            <div>
+              <span className="cycle-banner-label">Ciclo en curso</span>
+              <strong>{wb.active_cycle_code}</strong>
+              <Badge tone={wb.active_cycle_status}>{wb.active_cycle_status_label}</Badge>
+            </div>
+            <div className="cycle-banner-meta">
+              {wb.cycle_pending_rating} tecnologia(s) sin %P completo
+            </div>
+            <Button size="sm" variant="outline" onClick={() => navigate("/ciclos")}>
+              Gestionar ciclos
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <Card style={{ marginBottom: 24, background: "#FEF3C7", borderColor: "#FDE68A" }} padding={16}>
+          <div className="cycle-banner">
+            <div style={{ fontSize: 14, color: "#92400E" }}>
+              <strong>No hay ciclo operativo abierto.</strong> La priorizacion oficial P1 a P6
+              requiere un ciclo activo.
+            </div>
+            <Button size="sm" onClick={() => navigate("/ciclos")}>
+              Crear ciclo
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 16 }} className="dash-grid">
         <Card>
           <SectionTitle
             right={
-              updatedAt && (
-                <span className="chart-live-badge" title="Grafica sincronizada en tiempo real">
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981" }} />
-                  En vivo
-                </span>
-              )
+              <Button size="sm" variant="ghost" onClick={() => navigate("/priorizacion")}>
+                Abrir priorizacion
+              </Button>
             }
           >
-            Hallazgos por horizonte temporal
+            Cola de trabajo
           </SectionTitle>
-          {horizonData.some((d) => d.value > 0) ? (
-            <ResponsiveContainer width="100%" height={280} key={`horizon-${version}`}>
-              <BarChart data={horizonData} margin={{ top: 10, right: 10, left: -12, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#64748B" }} />
-                <YAxis tick={{ fontSize: 12, fill: "#64748B" }} allowDecimals={false} />
-                <ChartTooltip contentStyle={{ borderRadius: 8, border: "1px solid #E2E8F0", fontSize: 13 }} />
-                <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                  {horizonData.map((d, i) => (
-                    <Cell key={i} fill={horizonColors[d.name.toLowerCase()] || chartColors[i % chartColors.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState icon="📉" message="Aun no hay hallazgos. Ejecute un escaneo para poblar los datos." />
-          )}
-        </Card>
-
-        <Card>
-          <SectionTitle>Tipo de tecnologia</SectionTitle>
-          {stats.by_technology_type.some((d) => d.value > 0) ? (
-            <ResponsiveContainer width="100%" height={280} key={`type-${version}`}>
-              <PieChart>
-                <Pie
-                  data={stats.by_technology_type.map((d) => ({
-                    name: d.label || "Otro",
-                    value: d.value,
-                  }))}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={90}
-                  innerRadius={50}
-                  paddingAngle={2}
-                  label={(e) => e.name}
-                  labelLine={false}
-                >
-                  {stats.by_technology_type.map((_, i) => (
-                    <Cell key={i} fill={chartColors[i % chartColors.length]} />
-                  ))}
-                </Pie>
-                <ChartTooltip contentStyle={{ borderRadius: 8, border: "1px solid #E2E8F0", fontSize: 13 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState icon="🥧" message="Sin datos de tipo de tecnologia." />
-          )}
-        </Card>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16 }} className="dash-grid">
-        <Card>
-          <SectionTitle right={<Button size="sm" variant="ghost" onClick={() => navigate("/hallazgos")}>Ver todos</Button>}>
-            Hallazgos recientes
-          </SectionTitle>
-          {stats.recent_findings.length ? (
+          {wb.queue.length ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {stats.recent_findings.map((f) => {
-                const tag = ietsTag(f.source_category);
-                return (
-                  <div
-                    key={f.id}
-                    style={{
-                      padding: "12px 14px",
-                      border: "1px solid #E2E8F0",
-                      borderRadius: 10,
-                      transition: "background 150ms",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "#F8FAFC")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#0F172A" }}>{f.title}</div>
-                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                        {f.horizon && <Badge>{f.horizon}</Badge>}
-                        <Badge>{f.technology_type}</Badge>
-                      </div>
-                    </div>
-                    {/* Fuente de origen del hallazgo */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "#64748B" }}>
-                        <Icon name="globe" size={13} color="#94A3B8" />
-                        {f.source_url ? (
-                          <a
-                            href={f.source_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{ color: "#4F46E5", fontWeight: 500 }}
-                            title={`Abrir fuente: ${f.source_title}`}
-                          >
-                            {f.source_title}
-                          </a>
-                        ) : (
-                          <span>{f.source_title}</span>
-                        )}
-                      </span>
-                      {tag && (
-                        <Tooltip text="Este hallazgo proviene de una fuente producida por el IETS.">
-                          <Badge tone={tag.tone}>{tag.label}</Badge>
-                        </Tooltip>
-                      )}
-                    </div>
+              {wb.queue.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  className="queue-item"
+                  onClick={() => navigate("/bandeja-entrada")}
+                >
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                    <ScreeningScore score={f.screening_score} compact />
+                    <Badge tone={f.status}>{f.status}</Badge>
+                    {f.horizon && <Badge>{f.horizon}</Badge>}
                   </div>
-                );
-              })}
+                  <div style={{ fontWeight: 600, fontSize: 14, textAlign: "left", color: "#0F172A" }}>{f.title}</div>
+                  <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 4, textAlign: "left" }}>{f.source_title}</div>
+                </button>
+              ))}
             </div>
           ) : (
-            <EmptyState icon="🔭" message="Aun no hay hallazgos registrados." />
+            <EmptyState
+              icon="✅"
+              title="Cola vacia"
+              message="No hay senales pendientes. Ejecute la vigilancia de fuentes para detectar tecnologias emergentes."
+              action={
+                isEditor ? (
+                  <Button onClick={() => navigate("/vigilancia")}>
+                    <Icon name="radar" size={16} /> Fase 1 · Vigilancia
+                  </Button>
+                ) : null
+              }
+            />
           )}
         </Card>
 
         <Card>
-          <SectionTitle>Ultimo escaneo</SectionTitle>
-          {stats.last_scan ? (
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <Badge tone={stats.last_scan.status}>{stats.last_scan.status}</Badge>
-                <span style={{ fontSize: 13, color: "#64748B" }}>
-                  {new Date(stats.last_scan.started_at).toLocaleString()}
-                </span>
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{stats.last_scan.source_title || "Escaneo general"}</div>
-              <p style={{ fontSize: 13, color: "#64748B", marginTop: 6 }}>{stats.last_scan.message}</p>
-              <div style={{ display: "flex", gap: 16, marginTop: 16 }}>
-                <div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: "#3B82F6" }}>
-                    {stats.last_scan.items_found}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase" }}>Detectados</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: "#10B981" }}>
-                    {stats.last_scan.items_new}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "uppercase" }}>Nuevos</div>
-                </div>
-              </div>
+          <SectionTitle>Estado de vigilancia</SectionTitle>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="stat-row">
+              <span>Fuentes vigiladas</span>
+              <strong>{wb.sources_enabled}</strong>
             </div>
-          ) : (
-            <EmptyState icon="🛰️" message="No se ha ejecutado ningun escaneo todavia." />
-          )}
+            <div className="stat-row">
+              <span>Senales ultimos 7 dias</span>
+              <strong>{wb.findings_last_7d}</strong>
+            </div>
+            <div className="stat-row">
+              <span>Priorizadas</span>
+              <strong>{wb.prioritized}</strong>
+            </div>
+            {wb.last_scan ? (
+              <div style={{ marginTop: 8, padding: 12, background: "#F8FAFC", borderRadius: 10, fontSize: 13 }}>
+                <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                  <Badge tone={wb.last_scan.status}>{wb.last_scan.status}</Badge>
+                  <span style={{ color: "#94A3B8" }}>{new Date(wb.last_scan.started_at).toLocaleString()}</span>
+                </div>
+                <div>{wb.last_scan.message}</div>
+                <div style={{ marginTop: 8, color: "#64748B" }}>
+                  {wb.last_scan.items_new} nuevas · {wb.last_scan.items_found} detectadas
+                </div>
+              </div>
+            ) : (
+              <EmptyState icon="🛰️" message="Aun no hay escaneos registrados." />
+            )}
+            <Button variant="secondary" onClick={() => navigate("/vigilancia")} style={{ marginTop: 4 }}>
+              Ir a vigilancia de fuentes
+            </Button>
+          </div>
         </Card>
       </div>
-
-      {/* Listado de fuentes vigiladas */}
-      <Card style={{ marginTop: 24 }}>
-        <SectionTitle
-          right={
-            <Button size="sm" variant="ghost" onClick={() => navigate("/fuentes")}>
-              Gestionar fuentes
-            </Button>
-          }
-        >
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <Icon name="globe" size={18} /> Fuentes vigiladas ({sources.length})
-          </span>
-        </SectionTitle>
-        {sources.length ? (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-              gap: 10,
-            }}
-          >
-            {sortedSources.map((s) => {
-              const tag = ietsTag(s.category);
-              return (
-                <div
-                  key={s.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "10px 12px",
-                    border: "1px solid #E2E8F0",
-                    borderRadius: 9,
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: 7,
-                      background: "#EEF2FF",
-                      color: "#4F46E5",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Icon name="doc" size={15} />
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: "#0F172A",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                      title={s.title}
-                    >
-                      {s.url ? (
-                        <a
-                          href={s.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ color: "#0F172A" }}
-                        >
-                          {s.title}
-                        </a>
-                      ) : (
-                        s.title
-                      )}
-                    </div>
-                    <div style={{ fontSize: 11.5, color: "#94A3B8", marginTop: 2 }}>
-                      {s.findings_count} hallazgos · {s.category || "Sin categoria"}
-                    </div>
-                  </div>
-                  {tag && (
-                    <Tooltip text="Fuente producida por el IETS.">
-                      <Badge tone={tag.tone}>{tag.label}</Badge>
-                    </Tooltip>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <EmptyState icon="🌐" message="No hay fuentes registradas." />
-        )}
-      </Card>
     </div>
   );
 }
-
-const CONTEXT_ITEMS = [
-  {
-    id: "def",
-    icon: "compass",
-    title: "Definicion",
-    content: (
-      <p style={{ margin: 0 }}>
-        El <b>escaneo de horizonte</b> (horizon scanning) es un metodo sistematico de{" "}
-        <b>alerta temprana</b> que busca, identifica y analiza senales de tecnologias sanitarias
-        emergentes y nuevas (medicamentos, dispositivos, diagnosticos y salud digital)
-        <b> antes</b> de su entrada al mercado o su adopcion masiva. Permite a los decisores
-        anticiparse a los cambios, planificar recursos y preparar la evaluacion de tecnologias
-        (ETS) con la debida antelacion.
-      </p>
-    ),
-  },
-  {
-    id: "fases",
-    icon: "layers",
-    title: "Fases del proceso (metodologia IETS)",
-    content: (
-      <ol style={{ margin: 0, paddingLeft: 18 }}>
-        <li><b>Identificacion:</b> rastreo de fuentes y captura de senales tecnologicas.</li>
-        <li><b>Priorizacion:</b> filtrado y puntuacion segun impacto potencial (umbral &gt; 70%).</li>
-        <li><b>Descripcion / caracterizacion:</b> analisis de la tecnologia y su evidencia.</li>
-        <li><b>Diseminacion:</b> reportes y alertas a los grupos de interes por cluster tematico.</li>
-      </ol>
-    ),
-  },
-  {
-    id: "horizontes",
-    icon: "clock",
-    title: "Horizontes temporales",
-    content: (
-      <ul style={{ margin: 0, paddingLeft: 18 }}>
-        <li><b>Emergente:</b> tecnologia en fases muy tempranas (preclinica / fase I).</li>
-        <li><b>Transicional:</b> en desarrollo clinico o evaluacion (fase II/III, ensayos).</li>
-        <li><b>Inminente:</b> proxima a autorizacion o lanzamiento (aprobacion regulatoria, NICE/EMA/FDA).</li>
-      </ul>
-    ),
-  },
-  {
-    id: "porque",
-    icon: "bulb",
-    title: "Por que es importante para Colombia",
-    content: (
-      <p style={{ margin: 0 }}>
-        Anticipar las tecnologias emergentes le permite al <b>IETS</b> y al sistema de salud
-        colombiano planificar la <b>evaluacion de tecnologias</b>, dialogar tempranamente con
-        desarrolladores, estimar el <b>impacto presupuestal</b> y de equidad, y orientar las
-        decisiones de cobertura (rol de INVIMA y de la ruta de ETS). Este sistema integra
-        referentes internacionales (NIHR IO, IHSI, EuroScan, RedETS, entre otros) con el contexto local.
-      </p>
-    ),
-  },
-];

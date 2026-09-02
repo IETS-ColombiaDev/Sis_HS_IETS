@@ -22,6 +22,8 @@ def _to_out(db: Session, source: Source) -> SourceOut:
     count = db.query(func.count(Finding.id)).filter(Finding.source_id == source.id).scalar() or 0
     out = SourceOut.model_validate(source)
     out.findings_count = int(count)
+    if out.connector_config is None:
+        out.connector_config = {}
     return out
 
 

@@ -4,11 +4,12 @@ import api, { apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { useToast } from "../components/Toast";
-import { PageHeader, Card } from "../components/Card";
+import ModuleHeader from "../components/ModuleHeader";
+import PhaseGuide from "../components/PhaseGuide";
+import { Card } from "../components/Card";
 import Button from "../components/Button";
 import Badge from "../components/Badge";
 import DataTable from "../components/DataTable";
-import HelpNote from "../components/HelpNote";
 import Icon from "../components/Icon";
 import Modal from "../components/Modal";
 import { Textarea } from "../components/Field";
@@ -19,9 +20,9 @@ import { ENTITY_LABELS } from "../components/NotesPanel";
 
 const FILTERS = [
   { value: "", label: "Todas" },
-  { value: "finding", label: "Hallazgos" },
-  { value: "source", label: "Fuentes" },
-  { value: "recommendation", label: "Recomendaciones" },
+  { value: "finding", label: "Senales tecnologicas" },
+  { value: "source", label: "Referentes" },
+  { value: "recommendation", label: "Informes" },
   { value: "general", label: "Generales" },
 ];
 
@@ -92,9 +93,9 @@ export default function Notes() {
   };
 
   const entityLink = (n) => {
-    if (n.entity_type === "finding" && n.entity_id) return `/hallazgos`;
+    if (n.entity_type === "finding" && n.entity_id) return `/priorizacion`;
     if (n.entity_type === "source" && n.entity_id) return `/fuentes`;
-    if (n.entity_type === "recommendation" && n.entity_id) return `/recomendaciones`;
+    if (n.entity_type === "recommendation" && n.entity_id) return `/diseminacion`;
     return null;
   };
 
@@ -153,9 +154,10 @@ export default function Notes() {
 
   return (
     <div>
-      <PageHeader
+      <ModuleHeader
+        step="diseminacion"
         title="Notas del equipo"
-        subtitle="Observaciones, seguimientos y decisiones documentadas por el equipo de escaneo de horizonte."
+        purpose="Documentacion colaborativa vinculada a senales, fuentes e informes de diseminacion."
         actions={
           <div style={{ display: "flex", gap: 8 }}>
             <Button variant="secondary" onClick={exportNotes} loading={exporting}>
@@ -170,11 +172,14 @@ export default function Notes() {
         }
       />
 
-      <HelpNote id="notes-intro">
-        Las <strong>notas</strong> documentan observaciones del equipo. Puede <strong>comentar</strong>,{" "}
-        <strong>editar</strong>, <strong>fijar</strong> (📌), <strong>descargar</strong> (CSV o nota individual) y{" "}
-        <strong>mejorar con IA</strong> (si Gemini esta configurado). Todos leen; editores y admins crean y modifican.
-      </HelpNote>
+      <PhaseGuide
+        phase="Soporte a diseminacion"
+        tasks={[
+          "Registrar observaciones del equipo sobre senales e informes.",
+          "Documentar decisiones de comite y seguimiento regulatorio (INVIMA, ETS).",
+          "Vincular notas a la entidad correspondiente del pipeline.",
+        ]}
+      />
 
       <Card style={{ marginBottom: 16 }} padding={16}>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
@@ -200,6 +205,13 @@ export default function Notes() {
             icon="📝"
             title="Sin notas"
             message={isEditor ? "Cree la primera nota para documentar observaciones del equipo." : "Aun no hay notas registradas."}
+            action={
+              isEditor ? (
+                <Button onClick={() => setCreateOpen(true)}>
+                  <Icon name="plus" size={16} /> Nueva nota
+                </Button>
+              ) : null
+            }
           />
         </Card>
       ) : (

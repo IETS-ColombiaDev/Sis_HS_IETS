@@ -508,4 +508,101 @@ EXTRA_SOURCES: list[dict] = [
 
 
 def all_seed_sources() -> list[dict]:
-    return INVENTORY_SOURCES + EXTRA_SOURCES
+    return INVENTORY_SOURCES + EXTRA_SOURCES + API_SOURCES
+
+
+# Referentes con API estructurada (fase 4). Se insertan tambien sobre bases
+# ya pobladas, por URL, para no depender de vaciar el inventario.
+API_SOURCES: list[dict] = [
+    {
+        "title": "ClinicalTrials.gov — API REST v2",
+        "url": "https://clinicaltrials.gov/api/v2/studies",
+        "category": CAT_REFERENTE,
+        "authors": "U.S. National Library of Medicine (NIH)",
+        "year": "2026",
+        "description": (
+            "Registro de ensayos clinicos. El conector filtra fases II, III y IV y extrae "
+            "fecha estimada de finalizacion, patrocinador e intervencion."
+        ),
+        "relation_iets": "Referente global - insumo de time-to-market y de P5/P6",
+        "language": "Ingles",
+        "resource_type": "API REST",
+        "link_status": "Activo",
+        "tags": "ClinicalTrials,API,ensayos,fase III",
+        "connector": "clinicaltrials",
+        "connector_config": {"page_size": 40},
+        "scan_interval_hours": 12,
+        "scrape_enabled": True,
+    },
+    {
+        "title": "FDA Drugs@FDA (openFDA)",
+        "url": "https://api.fda.gov/drug/drugsfda.json",
+        "category": CAT_REFERENTE,
+        "authors": "U.S. Food and Drug Administration",
+        "year": "2026",
+        "description": "Aprobaciones de medicamentos. Extrae titular, principio activo y fecha.",
+        "relation_iets": "Referente regulatorio - pre-llenado de P5",
+        "language": "Ingles",
+        "resource_type": "API REST",
+        "link_status": "Activo",
+        "tags": "FDA,openFDA,aprobaciones",
+        "connector": "fda",
+        "connector_config": {"page_size": 40},
+        "scan_interval_hours": 24,
+        "scrape_enabled": True,
+    },
+    {
+        "title": "EMA — canal RSS de medicamentos humanos",
+        "url": "https://www.ema.europa.eu/en/rss.xml",
+        "category": CAT_REFERENTE,
+        "authors": "European Medicines Agency",
+        "year": "2026",
+        "description": "Highlights y opiniones del CHMP. No hay REST oficial; se consume el RSS.",
+        "relation_iets": "Referente regulatorio - pre-llenado de P5/P6",
+        "language": "Ingles",
+        "resource_type": "RSS",
+        "link_status": "Activo",
+        "tags": "EMA,RSS,CHMP",
+        "connector": "ema",
+        "connector_config": {"page_size": 25},
+        "scan_interval_hours": 24,
+        "scrape_enabled": True,
+    },
+    {
+        "title": "PubMed E-Utilities",
+        "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+        "category": CAT_REFERENTE,
+        "authors": "NCBI / National Library of Medicine",
+        "year": "2026",
+        "description": "Literatura de tecnologias emergentes y horizon scanning, como evidencia.",
+        "relation_iets": "Fuente complementaria de evidencia clinica",
+        "language": "Ingles",
+        "resource_type": "API REST",
+        "link_status": "Activo",
+        "tags": "PubMed,evidencia,NCBI",
+        "connector": "pubmed",
+        "connector_config": {"page_size": 20},
+        "scan_interval_hours": 24,
+        "scrape_enabled": True,
+    },
+    {
+        "title": "WHO ICTRP (espejo / lote)",
+        "url": "https://trialsearch.who.int/",
+        "category": CAT_REFERENTE,
+        "authors": "World Health Organization",
+        "year": "2026",
+        "description": (
+            "Registro internacional de ensayos. El portal no garantiza REST: el conector "
+            "acepta un espejo JSON o un lote descargado (ruta de contingencia)."
+        ),
+        "relation_iets": "Referente global - cobertura fuera de ClinicalTrials.gov",
+        "language": "Ingles",
+        "resource_type": "Portal / lote",
+        "link_status": "Activo (API no garantizada)",
+        "tags": "OMS,ICTRP,ensayos",
+        "connector": "who_ictrp",
+        "connector_config": {},
+        "scan_interval_hours": 48,
+        "scrape_enabled": False,
+    },
+]

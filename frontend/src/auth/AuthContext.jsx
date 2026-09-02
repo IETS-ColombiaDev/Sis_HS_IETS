@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import api, { setToken, getToken, setUnauthorizedHandler } from "../api/client";
 
 const AuthContext = createContext(null);
@@ -59,6 +59,9 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
+  const permissions = useMemo(() => new Set(user?.permissions || []), [user]);
+  const can = useCallback((permission) => permissions.has(permission), [permissions]);
+
   const value = {
     user,
     status,
@@ -67,8 +70,13 @@ export function AuthProvider({ children }) {
     loginDev,
     logout,
     refreshStatus: loadStatus,
-    isEditor: user && (user.role === "editor" || user.role === "admin"),
-    isAdmin: user && user.role === "admin",
+    can,
+    permissions,
+    /** Criterios P1 a P6 que este perfil puede calificar. */
+    rateableCriteria: user?.rateable_criteria || [],
+    // Compatibilidad: se derivan de la matriz de permisos, no del nombre del rol.
+    isEditor: can("technology:write"),
+    isAdmin: can("user:manage"),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

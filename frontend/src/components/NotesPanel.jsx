@@ -28,6 +28,7 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
   const [enhancingId, setEnhancingId] = useState(null);
 

@@ -9,10 +9,24 @@ from .. import gemini_service
 from ..database import get_db
 from ..deps import get_current_user, require_role
 from ..events import bump_state_version
-from ..models import Finding, Note, Recommendation, Source, User
+from ..models import Finding, Note, Recommendation, Source, Technology, User
+from ..priority import compute_screening_score
 from ..schemas import FindingCreate, FindingOut, FindingUpdate
+from ..technology_service import sync_technology_from_finding
 
 router = APIRouter(prefix="/api/findings", tags=["findings"])
+
+
+def _apply_screening(finding: Finding) -> None:
+    finding.screening_score = compute_screening_score(
+        horizon=finding.horizon,
+        technology_type=finding.technology_type,
+        phase=finding.phase,
+        therapeutic_area=finding.therapeutic_area,
+        summary=finding.summary,
+        technology=finding.technology,
+        title=finding.title,
+    )
 
 
 def _to_out(db: Session, finding: Finding) -> FindingOut:
@@ -20,6 +34,10 @@ def _to_out(db: Session, finding: Finding) -> FindingOut:
     out.source_title = finding.source.title if finding.source else ""
     out.source_category = finding.source.category if finding.source else ""
     out.source_url = finding.source.url if finding.source else ""
+    tech_id = (
+        db.query(Technology.id).filter(Technology.finding_id == finding.id).scalar()
+    )
+    out.technology_id = tech_id
     out.recommendations_count = (
         db.query(func.count(Recommendation.id))
         .filter(Recommendation.finding_id == finding.id)
@@ -87,9 +105,11 @@ def create_finding(
     data = payload.model_dump()
     content_hash = _hash(data["title"], data.get("url", ""))
     finding = Finding(content_hash=content_hash, **data)
+    _apply_screening(finding)
     db.add(finding)
     db.commit()
     db.refresh(finding)
+    sync_technology_from_finding(db, finding, captured_by=user.email, commit=True)
     bump_state_version(db)
     return _to_out(db, finding)
 
@@ -106,8 +126,10 @@ def update_finding(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hallazgo no encontrado")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(finding, key, value)
+    _apply_screening(finding)
     db.commit()
     db.refresh(finding)
+    sync_technology_from_finding(db, finding, captured_by=user.email, commit=True)
     bump_state_version(db)
     return _to_out(db, finding)
 
@@ -131,8 +153,10 @@ def enhance_finding_ai(
         val = updates.get(key)
         if val is not None and str(val).strip():
             setattr(finding, key, str(val)[:1000] if key == "summary" else str(val)[:390])
+    _apply_screening(finding)
     db.commit()
     db.refresh(finding)
+    sync_technology_from_finding(db, finding, captured_by=user.email, commit=True)
     bump_state_version(db)
     return _to_out(db, finding)
 

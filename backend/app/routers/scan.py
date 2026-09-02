@@ -1,4 +1,9 @@
-"""Ejecucion del escaneo (web scraping) y consulta de su historial."""
+"""Ejecucion del escaneo y consulta de su historial.
+
+La extraccion ya no corre en el hilo de la peticion: se encola un job por
+fuente y el worker lo atiende. `/source/{id}` sigue esperando ese job para no
+romper el boton de una sola fuente en la interfaz.
+"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -6,10 +11,11 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import get_current_user, require_role
-from ..events import bump_state_version
-from ..models import ScrapeLog, Source, User
+from ..ingest_service import enqueue, run_job
+from ..models import IngestJob, ScrapeLog, Source, User
 from ..schemas import LinkPreviewIn, LinkPreviewOut, ScanRequest, ScanResult, ScrapeLogOut
-from ..scraper import preview_url, scrape_source
+from ..scraper import preview_url
+from ..worker import kick
 
 router = APIRouter(prefix="/api/scan", tags=["scan"])
 
@@ -18,6 +24,21 @@ def _log_to_out(log: ScrapeLog) -> ScrapeLogOut:
     out = ScrapeLogOut.model_validate(log)
     out.source_title = log.source.title if log.source else ""
     return out
+
+
+def _job_as_log(job: IngestJob, source: Source | None) -> ScrapeLogOut:
+    return ScrapeLogOut(
+        id=job.id,
+        source_id=job.source_id,
+        source_title=source.title if source else "",
+        status=job.status,
+        items_found=job.items_found,
+        items_new=job.items_new,
+        message=job.message or f"Encolado ({job.connector})",
+        triggered_by=job.triggered_by,
+        started_at=job.started_at or job.created_at,
+        finished_at=job.finished_at,
+    )
 
 
 @router.post("/run", response_model=ScanResult)
@@ -36,17 +57,11 @@ def run_scan(
             detail="No hay fuentes habilitadas para escanear.",
         )
 
-    logs: list[ScrapeLogOut] = []
-    total_new = 0
-    total_found = 0
-    for source in sources:
-        log = scrape_source(db, source, triggered_by=user.email)
-        logs.append(_log_to_out(log))
-        total_new += log.items_new
-        total_found += log.items_found
-
-    bump_state_version(db)
-    return ScanResult(logs=logs, total_new=total_new, total_found=total_found)
+    jobs = enqueue(db, sources, triggered_by=user.email, origin="manual")
+    kick()
+    by_id = {s.id: s for s in sources}
+    logs = [_job_as_log(j, by_id.get(j.source_id)) for j in jobs]
+    return ScanResult(logs=logs, total_new=0, total_found=0)
 
 
 @router.post("/source/{source_id}", response_model=ScrapeLogOut)
@@ -58,9 +73,9 @@ def run_scan_source(
     source = db.get(Source, source_id)
     if not source:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fuente no encontrada")
-    log = scrape_source(db, source, triggered_by=user.email)
-    bump_state_version(db)
-    return _log_to_out(log)
+    jobs = enqueue(db, [source], triggered_by=user.email, origin="manual")
+    job = run_job(db, jobs[0].id)
+    return _job_as_log(job, source)
 
 
 @router.post("/preview", response_model=LinkPreviewOut)
