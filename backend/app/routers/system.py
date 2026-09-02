@@ -25,6 +25,7 @@ def system_status():
         dev_login_enabled=settings.allow_dev_login,
         allowed_domain=settings.allowed_email_domain,
         version=__version__,
+        recaptcha_site_key=settings.recaptcha_site_key,
     )
 
 

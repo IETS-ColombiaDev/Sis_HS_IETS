@@ -1,30 +1,40 @@
 import { useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { useCycle } from "../cycle/CycleContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import Icon from "./Icon";
 import Tooltip from "./Tooltip";
 import SafeAvatar from "./SafeAvatar";
 
 const NAV = [
-  { section: "Panel" },
-  { to: "/", label: "Resumen", icon: "home", end: true },
-  { to: "/dashboards", label: "Dashboards", icon: "chart" },
-  { section: "Escaneo de horizonte" },
-  { to: "/fuentes", label: "Listado de fuentes", icon: "globe" },
-  { to: "/hallazgos", label: "Hallazgos", icon: "telescope" },
-  { to: "/escaneo", label: "Escaneo web", icon: "radar" },
-  { to: "/notas", label: "Notas", icon: "note" },
-  { section: "Inteligencia" },
-  { to: "/recomendaciones", label: "Recomendaciones", icon: "bulb" },
+  { section: "Operacion diaria" },
+  { to: "/", label: "Bandeja de trabajo", icon: "home", end: true },
+  { to: "/ciclos", label: "Ciclos de escaneo", icon: "calendar" },
+  { section: "Metodologia IETS" },
+  { to: "/vigilancia", label: "1. Vigilancia", icon: "radar" },
+  { to: "/fuentes", label: "Inventario de fuentes", icon: "globe" },
+  { to: "/bandeja-entrada", label: "Bandeja de entrada", icon: "inbox" },
+  { to: "/postulaciones", label: "Postulaciones", icon: "note" },
+  { to: "/filtrado", label: "Filtrado y depuracion", icon: "filter" },
+  { to: "/priorizacion", label: "2. Priorizacion", icon: "layers" },
+  { to: "/evaluacion", label: "3. Evaluacion", icon: "doc" },
+  { to: "/diseminacion", label: "4. Diseminacion", icon: "bulb" },
+  { to: "/boletines", label: "Boletines del ciclo", icon: "doc" },
+  { to: "/notas", label: "Notas del equipo", icon: "note" },
+  { section: "Analisis y alertas" },
+  { to: "/dashboards", label: "Tablero estrategico", icon: "chart" },
+  { to: "/alertas", label: "Alertas tempranas", icon: "pulse" },
+  { to: "/senales", label: "Senales capturadas", icon: "list" },
   { to: "/chat", label: "Asistente IA", icon: "chat" },
-  { section: "Administracion", admin: true },
-  { to: "/usuarios", label: "Usuarios", icon: "users", admin: true },
-  { to: "/configuracion", label: "Configuracion", icon: "cog", admin: true },
+  { section: "Administracion", permission: "config:manage" },
+  { to: "/auditoria", label: "Bitacora de auditoria", icon: "shield", permission: "audit:read" },
+  { to: "/configuracion", label: "Configuracion", icon: "cog", permission: "config:manage" },
+  { to: "/usuarios", label: "Usuarios y perfiles", icon: "users", permission: "user:manage" },
 ];
 
 function Sidebar({ open, onClose }) {
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
   return (
     <>
       {open && (
@@ -96,7 +106,7 @@ function Sidebar({ open, onClose }) {
         <nav style={{ flex: 1, overflowY: "auto", padding: "14px 12px" }}>
           {NAV.map((item, i) => {
             if (item.section) {
-              if (item.admin && !isAdmin) return null;
+              if (item.permission && !can(item.permission)) return null;
               return (
                 <div
                   key={`s-${i}`}
@@ -113,7 +123,7 @@ function Sidebar({ open, onClose }) {
                 </div>
               );
             }
-            if (item.admin && !isAdmin) return null;
+            if (item.permission && !can(item.permission)) return null;
             return (
               <NavLink
                 key={item.to}
@@ -213,6 +223,49 @@ function GeminiPill({ enabled, model, isAdmin }) {
   );
 }
 
+/** Selector del ciclo operativo activo. El ciclo contextualiza todo el trabajo. */
+function CycleSelector() {
+  const { cycles, cycleId, setCycleId, cycle } = useCycle();
+  const navigate = useNavigate();
+
+  if (cycles.length === 0) {
+    return (
+      <Tooltip text="Aun no hay ciclos operativos. La priorizacion requiere uno.">
+        <button className="cycle-pill cycle-pill-empty" onClick={() => navigate("/ciclos")}>
+          <Icon name="calendar" size={15} />
+          Sin ciclo activo
+        </button>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Tooltip
+      text={
+        cycle
+          ? `Ciclo en pantalla: ${cycle.code} (${cycle.status_label}). Toda la priorizacion y la caracterizacion se leen en este contexto.`
+          : "Seleccione el ciclo operativo de trabajo."
+      }
+    >
+      <div className="cycle-pill">
+        <Icon name="calendar" size={15} />
+        <select
+          value={cycleId || ""}
+          onChange={(e) => setCycleId(Number(e.target.value))}
+          aria-label="Ciclo operativo"
+        >
+          {cycles.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.code}
+              {c.is_historic ? " (historico)" : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+    </Tooltip>
+  );
+}
+
 function Header({ onToggle }) {
   const { user, logout, status, isAdmin } = useAuth();
   const { updatedAt } = useRealtime();
@@ -220,16 +273,25 @@ function Header({ onToggle }) {
   const location = useLocation();
 
   const titles = {
-    "/": "Resumen general",
-    "/dashboards": "Dashboards",
-    "/fuentes": "Listado maestro de fuentes",
-    "/hallazgos": "Hallazgos de escaneo",
-    "/escaneo": "Escaneo web",
-    "/notas": "Notas del equipo",
-    "/recomendaciones": "Recomendaciones de adopcion",
+    "/": "Bandeja de trabajo",
+    "/ciclos": "Ciclos de escaneo",
+    "/dashboards": "Indicadores",
+    "/vigilancia": "Vigilancia",
+    "/escaneo": "Vigilancia",
+    "/fuentes": "Inventario de fuentes",
+    "/bandeja-entrada": "Bandeja de entrada",
+    "/filtrado": "Filtrado y depuracion",
+    "/senales": "Senales capturadas",
+    "/priorizacion": "Priorizacion",
+    "/hallazgos": "Senales capturadas",
+    "/caracterizacion": "Caracterizacion",
+    "/diseminacion": "Diseminacion",
+    "/recomendaciones": "Diseminacion",
+    "/notas": "Notas",
     "/chat": "Asistente IA",
-    "/usuarios": "Gestion de usuarios",
-    "/configuracion": "Configuracion del sistema",
+    "/auditoria": "Bitacora de auditoria",
+    "/usuarios": "Usuarios y perfiles",
+    "/configuracion": "Configuracion",
   };
 
   return (
@@ -268,36 +330,13 @@ function Header({ onToggle }) {
         <h2 style={{ fontSize: 20, fontWeight: 700 }}>{titles[location.pathname] || "IETS"}</h2>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <Tooltip
-          text={`Datos en tiempo real y compartidos: cualquier cambio (escaneos, hallazgos, recomendaciones) es visible al instante para todos los usuarios.${updatedAt ? ` Ultima actualizacion: ${new Date(updatedAt).toLocaleString()}.` : ""}`}
-        >
-          <div
-            className="realtime-pill"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 7,
-              fontSize: 12,
-              fontWeight: 600,
-              color: "#065F46",
-              background: "#ECFDF5",
-              border: "1px solid #A7F3D0",
-              padding: "5px 12px",
-              borderRadius: 9999,
-              cursor: "help",
-            }}
-          >
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: "#10B981",
-                animation: "pulse 2s infinite",
-              }}
-            />
-            En vivo
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <CycleSelector />
+
+        <Tooltip text={`Sincronizacion en tiempo real.${updatedAt ? ` Ultima: ${new Date(updatedAt).toLocaleTimeString()}.` : ""}`}>
+          <div className="header-status" title="En vivo">
+            <span className="header-status-dot" />
+            <span className="header-status-label">En vivo</span>
           </div>
         </Tooltip>
 

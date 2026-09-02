@@ -1,115 +1,203 @@
 import { useCallback, useEffect, useState } from "react";
-import api, { apiError } from "../api/client";
-import { useRealtime } from "../realtime/RealtimeContext";
-import { useToast } from "../components/Toast";
-import { PageHeader, Card, SectionTitle } from "../components/Card";
-import { LoadingBlock } from "../components/Spinner";
-import EmptyState from "../components/EmptyState";
-import HelpNote from "../components/HelpNote";
-import Button from "../components/Button";
 import {
-  BarChart,
   Bar,
-  PieChart,
-  Pie,
+  BarChart,
+  CartesianGrid,
   Cell,
+  Legend,
   ResponsiveContainer,
+  Scatter,
+  ScatterChart,
+  Tooltip,
   XAxis,
   YAxis,
-  Tooltip,
-  Legend,
-  CartesianGrid,
 } from "recharts";
-import { chartColors, horizonColors } from "../styles/theme";
+import api, { apiError } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
+import { useCycle } from "../cycle/CycleContext";
+import { useRealtime } from "../realtime/RealtimeContext";
+import { useToast } from "../components/Toast";
+import { Card, SectionTitle } from "../components/Card";
+import { LoadingBlock } from "../components/Spinner";
+import EmptyState from "../components/EmptyState";
+import Button from "../components/Button";
+import { Select } from "../components/Field";
+import ModuleHeader from "../components/ModuleHeader";
+import { chartColors } from "../styles/theme";
+import { PERM } from "../constants/methodology";
 
-function ChartCard({ title, hasData, children }) {
+const tooltipStyle = { borderRadius: 8, border: "1px solid #E2E8F0", fontSize: 13, background: "#fff" };
+
+function ChartCard({ title, hasData, empty, children }) {
   return (
     <Card>
       <SectionTitle>{title}</SectionTitle>
-      {hasData ? children : <EmptyState icon="📊" message="Sin datos para graficar todavia." />}
+      {hasData ? children : <EmptyState icon="📊" message={empty || "Sin datos para graficar todavia."} />}
     </Card>
   );
 }
 
-const tooltipStyle = { borderRadius: 8, border: "1px solid #E2E8F0", fontSize: 13 };
-
 export default function Dashboards() {
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const { version, updatedAt } = useRealtime();
+  const { cycleId, cycle } = useCycle();
+  const { can } = useAuth();
+  const { version } = useRealtime();
   const toast = useToast();
+  const restricted = can(PERM.RESTRICTED_ANALYTICS);
+
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState({ cluster_id: "", tech_type_id: "", band: "", status: "" });
+  const [clusters, setClusters] = useState([]);
+  const [types, setTypes] = useState([]);
+
+  useEffect(() => {
+    api.get("/clusters").then((r) => setClusters(r.data)).catch(() => {});
+    api.get("/tech-types").then((r) => setTypes(r.data)).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
+    if (!cycleId) {
+      setLoading(false);
+      setData(null);
+      return;
+    }
     try {
-      const { data } = await api.get("/dashboard/stats");
-      setStats(data);
+      const params = { cycle_id: cycleId };
+      if (filters.cluster_id) params.cluster_id = filters.cluster_id;
+      if (filters.tech_type_id) params.tech_type_id = filters.tech_type_id;
+      if (filters.band) params.band = filters.band;
+      if (filters.status) params.status = filters.status;
+      const { data: payload } = await api.get("/strategy/dashboard", { params });
+      setData(payload);
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar los dashboards"));
+      toast.error(apiError(e, "No se pudo cargar el tablero estrategico"));
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cycleId, filters, toast]);
 
   useEffect(() => {
     load();
   }, [load, version]);
 
-  if (loading) return <LoadingBlock label="Construyendo dashboards..." />;
-  if (!stats) return null;
+  if (!cycleId) {
+    return <EmptyState title="Seleccione un ciclo" description="El tablero estrategico se calcula por ciclo." />;
+  }
+  if (loading) return <LoadingBlock label="Construyendo el tablero estrategico..." />;
+  if (!data) return null;
 
-  const norm = (arr) => arr.map((d) => ({ name: d.label || "Sin clasificar", value: d.value }));
-  const anyData = (arr) => arr.some((d) => d.value > 0);
+  const funnel = [
+    { name: "Capturadas", value: data.funnel?.captured || 0 },
+    { name: "Filtradas", value: data.funnel?.filtered || 0 },
+    { name: "Priorizadas", value: data.funnel?.prioritized || 0 },
+    { name: "Evaluadas", value: data.funnel?.evaluated || 0 },
+  ];
+  const scatter = (data.ttm_scatter || [])
+    .filter((r) => r.months != null)
+    .map((r) => ({ ...r, months: Number(r.months) }));
+  const heat = (data.budget_heatmap || []).map((r) => ({
+    name: r.cluster,
+    y1: r.year1,
+    y2: r.year2,
+    y3: r.year3,
+  }));
 
   return (
     <div>
-      <PageHeader
-        title="Dashboards"
-        subtitle="Visualizacion analitica del inventario de fuentes y de los hallazgos del escaneo de horizonte."
+      <ModuleHeader
+        step="diseminacion"
+        title="Tablero estrategico"
+        purpose={`${cycle?.code || "Ciclo"} · Embudo, time-to-market y clusters del ciclo. Las modelaciones presupuestales solo las ven MSPS e INVIMA.`}
         actions={
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {updatedAt && (
-              <span className="chart-live-badge" title={`Ultima sync: ${new Date(updatedAt).toLocaleString()}`}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981" }} />
-                Graficas en vivo
-              </span>
-            )}
-            <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
-          </div>
+          <Button variant="secondary" onClick={() => window.print()}>
+            Imprimir
+          </Button>
         }
       />
 
-      <HelpNote id="dashboards-live">
-        Estas graficas se <strong>actualizan automaticamente</strong> cuando alguien escanea fuentes, agrega hallazgos
-        o modifica datos. El indicador verde confirma la sincronizacion en tiempo real con el resto del equipo.
-      </HelpNote>
+      <Card>
+        <div className="strategy-filters">
+          <Select
+            label="Cluster"
+            value={filters.cluster_id}
+            onChange={(e) => setFilters({ ...filters, cluster_id: e.target.value })}
+          >
+            <option value="">Todos</option>
+            {clusters.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label="Tipologia"
+            value={filters.tech_type_id}
+            onChange={(e) => setFilters({ ...filters, tech_type_id: e.target.value })}
+          >
+            <option value="">Todas</option>
+            {types.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label="Time-to-market"
+            value={filters.band}
+            onChange={(e) => setFilters({ ...filters, band: e.target.value })}
+          >
+            <option value="">Todas las franjas</option>
+            <option value="inminente">Inminente</option>
+            <option value="transicion">Transicion</option>
+            <option value="emergente">Emergente</option>
+            <option value="desconocido">Sin dato</option>
+          </Select>
+        </div>
+        {!restricted && (
+          <p className="eval-complete">
+            Vista agregada. Las modelaciones presupuestales y comparadores quedan restringidos a MSPS e INVIMA.
+          </p>
+        )}
+      </Card>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
-          gap: 16,
-        }}
-        key={`charts-${version}`}
-      >
-        <ChartCard title="Fuentes por categoria" hasData={anyData(stats.by_category)}>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart
-              layout="vertical"
-              data={norm(stats.by_category)}
-              margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 12, fill: "#64748B" }} allowDecimals={false} />
-              <YAxis
-                type="category"
-                dataKey="name"
-                width={150}
-                tick={{ fontSize: 11, fill: "#64748B" }}
-              />
+      <div className="strategy-grid" key={`charts-${version}`}>
+        <ChartCard title="Distribucion por cluster" hasData={(data.by_cluster || []).some((d) => d.value > 0)}>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={data.by_cluster}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} />
               <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                {norm(stats.by_category).map((_, i) => (
+              <Bar dataKey="value" fill="#6366F1" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard
+          title="Dispersion de time-to-market"
+          hasData={scatter.length > 0}
+          empty="No hay fechas de fase III para estimar el time-to-market de este ciclo."
+        >
+          <ResponsiveContainer width="100%" height={260}>
+            <ScatterChart>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis dataKey="months" name="Meses" unit=" m" />
+              <YAxis dataKey="points" name="Puntos" allowDecimals={false} />
+              <Tooltip cursor={{ strokeDasharray: "3 3" }} contentStyle={tooltipStyle} />
+              <Scatter data={scatter} fill="#3B82F6" />
+            </ScatterChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="Embudo del ciclo" hasData={funnel.some((d) => d.value > 0)}>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={funnel} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis type="number" allowDecimals={false} />
+              <YAxis type="category" dataKey="name" width={90} />
+              <Tooltip contentStyle={tooltipStyle} />
+              <Bar dataKey="value" fill="#06B6D4" radius={[0, 6, 6, 0]}>
+                {funnel.map((_, i) => (
                   <Cell key={i} fill={chartColors[i % chartColors.length]} />
                 ))}
               </Bar>
@@ -117,109 +205,26 @@ export default function Dashboards() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Hallazgos por horizonte" hasData={anyData(stats.by_horizon)}>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={norm(stats.by_horizon)}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={95}
-                label={(e) => `${e.name}: ${e.value}`}
-                labelLine={false}
-              >
-                {norm(stats.by_horizon).map((d, i) => (
-                  <Cell key={i} fill={horizonColors[d.name.toLowerCase()] || chartColors[i % chartColors.length]} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={tooltipStyle} />
-            </PieChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Hallazgos por tipo de tecnologia" hasData={anyData(stats.by_technology_type)}>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={norm(stats.by_technology_type)} margin={{ top: 10, right: 10, left: -12, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#64748B" }} />
-              <YAxis tick={{ fontSize: 12, fill: "#64748B" }} allowDecimals={false} />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                {norm(stats.by_technology_type).map((_, i) => (
-                  <Cell key={i} fill={chartColors[i % chartColors.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Estado de los hallazgos" hasData={anyData(stats.by_status)}>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={norm(stats.by_status)}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                innerRadius={55}
-                outerRadius={95}
-                paddingAngle={2}
-              >
-                {norm(stats.by_status).map((_, i) => (
-                  <Cell key={i} fill={chartColors[i % chartColors.length]} />
-                ))}
-              </Pie>
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Tooltip contentStyle={tooltipStyle} />
-            </PieChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Fuentes por idioma" hasData={anyData(stats.by_language)}>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={norm(stats.by_language)}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={95}
-                label={(e) => `${e.name}: ${e.value}`}
-                labelLine={false}
-              >
-                {norm(stats.by_language).map((_, i) => (
-                  <Cell key={i} fill={chartColors[i % chartColors.length]} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={tooltipStyle} />
-            </PieChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Fuentes mas productivas (hallazgos)" hasData={anyData(stats.top_sources)}>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart
-              layout="vertical"
-              data={norm(stats.top_sources)}
-              margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 12, fill: "#64748B" }} allowDecimals={false} />
-              <YAxis
-                type="category"
-                dataKey="name"
-                width={160}
-                tick={{ fontSize: 10, fill: "#64748B" }}
-                tickFormatter={(v) => (v.length > 26 ? v.slice(0, 24) + "…" : v)}
-              />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey="value" radius={[0, 6, 6, 0]} fill="#6366F1" />
-            </BarChart>
-          </ResponsiveContainer>
+        <ChartCard
+          title="Mapa de calor de impacto presupuestal"
+          hasData={restricted && heat.length > 0}
+        >
+          {restricted ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={heat}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Legend />
+                <Bar dataKey="y1" name="Anio 1" stackId="b" fill="#6366F1" />
+                <Bar dataKey="y2" name="Anio 2" stackId="b" fill="#3B82F6" />
+                <Bar dataKey="y3" name="Anio 3" stackId="b" fill="#06B6D4" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <EmptyState icon="🔒" message="Modelacion presupuestal restringida." />
+          )}
         </ChartCard>
       </div>
     </div>

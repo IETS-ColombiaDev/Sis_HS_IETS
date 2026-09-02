@@ -9,10 +9,17 @@ import Icon from "../components/Icon";
 import Tooltip from "../components/Tooltip";
 import { Input, Select } from "../components/Field";
 import { LoadingBlock } from "../components/Spinner";
+import MethodologyPanel from "../components/MethodologyPanel";
+
+const TABS = [
+  { id: "metodologia", label: "Gobierno metodologico", icon: "sliders" },
+  { id: "ia", label: "Integracion con IA", icon: "spark" },
+];
 
 export default function Settings() {
   const toast = useToast();
   const { refreshStatus } = useAuth();
+  const [tab, setTab] = useState("metodologia");
   const [cfg, setCfg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState("");
@@ -105,7 +112,7 @@ export default function Settings() {
     <div>
       <PageHeader
         title="Configuracion del sistema"
-        subtitle="Gestione la integracion con la IA (Gemini), verifique el estado de los servicios y consulte los parametros del sistema."
+        subtitle="Ajuste los umbrales y taxonomias que gobiernan la metodologia, gestione la integracion con Gemini y verifique el estado de los servicios."
       />
 
       {/* Estado general */}
@@ -151,6 +158,21 @@ export default function Settings() {
         />
       </div>
 
+      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+        {TABS.map((t) => (
+          <Button
+            key={t.id}
+            variant={tab === t.id ? "primary" : "secondary"}
+            onClick={() => setTab(t.id)}
+          >
+            <Icon name={t.icon} size={16} /> {t.label}
+          </Button>
+        ))}
+      </div>
+
+      {tab === "metodologia" && <MethodologyPanel />}
+
+      {tab === "ia" && (
       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16 }} className="dash-grid">
         {/* Panel Gemini */}
         <Card>
@@ -339,6 +361,7 @@ export default function Settings() {
           </div>
         </Card>
       </div>
+      )}
     </div>
   );
 }

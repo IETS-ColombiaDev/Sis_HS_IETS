@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api, { apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { useToast } from "../components/Toast";
-import { PageHeader, Card } from "../components/Card";
+import ModuleHeader from "../components/ModuleHeader";
+import PhaseGuide, { ModuleStatsRow } from "../components/PhaseGuide";
+import { Card } from "../components/Card";
 import Button from "../components/Button";
 import Badge from "../components/Badge";
 import Modal from "../components/Modal";
 import Markdown from "../components/Markdown";
 import ConfirmDialog from "../components/ConfirmDialog";
-import HelpNote from "../components/HelpNote";
 import NotesPanel from "../components/NotesPanel";
 import Icon from "../components/Icon";
 import { Select } from "../components/Field";
@@ -22,6 +24,7 @@ export default function Recommendations() {
   const { isEditor, status } = useAuth();
   const { version } = useRealtime();
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [recs, setRecs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,13 +35,21 @@ export default function Recommendations() {
   const [edit, setEdit] = useState(null); // recomendacion en edicion
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+  const [impactFilter, setImpactFilter] = useState("");
+
+  const filtered = recs.filter((r) => !impactFilter || r.impact === impactFilter);
+  const impactStats = {
+    alto: recs.filter((r) => r.impact === "alto").length,
+    medio: recs.filter((r) => r.impact === "medio").length,
+    bajo: recs.filter((r) => r.impact === "bajo").length,
+  };
 
   const load = useCallback(async () => {
     try {
       const { data } = await api.get("/recommendations");
       setRecs(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar las recomendaciones"));
+      toast.error(apiError(e, "No se pudieron cargar los informes"));
     } finally {
       setLoading(false);
     }
@@ -91,17 +102,31 @@ export default function Recommendations() {
 
   return (
     <div>
-      <PageHeader
-        title="Recomendaciones de adopcion"
-        subtitle="Analisis generados con IA (Gemini) sobre como podrian adoptarse en Colombia las tecnologias detectadas."
+      <ModuleHeader
+        step="diseminacion"
+        title="Diseminacion e informes"
+        purpose="Fase 4 IETS: recomendaciones de adopcion para Colombia a partir de tecnologias caracterizadas."
       />
 
-      <HelpNote id="recs-intro">
-        Cada tarjeta es una <strong>recomendacion de adopcion</strong> para Colombia generada por la IA a
-        partir de un hallazgo. Puede <strong>editarla</strong> para ajustar el texto, corregir datos o
-        cambiar el nivel de <strong>impacto</strong>. Para crear nuevas, vaya a <strong>Hallazgos</strong> y
-        pulse el boton <em>Generar IA</em>.
-      </HelpNote>
+      <PhaseGuide
+        phase="Fase 4 · Diseminacion"
+        tasks={[
+          "Generar informes de adopcion para el sistema de salud colombiano (Gemini + revision humana).",
+          "Clasificar impacto esperado: alto / medio / bajo.",
+          "Documentar decisiones del equipo en notas vinculadas.",
+        ]}
+        nextLabel="Notas del equipo"
+        onNext={() => navigate("/notas")}
+      />
+
+      <ModuleStatsRow
+        items={[
+          { label: "Informes emitidos", value: recs.length },
+          { label: "Impacto alto", value: impactStats.alto, color: "#EF4444" },
+          { label: "Impacto medio", value: impactStats.medio, color: "#F59E0B" },
+          { label: "Impacto bajo", value: impactStats.bajo },
+        ]}
+      />
 
       {status && !status.gemini_enabled && (
         <Card style={{ marginBottom: 16, borderLeft: "4px solid #F59E0B", background: "#FFFBEB" }}>
@@ -116,43 +141,55 @@ export default function Recommendations() {
         <Card>
           <EmptyState
             icon="💡"
-            title="Sin recomendaciones"
-            message="Vaya a Hallazgos y use el boton 'Generar IA' para crear una recomendacion de adopcion."
+            title="Sin informes de diseminacion"
+            message="Genere informes desde senales priorizadas y caracterizadas en las fases anteriores."
+            action={
+              <Button onClick={() => navigate("/priorizacion")}>
+                <Icon name="layers" size={16} /> Ir a Priorizacion
+              </Button>
+            }
           />
         </Card>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16 }}>
-          {recs.map((r) => (
-            <Card key={r.id} padding={20} style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
-                {r.impact ? <Badge tone={r.impact}>Impacto {r.impact}</Badge> : <span />}
-                <span style={{ fontSize: 11, color: "#94A3B8" }}>{new Date(r.created_at).toLocaleDateString()}</span>
-              </div>
-              <h3 style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3 }}>{r.title}</h3>
-              <p
-                style={{
-                  fontSize: 13,
-                  color: "#64748B",
-                  marginTop: 8,
-                  flex: 1,
-                  display: "-webkit-box",
-                  WebkitLineClamp: 4,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                }}
-              >
-                {r.content.replace(/[#*`>]/g, "").slice(0, 240)}
-              </p>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTop: "1px solid #F1F5F9" }}>
-                <span style={{ fontSize: 11, color: "#94A3B8" }} title={`Generado con ${r.model_used}`}>🤖 {r.model_used}</span>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <Button size="sm" variant="ghost" onClick={() => setDetail(r)}>Ver</Button>
+        <>
+          <Card padding={16} style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#64748B" }}>Filtrar por impacto:</span>
+              {["", "alto", "medio", "bajo"].map((i) => (
+                <button
+                  key={i || "all"}
+                  type="button"
+                  className={`view-toggle${impactFilter === i ? " active" : ""}`}
+                  onClick={() => setImpactFilter(i)}
+                >
+                  {i || "Todos"}
+                </button>
+              ))}
+            </div>
+          </Card>
+          <div className="informe-list">
+          {filtered.map((r) => (
+            <Card key={r.id} padding={0} className="informe-card">
+              <div className="informe-card-inner">
+                <div className="informe-card-head">
+                  <div>
+                    {r.impact ? <Badge tone={r.impact}>Impacto {r.impact}</Badge> : <Badge tone="viewer">Sin impacto</Badge>}
+                    <span className="informe-meta">Informe #{r.id} · {new Date(r.created_at).toLocaleDateString()}</span>
+                  </div>
+                  <Badge tone="viewer">🤖 {r.model_used}</Badge>
+                </div>
+                <h3 className="informe-title">{r.title}</h3>
+                <p className="informe-excerpt">
+                  {r.content.replace(/[#*`>]/g, "").slice(0, 280)}…
+                </p>
+                <div className="informe-actions">
+                  <Button size="sm" onClick={() => setDetail(r)}>Leer informe completo</Button>
                   {isEditor && (
                     <>
                       <Button size="sm" variant="outline" onClick={() => openEdit(r)}>
                         <Icon name="edit" size={14} /> Editar
                       </Button>
-                      <Button size="sm" variant="ghost" style={{ color: "#EF4444" }} title="Eliminar" onClick={() => setConfirmDel(r)}>
+                      <Button size="sm" variant="ghost" style={{ color: "#EF4444" }} onClick={() => setConfirmDel(r)}>
                         <Icon name="trash" size={15} />
                       </Button>
                     </>
@@ -161,7 +198,8 @@ export default function Recommendations() {
               </div>
             </Card>
           ))}
-        </div>
+          </div>
+        </>
       )}
 
       {/* Detalle */}
@@ -208,12 +246,9 @@ export default function Recommendations() {
       >
         {edit && (
           <div>
-            <HelpNote id="recs-edit" tone="tip" dismissible={false}>
-              Escriba en <strong>Markdown</strong> (use <code>##</code> para titulos, <code>-</code> para listas,
-              <code>**negrita**</code>). La vista previa muestra como se vera. Ajuste el <strong>impacto</strong> segun
-              la relevancia para el sistema de salud colombiano.
-            </HelpNote>
-
+            <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 12px" }}>
+              Markdown soportado. Ajuste titulo, contenido e impacto segun relevancia para Colombia.
+            </p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 160px", gap: 12, marginBottom: 12 }}>
               <div>
                 <label style={lbl}>Titulo</label>

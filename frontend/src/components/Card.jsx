@@ -1,4 +1,10 @@
-export function Card({ children, style, padding = 24 }) {
+/**
+ * `title`, `hint` y `actions` son opcionales y componen la misma cabecera que
+ * varias pantallas venian repitiendo a mano: un `SectionTitle` seguido de un
+ * parrafo de contexto. Sin ellos el componente se comporta como antes.
+ */
+export function Card({ children, style, padding = 24, title, hint, actions }) {
+  const hasHeader = Boolean(title || actions);
   return (
     <div
       style={{
@@ -9,6 +15,24 @@ export function Card({ children, style, padding = 24 }) {
         ...style,
       }}
     >
+      {hasHeader && (
+        <div style={padding === 0 ? { padding: "18px 18px 0" } : undefined}>
+          <SectionTitle right={actions}>{title}</SectionTitle>
+        </div>
+      )}
+      {hint && (
+        <p
+          style={{
+            fontSize: 13,
+            color: "#64748B",
+            marginTop: hasHeader ? -6 : 0,
+            marginBottom: 16,
+            ...(padding === 0 ? { padding: "0 18px" } : null),
+          }}
+        >
+          {hint}
+        </p>
+      )}
       {children}
     </div>
   );

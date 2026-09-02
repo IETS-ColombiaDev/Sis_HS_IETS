@@ -19,6 +19,37 @@ const PRESETS = {
   admin: { bg: "#EEF2FF", color: "#4338CA", border: "#C7D2FE" },
   editor: { bg: "#DBEAFE", color: "#1E40AF", border: "#BFDBFE" },
   viewer: { bg: "#F1F5F9", color: "#475569", border: "#E2E8F0" },
+
+  // Perfiles RBAC de la especificacion (Tabla 3)
+  superadmin: { bg: "#EEF2FF", color: "#4338CA", border: "#C7D2FE" },
+  evaluador_tecnico: { bg: "#DBEAFE", color: "#1E40AF", border: "#BFDBFE" },
+  evaluador_clinico: { bg: "#F0FDFA", color: "#0F766E", border: "#99F6E4" },
+  tomador_decisiones: { bg: "#F1F5F9", color: "#475569", border: "#E2E8F0" },
+  revisor_pares: { bg: "#FEF3C7", color: "#92400E", border: "#FDE68A" },
+
+  // Estados del ciclo operativo
+  en_configuracion: { bg: "#F1F5F9", color: "#475569", border: "#E2E8F0" },
+  en_filtrado: { bg: "#DBEAFE", color: "#1E40AF", border: "#BFDBFE" },
+  en_priorizacion: { bg: "#EEF2FF", color: "#4338CA", border: "#C7D2FE" },
+  en_evaluacion: { bg: "#EDE9FE", color: "#6D28D9", border: "#DDD6FE" },
+  cerrado_consolidado: { bg: "#D1FAE5", color: "#065F46", border: "#6EE7B7" },
+
+  // Estados metodologicos de la tecnologia dentro del ciclo
+  capturada_no_asignada: { bg: "#F1F5F9", color: "#475569", border: "#E2E8F0" },
+  asignada_a_ciclo: { bg: "#DBEAFE", color: "#1E40AF", border: "#BFDBFE" },
+  filtrada_apta_priorizacion: { bg: "#EEF2FF", color: "#4338CA", border: "#C7D2FE" },
+  excluida: { bg: "#F1F5F9", color: "#64748B", border: "#E2E8F0" },
+  priorizada: { bg: "#D1FAE5", color: "#065F46", border: "#6EE7B7" },
+  bajo_vigilancia: { bg: "#FEF3C7", color: "#92400E", border: "#FDE68A" },
+  no_priorizada: { bg: "#F1F5F9", color: "#64748B", border: "#E2E8F0" },
+  publicada: { bg: "#CCFBF1", color: "#0F766E", border: "#5EEAD4" },
+
+  // Condicion del glosario
+  nueva: { bg: "#E0E7FF", color: "#3730A3", border: "#A5B4FC" },
+
+  historico: { bg: "#F1F5F9", color: "#64748B", border: "#E2E8F0" },
+  info: { bg: "#EEF2FF", color: "#4338CA", border: "#C7D2FE" },
+  warning: { bg: "#FEF3C7", color: "#92400E", border: "#FDE68A" },
   default: { bg: "#F1F5F9", color: "#475569", border: "#E2E8F0" },
 };
 
