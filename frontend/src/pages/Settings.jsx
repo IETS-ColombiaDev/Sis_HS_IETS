@@ -3,6 +3,7 @@ import api, { apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
 import { PageHeader, Card, SectionTitle } from "../components/Card";
+import { GLOSSARY } from "../constants/glossary";
 import Button from "../components/Button";
 import Badge from "../components/Badge";
 import Icon from "../components/Icon";
@@ -14,26 +15,46 @@ import MethodologyPanel from "../components/MethodologyPanel";
 const TABS = [
   { id: "metodologia", label: "Gobierno metodologico", icon: "sliders" },
   { id: "ia", label: "Integracion con IA", icon: "spark" },
+  { id: "fuentes", label: "Llaves de fuentes", icon: "globe" },
 ];
 
 export default function Settings() {
   const toast = useToast();
   const { refreshStatus } = useAuth();
-  const [tab, setTab] = useState("metodologia");
+  const [tab, setTab] = useState("ia");
   const [cfg, setCfg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState("");
   const [showToken, setShowToken] = useState(false);
+  const [minimaxToken, setMinimaxToken] = useState("");
+  const [showMinimaxToken, setShowMinimaxToken] = useState(false);
+  const [openfdaKey, setOpenfdaKey] = useState("");
+  const [ncbiKey, setNcbiKey] = useState("");
+  const [ncbiEmail, setNcbiEmail] = useState("");
   const [model, setModel] = useState("");
+  const [minimaxModel, setMinimaxModel] = useState("");
+  const [provider, setProvider] = useState("auto");
+  const [ocrEnabled, setOcrEnabled] = useState(false);
+  const [webEnabled, setWebEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [banner, setBanner] = useState(null); // {type, message}
+  const [detecting, setDetecting] = useState(false);
+  const [banner, setBanner] = useState(null);
+
+  const applyCfg = (data) => {
+    setCfg(data);
+    setModel(data.gemini_model || "");
+    setMinimaxModel(data.minimax_model || "");
+    setProvider(data.ai_provider || "auto");
+    setOcrEnabled(Boolean(data.ai_ocr_enabled));
+    setWebEnabled(data.ai_web_enabled !== false);
+    setNcbiEmail(data.ncbi_email || "");
+  };
 
   const load = useCallback(async () => {
     try {
       const { data } = await api.get("/config");
-      setCfg(data);
-      setModel(data.gemini_model || "");
+      applyCfg(data);
     } catch (e) {
       toast.error(apiError(e, "No se pudo cargar la configuracion"));
     } finally {
@@ -46,16 +67,21 @@ export default function Settings() {
     load();
   }, [load]);
 
-  const testConnection = async () => {
+  const testConnection = async (who) => {
     setTesting(true);
     setBanner(null);
     try {
-      const { data } = await api.post("/config/test", {
-        gemini_api_key: token.trim() ? token.trim() : null,
-      });
+      const payload = { provider: who };
+      if (who === "minimax" && minimaxToken.trim()) payload.minimax_api_key = minimaxToken.trim();
+      if (who === "gemini" && token.trim()) payload.gemini_api_key = token.trim();
+      const { data } = await api.post("/config/test", payload);
       setBanner({ type: data.ok ? "ok" : "error", message: data.message });
-      if (data.ok) toast.success("Conexion con Gemini verificada");
-      else toast.error("La prueba de conexion fallo");
+      if (data.ok) {
+        toast.success(`Conexion ${who === "gemini" ? "Gemini" : "MiniMax"} verificada`);
+        if (data.available_models?.length && who === "minimax") {
+          setCfg((prev) => ({ ...prev, minimax_available_models: data.available_models, minimax_active_model: data.model }));
+        }
+      } else toast.error("La prueba de conexion fallo");
     } catch (e) {
       const msg = apiError(e, "No se pudo probar la conexion");
       setBanner({ type: "error", message: msg });
@@ -65,22 +91,54 @@ export default function Settings() {
     }
   };
 
+  const detectBest = async () => {
+    setDetecting(true);
+    setBanner(null);
+    try {
+      const { data } = await api.post("/config/detect-models");
+      setBanner({ type: data.ok ? "ok" : "error", message: data.message });
+      if (data.ok) {
+        setMinimaxModel("");
+        setCfg((prev) => ({
+          ...prev,
+          minimax_available_models: data.available_models || prev.minimax_available_models,
+          minimax_active_model: data.model,
+        }));
+        toast.success(`Mejor modelo: ${data.model}`);
+      }
+    } catch (e) {
+      toast.error(apiError(e, "No se pudieron detectar modelos"));
+    } finally {
+      setDetecting(false);
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     setBanner(null);
     try {
-      const payload = { gemini_model: model };
+      const payload = {
+        gemini_model: model,
+        minimax_model: minimaxModel,
+        ai_provider: provider,
+        ai_ocr_enabled: ocrEnabled,
+        ai_web_enabled: webEnabled,
+      };
       if (token.trim()) payload.gemini_api_key = token.trim();
+      if (minimaxToken.trim()) payload.minimax_api_key = minimaxToken.trim();
       const { data } = await api.put("/config", payload);
-      setCfg(data);
+      applyCfg(data);
       setToken("");
-      setModel(data.gemini_model || "");
+      setMinimaxToken("");
       refreshStatus();
-      if (data.gemini_enabled) {
-        setBanner({ type: "ok", message: `Configuracion guardada. IA activa con el modelo ${data.gemini_active_model}.` });
-        toast.success("Configuracion guardada. IA activada.");
+      if (data.ai_enabled) {
+        setBanner({
+          type: "ok",
+          message: `IA activa con ${data.ai_active_provider || "MiniMax"} · ${data.ai_model || data.minimax_active_model}. OCR ${data.ai_ocr_enabled ? "encendido" : "apagado"}.`,
+        });
+        toast.success("Configuracion de IA guardada");
       } else {
-        setBanner({ type: "warn", message: "Configuracion guardada, pero la IA sigue sin token valido." });
+        setBanner({ type: "warn", message: "Configuracion guardada, pero no hay una llave de IA valida." });
         toast.success("Configuracion guardada");
       }
     } catch (e) {
@@ -90,14 +148,16 @@ export default function Settings() {
     }
   };
 
-  const removeToken = async () => {
+  const removeToken = async (kind) => {
     setSaving(true);
     try {
-      const { data } = await api.put("/config", { gemini_api_key: "" });
-      setCfg(data);
-      setToken("");
+      const payload = kind === "minimax" ? { minimax_api_key: "" } : { gemini_api_key: "" };
+      const { data } = await api.put("/config", payload);
+      applyCfg(data);
+      if (kind === "minimax") setMinimaxToken("");
+      else setToken("");
       refreshStatus();
-      setBanner({ type: "warn", message: "Token eliminado. La IA opera ahora en modo basico." });
+      setBanner({ type: "warn", message: `Token de ${kind === "minimax" ? "MiniMax" : "Gemini"} eliminado.` });
       toast.success("Token eliminado");
     } catch (e) {
       toast.error(apiError(e, "No se pudo eliminar el token"));
@@ -108,14 +168,19 @@ export default function Settings() {
 
   if (loading) return <LoadingBlock label="Cargando configuracion..." />;
 
+  const aiOn = Boolean(cfg.ai_enabled);
+  const models = cfg.minimax_available_models?.length
+    ? cfg.minimax_available_models
+    : ["MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2.7-highspeed", "MiniMax-M2.5", "MiniMax-M2.5-highspeed", "MiniMax-M2.1", "MiniMax-M2"];
+
   return (
     <div>
       <PageHeader
         title="Configuracion del sistema"
-        subtitle="Ajuste los umbrales y taxonomias que gobiernan la metodologia, gestione la integracion con Gemini y verifique el estado de los servicios."
+        titleHint={GLOSSARY.minimax}
+        subtitle="Gobierne la metodologia, MiniMax (con OCR de sitios) y las llaves de las fuentes de nivel A."
       />
 
-      {/* Estado general */}
       <div
         style={{
           display: "grid",
@@ -127,10 +192,18 @@ export default function Settings() {
         <StatusCard
           icon="spark"
           label="Inteligencia Artificial"
-          value={cfg.gemini_enabled ? "Activa" : "Sin configurar"}
-          tone={cfg.gemini_enabled ? "ok" : "warn"}
-          sub={cfg.gemini_enabled ? cfg.gemini_active_model : "Requiere token de Gemini"}
-          tip="Estado de la integracion con Google Gemini para recomendaciones y chat."
+          value={aiOn ? "Activa" : "Sin configurar"}
+          tone={aiOn ? "ok" : "warn"}
+          sub={aiOn ? `${cfg.ai_active_provider || "minimax"} · ${cfg.ai_model || cfg.minimax_active_model}` : "Requiere llave de MiniMax"}
+          tip="MiniMax es el proveedor principal. Gemini queda como respaldo opcional."
+        />
+        <StatusCard
+          icon="globe"
+          label="IA en sitios / OCR"
+          value={cfg.ai_ocr_enabled ? "OCR activo" : cfg.ai_web_enabled ? "Solo texto" : "Apagado"}
+          tone={cfg.ai_ocr_enabled ? "ok" : cfg.ai_web_enabled ? "info" : "neutral"}
+          sub={cfg.ai_ocr_enabled ? `Vision: ${cfg.minimax_vision_model || "MiniMax-M3"}` : "La IA puede leer paginas; el OCR es opcional"}
+          tip="Con OCR, MiniMax-M3 lee imagenes y PDF escaneados de las fuentes."
         />
         <StatusCard
           icon="shield"
@@ -141,20 +214,12 @@ export default function Settings() {
           tip="Acceso con cuentas institucionales de Google del dominio permitido."
         />
         <StatusCard
-          icon="globe"
-          label="Fuentes vigiladas"
-          value={String(cfg.total_sources)}
-          tone="info"
-          sub={`${cfg.total_findings} hallazgos almacenados`}
-          tip="Total de fuentes en el inventario y hallazgos extraidos."
-        />
-        <StatusCard
           icon="info"
           label="Version del sistema"
           value={`v${cfg.version}`}
           tone="neutral"
-          sub={cfg.dev_login_enabled ? "Modo desarrollo activo" : "Modo produccion"}
-          tip="Version de la aplicacion y modo de ejecucion."
+          sub={`${cfg.total_sources} fuentes · ${cfg.total_findings} hallazgos`}
+          tip="Version de la aplicacion y volumen del inventario."
         />
       </div>
 
@@ -174,169 +239,134 @@ export default function Settings() {
 
       {tab === "ia" && (
       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16 }} className="dash-grid">
-        {/* Panel Gemini */}
         <Card>
           <SectionTitle
+            hint={GLOSSARY.minimax}
             right={
-              <Badge tone={cfg.gemini_enabled ? "ok" : "warn"}>
-                {cfg.gemini_enabled ? "Conectado" : "No conectado"}
+              <Badge tone={aiOn ? "ok" : "warn"}>
+                {aiOn ? `Conectado · ${cfg.ai_active_provider || "minimax"}` : "No conectado"}
               </Badge>
             }
           >
             <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-              <Icon name="key" size={18} /> Integracion con Gemini (IA)
+              <Icon name="key" size={18} /> MiniMax (IA principal)
             </span>
           </SectionTitle>
 
           <p style={{ fontSize: 13, color: "#64748B", marginTop: -6, marginBottom: 16 }}>
-            El token habilita la generacion de recomendaciones de adopcion para Colombia y el asistente
-            conversacional. Se guarda de forma segura en el servidor y nunca se expone completo.
+            MiniMax entra a las paginas de las fuentes, estructura senales de horizonte y, si lo
+            habilita, lee imagenes y PDF escaneados con MiniMax-M3. La llave no se muestra completa.
           </p>
 
           {banner && <AlertBanner type={banner.type} message={banner.message} onClose={() => setBanner(null)} />}
 
-          {cfg.gemini_has_key && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                background: "#F8FAFC",
-                border: "1px solid #E2E8F0",
-                borderRadius: 8,
-                padding: "10px 12px",
-                marginBottom: 14,
-                fontSize: 13,
-              }}
-            >
-              <Icon name="key" size={16} color="#64748B" />
-              <span style={{ color: "#475569" }}>Token actual:</span>
-              <code style={{ fontWeight: 700, color: "#0F172A" }}>{cfg.gemini_key_masked}</code>
-              <Tooltip text="Eliminar el token guardado. La IA pasara a modo basico.">
-                <button
-                  onClick={removeToken}
-                  disabled={saving}
-                  style={{
-                    marginLeft: "auto",
-                    border: "none",
-                    background: "transparent",
-                    color: "#EF4444",
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
-                >
-                  <Icon name="trash" size={15} /> Eliminar
-                </button>
-              </Tooltip>
-            </div>
+          {cfg.minimax_has_key && (
+            <MaskedKey
+              label="Llave MiniMax"
+              value={cfg.minimax_key_masked}
+              onRemove={() => removeToken("minimax")}
+              saving={saving}
+            />
           )}
 
-          <div style={{ position: "relative" }}>
-            <Input
-              label={cfg.gemini_has_key ? "Nuevo token (reemplaza el actual)" : "Token / API Key de Gemini"}
-              placeholder="AIza..."
-              type={showToken ? "text" : "password"}
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              autoComplete="off"
-              style={{ paddingRight: 42, fontFamily: "monospace" }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowToken((s) => !s)}
-              title={showToken ? "Ocultar" : "Mostrar"}
-              style={{
-                position: "absolute",
-                right: 10,
-                top: 34,
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                color: "#64748B",
-                padding: 4,
-              }}
-            >
-              <Icon name={showToken ? "eyeOff" : "eye"} size={18} />
-            </button>
-          </div>
+          <SecretInput
+            label={cfg.minimax_has_key ? "Nueva llave MiniMax (reemplaza la actual)" : "API Key de MiniMax"}
+            placeholder="sk-cp-... o sk-api-..."
+            value={minimaxToken}
+            show={showMinimaxToken}
+            onToggle={() => setShowMinimaxToken((s) => !s)}
+            onChange={setMinimaxToken}
+          />
 
-          <Select
-            label="Modelo"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-          >
-            <option value="">Automatico (detectar el mejor disponible)</option>
-            {(cfg.available_models || []).map((m) => (
+          <Select label="Proveedor" value={provider} onChange={(e) => setProvider(e.target.value)}>
+            <option value="auto">Automatico (MiniMax si hay llave; si no, Gemini)</option>
+            <option value="minimax">Solo MiniMax</option>
+            <option value="gemini">Solo Gemini</option>
+          </Select>
+
+          <Select label="Modelo MiniMax" value={minimaxModel} onChange={(e) => setMinimaxModel(e.target.value)}>
+            <option value="">Automatico (mejor modelo disponible)</option>
+            {models.map((m) => (
               <option key={m} value={m}>{m}</option>
             ))}
-            {model && !(cfg.available_models || []).includes(model) && (
-              <option value={model}>{model}</option>
+            {minimaxModel && !models.includes(minimaxModel) && (
+              <option value={minimaxModel}>{minimaxModel}</option>
             )}
           </Select>
 
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 6 }}>
-            <Tooltip text="Valida el token contra la API de Gemini con una consulta real (no lo guarda).">
-              <Button variant="secondary" onClick={testConnection} loading={testing}>
-                <Icon name="pulse" size={16} /> Probar conexion
-              </Button>
-            </Tooltip>
-            <Tooltip text="Guarda el token y el modelo. La IA se activa de inmediato.">
-              <Button onClick={save} loading={saving}>
-                <Icon name="save" size={16} /> Guardar configuracion
-              </Button>
-            </Tooltip>
+          <ToggleRow
+            checked={webEnabled}
+            onChange={setWebEnabled}
+            title="IA entra a los sitios web"
+            text="Durante el escaneo, MiniMax lee el contenido real de la pagina y extrae tecnologias."
+          />
+          <ToggleRow
+            checked={ocrEnabled}
+            onChange={setOcrEnabled}
+            title="Habilitar IA con OCR"
+            text={`MiniMax-M3 lee imagenes y PDF escaneados. Vision: ${cfg.minimax_vision_model || "MiniMax-M3"}.`}
+          />
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+            <Button variant="secondary" onClick={() => testConnection("minimax")} loading={testing}>
+              <Icon name="pulse" size={16} /> Probar MiniMax
+            </Button>
+            <Button variant="secondary" onClick={detectBest} loading={detecting}>
+              <Icon name="spark" size={16} /> Detectar mejor modelo
+            </Button>
+            <Button onClick={save} loading={saving}>
+              <Icon name="save" size={16} /> Guardar IA
+            </Button>
           </div>
 
-          <div
-            style={{
-              marginTop: 18,
-              padding: "12px 14px",
-              background: "#EFF6FF",
-              border: "1px solid #DBEAFE",
-              borderRadius: 8,
-              fontSize: 13,
-              color: "#1E40AF",
-              display: "flex",
-              gap: 10,
-            }}
-          >
-            <Icon name="info" size={18} color="#3B82F6" style={{ marginTop: 1 }} />
-            <div>
-              Obtenga un token gratuito en{" "}
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: "#1D4ED8", fontWeight: 700 }}
-              >
-                Google AI Studio <Icon name="external" size={12} />
-              </a>
-              . Debe iniciar sesion con una cuenta de Google y crear una API key.
-            </div>
+          <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid #E2E8F0" }}>
+            <SectionTitle>Gemini (respaldo opcional)</SectionTitle>
+            {cfg.gemini_has_key && (
+              <MaskedKey
+                label="Token Gemini"
+                value={cfg.gemini_key_masked}
+                onRemove={() => removeToken("gemini")}
+                saving={saving}
+              />
+            )}
+            <SecretInput
+              label={cfg.gemini_has_key ? "Nuevo token Gemini" : "Token / API Key de Gemini"}
+              placeholder="AIza..."
+              value={token}
+              show={showToken}
+              onToggle={() => setShowToken((s) => !s)}
+              onChange={setToken}
+            />
+            <Select label="Modelo Gemini" value={model} onChange={(e) => setModel(e.target.value)}>
+              <option value="">Automatico</option>
+              {(cfg.available_models || []).map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </Select>
+            <Button variant="outline" size="sm" onClick={() => testConnection("gemini")} loading={testing}>
+              Probar Gemini
+            </Button>
           </div>
         </Card>
 
-        {/* Guia rapida */}
         <Card style={{ background: "#F8FAFC" }}>
           <SectionTitle>Como funciona</SectionTitle>
           <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "#475569", lineHeight: 1.9 }}>
-            <li>Pegue su <b>token de Gemini</b> y pulse <b>Probar conexion</b>.</li>
-            <li>Si la prueba es exitosa, pulse <b>Guardar configuracion</b>.</li>
-            <li>La IA se activa al instante para <b>todos los usuarios</b>.</li>
-            <li>Genere <b>recomendaciones</b> desde Hallazgos y use el <b>Asistente IA</b>.</li>
+            <li>La llave de MiniMax se carga desde el servidor o se pega aqui.</li>
+            <li>Pulse <b>Detectar mejor modelo</b> para probar cual responde en su cuenta.</li>
+            <li>Active <b>IA entra a los sitios</b> para extraer senales reales al escanear.</li>
+            <li>Active <b>OCR</b> si las fuentes publican imagenes o PDF escaneados.</li>
+            <li>Gemini queda como respaldo si MiniMax no responde.</li>
           </ol>
-
           <div style={{ marginTop: 18 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#64748B", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
-              Funciones que habilita la IA
+              Lo que habilita
             </div>
             {[
-              ["bulb", "Recomendaciones de adopcion contextualizadas a Colombia (INVIMA, ruta ETS, impacto)."],
-              ["chat", "Asistente conversacional (RAG) sobre fuentes y hallazgos del sistema."],
+              ["globe", "Visita real de HTML/PDF de cada fuente y extraccion estructurada."],
+              ["spark", "OCR con MiniMax-M3 sobre imagenes y paginas escaneadas."],
+              ["bulb", "Recomendaciones de adopcion para Colombia y asistente RAG."],
+              ["chat", "Enriquecimiento de fichas y notas del equipo."],
             ].map(([ic, txt]) => (
               <div key={ic} style={{ display: "flex", gap: 10, marginBottom: 10, fontSize: 13, color: "#475569" }}>
                 <Icon name={ic} size={17} color="#6366F1" style={{ marginTop: 1 }} />
@@ -344,24 +374,168 @@ export default function Settings() {
               </div>
             ))}
           </div>
-
-          <div
-            style={{
-              marginTop: 8,
-              padding: "10px 12px",
-              background: "#fff",
-              border: "1px solid #E2E8F0",
-              borderRadius: 8,
-              fontSize: 12.5,
-              color: "#64748B",
-            }}
-          >
-            Sin token, el sistema sigue 100% operativo en <b>modo basico</b>: escaneo, dashboards,
-            fuentes y hallazgos funcionan; las recomendaciones y el chat usan respuestas basadas en la base de datos.
-          </div>
         </Card>
       </div>
       )}
+
+      {tab === "fuentes" && (
+        <Card>
+          <SectionTitle hint={GLOSSARY.nivel_a}>Llaves de fuentes de nivel A</SectionTitle>
+          <p style={{ fontSize: 13, color: "#64748B", marginTop: -6 }}>
+            openFDA y PubMed multiplican su cupo con una llave gratuita. Sin ellas el sistema funciona,
+            pero con un tope bajo que puede dejar corridas en ambar.
+          </p>
+          <div style={{ display: "grid", gap: 12, maxWidth: 520 }}>
+            <Input
+              label="Llave openFDA (api.data.gov)"
+              type="password"
+              value={openfdaKey}
+              onChange={(e) => setOpenfdaKey(e.target.value)}
+              placeholder={cfg.openfda_has_key ? "Llave ya configurada" : "Pegue la llave gratuita"}
+            />
+            <Input
+              label="Llave NCBI / PubMed"
+              type="password"
+              value={ncbiKey}
+              onChange={(e) => setNcbiKey(e.target.value)}
+              placeholder={cfg.ncbi_has_key ? "Llave ya configurada" : "Opcional; 10 peticiones por segundo"}
+            />
+            <Input
+              label="Correo institucional NCBI"
+              value={ncbiEmail}
+              onChange={(e) => setNcbiEmail(e.target.value)}
+            />
+            <div>
+              <Button
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    const payload = { ncbi_email: ncbiEmail };
+                    if (openfdaKey.trim()) payload.openfda_api_key = openfdaKey.trim();
+                    if (ncbiKey.trim()) payload.ncbi_api_key = ncbiKey.trim();
+                    const { data } = await api.put("/config", payload);
+                    applyCfg(data);
+                    setOpenfdaKey("");
+                    setNcbiKey("");
+                    toast.success("Llaves de fuentes guardadas");
+                  } catch (e) {
+                    toast.error(apiError(e, "No se pudieron guardar las llaves"));
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                loading={saving}
+              >
+                Guardar llaves
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function ToggleRow({ checked, onChange, title, text }) {
+  return (
+    <label
+      style={{
+        display: "flex",
+        gap: 12,
+        alignItems: "flex-start",
+        margin: "12px 0",
+        padding: "10px 12px",
+        border: "1px solid #E2E8F0",
+        borderRadius: 10,
+        background: checked ? "#F0FDF4" : "#F8FAFC",
+        cursor: "pointer",
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        style={{ marginTop: 3 }}
+      />
+      <span>
+        <strong style={{ display: "block", fontSize: 13, color: "#0F172A" }}>{title}</strong>
+        <span style={{ fontSize: 12, color: "#64748B" }}>{text}</span>
+      </span>
+    </label>
+  );
+}
+
+function SecretInput({ label, placeholder, value, show, onToggle, onChange }) {
+  return (
+    <div style={{ position: "relative" }}>
+      <Input
+        label={label}
+        placeholder={placeholder}
+        type={show ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        autoComplete="off"
+        style={{ paddingRight: 42, fontFamily: "monospace" }}
+      />
+      <button
+        type="button"
+        onClick={onToggle}
+        title={show ? "Ocultar" : "Mostrar"}
+        style={{
+          position: "absolute",
+          right: 10,
+          top: 34,
+          border: "none",
+          background: "transparent",
+          cursor: "pointer",
+          color: "#64748B",
+          padding: 4,
+        }}
+      >
+        <Icon name={show ? "eyeOff" : "eye"} size={18} />
+      </button>
+    </div>
+  );
+}
+
+function MaskedKey({ label, value, onRemove, saving }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        background: "#F8FAFC",
+        border: "1px solid #E2E8F0",
+        borderRadius: 8,
+        padding: "10px 12px",
+        marginBottom: 14,
+        fontSize: 13,
+      }}
+    >
+      <Icon name="key" size={16} color="#64748B" />
+      <span style={{ color: "#475569" }}>{label}:</span>
+      <code style={{ fontWeight: 700, color: "#0F172A" }}>{value}</code>
+      <Tooltip text="Eliminar la llave guardada.">
+        <button
+          onClick={onRemove}
+          disabled={saving}
+          style={{
+            marginLeft: "auto",
+            border: "none",
+            background: "transparent",
+            color: "#EF4444",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          <Icon name="trash" size={15} /> Eliminar
+        </button>
+      </Tooltip>
     </div>
   );
 }

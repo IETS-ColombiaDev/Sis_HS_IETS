@@ -61,17 +61,25 @@ def export_sources(
     sources = db.query(Source).order_by(Source.category, Source.title).all()
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["id", "titulo", "url", "categoria", "vigilada", "hallazgos", "ultimo_escaneo"])
+    writer.writerow([
+        "codigo", "titulo", "url", "bloque", "nivel", "conector", "frecuencia",
+        "salud", "vigilada", "hallazgos", "pais", "verificacion",
+    ])
     for s in sources:
         count = db.query(func.count(Finding.id)).filter(Finding.source_id == s.id).scalar() or 0
         writer.writerow([
-            s.id,
+            s.catalog_code,
             s.title,
             s.url,
             s.category,
+            s.access_level,
+            s.connector,
+            s.sync_frequency,
+            s.health_status,
             "si" if s.scrape_enabled else "no",
             count,
-            s.last_scraped_at.isoformat() if s.last_scraped_at else "",
+            s.country,
+            s.verification_status,
         ])
     buf.seek(0)
     return StreamingResponse(

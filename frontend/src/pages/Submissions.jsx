@@ -13,6 +13,7 @@ import { Textarea } from "../components/Field";
 import EmptyState from "../components/EmptyState";
 import { LoadingBlock } from "../components/Spinner";
 import { PERM } from "../constants/methodology";
+import { GLOSSARY } from "../constants/glossary";
 
 const TONE = { recibida: "warning", aceptada: "success", rechazada: "danger" };
 
@@ -72,6 +73,7 @@ export default function Submissions() {
     <div>
       <PageHeader
         title="Postulaciones reactivas"
+        titleHint={GLOSSARY.postulacion}
         subtitle="Cola de moderacion del canal publico. Nada entra al staging sin revision humana y declaracion de conflicto de interes."
         actions={
           <Button variant="secondary" onClick={() => navigate("/bandeja-entrada")}>

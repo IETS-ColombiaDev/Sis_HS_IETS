@@ -15,6 +15,7 @@ import EmptyState from "../components/EmptyState";
 import { LoadingBlock } from "../components/Spinner";
 import PhaseGuide, { ModuleStatsRow } from "../components/PhaseGuide";
 import { CONDITION_LABELS, PERM } from "../constants/methodology";
+import { GLOSSARY } from "../constants/glossary";
 
 /**
  * Bandeja de entrada del staging (RF04): senales capturadas que aun no
@@ -187,6 +188,7 @@ export default function Staging() {
     <div>
       <PageHeader
         title="Bandeja de entrada"
+        titleHint={GLOSSARY.bandeja_entrada}
         subtitle="Staging de senales capturadas que aun no pertenecen a ningun ciclo. Clasifique cluster y tipologia, y arrastre por lotes al ciclo activo."
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -207,6 +209,7 @@ export default function Staging() {
 
       <PhaseGuide
         phase="Fase 1 · Identificacion"
+        hint={GLOSSARY.vigilancia}
         tasks={[
           "Revise las senales capturadas por vigilancia y por el canal reactivo.",
           "Confirme cluster y tipologia: son obligatorios para entrar al ciclo.",
@@ -437,6 +440,7 @@ export default function Staging() {
 
             <Select
               label="Cluster de salud"
+              hint={GLOSSARY.cluster}
               required
               value={editing.cluster_id || ""}
               onChange={(e) => setEditing({ ...editing, cluster_id: e.target.value })}
@@ -451,6 +455,7 @@ export default function Staging() {
 
             <Select
               label="Tipologia tecnologica"
+              hint={GLOSSARY.tipologia}
               required
               value={editing.tech_type_id || ""}
               onChange={(e) => setEditing({ ...editing, tech_type_id: e.target.value })}

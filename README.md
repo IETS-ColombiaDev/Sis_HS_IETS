@@ -11,7 +11,7 @@ Inspirado en el modelo operativo del
 [NIHR Innovation Observatory](https://io.nihr.ac.uk/) y construido sobre la línea gráfica
 corporativa definida en [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md).
 
-**Versión:** 6.0.0 · **Stack:** FastAPI + React 18 + SQLite (compatible con PostgreSQL 15)
+**Versión:** 6.1.0 · **Stack:** FastAPI + React 18 + SQLite (compatible con PostgreSQL 15)
 
 > **v6.0 — Fases 0 a 6 del [plan de actualización](Plan_Fases_Actualizacion_Plataforma_EH_IETS.md).**
 > El ciclo es el eje, la priorización usa la matriz P1–P6, la evaluación temprana
@@ -66,7 +66,7 @@ Cuatro conceptos ordenan todo el sistema. Entenderlos evita la mayor parte de la
 | **1. Identificación** | Vigilancia | `/vigilancia` | Conectores API (ClinicalTrials, FDA, EMA, PubMed) y HTML de último recurso, en cola |
 | **Canal reactivo** | Postulación pública | `/postular` | Formulario externo con conflicto de interés; entra a moderación, no al catálogo |
 | **Canal reactivo** | Postulaciones | `/postulaciones` | Cola de aceptación o rechazo; lo aceptado llega a la bandeja como reactivo |
-| **1. Identificación** | Inventario | `/fuentes` | CRUD del inventario institucional (29 referentes semilla) |
+| **1. Identificación** | Inventario | `/fuentes` | Catálogo verificado D-06: 53 fuentes, sonda de salud y panel de cobertura |
 | **1. Identificación** | **Bandeja de entrada** | `/bandeja-entrada` | Staging: clasificar señales capturadas y asignarlas por lotes al ciclo |
 | **Transversal** | **Ciclos** | `/ciclos` | Crear, transicionar y cerrar ciclos; embudo de conversión |
 | **Filtrado** | **Filtrado y depuración** | `/filtrado` | Duplicados difusos, verificación de novedad, cruce INVIMA y Listado Único |
@@ -482,6 +482,7 @@ Documentación interactiva: **`http://127.0.0.1:8000/docs`**
 | `/api/auth` | `POST /google`, `POST /dev-login`, `GET /me` |
 | `/api/sources` | CRUD, categorías, export CSV, alta rápida |
 | `/api/scan` | `POST /run`, `POST /source/{id}`, `POST /preview`, `GET /logs` |
+| `/api/ingest` | `POST /run`, `GET /jobs`, `GET /connectors`, `POST /sources/import`, `POST /sources/{id}/probe`, `GET /health`, `GET /coverage` |
 | `/api/findings` | CRUD, filtros, `POST /{id}/enhance-ai` |
 | `/api/recommendations` | CRUD, `POST /generate` (Gemini) |
 | `/api/dashboard` | `GET /stats`, `GET /workbench` |
@@ -526,7 +527,7 @@ Al iniciar, el backend ejecuta en orden:
 2. Migraciones ligeras de esquema, incluida la de `priority_score` a `screening_score`
 3. Endurecimiento de la bitácora (triggers o `REVOKE` según el motor)
 4. Instalación de los listeners de auditoría
-5. Siembra de los 29 referentes si la base está vacía
+5. Sincronización del catálogo verificado D-06 (53 fuentes; retira el inventario anterior sin borrar senales)
 6. Siembra de clústeres, tipologías, criterios P1–P6 y parámetros metodológicos
 7. Recálculo de `screening_score` en las señales existentes
 8. Migración de señales a tecnologías y creación del Ciclo 0 - Histórico
@@ -687,6 +688,7 @@ El último punto es el único que cambia la operación de un ciclo en curso. Si 
 |---|---|
 | [`Plan_Fases_Actualizacion_Plataforma_EH_IETS.md`](Plan_Fases_Actualizacion_Plataforma_EH_IETS.md) | Plan de fases 0 a 7 y matriz de trazabilidad de los 20 RF |
 | [`BACKLOG.md`](BACKLOG.md) | Estado de cumplimiento por RF, diagramas, roadmap, riesgos y decisiones abiertas |
+| [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) | Inventario definitivo RF01 / D-06 y contrato de cada conector |
 | [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md) | Paleta, tipografía y componentes de interfaz |
 | [`backend/app/methodology.py`](backend/app/methodology.py) | Catálogos, estados y parámetros metodológicos |
 | [`backend/app/priority_engine.py`](backend/app/priority_engine.py) | Motor oficial %P |

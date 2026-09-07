@@ -1,14 +1,16 @@
 """Tablero estrategico, boletines y alertas (RF17, RF19, RF20)."""
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
-from .. import strategy_service
+from .. import graph_service, strategy_service
 from ..database import get_db
 from ..deps import get_current_user, require_permission
 from ..events import bump_state_version
-from ..models import AlertEvent, AlertSubscription, Bulletin, Cycle, User
+from ..models import AlertEvent, AlertSubscription, Bulletin, Cycle, StrategyGraph, User
 from ..rbac import P_CYCLE_WRITE, P_RESTRICTED_ANALYTICS, has_permission
 from ..strategy_service import StrategyRuleError
 from ..schemas import (
@@ -18,6 +20,8 @@ from ..schemas import (
     BulletinDecisionIn,
     BulletinOut,
     StrategyDashboardOut,
+    StrategyGraphIn,
+    StrategyGraphOut,
 )
 
 router = APIRouter(tags=["strategy"])
@@ -37,6 +41,10 @@ def strategy_dashboard(
     tech_type_id: int | None = None,
     band: str = "",
     status: str = "",
+    phase: str = "",
+    date_from: date | None = None,
+    date_to: date | None = None,
+    priority_min: int | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -49,8 +57,105 @@ def strategy_dashboard(
         tech_type_id=tech_type_id,
         band=band,
         status=status,
+        phase=phase,
+        date_from=date_from,
+        date_to=date_to,
+        priority_min=priority_min,
     )
     return StrategyDashboardOut(**data)
+
+
+@router.get("/api/strategy/graph")
+def strategy_graph(
+    cycle_id: int = Query(...),
+    cluster_id: int | None = None,
+    tech_type_id: int | None = None,
+    band: str = "",
+    status: str = "",
+    phase: str = "",
+    date_from: date | None = None,
+    date_to: date | None = None,
+    priority_min: int | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    cycle = _cycle(db, cycle_id)
+    return graph_service.build_graph(
+        db,
+        cycle,
+        include_restricted=has_permission(user, P_RESTRICTED_ANALYTICS),
+        cluster_id=cluster_id,
+        tech_type_id=tech_type_id,
+        band=band,
+        status=status,
+        phase=phase,
+        date_from=date_from,
+        date_to=date_to,
+        priority_min=priority_min,
+    )
+
+
+@router.get("/api/strategy/graphs", response_model=list[StrategyGraphOut])
+def list_saved_graphs(
+    cycle_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return graph_service.list_graphs(db, cycle_id, user.email)
+
+
+@router.post("/api/strategy/graphs", response_model=StrategyGraphOut)
+def save_graph_view(
+    payload: StrategyGraphIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    cycle = _cycle(db, payload.cycle_id)
+    row = graph_service.save_graph(
+        db,
+        cycle=cycle,
+        user_email=user.email,
+        title=payload.title,
+        payload=payload.payload,
+    )
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@router.put("/api/strategy/graphs/{graph_id}", response_model=StrategyGraphOut)
+def update_graph_view(
+    graph_id: int,
+    payload: StrategyGraphIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    cycle = _cycle(db, payload.cycle_id)
+    row = graph_service.save_graph(
+        db,
+        cycle=cycle,
+        user_email=user.email,
+        title=payload.title,
+        payload=payload.payload,
+        graph_id=graph_id,
+    )
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@router.delete("/api/strategy/graphs/{graph_id}", status_code=204)
+def delete_graph_view(
+    graph_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    row = db.get(StrategyGraph, graph_id)
+    if row is None or row.user_email != user.email:
+        raise HTTPException(status_code=404, detail="Grafo no encontrado")
+    db.delete(row)
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.post("/api/strategy/refresh/{cycle_id}")

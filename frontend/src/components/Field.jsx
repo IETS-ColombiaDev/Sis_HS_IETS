@@ -1,5 +1,9 @@
+import InfoTip from "./InfoTip";
+
 const labelStyle = {
-  display: "block",
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
   fontSize: 13,
   fontWeight: 600,
   color: "#0F172A",
@@ -29,20 +33,23 @@ function focusHandlers(error) {
   };
 }
 
-export function Label({ children, htmlFor, required }) {
+export function Label({ children, htmlFor, required, hint }) {
   return (
     <label htmlFor={htmlFor} style={labelStyle}>
-      {children}
-      {required && <span style={{ color: "#EF4444" }}> *</span>}
+      <span>
+        {children}
+        {required && <span style={{ color: "#EF4444" }}> *</span>}
+      </span>
+      <InfoTip text={hint} label={`Que es ${children}`} />
     </label>
   );
 }
 
-export function Input({ label, error, required, style, id, ...props }) {
+export function Input({ label, error, required, hint, style, id, ...props }) {
   return (
     <div style={{ marginBottom: 14 }}>
       {label && (
-        <Label htmlFor={id} required={required}>
+        <Label htmlFor={id} required={required} hint={hint}>
           {label}
         </Label>
       )}
@@ -57,11 +64,11 @@ export function Input({ label, error, required, style, id, ...props }) {
   );
 }
 
-export function Textarea({ label, error, required, rows = 4, style, id, ...props }) {
+export function Textarea({ label, error, required, hint, rows = 4, style, id, ...props }) {
   return (
     <div style={{ marginBottom: 14 }}>
       {label && (
-        <Label htmlFor={id} required={required}>
+        <Label htmlFor={id} required={required} hint={hint}>
           {label}
         </Label>
       )}
@@ -77,11 +84,11 @@ export function Textarea({ label, error, required, rows = 4, style, id, ...props
   );
 }
 
-export function Select({ label, error, required, children, style, id, ...props }) {
+export function Select({ label, error, required, hint, children, style, id, ...props }) {
   return (
     <div style={{ marginBottom: 14 }}>
       {label && (
-        <Label htmlFor={id} required={required}>
+        <Label htmlFor={id} required={required} hint={hint}>
           {label}
         </Label>
       )}

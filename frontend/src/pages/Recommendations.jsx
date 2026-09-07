@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { useToast } from "../components/Toast";
 import ModuleHeader from "../components/ModuleHeader";
+import { GLOSSARY } from "../constants/glossary";
 import PhaseGuide, { ModuleStatsRow } from "../components/PhaseGuide";
 import { Card } from "../components/Card";
 import Button from "../components/Button";
@@ -105,11 +106,13 @@ export default function Recommendations() {
       <ModuleHeader
         step="diseminacion"
         title="Diseminacion e informes"
+        titleHint={GLOSSARY.diseminacion}
         purpose="Fase 4 IETS: recomendaciones de adopcion para Colombia a partir de tecnologias caracterizadas."
       />
 
       <PhaseGuide
         phase="Fase 4 · Diseminacion"
+        hint={GLOSSARY.diseminacion}
         tasks={[
           "Generar informes de adopcion para el sistema de salud colombiano (Gemini + revision humana).",
           "Clasificar impacto esperado: alto / medio / bajo.",
@@ -128,10 +131,10 @@ export default function Recommendations() {
         ]}
       />
 
-      {status && !status.gemini_enabled && (
+      {status && !(status.ai_enabled ?? status.gemini_enabled) && (
         <Card style={{ marginBottom: 16, borderLeft: "4px solid #F59E0B", background: "#FFFBEB" }}>
           <div style={{ fontSize: 14, color: "#92400E" }}>
-            <strong>IA no configurada.</strong> Defina el token de Gemini en <strong>Configuracion</strong> para
+            <strong>IA no configurada.</strong> Defina la llave de MiniMax en <strong>Configuracion</strong> para
             generar recomendaciones enriquecidas. Sin ella se generan recomendaciones preliminares.
           </div>
         </Card>

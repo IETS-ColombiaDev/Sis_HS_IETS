@@ -408,7 +408,7 @@ def main() -> int:
 
     def list_connectors():
         codes = {c["code"] for c in r.get("/ingest/connectors")}
-        needed = {"clinicaltrials", "fda", "ema", "pubmed", "html"}
+        needed = {"clinicaltrials", "fda", "ema", "pubmed", "html", "health_canada", "ctis", "file_feed", "pcori_hs"}
         if not needed <= codes:
             raise RuntimeError(f"faltan conectores: {needed - codes}")
 
@@ -861,8 +861,19 @@ def main() -> int:
     if quota.get("original"):
         r.check(
             "restaurar cuota anual",
-            lambda: r.put("/methodology/params/cycle.max_per_year", {"value": quota["original"]}),
+            lambda: r.put("/methodology/params/cycle.max_per_year", {"value": "3"}),
         )
+
+    def drop_regression_cycle():
+        """La suite no debe dejar ciclos REG-* en la base operativa."""
+        if cycle.get("id"):
+            # No hay DELETE de ciclos: se deja marcado y el arranque lo expurga.
+            r.put(
+                f"/cycles/{cycle['id']}",
+                {"notes": "[REGRESSION-DISCARD] ciclo temporal de la suite de regresion."},
+            )
+
+    r.check("marcar ciclo de regresion para expurgo", drop_regression_cycle)
 
     r.client.close()
 

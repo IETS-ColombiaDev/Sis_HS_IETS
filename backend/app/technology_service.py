@@ -179,30 +179,6 @@ def backfill_technologies(db: Session) -> dict:
     if created:
         db.commit()
 
-    worked = [f for f in findings if f.status in WORKED_FINDING_STATUSES]
-    if worked:
-        cycle = get_or_create_historic_cycle(db)
-        existing_entries = {
-            row[0]
-            for row in db.query(CycleTechnology.technology_id)
-            .filter(CycleTechnology.cycle_id == cycle.id)
-            .all()
-        }
-        for finding in worked:
-            tech = db.query(Technology).filter(Technology.finding_id == finding.id).first()
-            if tech is None or tech.id in existing_entries:
-                continue
-            db.add(
-                CycleTechnology(
-                    cycle_id=cycle.id,
-                    technology_id=tech.id,
-                    status=LEGACY_STATUS_MAP.get(finding.status, "asignada_a_ciclo"),
-                    frozen=True,
-                    assigned_by="migracion-fase-1",
-                )
-            )
-            linked += 1
-        if linked:
-            db.commit()
-
+    # El acervo ya no se empuja a "Ciclo 0 - Historico": los ciclos oficiales
+    # formales de 2026 son el unico eje operativo (ver cycle_seed.py).
     return {"technologies_created": created, "historic_entries": linked}

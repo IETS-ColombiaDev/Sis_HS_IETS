@@ -3,6 +3,7 @@ import api, { apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
 import { PageHeader, Card } from "../components/Card";
+import { GLOSSARY } from "../constants/glossary";
 import Badge from "../components/Badge";
 import { Select } from "../components/Field";
 import Button from "../components/Button";
@@ -58,6 +59,7 @@ export default function Users() {
     <div>
       <PageHeader
         title="Usuarios y perfiles"
+        titleHint={GLOSSARY.rbac}
         subtitle="Matriz RBAC de cinco perfiles. Los permisos se otorgan por modulo y, en la matriz de priorizacion, por criterio: el evaluador tecnico califica P1, P5 y P6; el evaluador clinico califica P2, P3 y P4."
       />
 

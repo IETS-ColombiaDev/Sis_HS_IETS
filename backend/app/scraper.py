@@ -388,6 +388,35 @@ def _summarize(text: str, limit: int = 600) -> str:
     return cut + "..."
 
 
+def _enrich_with_ai(
+    findings_data: list[dict],
+    *,
+    source_title: str,
+    source_url: str,
+    html: str = "",
+    pdf_bytes: bytes | None = None,
+    pdf_text: str = "",
+) -> list[dict]:
+    """Si la IA web/OCR esta activa, entra al sitio y complementa hallazgos."""
+    try:
+        from . import ai_service, ai_web
+
+        if not ai_service.web_assist_enabled() and not ai_service.ocr_enabled():
+            return findings_data
+        extra = ai_web.extract_from_page(
+            source_title=source_title,
+            source_url=source_url,
+            html=html,
+            pdf_bytes=pdf_bytes,
+            pdf_text=pdf_text,
+        )
+        if extra:
+            return ai_web.merge_findings(findings_data, extra)
+    except Exception:  # noqa: BLE001
+        return findings_data
+    return findings_data
+
+
 # --------------------------------------------------------------------------- #
 #  Orquestacion
 # --------------------------------------------------------------------------- #
@@ -433,8 +462,22 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                     "published_date": "",
                 }
             ]
+            findings_data = _enrich_with_ai(
+                findings_data,
+                source_title=source.title,
+                source_url=source.url,
+                html="",
+                pdf_bytes=raw if raw else None,
+                pdf_text=pdf_text,
+            )
         else:
             findings_data = extract_candidates(source, text)
+            findings_data = _enrich_with_ai(
+                findings_data,
+                source_title=source.title,
+                source_url=source.url,
+                html=text,
+            )
 
         new_count = 0
         new_findings: list[Finding] = []
@@ -545,6 +588,7 @@ def preview_url(url: str) -> dict:
         main_text = extract_main_text(text, url)
         src = _PreviewSource(url)
         cands = extract_candidates(src, text)
+        cands = _enrich_with_ai(cands, source_title=title or url, source_url=url, html=text)
         sample = [
             {
                 "title": c["title"],

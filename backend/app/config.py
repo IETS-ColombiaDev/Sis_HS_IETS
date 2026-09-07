@@ -27,9 +27,16 @@ class Settings(BaseSettings):
     admin_emails: str = ""
     allow_dev_login: bool = True
 
-    # Gemini
+    # Gemini (respaldo opcional)
     gemini_api_key: str = ""
     gemini_model: str = ""
+
+    # MiniMax (proveedor principal de IA)
+    minimax_api_key: str = ""
+    minimax_model: str = ""
+    ai_provider: str = "auto"  # auto | minimax | gemini
+    ai_ocr_enabled: bool = False
+    ai_web_enabled: bool = True
 
     # General
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:8000,http://localhost:8000"
@@ -40,6 +47,11 @@ class Settings(BaseSettings):
     ingest_worker_interval_seconds: int = 20
     recaptcha_secret: str = ""
     recaptcha_site_key: str = ""
+
+    # Llaves gratuitas de fuentes de nivel A (D-06 / seccion 10.2).
+    openfda_api_key: str = ""
+    ncbi_api_key: str = ""
+    ncbi_email: str = "escaneo.horizonte@iets.org.co"
 
     @property
     def cors_origins_list(self) -> list[str]:

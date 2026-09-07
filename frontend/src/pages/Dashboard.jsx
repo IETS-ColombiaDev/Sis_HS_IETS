@@ -13,6 +13,8 @@ import { LoadingBlock } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
 import { ScreeningScore } from "../components/TriageBoard";
 import { IETS_PHASES, SCREENING_QUEUE_THRESHOLD } from "../constants/methodology";
+import { GLOSSARY } from "../constants/glossary";
+import InfoTip from "../components/InfoTip";
 
 export default function Dashboard() {
   const [wb, setWb] = useState(null);
@@ -45,7 +47,10 @@ export default function Dashboard() {
     <div>
       <div className="bandeja-header">
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>Bandeja de trabajo</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }} className="term-label">
+            Bandeja de trabajo
+            <InfoTip text={GLOSSARY.bandeja_trabajo} label="Que es la bandeja de trabajo" />
+          </h1>
           <p style={{ color: "#64748B", fontSize: 14, margin: 0 }}>
             Operacion diaria del escaneo de horizonte IETS — alerta temprana de tecnologias sanitarias para Colombia.
           </p>
@@ -66,7 +71,10 @@ export default function Dashboard() {
             onClick={() => navigate(phase.to)}
           >
             <span className="methodology-card-phase">{phase.phase}</span>
-            <strong>{phase.label}</strong>
+            <strong className="term-label">
+              {phase.label}
+              <InfoTip text={phase.help || phase.hint} label={`Que es ${phase.label}`} />
+            </strong>
             <span>{phase.short}</span>
           </button>
         ))}
@@ -80,11 +88,11 @@ export default function Dashboard() {
           marginBottom: 24,
         }}
       >
-        <KPICard label="En bandeja de entrada" value={wb.staging_unassigned} icon={<Icon name="inbox" />} accent="#6366F1" sub="Sin asignar a ciclo" />
-        <KPICard label="Cribado alto" value={wb.high_priority} icon={<Icon name="pulse" />} accent="#EF4444" sub={`Puntaje >${SCREENING_QUEUE_THRESHOLD}`} />
-        <KPICard label="Me toca calificar" value={wb.cycle_pending_for_me} icon={<Icon name="layers" />} accent="#3B82F6" sub={wb.my_criteria?.length ? wb.my_criteria.join(", ") : "Sin criterios asignados"} />
-        <KPICard label="Priorizadas" value={wb.cycle_prioritized} icon={<Icon name="check" />} accent="#10B981" sub="Ciclo activo" />
-        <KPICard label="Bajo vigilancia" value={wb.cycle_watchlist} icon={<Icon name="clock" />} accent="#F59E0B" sub="Monitoreo activo" />
+        <KPICard label="En bandeja de entrada" hint={GLOSSARY.bandeja_entrada} value={wb.staging_unassigned} icon={<Icon name="inbox" />} accent="#6366F1" sub="Sin asignar a ciclo" />
+        <KPICard label="Cribado alto" hint={GLOSSARY.cribado} value={wb.high_priority} icon={<Icon name="pulse" />} accent="#EF4444" sub={`Puntaje >${SCREENING_QUEUE_THRESHOLD}`} />
+        <KPICard label="Me toca calificar" hint={GLOSSARY.p16} value={wb.cycle_pending_for_me} icon={<Icon name="layers" />} accent="#3B82F6" sub={wb.my_criteria?.length ? wb.my_criteria.join(", ") : "Sin criterios asignados"} />
+        <KPICard label="Priorizadas" hint={GLOSSARY.priorizadas} value={wb.cycle_prioritized} icon={<Icon name="check" />} accent="#10B981" sub="Ciclo activo" />
+        <KPICard label="Bajo vigilancia" hint={GLOSSARY.bajo_vigilancia} value={wb.cycle_watchlist} icon={<Icon name="clock" />} accent="#F59E0B" sub="Monitoreo activo" />
       </div>
 
       {wb.active_cycle_id ? (

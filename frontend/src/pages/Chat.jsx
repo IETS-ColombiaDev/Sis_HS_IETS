@@ -135,7 +135,9 @@ export default function Chat() {
           <div>
             <div style={{ fontWeight: 700, fontSize: 15 }}>Asistente de Escaneo de Horizonte</div>
             <div style={{ fontSize: 12, color: "#94A3B8" }}>
-              {status?.gemini_enabled ? `Gemini · ${status.gemini_model}` : "Modo sin IA (configure GEMINI_API_KEY)"}
+              {status?.ai_enabled || status?.gemini_enabled
+                ? `${status.ai_provider === "gemini" ? "Gemini" : "MiniMax"} · ${status.ai_model || status.gemini_model || "modelo automatico"}`
+                : "Modo sin IA (configure MiniMax en Configuracion)"}
             </div>
           </div>
         </div>

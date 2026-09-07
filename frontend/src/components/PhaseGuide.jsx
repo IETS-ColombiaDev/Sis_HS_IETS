@@ -1,9 +1,14 @@
+import InfoTip from "./InfoTip";
+
 /** Guia compacta de la fase metodologica activa. */
-export default function PhaseGuide({ phase, tasks, nextLabel, nextTo, onNext }) {
+export default function PhaseGuide({ phase, tasks, nextLabel, nextTo, onNext, hint }) {
   return (
     <div className="phase-guide">
       <div className="phase-guide-head">
-        <span className="phase-guide-badge">{phase}</span>
+        <span className="phase-guide-badge term-label">
+          {phase}
+          <InfoTip text={hint} label={`Que es ${phase}`} />
+        </span>
         <span className="phase-guide-label">Que hace el tecnico en esta fase</span>
       </div>
       <ul className="phase-guide-tasks">

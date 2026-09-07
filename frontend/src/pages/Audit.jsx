@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import api, { apiError } from "../api/client";
 import { useToast } from "../components/Toast";
 import { Card, PageHeader } from "../components/Card";
+import { GLOSSARY } from "../constants/glossary";
 import Badge from "../components/Badge";
 import Button from "../components/Button";
 import { Input, Select } from "../components/Field";
@@ -104,6 +105,7 @@ export default function Audit() {
     <div>
       <PageHeader
         title="Bitacora de auditoria"
+        titleHint={GLOSSARY.bitacora}
         subtitle="Registro inmutable y de solo insercion. Cada cambio guarda usuario, IP, fecha UTC y los valores antes y despues. El motor de base de datos rechaza cualquier intento de modificarla o borrarla."
       />
 

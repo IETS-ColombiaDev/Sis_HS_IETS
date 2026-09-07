@@ -145,9 +145,44 @@ def run_schema_migrations() -> None:
             "failure_streak": "ALTER TABLE sources ADD COLUMN failure_streak INTEGER DEFAULT 0",
             "circuit_open_until": "ALTER TABLE sources ADD COLUMN circuit_open_until DATETIME",
             "last_error": "ALTER TABLE sources ADD COLUMN last_error TEXT DEFAULT ''",
+            "catalog_code": "ALTER TABLE sources ADD COLUMN catalog_code VARCHAR(40) DEFAULT ''",
+            "entity_type": "ALTER TABLE sources ADD COLUMN entity_type VARCHAR(60) DEFAULT ''",
+            "access_level": "ALTER TABLE sources ADD COLUMN access_level VARCHAR(8) DEFAULT ''",
+            "country": "ALTER TABLE sources ADD COLUMN country VARCHAR(80) DEFAULT ''",
+            "sync_frequency": "ALTER TABLE sources ADD COLUMN sync_frequency VARCHAR(40) DEFAULT ''",
+            "rate_limit_rpm": "ALTER TABLE sources ADD COLUMN rate_limit_rpm INTEGER",
+            "requires_api_key": "ALTER TABLE sources ADD COLUMN requires_api_key BOOLEAN DEFAULT 0",
+            "terms_url": "ALTER TABLE sources ADD COLUMN terms_url VARCHAR(1024) DEFAULT ''",
+            "terms_accepted_at": "ALTER TABLE sources ADD COLUMN terms_accepted_at DATETIME",
+            "robots_checked_at": "ALTER TABLE sources ADD COLUMN robots_checked_at DATETIME",
+            "robots_allowed": "ALTER TABLE sources ADD COLUMN robots_allowed BOOLEAN",
+            "health_status": "ALTER TABLE sources ADD COLUMN health_status VARCHAR(20) DEFAULT ''",
+            "last_ok_at": "ALTER TABLE sources ADD COLUMN last_ok_at DATETIME",
+            "schema_signature": "ALTER TABLE sources ADD COLUMN schema_signature VARCHAR(120) DEFAULT ''",
+            "provides_fields": "ALTER TABLE sources ADD COLUMN provides_fields TEXT",
+            "aliases": "ALTER TABLE sources ADD COLUMN aliases TEXT",
+            "verification_status": "ALTER TABLE sources ADD COLUMN verification_status VARCHAR(40) DEFAULT ''",
+            "catalog_note": "ALTER TABLE sources ADD COLUMN catalog_note TEXT DEFAULT ''",
+            "is_contrast": "ALTER TABLE sources ADD COLUMN is_contrast BOOLEAN DEFAULT 0",
+            "catalog_active": "ALTER TABLE sources ADD COLUMN catalog_active BOOLEAN DEFAULT 1",
+            "retired": "ALTER TABLE sources ADD COLUMN retired BOOLEAN DEFAULT 0",
+            "last_probe_at": "ALTER TABLE sources ADD COLUMN last_probe_at DATETIME",
+            "last_probe_detail": "ALTER TABLE sources ADD COLUMN last_probe_detail TEXT",
+            "next_review_due": "ALTER TABLE sources ADD COLUMN next_review_due DATETIME",
         }
         with engine.begin() as conn:
             for name, stmt in additions.items():
+                if name not in cols:
+                    conn.execute(text(stmt))
+
+    if "raw_records" in tables:
+        cols = _sqlite_columns(insp, "raw_records")
+        raw_additions = {
+            "adapter_version": "ALTER TABLE raw_records ADD COLUMN adapter_version VARCHAR(40) DEFAULT ''",
+            "endpoint": "ALTER TABLE raw_records ADD COLUMN endpoint VARCHAR(1024) DEFAULT ''",
+        }
+        with engine.begin() as conn:
+            for name, stmt in raw_additions.items():
                 if name not in cols:
                     conn.execute(text(stmt))
 
@@ -179,3 +214,16 @@ def run_schema_migrations() -> None:
                 conn.execute(
                     text("DELETE FROM methodology_params WHERE key = :key"), {"key": key}
                 )
+
+    if "chat_sessions" in tables:
+        cols = _sqlite_columns(insp, "chat_sessions")
+        chat_additions = {
+            "scope": "ALTER TABLE chat_sessions ADD COLUMN scope VARCHAR(40) DEFAULT ''",
+            "node_key": "ALTER TABLE chat_sessions ADD COLUMN node_key VARCHAR(120) DEFAULT ''",
+            "cycle_id": "ALTER TABLE chat_sessions ADD COLUMN cycle_id INTEGER",
+            "graph_id": "ALTER TABLE chat_sessions ADD COLUMN graph_id INTEGER",
+        }
+        with engine.begin() as conn:
+            for name, stmt in chat_additions.items():
+                if name not in cols:
+                    conn.execute(text(stmt))

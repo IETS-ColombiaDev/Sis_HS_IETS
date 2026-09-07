@@ -12,7 +12,9 @@ import EmptyState from "../components/EmptyState";
 import { LoadingBlock } from "../components/Spinner";
 import PhaseGuide, { ModuleStatsRow } from "../components/PhaseGuide";
 import ModuleHeader from "../components/ModuleHeader";
+import InfoTip from "../components/InfoTip";
 import { PERM } from "../constants/methodology";
+import { GLOSSARY } from "../constants/glossary";
 
 const FICHA = [
   "health_condition",
@@ -57,12 +59,12 @@ const DEFAULT_LABELS = {
 };
 
 const EDITORIAL_STEPS = [
-  { key: "borrador", label: "Borrador" },
-  { key: "revision_interna", label: "Interna" },
-  { key: "revision_externa", label: "Externa" },
-  { key: "con_observaciones", label: "Observado" },
-  { key: "aprobado_comite", label: "Comite" },
-  { key: "publicado", label: "Publicado" },
+  { key: "borrador", label: "Borrador", help: GLOSSARY.borrador },
+  { key: "revision_interna", label: "Interna", help: GLOSSARY.revision_interna },
+  { key: "revision_externa", label: "Externa", help: GLOSSARY.revision_externa },
+  { key: "con_observaciones", label: "Observado", help: GLOSSARY.observado },
+  { key: "aprobado_comite", label: "Comite", help: GLOSSARY.comite },
+  { key: "publicado", label: "Publicado", help: GLOSSARY.publicado },
 ];
 
 const ASSIGNMENT_STATUS = {
@@ -99,6 +101,40 @@ function fieldGroups(level) {
   return groups;
 }
 
+function ReportPreview({ title, levelLabel, statusLabel, cycleCode, labels, body, groups }) {
+  return (
+    <article className="iets-dossier">
+      <header className="iets-dossier-mast">
+        <div className="iets-dossier-brand">IETS</div>
+        <div>
+          <p className="iets-dossier-kicker">Instituto de Evaluacion Tecnologica en Salud · Colombia</p>
+          <h2>{title}</h2>
+          <p className="iets-dossier-sub">
+            {cycleCode || "Ciclo institucional"} · {levelLabel} · {statusLabel}
+          </p>
+        </div>
+      </header>
+      {groups.map((group, index) => (
+        <section key={group.title} className="iets-dossier-chapter">
+          <div className="iets-dossier-num">0{index + 1}</div>
+          <h3>{group.title}</h3>
+          {group.keys.map((key) => (
+            <article key={key} className="iets-dossier-block">
+              <h4>{labels[key] || key}</h4>
+              {(String(body[key] || "").split("\n").map((p) => p.trim()).filter(Boolean).length
+                ? String(body[key] || "").split("\n").map((p) => p.trim()).filter(Boolean)
+                : ["—"]
+              ).map((para, i) => (
+                <p key={`${key}-${i}`}>{para}</p>
+              ))}
+            </article>
+          ))}
+        </section>
+      ))}
+    </article>
+  );
+}
+
 function EditorialStepper({ status }) {
   const idx = EDITORIAL_STEPS.findIndex((s) => s.key === status);
   return (
@@ -109,7 +145,10 @@ function EditorialStepper({ status }) {
           className={i < idx ? "is-done" : i === idx ? "is-current" : ""}
         >
           <span>{i + 1}</span>
-          {step.label}
+          <span className="term-label">
+            {step.label}
+            <InfoTip text={step.help} label={`Que es ${step.label}`} />
+          </span>
         </li>
       ))}
     </ol>
@@ -141,6 +180,7 @@ export default function Evaluation() {
   const [inviteLink, setInviteLink] = useState("");
   const [comment, setComment] = useState({ field_key: "", body: "" });
   const [versions, setVersions] = useState([]);
+  const [showDossier, setShowDossier] = useState(true);
 
   const loadQueue = useCallback(async () => {
     if (!cycleId) {
@@ -206,6 +246,7 @@ export default function Evaluation() {
         setLevel(data.product_level || "ficha");
         setConfidential(Boolean(data.confidential));
         setBody(data.body || {});
+        setShowDossier(data.status === "publicado" || !["borrador", "con_observaciones"].includes(data.status));
         setInviteLink("");
         if (!data.coi_required) {
           api
@@ -347,14 +388,16 @@ export default function Evaluation() {
       <ModuleHeader
         step="caracterizacion"
         title="Evaluacion"
+        titleHint={GLOSSARY.evaluacion}
         purpose={
           cycle
-            ? `Fase 3 · Ciclo ${cycle.code}. Expediente editorial: ficha, informe o Mini-HTA con revision por pares.`
+            ? `Fase 3 · ${cycle.code}. Expediente editorial: ficha, informe o Mini-HTA con revision por pares.`
             : "Fase 3 · Expediente editorial: ficha, informe o Mini-HTA con revision por pares."
         }
       />
       <PhaseGuide
         phase="Fase 3"
+        hint={GLOSSARY.evaluacion}
         tasks={[
           "Complete la ficha, el informe o el Mini-HTA segun el puntaje de priorizacion",
           "Declare conflicto de interes antes de leer o editar el expediente",
@@ -455,8 +498,11 @@ export default function Evaluation() {
                         Guardar
                       </Button>
                     )}
+                    <Button variant="outline" onClick={() => setShowDossier((v) => !v)}>
+                      {showDossier ? "Ver campos" : "Ver expediente"}
+                    </Button>
                     <Button variant="secondary" onClick={exportHtml}>
-                      Exportar ficha institucional
+                      Exportar HTML institucional
                     </Button>
                     {(doc.allowed_transitions || []).map((status) => (
                       <Button key={status} variant="outline" onClick={() => move(status)}>
@@ -474,6 +520,7 @@ export default function Evaluation() {
                 />
                 <Select
                   label="Nivel de producto (sugerido por puntaje; se puede cambiar)"
+                  hint={GLOSSARY.mini_hta}
                   value={level}
                   disabled={!editable}
                   onChange={(e) => setLevel(e.target.value)}
@@ -501,32 +548,51 @@ export default function Evaluation() {
                   </p>
                 )}
 
-                {fieldGroups(level).map((group) => (
-                  <section key={group.title} className="eval-field-group">
-                    <h4>{group.title}</h4>
-                    {group.keys.map((key) => (
-                      <Textarea
-                        key={key}
-                        label={labels[key] || key}
-                        required
-                        rows={key.startsWith("budget") ? 2 : 4}
-                        value={body[key] || ""}
-                        disabled={!editable}
-                        onChange={(e) => setBody({ ...body, [key]: e.target.value })}
-                      />
-                    ))}
-                  </section>
-                ))}
-                <section className="eval-field-group">
-                  <h4>Dialogo temprano</h4>
-                  <Textarea
-                    label={labels.early_dialogue_notes}
-                    rows={3}
-                    value={body.early_dialogue_notes || ""}
-                    disabled={!editable}
-                    onChange={(e) => setBody({ ...body, early_dialogue_notes: e.target.value })}
+                {showDossier ? (
+                  <ReportPreview
+                    title={title}
+                    levelLabel={doc.product_level_label}
+                    statusLabel={doc.status_label}
+                    cycleCode={cycle?.code}
+                    labels={labels}
+                    body={body}
+                    groups={[
+                      ...fieldGroups(level),
+                      ...(body.early_dialogue_notes
+                        ? [{ title: "Dialogo temprano", keys: ["early_dialogue_notes"] }]
+                        : []),
+                    ]}
                   />
-                </section>
+                ) : (
+                  <>
+                    {fieldGroups(level).map((group) => (
+                      <section key={group.title} className="eval-field-group">
+                        <h4>{group.title}</h4>
+                        {group.keys.map((key) => (
+                          <Textarea
+                            key={key}
+                            label={labels[key] || key}
+                            required
+                            rows={key.startsWith("budget") ? 2 : 4}
+                            value={body[key] || ""}
+                            disabled={!editable}
+                            onChange={(e) => setBody({ ...body, [key]: e.target.value })}
+                          />
+                        ))}
+                      </section>
+                    ))}
+                    <section className="eval-field-group">
+                      <h4>Dialogo temprano</h4>
+                      <Textarea
+                        label={labels.early_dialogue_notes}
+                        rows={3}
+                        value={body.early_dialogue_notes || ""}
+                        disabled={!editable}
+                        onChange={(e) => setBody({ ...body, early_dialogue_notes: e.target.value })}
+                      />
+                    </section>
+                  </>
+                )}
 
                 {canInvite && (
                   <form onSubmit={sendInvite} className="eval-invite">

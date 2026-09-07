@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { useToast } from "../components/Toast";
 import ModuleHeader from "../components/ModuleHeader";
+import { GLOSSARY } from "../constants/glossary";
 import PhaseGuide, { ModuleStatsRow } from "../components/PhaseGuide";
 import { Card } from "../components/Card";
 import Button from "../components/Button";
@@ -66,8 +67,8 @@ export default function Characterization() {
   };
 
   const enhanceFinding = async (f) => {
-    if (!status?.gemini_enabled) {
-      toast.warning("Configure Gemini en Configuracion");
+    if (!(status?.ai_enabled ?? status?.gemini_enabled)) {
+      toast.warning("Configure MiniMax en Configuracion");
       return;
     }
     setEnhancingId(f.id);
@@ -93,6 +94,7 @@ export default function Characterization() {
       <ModuleHeader
         step="caracterizacion"
         title="Caracterizacion de tecnologias"
+        titleHint={GLOSSARY.caracterizacion}
         purpose="Fase 3 IETS: completar ficha tecnica (horizonte, fase, area terapeutica, evidencia) antes de diseminar."
         actions={
           <Button variant="secondary" onClick={() => navigate("/priorizacion")}>
@@ -103,6 +105,7 @@ export default function Characterization() {
 
       <PhaseGuide
         phase="Fase 3 · Caracterizacion"
+        hint={GLOSSARY.caracterizacion}
         tasks={[
           "Describir la tecnologia emergente y su evidencia disponible.",
           "Clasificar horizonte temporal (emergente / transicional / inminente).",

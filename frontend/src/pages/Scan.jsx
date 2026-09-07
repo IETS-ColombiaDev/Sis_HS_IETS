@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { useToast } from "../components/Toast";
 import ModuleHeader from "../components/ModuleHeader";
+import { GLOSSARY } from "../constants/glossary";
 import PhaseGuide, { ModuleStatsRow } from "../components/PhaseGuide";
 import { Card, SectionTitle } from "../components/Card";
 import Button from "../components/Button";
@@ -134,6 +135,7 @@ export default function Scan() {
       <ModuleHeader
         step="identificacion"
         title="Vigilancia de fuentes"
+        titleHint={GLOSSARY.vigilancia}
         purpose="Fase 1 · Identificacion: rastreo sistematico de referentes internacionales para capturar senales de tecnologias sanitarias emergentes."
         actions={
           isEditor && (
@@ -153,10 +155,11 @@ export default function Scan() {
 
       <PhaseGuide
         phase="Fase 1 · Identificacion"
+        hint={GLOSSARY.vigilancia}
         tasks={[
-          "Seleccionar referentes del inventario internacional (NIHR IO, EuroScan, RedETS, etc.).",
-          "Ejecutar rastreo automatizado: extraccion HTML/PDF y deteccion de senales.",
-          "Las senales nuevas pasan automaticamente a Priorizacion (Fase 2).",
+          "Priorice las fuentes de nivel A y B: ClinicalTrials, openFDA, Health Canada, EMA, PubMed y TGA.",
+          "La sonda corre antes de cada corrida de contrato. Ambar o rojo suspende esa fuente, no el resto.",
+          "Las senales nuevas llegan a la bandeja de entrada; el nivel D no pisa campos ya llenados por A/B.",
         ]}
         nextLabel="Priorizacion de senales"
         onNext={() => navigate("/priorizacion")}
@@ -266,6 +269,9 @@ export default function Scan() {
                       <div className="source-scan-body">
                         <div className="source-scan-title-row">
                           <span className="source-scan-title" title={s.title}>{s.title}</span>
+                          {s.catalog_code && <span className="catalog-code">{s.catalog_code}</span>}
+                          {s.access_level && <Badge tone={s.access_level}>Nivel {s.access_level}</Badge>}
+                          {s.health_status && <Badge tone={s.health_status}>{s.health_status}</Badge>}
                           {tag && <Badge tone={tag.tone}>{tag.label}</Badge>}
                         </div>
                         <div className="source-scan-meta">

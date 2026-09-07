@@ -22,6 +22,7 @@ export default function PublicFiche() {
   }, [id]);
 
   const labels = data?.field_labels || {};
+  const entries = Object.entries(data?.body || {}).filter(([, value]) => String(value || "").trim());
 
   return (
     <PublicShell
@@ -36,16 +37,52 @@ export default function PublicFiche() {
       {error && <p className="public-submit-error">{error}</p>}
 
       {data && (
-        <>
-          {Object.entries(data.body || {}).map(([key, value]) => (
-            <section key={key} className="eval-public-block">
-              <h3>{labels[key] || key}</h3>
-              <p>{value}</p>
-            </section>
+        <article className="iets-dossier is-public">
+          <header className="iets-dossier-mast">
+            <div className="iets-dossier-brand">IETS</div>
+            <div>
+              <p className="iets-dossier-kicker">Consulta publica · Escaneo de horizonte</p>
+              <h2>{data.title}</h2>
+              <p className="iets-dossier-sub">
+                {[data.commercial_name, data.inn_name && `DCI ${data.inn_name}`, data.manufacturer]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            </div>
+          </header>
+
+          <div className="public-fiche-meta">
+            <div>
+              <b>Cluster</b>
+              <span>{data.cluster || "—"}</span>
+            </div>
+            <div>
+              <b>Horizonte</b>
+              <span>{data.ttm_band_label || "—"}</span>
+            </div>
+            <div>
+              <b>Producto</b>
+              <span>{data.product_level || "Ficha"}</span>
+            </div>
+          </div>
+
+          {entries.map(([key, value], index) => (
+            <article key={key} className="iets-dossier-block">
+              <h4>
+                <span className="iets-dossier-num-inline">0{index + 1}</span>
+                {labels[key] || key}
+              </h4>
+              {String(value)
+                .split("\n")
+                .filter((p) => p.trim())
+                .map((para, i) => (
+                  <p key={`${key}-${i}`}>{para}</p>
+                ))}
+            </article>
           ))}
 
-          <section className="eval-public-block">
-            <h3>Ensayos clinicos asociados</h3>
+          <section className="iets-dossier-block">
+            <h4>Ensayos clinicos asociados</h4>
             {(data.nct_ids || []).length === 0 ? (
               <p>Sin identificadores NCT registrados.</p>
             ) : (
@@ -70,7 +107,7 @@ export default function PublicFiche() {
             </Button>
             <Link to="/expedientes">Volver al buscador</Link>
           </div>
-        </>
+        </article>
       )}
     </PublicShell>
   );

@@ -5,6 +5,7 @@ import { Card } from "../components/Card";
 import Button from "../components/Button";
 import EmptyState from "../components/EmptyState";
 import ModuleHeader from "../components/ModuleHeader";
+import { GLOSSARY } from "../constants/glossary";
 
 export default function Alerts() {
   const toast = useToast();
@@ -45,6 +46,7 @@ export default function Alerts() {
       <ModuleHeader
         step="diseminacion"
         title="Alertas tempranas"
+        titleHint={GLOSSARY.alertas}
         purpose="Avisos operativos: nuevos ensayos fase III en el pais y cambios de fase en tecnologias de alto impacto presupuestal. El envio por correo queda pendiente."
         actions={<Button onClick={subscribeAll}>Suscribirme</Button>}
       />

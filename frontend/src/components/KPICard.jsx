@@ -1,4 +1,6 @@
-export default function KPICard({ label, value, icon, accent = "#6366F1", sub }) {
+import InfoTip from "./InfoTip";
+
+export default function KPICard({ label, value, icon, accent = "#6366F1", sub, hint }) {
   return (
     <div
       style={{
@@ -20,6 +22,9 @@ export default function KPICard({ label, value, icon, accent = "#6366F1", sub })
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
             fontSize: 11,
             fontWeight: 600,
             letterSpacing: 0.5,
@@ -28,6 +33,7 @@ export default function KPICard({ label, value, icon, accent = "#6366F1", sub })
           }}
         >
           {label}
+          <InfoTip text={hint} label={`Que es ${label}`} />
         </div>
         {icon && (
           <div

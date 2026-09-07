@@ -7,6 +7,7 @@ El plan la pide como fuente complementaria, bajo la misma politica de ritmo
 """
 from __future__ import annotations
 
+from ..config import settings
 from .base import (
     CanonicalRecord,
     Connector,
@@ -15,6 +16,7 @@ from .base import (
     parse_compact_date,
     register,
     request_json,
+    schema_signature,
 )
 
 ESEARCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
@@ -34,12 +36,14 @@ class PubmedConnector(Connector):
         "Indice de literatura del NCBI. Recupera articulos recientes de "
         "escaneo de horizonte y tecnologias emergentes como evidencia."
     )
-    min_interval = 0.35
+    min_interval = 0.12
+    adapter_version = "2"
 
     def fetch(self, *, config: dict, url: str = "") -> ConnectorResult:
         config = config or {}
         term = clean_text(config.get("query_term") or DEFAULT_TERM)
         retmax = int(config.get("page_size", 25))
+        common = _ncbi_params(config)
 
         search = request_json(
             ESEARCH,
@@ -49,6 +53,7 @@ class PubmedConnector(Connector):
                 "retmode": "json",
                 "retmax": max(1, min(retmax, 100)),
                 "sort": "pub_date",
+                **common,
             },
             connector_code=self.code,
             min_interval=self.min_interval,
@@ -59,7 +64,7 @@ class PubmedConnector(Connector):
 
         summary = request_json(
             ESUMMARY,
-            params={"db": "pubmed", "id": ",".join(idlist), "retmode": "json"},
+            params={"db": "pubmed", "id": ",".join(idlist), "retmode": "json", **common},
             connector_code=self.code,
             min_interval=self.min_interval,
         )
@@ -72,6 +77,9 @@ class PubmedConnector(Connector):
         return ConnectorResult(
             records=records,
             message=f"{len(records)} articulos de PubMed.",
+            schema_signature=schema_signature(summary),
+            adapter_version=self.adapter_version,
+            endpoint=ESUMMARY,
         )
 
     def _to_record(self, pmid: str, doc: dict) -> CanonicalRecord | None:
@@ -101,6 +109,17 @@ class PubmedConnector(Connector):
             phase3_completion_date=parse_compact_date(pubdate[:10] if len(pubdate) >= 7 else ""),
             raw=doc,
         )
+
+
+def _ncbi_params(config: dict) -> dict:
+    params = {
+        "email": clean_text(config.get("email") or settings.ncbi_email) or "escaneo.horizonte@iets.org.co",
+        "tool": "iets_horizon_scanning",
+    }
+    api_key = clean_text(config.get("api_key") or settings.ncbi_api_key)
+    if api_key:
+        params["api_key"] = api_key
+    return params
 
 
 register(PubmedConnector())

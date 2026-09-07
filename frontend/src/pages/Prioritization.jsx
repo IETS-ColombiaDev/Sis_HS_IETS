@@ -16,6 +16,7 @@ import { LoadingBlock } from "../components/Spinner";
 import PhaseGuide, { ModuleStatsRow } from "../components/PhaseGuide";
 import PriorityMatrix from "../components/PriorityMatrix";
 import { PERM, TECH_STATUS_LABELS } from "../constants/methodology";
+import { GLOSSARY } from "../constants/glossary";
 
 /**
  * Fase 2 de la metodologia dentro de un ciclo: filtrado y calificacion con la
@@ -117,6 +118,7 @@ export default function Prioritization() {
       <div>
         <PageHeader
           title="Priorizacion"
+          titleHint={GLOSSARY.priorizacion}
           subtitle="La priorizacion ocurre siempre dentro de un ciclo operativo."
         />
         <Card>
@@ -135,6 +137,7 @@ export default function Prioritization() {
     <div>
       <PageHeader
         title="Priorizacion"
+        titleHint={GLOSSARY.priorizacion}
         subtitle={`Matriz oficial de seis criterios binarios en ${cycle?.code}. El indice %P solo se calcula cuando los seis criterios estan validados por los perfiles habilitados.`}
         actions={
           <Button variant={onlyMine ? "primary" : "secondary"} onClick={() => setOnlyMine((v) => !v)}>
@@ -146,6 +149,7 @@ export default function Prioritization() {
 
       <PhaseGuide
         phase="Fase 2 · Priorizacion"
+        hint={GLOSSARY.priorizacion}
         tasks={[
           `Su perfil califica: ${rateableCriteria.length ? rateableCriteria.join(", ") : "ningun criterio"}.`,
           "Excluya con causa tipificada lo que no cumple el criterio de novedad.",

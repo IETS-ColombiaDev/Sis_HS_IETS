@@ -3,7 +3,7 @@
 Documento vivo de producto, arquitectura y trazabilidad metodológica.
 Ordenado según el [Plan de actualización por fases](Plan_Fases_Actualizacion_Plataforma_EH_IETS.md), cuya recomendación 5 exige mantener aquí el estado de cumplimiento de cada requerimiento funcional para que la trazabilidad ante entes de control esté siempre disponible.
 
-**Versión del sistema:** v6.0.0 · **Fases cerradas:** 0, 1, 2, 3, 4, 5 y 6 · **Fase en curso:** 7
+**Versión del sistema:** v6.1.0 · **Fases cerradas:** 0, 1, 2, 3, 4, 5 y 6 · **Fase en curso:** 7 · **D-06 cerrado en código:** catálogo de 53 fuentes
 
 ---
 
@@ -71,7 +71,7 @@ Estado real verificado contra el código en la fecha de esta actualización.
 
 | RF | Requerimiento | Fase | Estado | Dónde está implementado |
 |---|---|---|---|---|
-| RF01 | Captura proactiva por APIs y conectores | 4 | **Hecho** | Adaptadores `clinicaltrials`, `fda`, `ema`, `pubmed`, `who_ictrp`; HTML como último recurso; cola `ingest_jobs` |
+| RF01 | Captura proactiva por APIs y conectores | 4 | **Hecho (D-06)** | Catálogo de 53 fuentes; adaptadores `clinicaltrials`, `fda` multiconjunto, `ema` descarga, `pubmed`, `who_ictrp`, `health_canada`, `ctis`, `file_feed`, `pcori_hs`, `manual`; sonda, cobertura e importación |
 | RF02 | Portal web de postulación reactiva | 4 | **Hecho** | `/postular` público + cola de moderación en `/postulaciones`; COI bloqueante |
 | RF03 | Staging data lake con `raw_payload` | 1 / 4 | **Hecho** | `raw_records` conserva el crudo por conector y `external_id`; reproceso sin volver a la fuente |
 | RF04 | Buzón de entrada y previsualización | 1 / 4 | **Hecho** | Filtro por canal, preview del crudo y transferencia por lotes |
