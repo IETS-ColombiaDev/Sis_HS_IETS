@@ -47,6 +47,18 @@ const PRESETS = {
   // Condicion del glosario
   nueva: { bg: "#E0E7FF", color: "#3730A3", border: "#A5B4FC" },
 
+  A: { bg: "#D1FAE5", color: "#065F46", border: "#6EE7B7" },
+  B: { bg: "#CCFBF1", color: "#0F766E", border: "#5EEAD4" },
+  C: { bg: "#FEF3C7", color: "#92400E", border: "#FDE68A" },
+  D: { bg: "#DBEAFE", color: "#1E40AF", border: "#BFDBFE" },
+  E: { bg: "#F1F5F9", color: "#475569", border: "#E2E8F0" },
+  verde: { bg: "#D1FAE5", color: "#065F46", border: "#6EE7B7" },
+  ambar: { bg: "#FEF3C7", color: "#92400E", border: "#FDE68A" },
+  rojo: { bg: "#FEE2E2", color: "#991B1B", border: "#FCA5A5" },
+  sin_sonda: { bg: "#F1F5F9", color: "#64748B", border: "#E2E8F0" },
+  verificada: { bg: "#D1FAE5", color: "#065F46", border: "#6EE7B7" },
+  declarada: { bg: "#DBEAFE", color: "#1E40AF", border: "#BFDBFE" },
+  observacion: { bg: "#FEF3C7", color: "#92400E", border: "#FDE68A" },
   historico: { bg: "#F1F5F9", color: "#64748B", border: "#E2E8F0" },
   info: { bg: "#EEF2FF", color: "#4338CA", border: "#C7D2FE" },
   warning: { bg: "#FEF3C7", color: "#92400E", border: "#FDE68A" },

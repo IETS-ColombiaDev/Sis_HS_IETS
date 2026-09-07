@@ -110,8 +110,8 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
   };
 
   const enhanceNote = async (note) => {
-    if (!status?.gemini_enabled) {
-      toast.warning("Configure el token de Gemini en Configuracion para usar IA");
+    if (!(status?.ai_enabled ?? status?.gemini_enabled)) {
+      toast.warning("Configure MiniMax en Configuracion para usar IA");
       return;
     }
     setEnhancingId(note.id);
@@ -221,7 +221,7 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
                     {isEditor && (
                       <div style={{ display: "flex", gap: 4 }}>
                         <button type="button" title="Descargar nota" onClick={() => downloadNote(n)} style={iconBtn}><Icon name="doc" size={13} /></button>
-                        {status?.gemini_enabled && (
+                        {(status?.ai_enabled ?? status?.gemini_enabled) && (
                           <button type="button" title="Mejorar con IA" onClick={() => enhanceNote(n)} disabled={enhancingId === n.id} style={iconBtn}>
                             <Icon name="spark" size={13} />
                           </button>

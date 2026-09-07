@@ -11,7 +11,8 @@ export const IETS_PHASES = [
     short: "Vigilar fuentes y capturar senales",
     to: "/vigilancia",
     icon: "radar",
-    hint: "Rastreo de referentes internacionales y captura en el staging",
+    hint: "Buscar en el mundo senales de tecnologias nuevas y guardarlas para revisarlas.",
+    help: "Paso 1. El equipo vigila fuentes (ensayos, agencias, literatura) y captura senales de tecnologias que aun no estan en Colombia. Nada se decide aqui: solo se detecta y se guarda en la bandeja.",
   },
   {
     key: "priorizacion",
@@ -20,7 +21,8 @@ export const IETS_PHASES = [
     short: "Calificar la matriz P1 a P6",
     to: "/priorizacion",
     icon: "layers",
-    hint: "Matriz oficial de seis criterios binarios; %P = (suma / 6) x 100",
+    hint: "Ponerle nota a cada tecnologia con seis preguntas si/no (P1 a P6).",
+    help: "Paso 2. Cada tecnologia recibe seis preguntas oficiales (P1 a P6). Cada si suma 1 punto. Las que llegan al umbral pasan primero a evaluacion; las demas quedan en vigilancia o se descartan del ciclo.",
   },
   {
     key: "caracterizacion",
@@ -29,7 +31,8 @@ export const IETS_PHASES = [
     short: "Ficha, informe o Mini-HTA",
     to: "/evaluacion",
     icon: "doc",
-    hint: "Expediente editorial con revision por pares",
+    hint: "Redactar la ficha o el informe y pasarlo por revision de pares.",
+    help: "Paso 3. Se escribe la ficha, el informe o un Mini-HTA (informe mas profundo) y un revisor independiente lo revisa antes de publicarlo.",
   },
   {
     key: "diseminacion",
@@ -38,7 +41,8 @@ export const IETS_PHASES = [
     short: "Informar, publicar y alertar",
     to: "/diseminacion",
     icon: "bulb",
-    hint: "Informes, boletines, ficha publica y tablero estrategico",
+    hint: "Compartir informes, boletines, tablero y alertas con quien decide.",
+    help: "Paso 4. Se publica lo ya evaluado: informes, boletin del ciclo, tablero de indicadores y alertas para MinSalud, INVIMA y otros tomadores de decision.",
   },
 ];
 

@@ -531,52 +531,8 @@ def has_published_report(db: Session, cycle_id: int, technology_id: int) -> bool
     return row is not None
 
 
-def render_institutional_html(doc: EvaluationDoc, tech: Technology | None = None) -> str:
+def render_institutional_html(doc: EvaluationDoc, tech: Technology | None = None, cycle_code: str = "") -> str:
     """Plantilla HTML/CSS institucional. El PDF se obtiene por impresion o Playwright."""
-    body = doc.body or {}
-    fields = catalog.required_fields(doc.product_level)
-    rows = []
-    for key in fields:
-        label = catalog.FIELD_LABELS.get(key, key)
-        value = escape(str(body.get(key) or "").strip() or "—")
-        rows.append(
-            f"<section class='block'><h2>{escape(label)}</h2><p>{value.replace(chr(10), '<br>')}</p></section>"
-        )
-    tech_name = escape(_tech_title(tech) if tech else doc.title)
-    level = escape(catalog.PRODUCT_LEVEL_LABELS.get(doc.product_level, doc.product_level))
-    status = escape(catalog.EDITORIAL_STATUS_LABELS.get(doc.status, doc.status))
-    version = f"{doc.version_major}.{doc.version_minor}"
-    confidential = "CONFIDENCIAL — uso institucional" if doc.confidential else "Documento institucional"
-    return f"""<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8"/>
-  <title>{escape(doc.title or tech_name)} — IETS</title>
-  <style>
-    @page {{ margin: 18mm 16mm; }}
-    body {{ font-family: "Segoe UI", Calibri, Arial, sans-serif; color: #0F172A; margin: 0; }}
-    header {{ border-bottom: 4px solid #6366F1; padding: 0 0 16px; margin-bottom: 24px; }}
-    .kicker {{ letter-spacing: 0.14em; text-transform: uppercase; font-size: 11px; color: #6366F1; font-weight: 700; }}
-    h1 {{ font-size: 22px; margin: 8px 0 4px; }}
-    .meta {{ color: #64748B; font-size: 13px; }}
-    .stamp {{ float: right; font-size: 11px; font-weight: 700; color: #B45309; border: 1px solid #F59E0B; padding: 4px 8px; }}
-    .block {{ margin: 18px 0; page-break-inside: avoid; }}
-    h2 {{ font-size: 14px; color: #312E81; margin: 0 0 6px; }}
-    p {{ line-height: 1.5; margin: 0; white-space: pre-wrap; }}
-    footer {{ margin-top: 32px; border-top: 1px solid #E2E8F0; padding-top: 10px; font-size: 11px; color: #94A3B8; }}
-  </style>
-</head>
-<body>
-  <header>
-    <div class="stamp">{escape(confidential)}</div>
-    <div class="kicker">Instituto de Evaluacion Tecnologica en Salud — Escaneo de Horizonte</div>
-    <h1>{escape(doc.title or tech_name)}</h1>
-    <div class="meta">{level} · {status} · version {escape(version)}</div>
-  </header>
-  {''.join(rows)}
-  <footer>
-    Documento generado por la plataforma de escaneo de horizonte del IETS.
-    La publicacion formal requiere aprobacion del comite tecnico.
-  </footer>
-</body>
-</html>"""
+    from .report_html import render_evaluation_html
+
+    return render_evaluation_html(doc, tech=tech, cycle_code=cycle_code)

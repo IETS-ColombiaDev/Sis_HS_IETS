@@ -14,6 +14,7 @@ import { LoadingBlock } from "../components/Spinner";
 import PhaseGuide, { ModuleStatsRow } from "../components/PhaseGuide";
 import { downloadFromApi } from "../utils/download";
 import { PERM, TECH_STATUS_LABELS } from "../constants/methodology";
+import { GLOSSARY } from "../constants/glossary";
 
 /**
  * Fase 3 del plan: depuracion del acervo del ciclo.
@@ -906,11 +907,13 @@ export default function Screening() {
     <div>
       <PageHeader
         title="Filtrado y depuracion"
+        titleHint={GLOSSARY.filtrado}
         subtitle="Modulo 2 de la especificacion: desduplicacion difusa, criterio de novedad con verificacion regulatoria y Listado Unico por cluster."
       />
 
       <PhaseGuide
         phase="Modulo 2"
+        hint={GLOSSARY.filtrado}
         tasks={[
           "Ejecutar el barrido difuso y resolver los pares propuestos: fusionar o declarar que son distintas.",
           "Cruzar cada tecnologia con el indice del INVIMA y registrar por que via es novedosa.",

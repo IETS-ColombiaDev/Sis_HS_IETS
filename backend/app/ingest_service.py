@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from . import ingest
 from .audit import record_action
 from .events import bump_state_version
-from .ingest.base import CanonicalRecord, ConnectorError, RateLimited
+from .ingest.base import CanonicalRecord, ConnectorError, RateLimited, SchemaChanged
 from .methodology import get_param
 from .models import Finding, IngestJob, RawRecord, ScrapeLog, Source, Technology
 from .priority import compute_screening_score
@@ -26,7 +26,9 @@ from .technology_service import sync_technology_from_finding
 
 log = logging.getLogger(__name__)
 
-HTML_CONNECTORS = {"html", "", None}
+HTML_CONNECTORS = {"html", "pdf", "", None}
+GOVERNOR_LEVELS = {"A", "B"}
+LEVEL_RANK = {"A": 4, "B": 3, "C": 2, "D": 1, "E": 0, "": 0}
 
 
 def enqueue(
@@ -40,6 +42,8 @@ def enqueue(
     jobs: list[IngestJob] = []
     now = datetime.now(timezone.utc)
     for source in sources:
+        if getattr(source, "retired", False) or source.catalog_active is False:
+            continue
         pending = (
             db.query(IngestJob)
             .filter(
@@ -125,12 +129,28 @@ def run_job(db: Session, job_id: int) -> IngestJob:
         )
 
     connector_code = (job.connector or source.connector or "html").lower()
-    used_html = connector_code in HTML_CONNECTORS or connector_code == "html"
+    used_html = connector_code in HTML_CONNECTORS
+    if (source.access_level or "").upper() in GOVERNOR_LEVELS and source.catalog_code:
+        from .probe_service import probe_source
+
+        probe = probe_source(db, source)
+        if probe.get("status") in {"ambar", "rojo"}:
+            return _fail(
+                db,
+                job,
+                f"Sonda {probe.get('status')}: {probe.get('message')}. Ingesta no arrancada.",
+                retry=probe.get("status") == "rojo",
+            )
     try:
         if used_html:
             found, new, message, partial = _run_html(db, source, job.triggered_by)
         else:
             found, new, message, partial = _run_adapter(db, source, job, connector_code)
+    except SchemaChanged as exc:
+        source.health_status = "ambar"
+        source.scrape_enabled = False
+        source.last_error = str(exc)[:2000]
+        return _fail(db, job, str(exc), retry=False)
     except RateLimited as exc:
         _open_circuit(db, source, hours=1, error=str(exc))
         return _fail(db, job, str(exc), retry=True)
@@ -144,6 +164,9 @@ def run_job(db: Session, job_id: int) -> IngestJob:
 
     _clear_circuit(source)
     source.last_scraped_at = datetime.now(timezone.utc)
+    source.last_ok_at = source.last_scraped_at
+    if source.health_status != "ambar":
+        source.health_status = "verde"
     job.items_found = found
     job.items_new = new
     job.message = message
@@ -190,6 +213,8 @@ def persist_record(
         .filter(RawRecord.connector == connector, RawRecord.external_id == record.external_id)
         .first()
     )
+    adapter = ingest.get_connector(connector)
+    adapter_version = getattr(adapter, "adapter_version", "") if adapter else ""
     if raw is None:
         raw = RawRecord(
             connector=connector,
@@ -198,6 +223,8 @@ def persist_record(
             job_id=job_id,
             payload=payload,
             payload_hash=payload_hash,
+            adapter_version=adapter_version,
+            endpoint=(source.url or "")[:1024],
         )
         db.add(raw)
         db.flush()
@@ -205,6 +232,8 @@ def persist_record(
         raw.payload = payload
         raw.payload_hash = payload_hash
         raw.job_id = job_id
+        raw.adapter_version = adapter_version or raw.adapter_version
+        raw.endpoint = (source.url or raw.endpoint or "")[:1024]
         raw.reprocessed_count = (raw.reprocessed_count or 0) + 1
         raw.fetched_at = datetime.now(timezone.utc)
         if raw.finding_id:
@@ -253,11 +282,14 @@ def persist_record(
     db.flush()
 
     tech = sync_technology_from_finding(db, finding, captured_by=captured_by)
-    _apply_canonical(tech, record)
+    _apply_canonical(tech, record, source)
     tech.raw_payload = {
         "origin": "connector",
         "connector": connector,
         "external_id": record.external_id,
+        "access_level": source.access_level or "",
+        "catalog_code": source.catalog_code or "",
+        "adapter_version": adapter_version,
         "payload": payload,
     }
 
@@ -289,7 +321,14 @@ def list_connectors() -> list[dict]:
             "description": "El scraper generico se conserva para referentes sin API.",
             "min_interval": 0.0,
             "requires_url": True,
-        }
+        },
+        {
+            "code": "pdf",
+            "label": "Extraccion de PDF",
+            "description": "Documentos oficiales sin capa de datos (MHRA, ACE).",
+            "min_interval": 0.0,
+            "requires_url": True,
+        },
     ]
 
 
@@ -305,6 +344,12 @@ def _run_adapter(
 
     max_records = int(get_param(db, "ingest.max_records_per_run", 50) or 50)
     result = adapter.fetch(config=source.connector_config or {}, url=source.url or "")
+    if result.next_cursor:
+        cfg = dict(source.connector_config or {})
+        cfg["pageToken"] = result.next_cursor
+        source.connector_config = cfg
+    if result.schema_signature and not source.schema_signature:
+        source.schema_signature = result.schema_signature
     new = 0
     for record in result.records[:max_records]:
         _raw, created = persist_record(
@@ -332,24 +377,40 @@ def _run_html(db: Session, source: Source, triggered_by: str) -> tuple[int, int,
     )
 
 
-def _apply_canonical(tech: Technology, record: CanonicalRecord) -> None:
-    if record.inn_name:
+def _apply_canonical(tech: Technology, record: CanonicalRecord, source: Source | None = None) -> None:
+    incoming = ((source.access_level if source else "") or "").upper()
+    existing = ((tech.raw_payload or {}).get("access_level") or "").upper()
+    agency = (source.connector if source else "") in {"fda", "ema", "health_canada"}
+
+    def take(current, incoming_value, *, agency_field: bool = False) -> bool:
+        if not incoming_value:
+            return False
+        if not current:
+            return True
+        if agency_field and agency:
+            return True
+        if LEVEL_RANK.get(incoming, 0) < LEVEL_RANK.get(existing, 0) and incoming in {"D", "E"}:
+            return False
+        return True
+
+    if take(tech.inn_name, record.inn_name):
         tech.inn_name = record.inn_name[:400]
-    if record.manufacturer:
+    if take(tech.manufacturer, record.manufacturer):
         tech.manufacturer = record.manufacturer[:300]
-    if record.mechanism:
+    if take(tech.mechanism, record.mechanism):
         tech.mechanism = record.mechanism
-    if record.indication:
+    if take(tech.indication, record.indication):
         tech.indication = record.indication
     if record.nct_ids:
-        tech.nct_ids = record.nct_ids
-    if record.phase3_completion_date and tech.phase3_completion_date is None:
+        merged = list(dict.fromkeys([*(tech.nct_ids or []), *record.nct_ids]))
+        tech.nct_ids = merged
+    if take(tech.phase3_completion_date, record.phase3_completion_date):
         tech.phase3_completion_date = record.phase3_completion_date
-    if record.fda_approval_date and tech.fda_approval_date is None:
+    if take(tech.fda_approval_date, record.fda_approval_date, agency_field=True):
         tech.fda_approval_date = record.fda_approval_date
-    if record.ema_approval_date and tech.ema_approval_date is None:
+    if take(tech.ema_approval_date, record.ema_approval_date, agency_field=True):
         tech.ema_approval_date = record.ema_approval_date
-    if record.regulatory_status:
+    if take(tech.regulatory_status, record.regulatory_status, agency_field=True):
         tech.regulatory_status = record.regulatory_status[:120]
 
 

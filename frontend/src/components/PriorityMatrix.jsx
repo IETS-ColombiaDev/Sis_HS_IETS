@@ -6,6 +6,8 @@ import Button from "./Button";
 import Icon from "./Icon";
 import { LoadingBlock } from "./Spinner";
 import { TECH_STATUS_LABELS } from "../constants/methodology";
+import { GLOSSARY } from "../constants/glossary";
+import InfoTip from "./InfoTip";
 
 /**
  * Matriz oficial de priorizacion P1 a P6.
@@ -26,7 +28,10 @@ export function PriorityGauge({ state }) {
       <div className="pm-gauge-value">
         {complete ? (
           <>
-            <strong>{pct}%</strong>
+            <strong className="term-label">
+              {pct}%
+              <InfoTip text={GLOSSARY.pct_p} label="Que es el porcentaje P" />
+            </strong>
             <span>
               {state.points} de {state.total_criteria} criterios
             </span>
@@ -72,7 +77,10 @@ function CriterionRow({ criterion, score, onRate, disabled }) {
     <div className="pm-row" data-rated={value != null ? "true" : "false"}>
       <div className="pm-row-main">
         <div className="pm-row-head">
-          <span className="pm-code">{criterion.code}</span>
+          <span className="pm-code term-label">
+            {criterion.code}
+            <InfoTip text={criterion.prompt || GLOSSARY.p16} label={`Que es ${criterion.code}`} />
+          </span>
           <span className="pm-short">{criterion.short_label}</span>
           {value != null && (
             <Badge tone={value === 1 ? "priorizada" : "no_priorizada"}>

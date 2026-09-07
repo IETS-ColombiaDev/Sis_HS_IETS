@@ -44,7 +44,7 @@ export default function FindingDetailModal({
             <a href={finding.url} target="_blank" rel="noreferrer">
               <Button variant="secondary" size="sm"><Icon name="external" size={14} /> Enlace original</Button>
             </a>
-            {status?.gemini_enabled && isEditor && (
+            {(status?.ai_enabled ?? status?.gemini_enabled) && isEditor && (
               <Button variant="outline" size="sm" loading={enhancingId === finding.id} onClick={() => onEnhance(finding)}>
                 <Icon name="spark" size={14} /> Enriquecer con IA
               </Button>

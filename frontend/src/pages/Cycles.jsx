@@ -12,6 +12,7 @@ import { Input, Select, Textarea } from "../components/Field";
 import EmptyState from "../components/EmptyState";
 import { LoadingBlock } from "../components/Spinner";
 import { CYCLE_STATUS_LABELS, PERM } from "../constants/methodology";
+import { GLOSSARY } from "../constants/glossary";
 
 const FUNNEL = [
   { key: "assigned", label: "Asignadas" },
@@ -56,7 +57,7 @@ function CycleFunnel({ summary }) {
 }
 
 function CycleCard({ cycle, isSelected, onSelect, onTransition, onCarryOver, canWrite, canClose }) {
-  const weeks = weeksBetween(cycle.opened_on, cycle.bulletin_due_on || cycle.data_cutoff_on);
+  const weeks = weeksBetween(cycle.opened_on, cycle.data_cutoff_on);
 
   return (
     <Card style={isSelected ? { borderColor: "#6366F1", boxShadow: "0 0 0 3px #EEF2FF" } : undefined}>
@@ -229,7 +230,8 @@ export default function Cycles() {
     <div>
       <PageHeader
         title="Ciclos de escaneo"
-        subtitle="Eje de la metodologia. Maximo tres ciclos formales por ano y ventana operativa de 10 a 16 semanas. Al cerrar, los puntajes quedan congelados y las tecnologias bajo vigilancia se proponen para el ciclo siguiente."
+        titleHint={GLOSSARY.ciclo}
+        subtitle="Eje de la metodologia. La cuota de nuevos ciclos formales sigue en tres por ano (ventana de 10 a 16 semanas). El ejercicio 2026 incluye ademas el Ciclo IV extraordinario de diseminacion, con informes y boletin publicados. Al cerrar, los puntajes quedan congelados y las tecnologias bajo vigilancia se proponen para el ciclo siguiente."
         actions={
           canWrite && (
             <Button onClick={startCreate}>
@@ -299,12 +301,14 @@ export default function Cycles() {
             />
             <Input
               label="Corte de datos"
+              hint={GLOSSARY.corte_datos}
               type="date"
               value={form.data_cutoff_on}
               onChange={(e) => setForm({ ...form, data_cutoff_on: e.target.value })}
             />
             <Input
               label="Fecha proyectada de boletin"
+              hint={GLOSSARY.boletin}
               type="date"
               value={form.bulletin_due_on || ""}
               onChange={(e) => setForm({ ...form, bulletin_due_on: e.target.value || null })}

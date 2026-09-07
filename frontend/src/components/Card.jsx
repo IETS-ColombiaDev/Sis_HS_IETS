@@ -1,3 +1,5 @@
+import InfoTip from "./InfoTip";
+
 /**
  * `title`, `hint` y `actions` son opcionales y componen la misma cabecera que
  * varias pantallas venian repitiendo a mano: un `SectionTitle` seguido de un
@@ -38,7 +40,16 @@ export function Card({ children, style, padding = 24, title, hint, actions }) {
   );
 }
 
-export function PageHeader({ title, subtitle, actions }) {
+export function PageHeader({ title, subtitle, actions, titleHint }) {
+  const heading =
+    typeof title === "string" && titleHint ? (
+      <span className="term-label">
+        {title}
+        <InfoTip text={titleHint} label={`Que es ${title}`} />
+      </span>
+    ) : (
+      title
+    );
   return (
     <div
       style={{
@@ -51,7 +62,7 @@ export function PageHeader({ title, subtitle, actions }) {
       }}
     >
       <div>
-        <h1 style={{ fontSize: 24, fontWeight: 700 }}>{title}</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700 }}>{heading}</h1>
         {subtitle && (
           <p style={{ color: "#64748B", fontSize: 14, marginTop: 6, maxWidth: 720 }}>{subtitle}</p>
         )}
@@ -61,7 +72,7 @@ export function PageHeader({ title, subtitle, actions }) {
   );
 }
 
-export function SectionTitle({ children, right }) {
+export function SectionTitle({ children, right, hint }) {
   return (
     <div
       style={{
@@ -71,7 +82,15 @@ export function SectionTitle({ children, right }) {
         marginBottom: 16,
       }}
     >
-      <h3 style={{ fontSize: 16, fontWeight: 600 }}>{children}</h3>
+      <h3 style={{ fontSize: 16, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {children}
+        {hint ? (
+          <InfoTip
+            text={hint}
+            label={typeof children === "string" ? `Que es ${children}` : "Mas informacion"}
+          />
+        ) : null}
+      </h3>
       {right}
     </div>
   );

@@ -9,12 +9,33 @@ import Badge from "../components/Badge";
 import EmptyState from "../components/EmptyState";
 import ModuleHeader from "../components/ModuleHeader";
 import { PERM } from "../constants/methodology";
+import { GLOSSARY } from "../constants/glossary";
 
 const BULLETIN_STATUS = {
   borrador: "Borrador",
   pendiente_aprobacion: "Pendiente de aprobacion",
   publicado: "Publicado",
 };
+
+function BulletinKpis({ body }) {
+  const funnel = body?.funnel || {};
+  const items = [
+    { label: "Asignadas", value: funnel.captured ?? funnel.assigned ?? 0 },
+    { label: "Filtradas", value: funnel.filtered ?? 0 },
+    { label: "Priorizadas", value: funnel.prioritized ?? body?.prioritized ?? 0 },
+    { label: "Publicadas", value: funnel.published ?? body?.published ?? funnel.evaluated ?? 0 },
+  ];
+  return (
+    <div className="bulletin-kpis">
+      {items.map((item) => (
+        <div key={item.label} className="bulletin-kpi">
+          <b>{item.value}</b>
+          <span>{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function Bulletins() {
   const { cycleId, cycle } = useCycle();
@@ -61,9 +82,10 @@ export default function Bulletins() {
       <ModuleHeader
         step="diseminacion"
         title="Boletines del ciclo"
+        titleHint={GLOSSARY.boletin}
         purpose={
           cycle
-            ? `Fase 4 · Ciclo ${cycle.code}. Resumen ejecutivo para publicar despues de la aprobacion.`
+            ? `Fase 4 · ${cycle.code}. Resumen ejecutivo epidemiologico y financiero para publicar despues de la aprobacion.`
             : "Fase 4 · Resumen ejecutivo para publicar despues de la aprobacion."
         }
         actions={
@@ -79,12 +101,31 @@ export default function Bulletins() {
         />
       ) : (
         items.map((b) => (
-          <Card key={b.id}>
-            <h3 style={{ marginTop: 0 }}>{b.title}</h3>
-            <Badge>{BULLETIN_STATUS[b.status] || b.status}</Badge>
-            <p>
-              Priorizadas: {b.body?.prioritized ?? "—"} · Publicadas: {b.body?.published ?? "—"}
-            </p>
+          <Card key={b.id} className="bulletin-card">
+            <div className="bulletin-card-head">
+              <div>
+                <p className="iets-dossier-kicker">Boletin epidemiologico y financiero</p>
+                <h3>{b.title}</h3>
+                <p className="bulletin-card-meta">
+                  Compilado {b.body?.compiled_on || "—"}
+                  {b.approved_by ? ` · Aprobado por ${b.approved_by}` : ""}
+                </p>
+              </div>
+              <Badge tone={b.status === "publicado" ? "ok" : "info"}>
+                {BULLETIN_STATUS[b.status] || b.status}
+              </Badge>
+            </div>
+            <BulletinKpis body={b.body} />
+            {(b.body?.by_cluster || []).length > 0 && (
+              <ul className="bulletin-clusters">
+                {b.body.by_cluster.map((row) => (
+                  <li key={row.label}>
+                    <span>{row.label}</span>
+                    <strong>{row.value}</strong>
+                  </li>
+                ))}
+              </ul>
+            )}
             <div className="eval-actions">
               {canWrite && b.status !== "publicado" && (
                 <>

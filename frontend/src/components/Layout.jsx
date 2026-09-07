@@ -1,36 +1,40 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useCycle } from "../cycle/CycleContext";
 import { useRealtime } from "../realtime/RealtimeContext";
+import { aiEnabled, aiLabel } from "../ai/status";
+import { CYCLE_STATUS_LABELS } from "../constants/methodology";
+import { GLOSSARY } from "../constants/glossary";
 import Icon from "./Icon";
 import Tooltip from "./Tooltip";
+import InfoTip from "./InfoTip";
 import SafeAvatar from "./SafeAvatar";
 
 const NAV = [
   { section: "Operacion diaria" },
-  { to: "/", label: "Bandeja de trabajo", icon: "home", end: true },
-  { to: "/ciclos", label: "Ciclos de escaneo", icon: "calendar" },
+  { to: "/", label: "Bandeja de trabajo", icon: "home", end: true, help: GLOSSARY.bandeja_trabajo },
+  { to: "/ciclos", label: "Ciclos de escaneo", icon: "calendar", help: GLOSSARY.ciclo },
   { section: "Metodologia IETS" },
-  { to: "/vigilancia", label: "1. Vigilancia", icon: "radar" },
-  { to: "/fuentes", label: "Inventario de fuentes", icon: "globe" },
-  { to: "/bandeja-entrada", label: "Bandeja de entrada", icon: "inbox" },
-  { to: "/postulaciones", label: "Postulaciones", icon: "note" },
-  { to: "/filtrado", label: "Filtrado y depuracion", icon: "filter" },
-  { to: "/priorizacion", label: "2. Priorizacion", icon: "layers" },
-  { to: "/evaluacion", label: "3. Evaluacion", icon: "doc" },
-  { to: "/diseminacion", label: "4. Diseminacion", icon: "bulb" },
-  { to: "/boletines", label: "Boletines del ciclo", icon: "doc" },
-  { to: "/notas", label: "Notas del equipo", icon: "note" },
+  { to: "/vigilancia", label: "1. Vigilancia", icon: "radar", help: GLOSSARY.vigilancia },
+  { to: "/fuentes", label: "Catalogo de fuentes", icon: "globe", help: GLOSSARY.catalogo_fuentes },
+  { to: "/bandeja-entrada", label: "Bandeja de entrada", icon: "inbox", help: GLOSSARY.bandeja_entrada },
+  { to: "/postulaciones", label: "Postulaciones", icon: "note", help: GLOSSARY.postulacion },
+  { to: "/filtrado", label: "Filtrado y depuracion", icon: "filter", help: GLOSSARY.filtrado },
+  { to: "/priorizacion", label: "2. Priorizacion", icon: "layers", help: GLOSSARY.priorizacion },
+  { to: "/evaluacion", label: "3. Evaluacion", icon: "doc", help: GLOSSARY.evaluacion },
+  { to: "/diseminacion", label: "4. Diseminacion", icon: "bulb", help: GLOSSARY.diseminacion },
+  { to: "/boletines", label: "Boletines del ciclo", icon: "doc", help: GLOSSARY.boletin },
+  { to: "/notas", label: "Notas del equipo", icon: "note", help: "Notas internas del equipo, vinculadas a senales, fuentes o informes. No son el informe publico." },
   { section: "Analisis y alertas" },
-  { to: "/dashboards", label: "Tablero estrategico", icon: "chart" },
-  { to: "/alertas", label: "Alertas tempranas", icon: "pulse" },
-  { to: "/senales", label: "Senales capturadas", icon: "list" },
-  { to: "/chat", label: "Asistente IA", icon: "chat" },
+  { to: "/dashboards", label: "Tablero estrategico", icon: "chart", help: GLOSSARY.tablero },
+  { to: "/alertas", label: "Alertas tempranas", icon: "pulse", help: GLOSSARY.alertas },
+  { to: "/senales", label: "Senales capturadas", icon: "list", help: GLOSSARY.senal },
+  { to: "/chat", label: "Asistente IA", icon: "chat", help: GLOSSARY.minimax },
   { section: "Administracion", permission: "config:manage" },
-  { to: "/auditoria", label: "Bitacora de auditoria", icon: "shield", permission: "audit:read" },
-  { to: "/configuracion", label: "Configuracion", icon: "cog", permission: "config:manage" },
-  { to: "/usuarios", label: "Usuarios y perfiles", icon: "users", permission: "user:manage" },
+  { to: "/auditoria", label: "Bitacora de auditoria", icon: "shield", permission: "audit:read", help: GLOSSARY.bitacora },
+  { to: "/configuracion", label: "Configuracion", icon: "cog", permission: "config:manage", help: "Parametros de la metodologia, el modelo de IA y las llaves de las fuentes automaticas." },
+  { to: "/usuarios", label: "Usuarios y perfiles", icon: "users", permission: "user:manage", help: GLOSSARY.rbac },
 ];
 
 function Sidebar({ open, onClose }) {
@@ -125,55 +129,60 @@ function Sidebar({ open, onClose }) {
             }
             if (item.permission && !can(item.permission)) return null;
             return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                onClick={onClose}
-                style={({ isActive }) => ({
-                  position: "relative",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "10px 12px 10px 14px",
-                  borderRadius: 9,
-                  marginBottom: 2,
-                  color: isActive ? "#4F46E5" : "#475569",
-                  background: isActive ? "#EEF2FF" : "transparent",
-                  fontWeight: isActive ? 600 : 500,
-                  fontSize: 14,
-                  textDecoration: "none",
-                  transition: "background 150ms ease-in-out, color 150ms",
-                })}
-                onMouseEnter={(e) => {
-                  if (e.currentTarget.getAttribute("aria-current") !== "page")
-                    e.currentTarget.style.background = "#F1F5F9";
-                }}
-                onMouseLeave={(e) => {
-                  const active = e.currentTarget.getAttribute("aria-current") === "page";
-                  e.currentTarget.style.background = active ? "#EEF2FF" : "transparent";
-                }}
-              >
-                {({ isActive }) => (
-                  <>
-                    {isActive && (
-                      <span
-                        style={{
-                          position: "absolute",
-                          left: 0,
-                          top: 8,
-                          bottom: 8,
-                          width: 3,
-                          borderRadius: 3,
-                          background: "linear-gradient(180deg,#6366F1,#3B82F6)",
-                        }}
-                      />
-                    )}
-                    <Icon name={item.icon} size={19} strokeWidth={isActive ? 2.1 : 1.8} />
-                    {item.label}
-                  </>
+              <div key={item.to} className="nav-row">
+                <NavLink
+                  to={item.to}
+                  end={item.end}
+                  onClick={onClose}
+                  style={({ isActive }) => ({
+                    position: "relative",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "10px 12px 10px 14px",
+                    borderRadius: 9,
+                    flex: 1,
+                    minWidth: 0,
+                    color: isActive ? "#4F46E5" : "#475569",
+                    background: isActive ? "#EEF2FF" : "transparent",
+                    fontWeight: isActive ? 600 : 500,
+                    fontSize: 14,
+                    textDecoration: "none",
+                    transition: "background 150ms ease-in-out, color 150ms",
+                  })}
+                  onMouseEnter={(e) => {
+                    if (e.currentTarget.getAttribute("aria-current") !== "page")
+                      e.currentTarget.style.background = "#F1F5F9";
+                  }}
+                  onMouseLeave={(e) => {
+                    const active = e.currentTarget.getAttribute("aria-current") === "page";
+                    e.currentTarget.style.background = active ? "#EEF2FF" : "transparent";
+                  }}
+                >
+                  {({ isActive }) => (
+                    <>
+                      {isActive && (
+                        <span
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            top: 8,
+                            bottom: 8,
+                            width: 3,
+                            borderRadius: 3,
+                            background: "linear-gradient(180deg,#6366F1,#3B82F6)",
+                          }}
+                        />
+                      )}
+                      <Icon name={item.icon} size={19} strokeWidth={isActive ? 2.1 : 1.8} />
+                      {item.label}
+                    </>
+                  )}
+                </NavLink>
+                {item.help && (
+                  <InfoTip text={item.help} position="right" label={`Que es ${item.label}`} />
                 )}
-              </NavLink>
+              </div>
             );
           })}
         </nav>
@@ -185,17 +194,18 @@ function Sidebar({ open, onClose }) {
   );
 }
 
-function GeminiPill({ enabled, model, isAdmin }) {
+function GeminiPill({ status, isAdmin }) {
   const navigate = useNavigate();
+  const enabled = aiEnabled(status);
+  const label = aiLabel(status);
   const tone = enabled
     ? { color: "#065F46", bg: "#ECFDF5", border: "#A7F3D0", dot: "#10B981" }
     : { color: "#92400E", bg: "#FEF3C7", border: "#FDE68A", dot: "#F59E0B" };
-  const label = enabled ? `IA activa${model ? ` · ${model}` : ""}` : "IA sin configurar";
   const tip = enabled
-    ? `Inteligencia artificial habilitada (${model || "modelo automatico"}).${isAdmin ? " Clic para gestionar." : ""}`
+    ? `Inteligencia artificial activa (${label}).${status?.ai_ocr_enabled ? " OCR de sitios habilitado." : ""}${isAdmin ? " Clic para gestionar." : ""}`
     : isAdmin
-    ? "La IA no tiene token. Clic para configurar el token de Gemini."
-    : "La IA no esta configurada. Solicite a un administrador el token de Gemini.";
+    ? "La IA no tiene token. Clic para configurar MiniMax."
+    : "La IA no esta configurada. Solicite a un administrador la llave de MiniMax.";
   return (
     <Tooltip text={tip}>
       <button
@@ -213,7 +223,7 @@ function GeminiPill({ enabled, model, isAdmin }) {
           padding: "5px 11px",
           borderRadius: 9999,
           cursor: isAdmin ? "pointer" : "default",
-          maxWidth: 220,
+          maxWidth: 260,
         }}
       >
         <span style={{ width: 8, height: 8, borderRadius: "50%", background: tone.dot, flexShrink: 0 }} />
@@ -223,46 +233,132 @@ function GeminiPill({ enabled, model, isAdmin }) {
   );
 }
 
-/** Selector del ciclo operativo activo. El ciclo contextualiza todo el trabajo. */
+function cycleStatusLabel(cycle) {
+  return cycle?.status_label || CYCLE_STATUS_LABELS[cycle?.status] || cycle?.status || "";
+}
+
+/** Selector del ciclo operativo: lista visual con estado, fechas e historicos. */
 function CycleSelector() {
-  const { cycles, cycleId, setCycleId, cycle } = useCycle();
+  const { cycles, cycleId, setCycleId, cycle, openCycles } = useCycle();
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDoc = (ev) => {
+      if (boxRef.current && !boxRef.current.contains(ev.target)) setOpen(false);
+    };
+    const onKey = (ev) => {
+      if (ev.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   if (cycles.length === 0) {
     return (
       <Tooltip text="Aun no hay ciclos operativos. La priorizacion requiere uno.">
         <button className="cycle-pill cycle-pill-empty" onClick={() => navigate("/ciclos")}>
           <Icon name="calendar" size={15} />
-          Sin ciclo activo
+          Crear ciclo de trabajo
         </button>
       </Tooltip>
     );
   }
 
+  const historic = cycles.filter((c) => c.is_historic || c.status === "cerrado_consolidado");
+  const active = openCycles.length ? openCycles : cycles.filter((c) => !historic.includes(c));
+
   return (
-    <Tooltip
-      text={
-        cycle
-          ? `Ciclo en pantalla: ${cycle.code} (${cycle.status_label}). Toda la priorizacion y la caracterizacion se leen en este contexto.`
-          : "Seleccione el ciclo operativo de trabajo."
-      }
-    >
-      <div className="cycle-pill">
+    <div className="cycle-switcher" ref={boxRef}>
+      <InfoTip text={GLOSSARY.ciclo} position="bottom" label="Que es un ciclo de escaneo" />
+      <button
+        type="button"
+        className="cycle-pill cycle-pill-button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label="Seleccionar ciclo operativo"
+      >
         <Icon name="calendar" size={15} />
-        <select
-          value={cycleId || ""}
-          onChange={(e) => setCycleId(Number(e.target.value))}
-          aria-label="Ciclo operativo"
-        >
-          {cycles.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.code}
-              {c.is_historic ? " (historico)" : ""}
-            </option>
-          ))}
-        </select>
+        <span className="cycle-pill-main">
+          <strong>{cycle?.code || "Ciclo"}</strong>
+          <em>{cycleStatusLabel(cycle)}</em>
+        </span>
+        <span className={`cycle-pill-chevron${open ? " is-open" : ""}`}>▾</span>
+      </button>
+      {open && (
+        <div className="cycle-switcher-panel" role="listbox">
+          <div className="cycle-switcher-head">
+            <span>Ciclo en pantalla</span>
+            <button type="button" onClick={() => { setOpen(false); navigate("/ciclos"); }}>
+              Gestionar ciclos
+            </button>
+          </div>
+          {active.length > 0 && (
+            <div className="cycle-switcher-group">
+              <div className="cycle-switcher-label">Abiertos</div>
+              {active.map((c) => (
+                <CycleOption
+                  key={c.id}
+                  cycle={c}
+                  selected={c.id === cycleId}
+                  onPick={() => {
+                    setCycleId(c.id);
+                    setOpen(false);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+          {historic.length > 0 && (
+            <div className="cycle-switcher-group">
+              <div className="cycle-switcher-label">Historicos / cerrados</div>
+              {historic.map((c) => (
+                <CycleOption
+                  key={c.id}
+                  cycle={c}
+                  selected={c.id === cycleId}
+                  onPick={() => {
+                    setCycleId(c.id);
+                    setOpen(false);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CycleOption({ cycle, selected, onPick }) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      className={`cycle-option${selected ? " is-selected" : ""}`}
+      onClick={onPick}
+    >
+      <div className="cycle-option-top">
+        <strong>{cycle.code}</strong>
+        <span className={`cycle-option-status tone-${cycle.status || "en_configuracion"}`}>
+          {cycleStatusLabel(cycle)}
+        </span>
+        {cycle.is_historic && <span className="cycle-option-hist">Historico</span>}
       </div>
-    </Tooltip>
+      <div className="cycle-option-dates">
+        Apertura {cycle.opened_on || "—"} · Corte {cycle.data_cutoff_on || "—"}
+        {cycle.bulletin_due_on ? ` · Boletin ${cycle.bulletin_due_on}` : ""}
+      </div>
+    </button>
   );
 }
 
@@ -341,7 +437,7 @@ function Header({ onToggle }) {
         </Tooltip>
 
         {status && (
-          <GeminiPill enabled={status.gemini_enabled} model={status.gemini_model} isAdmin={isAdmin} />
+          <GeminiPill status={status} isAdmin={isAdmin} />
         )}
 
         <div style={{ position: "relative" }}>

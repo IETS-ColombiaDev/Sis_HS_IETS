@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { useToast } from "../components/Toast";
 import ModuleHeader from "../components/ModuleHeader";
+import { GLOSSARY } from "../constants/glossary";
 import PhaseGuide from "../components/PhaseGuide";
 import { Card } from "../components/Card";
 import Button from "../components/Button";
@@ -157,6 +158,7 @@ export default function Notes() {
       <ModuleHeader
         step="diseminacion"
         title="Notas del equipo"
+        titleHint="Notas internas del equipo, vinculadas a senales, fuentes o informes. No son el informe publico."
         purpose="Documentacion colaborativa vinculada a senales, fuentes e informes de diseminacion."
         actions={
           <div style={{ display: "flex", gap: 8 }}>
@@ -174,6 +176,7 @@ export default function Notes() {
 
       <PhaseGuide
         phase="Soporte a diseminacion"
+        hint={GLOSSARY.diseminacion}
         tasks={[
           "Registrar observaciones del equipo sobre senales e informes.",
           "Documentar decisiones de comite y seguimiento regulatorio (INVIMA, ETS).",

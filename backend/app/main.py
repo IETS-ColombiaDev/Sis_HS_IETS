@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import __version__, audit, gemini_service, methodology, settings_store
+from . import __version__, ai_service, audit, methodology, settings_store
 from .config import settings
 from .database import (
     Base,
@@ -27,9 +27,6 @@ from .database import (
     harden_audit_log,
     run_schema_migrations,
 )
-from sqlalchemy import or_
-
-from .models import Source
 from .routers import (
     audit as audit_router,
     auth,
@@ -56,34 +53,35 @@ from .routers import (
     technologies,
     users,
 )
-from .seed_data import all_seed_sources
+from .catalog_service import sync_catalog
 from .technology_service import backfill_technologies
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
 
 def seed_sources_if_empty() -> None:
+    """Carga o actualiza el catalogo verificado D-06. Es idempotente."""
     db = SessionLocal()
     try:
-        if db.query(Source).count() > 0:
-            return
-        for data in all_seed_sources():
-            db.add(Source(**data))
-        db.commit()
+        sync_catalog(db, triggered_by="arranque")
     finally:
         db.close()
 
 
 def load_runtime_config() -> None:
-    """Carga la config de Gemini persistida en la BD (tiene prioridad sobre el .env)."""
+    """Carga MiniMax / Gemini / OCR persistidos (BD pisa al .env)."""
     db = SessionLocal()
     try:
-        api_key, model = settings_store.load_gemini_config(db)
-        if api_key or model:
-            gemini_service.configure_runtime(
-                api_key=api_key or None,
-                model=model or None,
-            )
+        cfg = settings_store.load_ai_config(db)
+        ai_service.configure_runtime(
+            provider=str(cfg["provider"]),
+            ocr_enabled=bool(cfg["ocr_enabled"]),
+            web_enabled=bool(cfg["web_enabled"]),
+            minimax_api_key=str(cfg["minimax_api_key"]) or None,
+            minimax_model=str(cfg["minimax_model"]) or None,
+            gemini_api_key=str(cfg["gemini_api_key"]) or None,
+            gemini_model=str(cfg["gemini_model"]) or None,
+        )
     finally:
         db.close()
 
@@ -135,29 +133,8 @@ def migrate_to_technologies() -> None:
 
 
 def seed_api_sources() -> None:
-    """Inserta los referentes con API si aun no existen (fase 4, idempotente)."""
-    from .seed_data import API_SOURCES
-
-    db = SessionLocal()
-    try:
-        for data in API_SOURCES:
-            url = (data.get("url") or "").strip()
-            title = data.get("title") or ""
-            exists = (
-                db.query(Source)
-                .filter(or_(Source.url == url, Source.title == title))
-                .first()
-            )
-            if exists:
-                if not exists.connector or exists.connector == "html":
-                    exists.connector = data.get("connector") or exists.connector
-                    if data.get("connector_config") and not exists.connector_config:
-                        exists.connector_config = data["connector_config"]
-                continue
-            db.add(Source(**data))
-        db.commit()
-    finally:
-        db.close()
+    """Compatibilidad: el catalogo D-06 ya incluye las fuentes con contrato."""
+    return
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -171,8 +148,28 @@ async def lifespan(app: FastAPI):
     seed_sources_if_empty()
     seed_methodology()
     load_runtime_config()
+    from .settings_store import load_ingest_keys
+
+    db = SessionLocal()
+    try:
+        keys = load_ingest_keys(db)
+        if keys["openfda_api_key"]:
+            settings.openfda_api_key = keys["openfda_api_key"]
+        if keys["ncbi_api_key"]:
+            settings.ncbi_api_key = keys["ncbi_api_key"]
+        if keys["ncbi_email"]:
+            settings.ncbi_email = keys["ncbi_email"]
+    finally:
+        db.close()
     backfill_screening_scores()
     migrate_to_technologies()
+    from .cycle_seed import sync_official_cycles
+
+    db = SessionLocal()
+    try:
+        sync_official_cycles(db)
+    finally:
+        db.close()
     seed_api_sources()
     from .worker import start_worker, stop_worker
 

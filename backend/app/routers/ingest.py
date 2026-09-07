@@ -1,15 +1,29 @@
-"""Cola de ingesta y consulta del crudo (RF01, RF03)."""
+"""Cola de ingesta, sonda de salud, cobertura e importacion del catalogo."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from ..catalog import catalog_stats
+from ..catalog_service import accept_terms, sync_catalog
+from ..coverage_service import coverage_gaps
 from ..database import get_db
 from ..deps import get_current_user, require_permission
 from ..ingest_service import enqueue, list_connectors, run_job, tick
 from ..models import IngestJob, RawRecord, Source, Technology, User
-from ..rbac import P_SCAN_RUN
-from ..schemas import ConnectorOut, IngestJobOut, IngestRunIn, IngestRunOut, RawPreviewOut
+from ..probe_service import health_board, probe_all, probe_source
+from ..rbac import P_SCAN_RUN, P_SOURCE_WRITE
+from ..schemas import (
+    CatalogImportOut,
+    ConnectorOut,
+    CoverageOut,
+    IngestHealthOut,
+    IngestJobOut,
+    IngestRunIn,
+    IngestRunOut,
+    RawPreviewOut,
+    SourceProbeOut,
+)
 from ..worker import kick
 
 router = APIRouter(prefix="/api/ingest", tags=["ingest"])
@@ -77,6 +91,70 @@ def process_pending(
 ):
     done = tick(db, limit=limit)
     return [_job_out(j, db) for j in done]
+
+
+@router.post("/sources/import", response_model=CatalogImportOut)
+def import_catalog(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_SOURCE_WRITE)),
+):
+    return CatalogImportOut(**sync_catalog(db, triggered_by=user.email))
+
+
+@router.get("/catalog/stats")
+def catalog_overview(user: User = Depends(get_current_user)):
+    return catalog_stats()
+
+
+@router.post("/sources/{source_id}/probe", response_model=SourceProbeOut)
+def probe_one(
+    source_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_SCAN_RUN)),
+):
+    source = db.get(Source, source_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Fuente no encontrada")
+    return SourceProbeOut(**probe_source(db, source))
+
+
+@router.post("/sources/{source_id}/accept-terms")
+def accept_source_terms(
+    source_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_SOURCE_WRITE)),
+):
+    source = db.get(Source, source_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Fuente no encontrada")
+    row = accept_terms(db, source)
+    return {"id": row.id, "terms_accepted_at": row.terms_accepted_at}
+
+
+@router.post("/probe")
+def probe_governors(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_SCAN_RUN)),
+    only_ab: bool = Query(True),
+):
+    return probe_all(db, only_ab=only_ab)
+
+
+@router.get("/health", response_model=IngestHealthOut)
+def ingest_health(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return IngestHealthOut(**health_board(db))
+
+
+@router.get("/coverage", response_model=CoverageOut)
+def ingest_coverage(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    cycle_id: int | None = Query(None),
+):
+    return CoverageOut(**coverage_gaps(db, cycle_id))
 
 
 @router.get("/raw/{technology_id}", response_model=RawPreviewOut)

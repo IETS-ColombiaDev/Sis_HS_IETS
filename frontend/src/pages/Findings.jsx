@@ -19,6 +19,7 @@ import Modal from "../components/Modal";
 import { LoadingBlock } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
 import { SCREENING_QUEUE_THRESHOLD } from "../constants/methodology";
+import { GLOSSARY } from "../constants/glossary";
 
 const HORIZONS = ["emergente", "transicional", "inminente"];
 const TYPES = ["medicamento", "dispositivo", "digital", "otro"];
@@ -116,8 +117,8 @@ export default function Findings() {
   };
 
   const enhanceFinding = async (f) => {
-    if (!status?.gemini_enabled) {
-      toast.warning("Configure el token de Gemini en Configuracion");
+    if (!(status?.ai_enabled ?? status?.gemini_enabled)) {
+      toast.warning("Configure MiniMax en Configuracion");
       return;
     }
     setEnhancingId(f.id);
@@ -200,6 +201,7 @@ export default function Findings() {
       <ModuleHeader
         step="priorizacion"
         title="Priorizacion de senales"
+        titleHint={GLOSSARY.senal}
         purpose={`Fase 2 IETS: filtrar tecnologias por impacto potencial. Umbral de prioridad: ${SCREENING_QUEUE_THRESHOLD}%. ${highPriorityCount} senales sobre el umbral.`}
         actions={
           isEditor && (
@@ -212,6 +214,7 @@ export default function Findings() {
 
       <PhaseGuide
         phase="Fase 2 · Priorizacion"
+        hint={GLOSSARY.priorizacion}
         tasks={[
           "Revisar senales nuevas capturadas en la vigilancia.",
           "Evaluar impacto potencial (puntuacion >70% = prioridad alta para Colombia).",
@@ -310,13 +313,13 @@ export default function Findings() {
               <Select label="Tipo" value={form.technology_type} onChange={(e) => setForm({ ...form, technology_type: e.target.value })}>
                 {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </Select>
-              <Select label="Horizonte temporal" value={form.horizon} onChange={(e) => setForm({ ...form, horizon: e.target.value })}>
+              <Select label="Horizonte temporal" hint={GLOSSARY.horizonte} value={form.horizon} onChange={(e) => setForm({ ...form, horizon: e.target.value })}>
                 <option value="">Sin clasificar</option>
                 {HORIZONS.map((h) => <option key={h} value={h}>{h}</option>)}
               </Select>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <Input label="Fase de desarrollo" value={form.phase} onChange={(e) => setForm({ ...form, phase: e.target.value })} />
+              <Input label="Fase de desarrollo" hint={GLOSSARY.fase} value={form.phase} onChange={(e) => setForm({ ...form, phase: e.target.value })} />
               <Input label="Area terapeutica" value={form.therapeutic_area} onChange={(e) => setForm({ ...form, therapeutic_area: e.target.value })} />
             </div>
             <Select label="Estado de triage" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>

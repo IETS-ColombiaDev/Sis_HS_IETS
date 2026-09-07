@@ -1,8 +1,8 @@
 """Datamart estrategico, ficha publica, boletines y alertas (fase 6)."""
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, timezone
-from html import escape
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -50,15 +50,70 @@ def _tech_name(tech: Technology | None) -> str:
     return (tech.commercial_name or tech.inn_name or f"Tecnologia {tech.id}").strip()
 
 
+PHASE_LABELS = {
+    "autorizada": "Autorizada / en mercado",
+    "fase_iv": "Fase IV",
+    "fase_iii": "Fase III",
+    "fase_ii": "Fase II",
+    "fase_i": "Fase I",
+    "sin_fase": "Sin fase declarada",
+}
+
+
 def _parse_money(value) -> float:
-    text = str(value or "").strip().replace(",", ".")
-    digits = "".join(ch for ch in text if ch.isdigit() or ch == ".")
-    if not digits:
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value or "").strip()
+    match = re.search(r"(\d+(?:[.,]\d+)?)", text)
+    if not match:
         return 0.0
     try:
-        return float(digits)
+        return float(match.group(1).replace(",", "."))
     except ValueError:
         return 0.0
+
+
+def _phase_bucket(text: str) -> str:
+    low = (text or "").lower()
+    if any(tok in low for tok in ("autoriz", "aprobad", "authorized", "approved")):
+        return "autorizada"
+    if "fase 4" in low or "phase 4" in low or "fase iv" in low:
+        return "fase_iv"
+    if "fase 3" in low or "phase 3" in low or "fase iii" in low or re.search(r"\biii\b", low):
+        return "fase_iii"
+    if "fase 2" in low or "phase 2" in low or "fase ii" in low or re.search(r"\bii\b", low):
+        return "fase_ii"
+    if "fase 1" in low or "phase 1" in low or "fase i" in low or "first-in-human" in low:
+        return "fase_i"
+    return "sin_fase"
+
+
+def _as_date(value) -> date | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _conversion(funnel: dict) -> dict:
+    captured = int(funnel.get("captured") or 0)
+    def _pct(key: str) -> int:
+        if not captured:
+            return 0
+        return round(100 * int(funnel.get(key) or 0) / captured)
+
+    return {
+        "filter_rate": _pct("filtered"),
+        "priority_rate": _pct("prioritized"),
+        "eval_rate": _pct("evaluated"),
+        "publish_rate": _pct("published"),
+    }
 
 
 def _looks_phase3(text: str) -> bool:
@@ -114,7 +169,19 @@ def snapshot_ttm(db: Session, cycle: Cycle) -> int:
     return written
 
 
-def build_payload(db: Session, cycle: Cycle) -> dict:
+def build_payload(
+    db: Session,
+    cycle: Cycle,
+    *,
+    cluster_id: int | None = None,
+    tech_type_id: int | None = None,
+    band: str = "",
+    status: str = "",
+    phase: str = "",
+    date_from: date | None = None,
+    date_to: date | None = None,
+    priority_min: int | None = None,
+) -> dict:
     entries = db.query(CycleTechnology).filter(CycleTechnology.cycle_id == cycle.id).all()
     tech_ids = [e.technology_id for e in entries]
     techs = (
@@ -139,12 +206,32 @@ def build_payload(db: Session, cycle: Cycle) -> dict:
     by_cluster: dict[str, int] = {}
     by_type: dict[str, int] = {}
     by_band: dict[str, int] = {}
+    by_phase: dict[str, int] = {}
     scatter: list[dict] = []
     heatmap: list[dict] = []
 
     for entry in entries:
         tech = techs.get(entry.technology_id) or db.get(Technology, entry.technology_id)
         if tech is None:
+            continue
+        calc = ttm.compute_for(db, tech)
+        phase_code = _phase_bucket(tech.development_phase)
+        captured_on = _as_date(tech.captured_at)
+        if cluster_id and tech.cluster_id != cluster_id:
+            continue
+        if tech_type_id and tech.tech_type_id != tech_type_id:
+            continue
+        if status and entry.status != status:
+            continue
+        if band and calc["band"] != band:
+            continue
+        if phase and phase_code != phase:
+            continue
+        if priority_min is not None and int(entry.priority_points or 0) < int(priority_min):
+            continue
+        if date_from and captured_on and captured_on < date_from:
+            continue
+        if date_to and captured_on and captured_on > date_to:
             continue
         funnel["captured"] += 1
         if entry.status in {
@@ -170,17 +257,21 @@ def build_payload(db: Session, cycle: Cycle) -> dict:
         type_name = types.get(tech.tech_type_id, "Sin tipologia")
         by_cluster[cluster_name] = by_cluster.get(cluster_name, 0) + 1
         by_type[type_name] = by_type.get(type_name, 0) + 1
-
-        calc = ttm.compute_for(db, tech)
         by_band[calc["band"]] = by_band.get(calc["band"], 0) + 1
+        by_phase[phase_code] = by_phase.get(phase_code, 0) + 1
         scatter.append(
             {
                 "technology_id": tech.id,
                 "name": _tech_name(tech),
                 "months": calc["months"],
                 "band": calc["band"],
+                "band_label": calc["band_label"],
+                "basis": calc["basis"],
                 "points": int(entry.priority_points or 0),
                 "cluster": cluster_name,
+                "status": entry.status,
+                "phase": tech.development_phase or "",
+                "phase_bucket": phase_code,
             }
         )
 
@@ -215,9 +306,14 @@ def build_payload(db: Session, cycle: Cycle) -> dict:
         "by_cluster": [{"label": k, "value": v} for k, v in sorted(by_cluster.items())],
         "by_type": [{"label": k, "value": v} for k, v in sorted(by_type.items())],
         "by_band": [{"label": ttm.TTM_BAND_LABELS.get(k, k), "code": k, "value": v} for k, v in by_band.items()],
+        "by_phase": [
+            {"label": PHASE_LABELS.get(k, k), "code": k, "value": v} for k, v in by_phase.items()
+        ],
         "ttm_scatter": scatter,
         "budget_heatmap": list(heat_by_cluster.values()),
         "budget_items": heatmap,
+        "conversion": _conversion(funnel),
+        "kpis": {**funnel, **_conversion(funnel)},
     }
 
 
@@ -242,62 +338,78 @@ def dashboard_for(
     tech_type_id: int | None = None,
     band: str = "",
     status: str = "",
+    phase: str = "",
+    date_from: date | None = None,
+    date_to: date | None = None,
+    priority_min: int | None = None,
 ) -> dict:
+    has_filters = any(
+        [
+            cluster_id,
+            tech_type_id,
+            band,
+            status,
+            phase,
+            date_from,
+            date_to,
+            priority_min is not None,
+        ]
+    )
     cached = db.query(CycleDatamart).filter(CycleDatamart.cycle_id == cycle.id).first()
-    payload = dict(cached.payload or {}) if cached and not any([cluster_id, tech_type_id, band, status]) else build_payload(db, cycle)
-    if cluster_id or tech_type_id or band or status:
-        payload = _filter_live(db, cycle, cluster_id, tech_type_id, band, status)
+    use_cache = (
+        bool(cached)
+        and not has_filters
+        and cycle.status == "cerrado_consolidado"
+    )
+    if use_cache:
+        payload = dict(cached.payload or {})
+        if "conversion" not in payload:
+            payload["conversion"] = _conversion(payload.get("funnel") or {})
+        if "kpis" not in payload:
+            payload["kpis"] = {**(payload.get("funnel") or {}), **payload["conversion"]}
+        if "by_phase" not in payload:
+            payload["by_phase"] = []
+    else:
+        payload = build_payload(
+            db,
+            cycle,
+            cluster_id=cluster_id,
+            tech_type_id=tech_type_id,
+            band=band,
+            status=status,
+            phase=phase,
+            date_from=date_from,
+            date_to=date_to,
+            priority_min=priority_min,
+        )
 
     public = {
         "cycle_id": payload.get("cycle_id", cycle.id),
         "cycle_code": payload.get("cycle_code", cycle.code),
         "funnel": payload.get("funnel", {}),
+        "kpis": payload.get("kpis") or {**(payload.get("funnel") or {}), **_conversion(payload.get("funnel") or {})},
+        "conversion": payload.get("conversion") or _conversion(payload.get("funnel") or {}),
         "by_cluster": payload.get("by_cluster", []),
         "by_type": payload.get("by_type", []),
         "by_band": payload.get("by_band", []),
+        "by_phase": payload.get("by_phase", []),
         "ttm_scatter": payload.get("ttm_scatter", []),
         "restricted": include_restricted,
-        "from_cache": bool(cached and not any([cluster_id, tech_type_id, band, status])),
+        "from_cache": use_cache,
+        "refreshed_at": cached.refreshed_at if cached else None,
+        "cycle_status": cycle.status,
     }
     if include_restricted:
         public["budget_heatmap"] = payload.get("budget_heatmap", [])
         public["budget_items"] = payload.get("budget_items", [])
-        public["comparators"] = _comparators(db, cycle)
+        if has_filters:
+            allowed = {r["technology_id"] for r in payload.get("ttm_scatter") or []}
+            public["comparators"] = [
+                item for item in _comparators(db, cycle) if item["technology_id"] in allowed
+            ]
+        else:
+            public["comparators"] = _comparators(db, cycle)
     return public
-
-
-def _filter_live(
-    db: Session,
-    cycle: Cycle,
-    cluster_id: int | None,
-    tech_type_id: int | None,
-    band: str,
-    status: str,
-) -> dict:
-    payload = build_payload(db, cycle)
-    if not any([cluster_id, tech_type_id, band, status]):
-        return payload
-    allowed = set()
-    q = db.query(CycleTechnology, Technology).join(
-        Technology, Technology.id == CycleTechnology.technology_id
-    ).filter(CycleTechnology.cycle_id == cycle.id)
-    if cluster_id:
-        q = q.filter(Technology.cluster_id == cluster_id)
-    if tech_type_id:
-        q = q.filter(Technology.tech_type_id == tech_type_id)
-    if status:
-        q = q.filter(CycleTechnology.status == status)
-    rows = q.all()
-    allowed = {tech.id for _, tech in rows}
-    if band:
-        allowed = {
-            tid
-            for tid in allowed
-            if (db.get(Technology, tid) and ttm.compute_for(db, db.get(Technology, tid))["band"] == band)
-        }
-    payload["ttm_scatter"] = [r for r in payload["ttm_scatter"] if r["technology_id"] in allowed]
-    payload["budget_items"] = [r for r in payload["budget_items"] if r["technology_id"] in allowed]
-    return payload
 
 
 def _comparators(db: Session, cycle: Cycle) -> list[dict]:
@@ -356,7 +468,11 @@ def list_public_fiches(
         )
     items = []
     cap = max(1, min(int(limit or 50), 50))
-    for doc, tech in query.order_by(EvaluationDoc.published_at.desc()).limit(cap).all():
+    seen: set[int] = set()
+    for doc, tech in query.order_by(EvaluationDoc.published_at.desc()).all():
+        if tech.id in seen:
+            continue
+        seen.add(tech.id)
         items.append(
             {
                 "id": tech.id,
@@ -369,41 +485,15 @@ def list_public_fiches(
                 "published_at": doc.published_at,
             }
         )
+        if len(items) >= cap:
+            break
     return items
 
 
 def render_public_fiche_html(data: dict) -> str:
-    blocks = []
-    from .evaluation import FIELD_LABELS
+    from .report_html import render_public_fiche_html as _render
 
-    for key, value in (data.get("body") or {}).items():
-        label = FIELD_LABELS.get(key, key)
-        blocks.append(
-            f"<section class='block'><h2>{escape(label)}</h2><p>{escape(str(value)).replace(chr(10), '<br>')}</p></section>"
-        )
-    ncts = "".join(
-        f"<li><a href='https://clinicaltrials.gov/study/{escape(n)}'>{escape(n)}</a></li>"
-        for n in data.get("nct_ids") or []
-    )
-    return f"""<!DOCTYPE html>
-<html lang="es"><head><meta charset="utf-8"/><title>{escape(data.get('title') or '')}</title>
-<style>
-@page {{ margin: 18mm; }}
-body {{ font-family: "Segoe UI", Calibri, Arial, sans-serif; color: #0F172A; background: #fff; }}
-header {{ border-bottom: 4px solid #6366F1; padding-bottom: 12px; }}
-.kicker {{ letter-spacing: .12em; text-transform: uppercase; color: #6366F1; font-size: 11px; font-weight: 700; }}
-.block {{ margin: 16px 0; }}
-h2 {{ font-size: 14px; color: #312E81; }}
-</style></head><body>
-<header>
-  <div class="kicker">Ficha publica — Escaneo de Horizonte IETS</div>
-  <h1>{escape(data.get('title') or '')}</h1>
-  <p>{escape(data.get('ttm_band_label') or '')} · {escape(data.get('cluster') or '')}</p>
-</header>
-{''.join(blocks)}
-<h2>Ensayos clinicos asociados</h2>
-<ul>{ncts or '<li>Sin identificadores NCT</li>'}</ul>
-</body></html>"""
+    return _render(data)
 
 
 def public_fiche(db: Session, technology_id: int) -> dict:
@@ -514,37 +604,9 @@ def publish_bulletin(db: Session, bulletin: Bulletin, *, actor: str) -> Bulletin
 
 
 def render_bulletin_html(bulletin: Bulletin) -> str:
-    body = bulletin.body or {}
-    funnel = body.get("funnel") or {}
-    clusters = "".join(
-        f"<li>{escape(str(i.get('label')))}: {int(i.get('value') or 0)}</li>"
-        for i in body.get("by_cluster") or []
-    )
-    return f"""<!DOCTYPE html>
-<html lang="es"><head><meta charset="utf-8"/><title>{escape(bulletin.title)}</title>
-<style>
-@page {{ margin: 18mm; }}
-body {{ font-family: "Segoe UI", Calibri, Arial, sans-serif; color: #0F172A; }}
-header {{ border-bottom: 4px solid #6366F1; padding-bottom: 12px; }}
-.kicker {{ letter-spacing: .12em; text-transform: uppercase; color: #6366F1; font-size: 11px; font-weight: 700; }}
-.kpi {{ display: inline-block; margin: 12px 16px 12px 0; }}
-.kpi b {{ font-size: 22px; }}
-</style></head><body>
-<header>
-  <div class="kicker">Instituto de Evaluacion Tecnologica en Salud</div>
-  <h1>{escape(bulletin.title)}</h1>
-  <p>Estado: {escape(bulletin.status)} · Compilado: {escape(str(body.get('compiled_on') or ''))}</p>
-</header>
-<section>
-  <div class="kpi"><b>{funnel.get('captured', 0)}</b><br/>Capturadas</div>
-  <div class="kpi"><b>{funnel.get('filtered', 0)}</b><br/>Filtradas</div>
-  <div class="kpi"><b>{funnel.get('prioritized', 0)}</b><br/>Priorizadas</div>
-  <div class="kpi"><b>{funnel.get('evaluated', 0)}</b><br/>Evaluadas</div>
-</section>
-<h2>Distribucion por cluster</h2>
-<ul>{clusters or '<li>Sin datos</li>'}</ul>
-<footer>Boletin generado por la plataforma de escaneo de horizonte. Requiere aprobacion del lider para su difusion formal.</footer>
-</body></html>"""
+    from .report_html import render_bulletin_html as _render
+
+    return _render(bulletin)
 
 
 def on_cycle_closed(db: Session, cycle: Cycle, *, actor: str = "") -> None:

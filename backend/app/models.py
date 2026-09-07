@@ -79,6 +79,36 @@ class Source(Base):
     )
     last_error: Mapped[str] = mapped_column(Text, default="")
 
+    # Catalogo verificado RF01 / D-06 (Catalogo_Fuentes_Proactivas_Verificadas).
+    catalog_code: Mapped[str] = mapped_column(String(40), default="", index=True)
+    entity_type: Mapped[str] = mapped_column(String(60), default="", index=True)
+    access_level: Mapped[str] = mapped_column(String(8), default="", index=True)  # A|B|C|D|E
+    country: Mapped[str] = mapped_column(String(80), default="")
+    sync_frequency: Mapped[str] = mapped_column(String(40), default="")
+    rate_limit_rpm: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    requires_api_key: Mapped[bool] = mapped_column(Boolean, default=False)
+    terms_url: Mapped[str] = mapped_column(String(1024), default="")
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    robots_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    robots_allowed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    health_status: Mapped[str] = mapped_column(String(20), default="", index=True)
+    last_ok_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    schema_signature: Mapped[str] = mapped_column(String(120), default="")
+    provides_fields: Mapped[list | None] = mapped_column(JSONType, default=list)
+    aliases: Mapped[list | None] = mapped_column(JSONType, default=list)
+    verification_status: Mapped[str] = mapped_column(String(40), default="")
+    catalog_note: Mapped[str] = mapped_column(Text, default="")
+    is_contrast: Mapped[bool] = mapped_column(Boolean, default=False)
+    catalog_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    retired: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_probe_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_probe_detail: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
+    next_review_due: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -167,6 +197,10 @@ class ChatSession(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(400), default="Nueva conversacion")
     user_email: Mapped[str] = mapped_column(String(255), default="", index=True)
+    scope: Mapped[str] = mapped_column(String(40), default="", index=True)
+    node_key: Mapped[str] = mapped_column(String(120), default="", index=True)
+    cycle_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    graph_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -697,6 +731,8 @@ class RawRecord(Base):
     )
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     reprocessed_count: Mapped[int] = mapped_column(Integer, default=0)
+    adapter_version: Mapped[str] = mapped_column(String(40), default="")
+    endpoint: Mapped[str] = mapped_column(String(1024), default="")
 
 
 class Submission(Base):
@@ -939,3 +975,17 @@ class AlertEvent(Base):
     cluster_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class StrategyGraph(Base):
+    """Vista de grafo del ciclo: layout, nodos abiertos y notas. El chat vive en ChatSession."""
+
+    __tablename__ = "strategy_graphs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cycle_id: Mapped[int] = mapped_column(ForeignKey("cycles.id", ondelete="CASCADE"), index=True)
+    user_email: Mapped[str] = mapped_column(String(255), default="", index=True)
+    title: Mapped[str] = mapped_column(String(400), default="Grafo del ciclo")
+    payload: Mapped[dict | None] = mapped_column(JSONType, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

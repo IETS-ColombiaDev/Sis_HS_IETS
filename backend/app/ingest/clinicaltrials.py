@@ -66,7 +66,8 @@ class ClinicalTrialsConnector(Connector):
     # Su WAF responde 403 a cualquier User-Agent que no reconozca. Con el
     # encabezado por defecto del cliente HTTP la peticion pasa.
     send_user_agent = False
-    min_interval = 0.4
+    min_interval = 1.5
+    adapter_version = "2"
 
     def fetch(self, *, config: dict, url: str = "") -> ConnectorResult:
         config = config or {}
@@ -86,6 +87,9 @@ class ClinicalTrialsConnector(Connector):
             params["query.term"] = term
         if config.get("statuses"):
             params["filter.overallStatus"] = ",".join(config["statuses"])
+        cursor = clean_text(config.get("pageToken") or config.get("cursor") or "")
+        if cursor:
+            params["pageToken"] = cursor
 
         data = request_json(
             API_URL,
@@ -99,8 +103,20 @@ class ClinicalTrialsConnector(Connector):
         records = [self._to_record(s) for s in studies]
         records = [r for r in records if r is not None]
         total = data.get("totalCount")
+        next_token = clean_text(data.get("nextPageToken"))
         message = f"{len(records)} estudios de {total if total is not None else 'n/d'} disponibles."
-        return ConnectorResult(records=records, message=message)
+        if next_token:
+            message += " Hay mas paginas; el cursor queda persistido."
+        from .base import schema_signature
+
+        return ConnectorResult(
+            records=records,
+            message=message,
+            next_cursor=next_token or None,
+            schema_signature=schema_signature(data),
+            adapter_version=self.adapter_version,
+            endpoint=API_URL,
+        )
 
     def _to_record(self, study: dict) -> CanonicalRecord | None:
         protocol = study.get("protocolSection") or {}

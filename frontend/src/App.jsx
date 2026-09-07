@@ -28,13 +28,20 @@ import Bulletins from "./pages/Bulletins";
 import Alerts from "./pages/Alerts";
 import Submissions from "./pages/Submissions";
 import { CycleProvider } from "./cycle/CycleContext";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 /** Protege una ruta por autenticacion y, opcionalmente, por permiso RBAC. */
 function Protected({ children, permission }) {
   const { user, can } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (permission && !can(permission)) return <Navigate to="/" replace />;
-  return <Layout>{children}</Layout>;
+  return (
+    <Layout>
+      <ErrorBoundary title="Esta pantalla se detuvo" hint="El menu sigue disponible. Reintente o cambie de modulo.">
+        {children}
+      </ErrorBoundary>
+    </Layout>
+  );
 }
 
 function LegacyRedirect({ to }) {

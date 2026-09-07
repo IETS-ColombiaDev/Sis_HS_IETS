@@ -6,7 +6,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from .. import gemini_service
+from .. import ai_service
 from ..database import get_db
 from ..deps import get_current_user, require_role
 from ..events import bump_state_version
@@ -51,7 +51,7 @@ def generate_recommendation(
     if not finding:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hallazgo no encontrado")
 
-    text, model = gemini_service.generate_adoption_recommendation(finding, finding.source)
+    text, model = ai_service.generate_adoption_recommendation(finding, finding.source)
     rec = Recommendation(
         finding_id=finding.id,
         title=f"Recomendacion de adopcion: {finding.technology or finding.title}"[:590],

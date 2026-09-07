@@ -58,7 +58,7 @@ def estimate_months(tech: Technology, *, as_of: date | None = None, review_days:
 
     expected = phase3 + timedelta(days=int(review_days or 0))
     months = round((expected - today).days / 30.44, 2)
-    return months, "fase_iii_mas_revision"
+    return max(months, 0.0), "fase_iii_mas_revision"
 
 
 def classify_months(db: Session, months: float | None) -> str:

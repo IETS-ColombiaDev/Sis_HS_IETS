@@ -1,8 +1,8 @@
-"""Conector de EMA Human Medicines Highlights (RF01).
+"""Conector de EMA: descarga oficial de tablas, RSS como contingencia.
 
-La EMA no publica un REST equivalente al de ClinicalTrials.gov. El canal
-oficial de highlights es un RSS; el adaptador lo traduce al esquema canonico
-y conserva el XML parseado en `raw` para poder reprocesar el mapeo.
+La EMA no expone REST. El sitio publica tablas descargables que actualiza
+cada noche (nivel B). El RSS se conserva solo si la descarga no esta
+disponible o no se puede interpretar.
 """
 from __future__ import annotations
 
@@ -16,25 +16,76 @@ from .base import (
     find_nct_ids,
     parse_compact_date,
     register,
+    request_bytes,
     request_text,
+    schema_signature,
 )
 
 DEFAULT_FEED = "https://www.ema.europa.eu/en/rss.xml"
+DOWNLOAD_PAGE = "https://www.ema.europa.eu/en/medicines/download-medicine-data"
 
 
 class EmaConnector(Connector):
     code = "ema"
-    label = "EMA Human Medicines (RSS)"
+    label = "EMA medicamentos (descarga + RSS)"
     description = (
-        "Canal RSS de la Agencia Europea de Medicamentos: opiniones del CHMP, "
-        "autorizaciones y highlights de medicamentos humanos."
+        "Tablas oficiales descargables de la EMA, con el canal RSS como "
+        "contingencia cuando el archivo no esta disponible."
     )
     min_interval = 0.5
+    adapter_version = "2"
 
     def fetch(self, *, config: dict, url: str = "") -> ConnectorResult:
         config = config or {}
+        if config.get("records"):
+            rows = [r for r in config["records"] if isinstance(r, dict)]
+            records = [self._from_table_row(row) for row in rows]
+            records = [r for r in records if r]
+            return ConnectorResult(
+                records=records,
+                message=f"{len(records)} medicamentos EMA desde lote local.",
+                adapter_version=self.adapter_version,
+            )
+
+        mode = (config.get("mode") or "download").lower()
+        page_size = int(config.get("page_size", 40))
+        if mode != "rss":
+            downloaded = self._try_download(config, page_size)
+            if downloaded is not None:
+                return downloaded
+        return self._from_rss(config, url, page_size)
+
+    def _try_download(self, config: dict, page_size: int) -> ConnectorResult | None:
+        file_url = clean_text(config.get("download_url") or "")
+        if not file_url:
+            return None
+        try:
+            from .file_feed import _parse_tabular
+
+            payload, content_type = request_bytes(
+                file_url,
+                connector_code=self.code,
+                min_interval=self.min_interval,
+            )
+            rows = _parse_tabular(payload, content_type, {"download_url": file_url})
+        except Exception:
+            return None
+        records = [self._from_table_row(row) for row in rows[: max(1, min(page_size, 200))]]
+        records = [r for r in records if r]
+        if not records:
+            return None
+        return ConnectorResult(
+            records=records,
+            message=f"{len(records)} medicamentos de la tabla descargable de la EMA.",
+            schema_signature=schema_signature(rows[:3]),
+            adapter_version=self.adapter_version,
+            endpoint=file_url,
+        )
+
+    def _from_rss(self, config: dict, url: str, page_size: int) -> ConnectorResult:
         feed = clean_text(config.get("feed_url") or url or DEFAULT_FEED) or DEFAULT_FEED
-        page_size = int(config.get("page_size", 30))
+        if "download-medicine-data" in feed:
+            feed = DEFAULT_FEED
         xml_text = request_text(
             feed,
             connector_code=self.code,
@@ -45,7 +96,57 @@ class EmaConnector(Connector):
         records = [r for r in records if r is not None]
         return ConnectorResult(
             records=records,
-            message=f"{len(records)} items del canal RSS de la EMA.",
+            message=f"{len(records)} items del canal RSS de la EMA (contingencia).",
+            partial=True,
+            adapter_version=self.adapter_version,
+            endpoint=feed,
+        )
+
+    def _from_table_row(self, row: dict) -> CanonicalRecord | None:
+        name = clean_text(
+            row.get("Medicine name")
+            or row.get("Name of medicine")
+            or row.get("medicine_name")
+            or row.get("name")
+            or row.get("title"),
+            590,
+        )
+        inn = clean_text(
+            row.get("International non-proprietary name")
+            or row.get("INN")
+            or row.get("inn_name")
+            or row.get("Active substance"),
+            400,
+        )
+        if not name and not inn:
+            return None
+        maker = clean_text(
+            row.get("Marketing authorisation holder")
+            or row.get("Company")
+            or row.get("manufacturer"),
+            300,
+        )
+        approval = clean_text(
+            row.get("Marketing authorisation date")
+            or row.get("Date of authorisation")
+            or row.get("authorisation_date")
+        )
+        ident = clean_text(row.get("EMA product number") or row.get("Product number") or name or inn)
+        return CanonicalRecord(
+            external_id=ident[:180],
+            title=name or inn,
+            url=DOWNLOAD_PAGE,
+            summary=clean_text(f"{name or inn}. {inn}. Titular: {maker or 'n/d'}.", 1500),
+            commercial_name=(name or inn)[:400],
+            inn_name=inn,
+            manufacturer=maker,
+            technology_type="medicamento",
+            development_phase="Autorizado EMA" if approval else "Registro EMA",
+            horizon="inminente" if approval else "transicional",
+            ema_approval_date=parse_compact_date(approval),
+            regulatory_status="Autorizado EMA" if approval else "Publicacion EMA",
+            published_date=approval or "",
+            raw=row,
         )
 
     def _to_record(self, item: dict) -> CanonicalRecord | None:

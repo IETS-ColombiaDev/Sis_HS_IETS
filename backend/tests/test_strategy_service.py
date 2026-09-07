@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app import methodology, strategy_service, ttm  # noqa: E402
 from app.database import Base  # noqa: E402
-from app.models import Cycle, CycleTechnology, EvaluationDoc, MethodologyParam, Technology  # noqa: E402
+from app.models import Cluster, Cycle, CycleTechnology, EvaluationDoc, MethodologyParam, Technology  # noqa: E402
 from app.strategy_service import StrategyRuleError  # noqa: E402
 
 
@@ -44,6 +44,13 @@ def test_ttm_bands_follow_parametrized_thresholds(db):
     db.get(MethodologyParam, "ttm.inminente_months_max").value = "20"
     db.commit()
     assert ttm.classify_months(db, 18) == "inminente"
+
+
+def test_ttm_past_phase3_does_not_go_negative():
+    tech = Technology(phase3_completion_date=dt.date(2022, 6, 30))
+    months, basis = ttm.estimate_months(tech, as_of=dt.date(2026, 9, 7), review_days=180)
+    assert basis == "fase_iii_mas_revision"
+    assert months == 0.0
 
 
 def test_ttm_uses_phase3_plus_review_days():
@@ -153,6 +160,37 @@ def test_datamart_funnel_and_restricted_payload(db):
     assert "comparators" not in public
     restricted = strategy_service.dashboard_for(db, cycle, include_restricted=True)
     assert "budget_heatmap" in restricted
+    assert restricted["funnel"]["captured"] == 1
+    assert restricted["conversion"]["priority_rate"] == 100
+
+
+def test_dashboard_filters_recompute_funnel(db):
+    cluster = db.query(Cluster).first()
+    other = db.query(Cluster).filter(Cluster.id != cluster.id).first()
+    cycle = Cycle(
+        code="C-FIL",
+        year=dt.date.today().year,
+        opened_on=dt.date.today(),
+        data_cutoff_on=dt.date.today() + dt.timedelta(weeks=12),
+        status="en_priorizacion",
+    )
+    a = _tech(db, commercial_name="Alfa", cluster_id=cluster.id, development_phase="Fase III")
+    b = _tech(db, commercial_name="Beta", cluster_id=other.id if other else cluster.id, development_phase="Fase I")
+    db.add(cycle)
+    db.commit()
+    db.add(CycleTechnology(cycle_id=cycle.id, technology_id=a.id, status="priorizada", priority_points=5))
+    db.add(CycleTechnology(cycle_id=cycle.id, technology_id=b.id, status="asignada_a_ciclo", priority_points=1))
+    db.commit()
+    full = strategy_service.dashboard_for(db, cycle, include_restricted=False)
+    assert full["funnel"]["captured"] == 2
+    filtered = strategy_service.dashboard_for(
+        db, cycle, include_restricted=False, cluster_id=cluster.id
+    )
+    assert filtered["funnel"]["captured"] == 1
+    assert filtered["ttm_scatter"][0]["name"] == "Alfa"
+    phased = strategy_service.dashboard_for(db, cycle, include_restricted=False, phase="fase_i")
+    assert phased["funnel"]["captured"] == 1
+    assert phased["from_cache"] is False
 
 
 def test_public_stats_never_include_budget(db):

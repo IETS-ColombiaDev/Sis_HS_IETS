@@ -10,7 +10,7 @@ from ..database import get_db
 from ..deps import get_current_user, require_permission
 from ..evaluation_service import EvaluationRuleError
 from ..events import bump_state_version
-from ..models import CycleTechnology, EvaluationDoc, ReviewAssignment, Technology, User
+from ..models import Cycle, CycleTechnology, EvaluationDoc, ReviewAssignment, Technology, User
 from ..rbac import P_CYCLE_WRITE, P_REPORT_WRITE, P_REVIEW_SUBMIT, has_permission
 from ..schemas import (
     EvaluationCoiIn,
@@ -85,7 +85,7 @@ def list_queue(
         db.query(CycleTechnology)
         .filter(
             CycleTechnology.cycle_id == cycle_id,
-            CycleTechnology.status.in_(("priorizada", "en_evaluacion")),
+            CycleTechnology.status.in_(("priorizada", "en_evaluacion", "publicada")),
         )
         .all()
     )
@@ -348,7 +348,8 @@ def export_html(
             detail="Sin declaracion de conflicto de interes no se habilita la exportacion.",
         )
     tech = db.get(Technology, doc.technology_id)
-    html = evaluation_service.render_institutional_html(doc, tech)
+    cycle = db.get(Cycle, doc.cycle_id)
+    html = evaluation_service.render_institutional_html(doc, tech, cycle_code=cycle.code if cycle else "")
     filename = f"iets-evaluacion-{doc.id}-v{doc.version_major}.{doc.version_minor}.html"
     return Response(
         content=html,

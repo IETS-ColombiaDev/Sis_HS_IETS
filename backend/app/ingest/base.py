@@ -33,6 +33,10 @@ class RateLimited(ConnectorError):
     """La fuente pidio explicitamente que bajemos el ritmo."""
 
 
+class SchemaChanged(ConnectorError):
+    """El esquema observado no coincide con el contrato del adaptador."""
+
+
 @dataclass(slots=True)
 class CanonicalRecord:
     """Una senal ya traducida al vocabulario del sistema.
@@ -82,6 +86,10 @@ class ConnectorResult:
     records: list[CanonicalRecord]
     message: str = ""
     partial: bool = False
+    next_cursor: str | None = None
+    schema_signature: str | None = None
+    adapter_version: str = "1"
+    endpoint: str = ""
 
 
 class Connector:
@@ -97,9 +105,20 @@ class Connector:
     # permiten 3 por segundo sin clave; openFDA, 240 por minuto.
     min_interval: float = 0.0
     requires_url: bool = False
+    adapter_version: str = "1"
 
     def fetch(self, *, config: dict, url: str = "") -> ConnectorResult:
         raise NotImplementedError
+
+    def probe_spec(self, *, config: dict, url: str = "") -> dict:
+        """Peticion minima de comprobacion declarada por el adaptador o la fuente."""
+        spec = ((config or {}).get("probe") or {}) if isinstance(config, dict) else {}
+        return {
+            "url": spec.get("url") or url,
+            "params": spec.get("params") or {},
+            "expect_status": int(spec.get("expect_status") or 200),
+            "expect_json_path": spec.get("expect_json_path") or "",
+        }
 
 
 # --------------------------------------------------------------------------- #
@@ -187,6 +206,92 @@ def request_json(
             raise ConnectorError(f"Respuesta no interpretable como JSON: {exc}")
 
     raise ConnectorError(last_error or "Fallo desconocido")
+
+
+def request_bytes(
+    url: str,
+    *,
+    params: dict | None = None,
+    connector_code: str = "",
+    send_user_agent: bool = True,
+    min_interval: float = 0.0,
+    timeout: float = 60.0,
+    max_attempts: int = 4,
+    accept: str = "*/*",
+) -> tuple[bytes, str]:
+    """GET binario (CSV, XLSX) con la misma politica de reintento."""
+    headers = {"Accept": accept}
+    if send_user_agent:
+        headers["User-Agent"] = USER_AGENT
+
+    last_error = ""
+    for attempt in range(1, max_attempts + 1):
+        _respect_interval(connector_code or url, min_interval)
+        try:
+            with httpx.Client(timeout=timeout, follow_redirects=True, headers=headers) as client:
+                resp = client.get(url, params=params)
+
+            if resp.status_code in RETRYABLE_STATUS:
+                retry_after = _retry_after_seconds(resp)
+                last_error = f"HTTP {resp.status_code}"
+                if attempt == max_attempts:
+                    if resp.status_code == 429:
+                        raise RateLimited(f"{last_error} tras {attempt} intentos")
+                    raise ConnectorError(f"{last_error} tras {attempt} intentos")
+                _sleep_backoff(attempt, retry_after)
+                continue
+
+            if resp.status_code >= 400:
+                raise ConnectorError(f"HTTP {resp.status_code}: {resp.text[:200]}")
+
+            return resp.content, resp.headers.get("content-type", "")
+        except (httpx.TimeoutException, httpx.TransportError) as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+            if attempt == max_attempts:
+                raise ConnectorError(f"Red inaccesible tras {attempt} intentos. {last_error}")
+            _sleep_backoff(attempt, None)
+
+    raise ConnectorError(last_error or "Fallo desconocido")
+
+
+def schema_signature(payload) -> str:
+    """Huella estable de las claves observadas, para detectar cambios de contrato."""
+    keys = _collect_keys(payload)
+    digest = hashlib.sha256("|".join(sorted(keys)).encode("utf-8")).hexdigest()[:24]
+    return digest
+
+
+def _collect_keys(value, prefix: str = "", depth: int = 0) -> set[str]:
+    if depth > 3:
+        return set()
+    keys: set[str] = set()
+    if isinstance(value, dict):
+        for key, child in value.items():
+            path = f"{prefix}.{key}" if prefix else str(key)
+            keys.add(path)
+            keys |= _collect_keys(child, path, depth + 1)
+    elif isinstance(value, list) and value:
+        keys |= _collect_keys(value[0], prefix, depth + 1)
+    return keys
+
+
+def json_path_exists(payload, path: str) -> bool:
+    if not path:
+        return True
+    current = payload
+    for part in path.split("."):
+        if isinstance(current, list):
+            if part.isdigit():
+                idx = int(part)
+                if idx >= len(current):
+                    return False
+                current = current[idx]
+                continue
+            return False
+        if not isinstance(current, dict) or part not in current:
+            return False
+        current = current[part]
+    return current is not None and current != [] and current != ""
 
 
 def request_text(

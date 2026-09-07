@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import Icon from "./Icon";
+import InfoTip from "./InfoTip";
 import { IETS_PHASES } from "../constants/methodology";
 
 /** Flujograma metodologico IETS visible en cada modulo operativo. */
@@ -46,12 +47,12 @@ export default function WorkflowStrip({ active }) {
               type="button"
               className={`workflow-step${isActive ? " workflow-step--active" : ""}`}
               onClick={() => navigate(step.to)}
-              title={step.hint}
             >
               <span className="workflow-step-num">{i + 1}</span>
               <Icon name={step.icon} size={15} />
               <span className="workflow-step-label">{step.label}</span>
             </button>
+            <InfoTip text={step.help || step.hint} position="bottom" label={`Que es ${step.label}`} />
             {i < IETS_PHASES.length - 1 && <span className="workflow-arrow" aria-hidden="true" />}
           </div>
         );

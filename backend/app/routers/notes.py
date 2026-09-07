@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from .. import gemini_service
+from .. import ai_service
 from ..database import get_db
 from ..deps import get_current_user, require_role
 from ..events import bump_state_version
@@ -152,14 +152,14 @@ def enhance_note_ai(
     db: Session = Depends(get_db),
     user: User = Depends(require_role("editor")),
 ):
-    """Mejora el contenido de una nota con Gemini y la guarda."""
-    if not gemini_service.is_enabled():
-        raise HTTPException(status_code=400, detail="IA no configurada. Configure el token de Gemini en Configuracion.")
+    """Mejora el contenido de una nota con MiniMax / Gemini y la guarda."""
+    if not ai_service.is_enabled():
+        raise HTTPException(status_code=400, detail="IA no configurada. Configure MiniMax en Configuracion.")
     note = db.get(Note, note_id)
     if not note:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nota no encontrada")
     ctx = _entity_label(db, note.entity_type, note.entity_id)
-    improved, model = gemini_service.enhance_note_content(note.title, note.content, ctx)
+    improved, model = ai_service.enhance_note_content(note.title, note.content, ctx)
     note.content = improved
     db.commit()
     db.refresh(note)

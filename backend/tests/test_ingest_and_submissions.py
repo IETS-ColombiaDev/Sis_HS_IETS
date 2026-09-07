@@ -61,7 +61,7 @@ def _source(db, **kwargs) -> Source:
 
 def test_registry_includes_the_planned_connectors():
     codes = {c.code for c in ingest.all_connectors()}
-    assert {"clinicaltrials", "fda", "ema", "pubmed", "who_ictrp", "fixture"} <= codes
+    assert {"clinicaltrials", "fda", "ema", "pubmed", "who_ictrp", "fixture", "health_canada", "ctis"} <= codes
 
 
 def test_clinicaltrials_maps_phase3_completion():
@@ -104,7 +104,8 @@ def test_fda_maps_application_number():
             },
             "products": [{"active_ingredients": [{"name": "examplemab"}], "dosage_form": "INJECTION"}],
             "submissions": [{"submission_status_date": "20260501"}],
-        }
+        },
+        "drug/drugsfda",
     )
     assert rec.external_id == "NDA210365"
     assert rec.fda_approval_date == dt.date(2026, 5, 1)

@@ -75,6 +75,20 @@ class SourceBase(BaseModel):
     connector: str = "html"
     connector_config: dict | None = None
     scan_interval_hours: int = 24
+    catalog_code: str = ""
+    entity_type: str = ""
+    access_level: str = ""
+    country: str = ""
+    sync_frequency: str = ""
+    rate_limit_rpm: int | None = None
+    requires_api_key: bool = False
+    terms_url: str = ""
+    provides_fields: list | None = None
+    aliases: list | None = None
+    verification_status: str = ""
+    catalog_note: str = ""
+    is_contrast: bool = False
+    catalog_active: bool = True
 
 
 class SourceCreate(SourceBase):
@@ -103,6 +117,25 @@ class SourceUpdate(BaseModel):
     connector: str | None = None
     connector_config: dict | None = None
     scan_interval_hours: int | None = None
+    catalog_code: str | None = None
+    entity_type: str | None = None
+    access_level: str | None = None
+    country: str | None = None
+    sync_frequency: str | None = None
+    rate_limit_rpm: int | None = None
+    requires_api_key: bool | None = None
+    terms_url: str | None = None
+    terms_accepted_at: datetime | None = None
+    robots_checked_at: datetime | None = None
+    robots_allowed: bool | None = None
+    health_status: str | None = None
+    provides_fields: list | None = None
+    aliases: list | None = None
+    verification_status: str | None = None
+    catalog_note: str | None = None
+    is_contrast: bool | None = None
+    catalog_active: bool | None = None
+    scrape_enabled: bool | None = None
 
 
 class SourceOut(SourceBase):
@@ -116,6 +149,16 @@ class SourceOut(SourceBase):
     last_error: str = ""
     failure_streak: int = 0
     circuit_open_until: datetime | None = None
+    terms_accepted_at: datetime | None = None
+    robots_checked_at: datetime | None = None
+    robots_allowed: bool | None = None
+    health_status: str = ""
+    last_ok_at: datetime | None = None
+    schema_signature: str = ""
+    retired: bool = False
+    last_probe_at: datetime | None = None
+    last_probe_detail: dict | None = None
+    next_review_due: datetime | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -310,6 +353,10 @@ class ChatSessionOut(BaseModel):
     id: int
     title: str
     user_email: str
+    scope: str = ""
+    node_key: str = ""
+    cycle_id: int | None = None
+    graph_id: int | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -321,6 +368,10 @@ class ChatSessionDetail(ChatSessionOut):
 class ChatSendIn(BaseModel):
     session_id: int | None = None
     message: str
+    scope: str = ""
+    node_key: str = ""
+    cycle_id: int | None = None
+    graph_id: int | None = None
 
 
 class ChatSendOut(BaseModel):
@@ -392,6 +443,11 @@ class SystemStatus(BaseModel):
     allowed_domain: str
     version: str
     recaptcha_site_key: str = ""
+    ai_enabled: bool = False
+    ai_provider: str = ""
+    ai_model: str = ""
+    ai_ocr_enabled: bool = False
+    ai_web_enabled: bool = False
 
 
 # --------------------------------------------------------------------------- #
@@ -410,15 +466,40 @@ class ConfigOut(BaseModel):
     total_sources: int = 0
     total_findings: int = 0
     version: str
+    openfda_has_key: bool = False
+    ncbi_has_key: bool = False
+    ncbi_email: str = ""
+    ai_enabled: bool = False
+    ai_provider: str = "auto"
+    ai_active_provider: str = ""
+    ai_model: str = ""
+    ai_ocr_enabled: bool = False
+    ai_web_enabled: bool = True
+    minimax_has_key: bool = False
+    minimax_key_masked: str = ""
+    minimax_model: str = ""
+    minimax_active_model: str = ""
+    minimax_available_models: list[str] = []
+    minimax_vision_model: str = ""
 
 
 class ConfigUpdate(BaseModel):
     gemini_api_key: str | None = None  # None = no cambiar; "" = borrar
     gemini_model: str | None = None
+    openfda_api_key: str | None = None
+    ncbi_api_key: str | None = None
+    ncbi_email: str | None = None
+    minimax_api_key: str | None = None
+    minimax_model: str | None = None
+    ai_provider: str | None = None
+    ai_ocr_enabled: bool | None = None
+    ai_web_enabled: bool | None = None
 
 
 class GeminiTestIn(BaseModel):
     gemini_api_key: str | None = None  # opcional: probar una key sin guardarla
+    minimax_api_key: str | None = None
+    provider: str | None = None
 
 
 class GeminiTestOut(BaseModel):
@@ -426,6 +507,7 @@ class GeminiTestOut(BaseModel):
     message: str
     model: str = ""
     available_models: list[str] = []
+    provider: str = ""
 
 
 # =========================================================================== #
@@ -959,6 +1041,46 @@ class IngestRunOut(BaseModel):
     processed: int = 0
 
 
+class SourceProbeOut(BaseModel):
+    source_id: int
+    catalog_code: str = ""
+    url: str = ""
+    status: str
+    http_status: int | None = None
+    message: str = ""
+    schema_signature: str = ""
+    schema_changed: bool = False
+    zero_records: bool = False
+    probed_at: str = ""
+
+
+class IngestHealthOut(BaseModel):
+    counts: dict
+    total: int = 0
+    items: list[dict] = []
+
+
+class CoverageOut(BaseModel):
+    cycle_id: int | None = None
+    cycle_code: str = ""
+    contrast_sources: list[dict] = []
+    cycle_size: int = 0
+    contrast_captured: int = 0
+    gaps: list[dict] = []
+    gap_count: int = 0
+
+
+class CatalogImportOut(BaseModel):
+    version: str
+    created: int = 0
+    updated: int = 0
+    retired: int = 0
+    total: int = 0
+    stats: dict = {}
+    imported_at: str = ""
+    triggered_by: str = ""
+
+
 class RawPreviewOut(BaseModel):
     technology_id: int
     origin: str = ""
@@ -1187,16 +1309,39 @@ class ReviewerAccessOut(BaseModel):
 class StrategyDashboardOut(BaseModel):
     cycle_id: int
     cycle_code: str = ""
+    cycle_status: str = ""
     funnel: dict = {}
+    kpis: dict = {}
+    conversion: dict = {}
     by_cluster: list[dict] = []
     by_type: list[dict] = []
     by_band: list[dict] = []
+    by_phase: list[dict] = []
     ttm_scatter: list[dict] = []
     restricted: bool = False
     from_cache: bool = False
+    refreshed_at: datetime | None = None
     budget_heatmap: list[dict] | None = None
     budget_items: list[dict] | None = None
     comparators: list[dict] | None = None
+
+
+class StrategyGraphOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    cycle_id: int
+    user_email: str
+    title: str
+    payload: dict = {}
+    created_at: datetime
+    updated_at: datetime
+
+
+class StrategyGraphIn(BaseModel):
+    cycle_id: int
+    title: str = "Grafo del ciclo"
+    payload: dict = {}
 
 
 class PublicStatsOut(BaseModel):
