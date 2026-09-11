@@ -1,0 +1,304 @@
+# ============================================================================
+#  CI del Sistema de Escaneo de Horizonte del IETS (fase 0, P0-2)
+# ============================================================================
+# En cada push a main y en cada pull request:
+#   backend   pytest + alembic upgrade/check sobre SQLite vacia
+#   postgres  migraciones Alembic reales contra PostgreSQL 15 (vacia y heredada)
+#   frontend  npm ci + npm run build (publica dist como artefacto)
+#   e2e       Playwright (chromium) contra el backend con SQLite temporal
+#   smoke     uvicorn + smoke_test.py --skip-network
+#   docker    build de la imagen (sin push) y validacion de docker-compose.yml
+# ============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "24"
+  PYTEST_VERSION: "9.1.1"
+
+jobs:
+  # ------------------------------------------------------------------------ #
+  backend:
+    name: Backend (pytest + Alembic)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      ENVIRONMENT: testing
+      INGEST_WORKER_ENABLED: "false"
+      SECRET_KEY: ci-backend-secret-key-not-for-production-0123456789
+      DATABASE_URL: sqlite:///./ci_pytest.db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt "pytest==${PYTEST_VERSION}"
+      - name: Pruebas unitarias
+        run: python -m pytest -q
+      - name: Alembic sobre SQLite vacia (upgrade, deriva y downgrade)
+        run: |
+          python -m alembic -x url=sqlite:///./ci_alembic.db upgrade head
+          python -m alembic -x url=sqlite:///./ci_alembic.db check
+          python -m alembic -x url=sqlite:///./ci_alembic.db downgrade base
+          python -m alembic -x url=sqlite:///./ci_alembic.db upgrade head
+
+  # ------------------------------------------------------------------------ #
+  postgres:
+    name: Migraciones en PostgreSQL 15
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: iets
+          POSTGRES_PASSWORD: iets
+          POSTGRES_DB: iets_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U iets -d iets_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      ENVIRONMENT: testing
+      INGEST_WORKER_ENABLED: "false"
+      SECRET_KEY: ci-postgres-secret-key-not-for-production-0123456789
+      PG_BASE: postgresql+psycopg://iets:iets@localhost:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Base vacia -> created, luego current (idempotente)
+        env:
+          DATABASE_URL: ${{ env.PG_BASE }}/iets_ci
+        run: |
+          python -m app.migrations | tee first.txt
+          grep -q "Migracion: created" first.txt
+          python -m app.migrations | tee second.txt
+          grep -q "Migracion: current" second.txt
+          python -m alembic check
+      - name: Base heredada (create_all sin Alembic) -> stamped
+        env:
+          DATABASE_URL: ${{ env.PG_BASE }}/iets_legacy
+        run: |
+          python - <<'EOF'
+          from sqlalchemy import create_engine, text
+          admin = create_engine("${{ env.PG_BASE }}/iets_ci", isolation_level="AUTOCOMMIT")
+          with admin.connect() as conn:
+              conn.execute(text("CREATE DATABASE iets_legacy"))
+          from app import models  # noqa: F401
+          from app.database import Base, engine, ensure_pg_extensions
+          ensure_pg_extensions()
+          Base.metadata.create_all(bind=engine)
+          EOF
+          python -m app.migrations | tee legacy.txt
+          grep -q "Migracion: stamped" legacy.txt
+          python -m app.migrations | grep -q "Migracion: current"
+      - name: Indices GIN pg_trgm y extensiones presentes en ambas bases
+        run: |
+          python - <<'EOF'
+          from sqlalchemy import create_engine, text
+          for db in ("iets_ci", "iets_legacy"):
+              eng = create_engine(f"${{ env.PG_BASE }}/{db}")
+              with eng.connect() as conn:
+                  idx = {r[0]: r[1] for r in conn.execute(text(
+                      "SELECT indexname, indexdef FROM pg_indexes WHERE indexname LIKE '%_trgm'"))}
+                  ext = {r[0] for r in conn.execute(text("SELECT extname FROM pg_extension"))}
+              print(db, sorted(idx), sorted(ext))
+              assert "pg_trgm" in ext, db
+              assert len(idx) == 2 and all("gin_trgm_ops" in d for d in idx.values()), (db, idx)
+          EOF
+
+  # ------------------------------------------------------------------------ #
+  frontend:
+    name: Frontend (build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 3
+
+  # ------------------------------------------------------------------------ #
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: frontend
+    timeout-minutes: 30
+    env:
+      # playwright.config.js, modo autocontenido: levanta uvicorn en ../backend
+      # con SQLite temporal, dev-login y sin worker de ingesta.
+      E2E_CHANNEL: chromium
+      E2E_PYTHON: python
+      ADMIN_EMAILS: admin@iets.org.co
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Dependencias del backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Dependencias del frontend
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+      - name: Navegador
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Pruebas E2E
+        working-directory: frontend
+        run: npx playwright test
+      - name: Reporte de Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            frontend/e2e-report
+            frontend/test-results
+          retention-days: 7
+
+  # ------------------------------------------------------------------------ #
+  smoke:
+    name: Regresion de extremo a extremo (smoke_test)
+    runs-on: ubuntu-latest
+    needs: frontend
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      ENVIRONMENT: development
+      ALLOW_DEV_LOGIN: "true"
+      ADMIN_EMAILS: admin@iets.org.co
+      INGEST_WORKER_ENABLED: "false"
+      SECRET_KEY: ci-smoke-secret-key-not-for-production-0123456789
+      DATABASE_URL: sqlite:///./ci_smoke.db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+      - name: Migrar y levantar la API
+        run: |
+          python -m app.migrations
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > uvicorn.log 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:8000/api/health; then echo; exit 0; fi
+            sleep 2
+          done
+          echo "La API no respondio en /api/health"; cat uvicorn.log; exit 1
+      - name: La SPA se sirve desde dist
+        run: |
+          curl -fsS http://127.0.0.1:8000/ > index.html
+          grep -qi 'id="root"' index.html
+      - name: smoke_test.py
+        run: python smoke_test.py --base http://127.0.0.1:8000 --skip-network
+      - name: Log de uvicorn
+        if: always()
+        run: cat uvicorn.log || true
+
+  # ------------------------------------------------------------------------ #
+  docker:
+    name: Imagen Docker (build sin push)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar docker-compose.yml
+        run: |
+          cp deploy/.env.production.example deploy/.env.production
+          sed -i 's/^SECRET_KEY=.*/SECRET_KEY=ci-compose-secret-key-not-for-production-0123456789/' deploy/.env.production
+          sed -i 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci_compose_password/' deploy/.env.production
+          docker compose --env-file deploy/.env.production config --quiet
+          docker compose --env-file deploy/.env.production --profile https config --quiet
+      - uses: docker/setup-buildx-action@v3
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          load: true
+          tags: iets-horizonte:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: La imagen rechaza arrancar con SECRET_KEY insegura
+        run: |
+          if docker run --rm -e SECRET_KEY=corta iets-horizonte:ci; then
+            echo "Se esperaba un fallo por SECRET_KEY insegura"; exit 1
+          fi
+      - name: Usuario no root y comandos de administracion disponibles
+        run: |
+          test "$(docker run --rm iets-horizonte:ci id -u)" = "10001"
+          docker run --rm -e SECRET_KEY=ci-docker-secret-key-not-for-production-0123456789 \
+            iets-horizonte:ci python -m app.cli check-config
+          docker run --rm iets-horizonte:ci test -f /app/frontend/dist/index.html

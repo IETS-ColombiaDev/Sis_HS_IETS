@@ -5,7 +5,7 @@ export default function ConfirmDialog({
   open,
   onClose,
   onConfirm,
-  title = "Confirmar accion",
+  title = "Confirmar acción",
   message,
   confirmLabel = "Confirmar",
   confirmVariant = "danger",

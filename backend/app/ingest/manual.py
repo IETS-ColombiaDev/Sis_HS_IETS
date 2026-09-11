@@ -10,9 +10,9 @@ from .base import CanonicalRecord, Connector, ConnectorResult, clean_text, parse
 
 class ManualConnector(Connector):
     code = "manual"
-    label = "Curaduria humana"
+    label = "Curaduría humana"
     description = (
-        "No hay ruta automatizable razonable. El sistema recuerda la revision "
+        "No hay ruta automatizable razonable. El sistema recuerda la revisión "
         "y acepta un lote cargado por el evaluador."
     )
     requires_url = False
@@ -50,14 +50,14 @@ class ManualConnector(Connector):
         if records:
             return ConnectorResult(
                 records=records,
-                message=f"{len(records)} registros de curaduria cargados a mano.",
+                message=f"{len(records)} registros de curaduría cargados a mano.",
                 adapter_version=self.adapter_version,
             )
         return ConnectorResult(
             records=[],
             message=(
-                "Fuente de curaduria: no hay lote cargado. "
-                "Registre la revision en la ficha y, si aplica, adjunte records."
+                "Fuente de curaduría: no hay lote cargado. "
+                "Registre la revisión en la ficha y, si aplica, adjunte records."
             ),
             adapter_version=self.adapter_version,
         )

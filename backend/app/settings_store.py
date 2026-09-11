@@ -74,3 +74,66 @@ def load_ingest_keys(db: Session) -> dict[str, str]:
         "ncbi_api_key": get_value(db, NCBI_API_KEY, ""),
         "ncbi_email": get_value(db, NCBI_EMAIL, ""),
     }
+
+
+# --------------------------------------------------------------------------- #
+#  Tareas programadas del worker (P0-4 y P1-4)
+# --------------------------------------------------------------------------- #
+SCHEDULE_SCAN_ENABLED = "cfg.schedule.scan_enabled"
+SCHEDULE_SCAN_HOURS = "cfg.schedule.scan_interval_hours"
+SCHEDULE_DEDUP_ENABLED = "cfg.schedule.dedup_enabled"
+SCHEDULE_DEDUP_HOURS = "cfg.schedule.dedup_interval_hours"
+
+# Valores por defecto: la vigilancia revisa cada 6 horas que fuentes vencieron
+# segun su propia frecuencia; el barrido de duplicados corre una vez al dia.
+SCHEDULE_DEFAULTS = {
+    "scan_enabled": True,
+    "scan_interval_hours": 6,
+    "dedup_enabled": True,
+    "dedup_interval_hours": 24,
+}
+SCHEDULE_HOURS_MIN = 1
+SCHEDULE_HOURS_MAX = 24 * 30
+
+
+def _int(db: Session, key: str, default: int) -> int:
+    raw = get_value(db, key, "")
+    try:
+        value = int(float(raw)) if raw != "" else default
+    except ValueError:
+        value = default
+    return max(SCHEDULE_HOURS_MIN, min(SCHEDULE_HOURS_MAX, value))
+
+
+def load_schedule(db: Session) -> dict:
+    """Configuracion vigente de las tareas programadas (BD o valores por defecto)."""
+    d = SCHEDULE_DEFAULTS
+    return {
+        "scan_enabled": _flag(db, SCHEDULE_SCAN_ENABLED, d["scan_enabled"]),
+        "scan_interval_hours": _int(db, SCHEDULE_SCAN_HOURS, d["scan_interval_hours"]),
+        "dedup_enabled": _flag(db, SCHEDULE_DEDUP_ENABLED, d["dedup_enabled"]),
+        "dedup_interval_hours": _int(db, SCHEDULE_DEDUP_HOURS, d["dedup_interval_hours"]),
+    }
+
+
+def save_schedule(db: Session, **changes) -> dict:
+    """Guarda solo los campos presentes. Las horas deben estar en [1, 720]."""
+    keys = {
+        "scan_enabled": SCHEDULE_SCAN_ENABLED,
+        "scan_interval_hours": SCHEDULE_SCAN_HOURS,
+        "dedup_enabled": SCHEDULE_DEDUP_ENABLED,
+        "dedup_interval_hours": SCHEDULE_DEDUP_HOURS,
+    }
+    for name, value in changes.items():
+        if value is None or name not in keys:
+            continue
+        if name.endswith("_hours"):
+            hours = int(value)
+            if hours < SCHEDULE_HOURS_MIN or hours > SCHEDULE_HOURS_MAX:
+                raise ValueError(
+                    f"El intervalo debe estar entre {SCHEDULE_HOURS_MIN} y {SCHEDULE_HOURS_MAX} horas."
+                )
+            set_value(db, keys[name], str(hours))
+        else:
+            set_value(db, keys[name], "true" if value else "false")
+    return load_schedule(db)

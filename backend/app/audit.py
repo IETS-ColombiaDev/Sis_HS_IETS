@@ -81,7 +81,16 @@ AUDITED_MODELS: tuple[type, ...] = (
 )
 
 # Campos que jamas deben copiarse a la bitacora (ruido o dato sensible).
-EXCLUDED_FIELDS = {"raw_content", "raw_payload", "picture", "payload", "token_hash"}
+EXCLUDED_FIELDS = {
+    "raw_content",
+    "raw_payload",
+    "picture",
+    "payload",
+    "token_hash",
+    # Credenciales: el hash de la contrasena nunca viaja a la bitacora. Los
+    # eventos de acceso se registran aparte con `record_action` (auth:*).
+    "password_hash",
+}
 
 # Los dos contextos guardan un diccionario *mutable* y se reasignan lo menos
 # posible. La razon es la propagacion de `contextvars` en FastAPI:

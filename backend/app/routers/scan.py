@@ -10,9 +10,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..deps import get_current_user, require_role
+from ..deps import get_current_user, require_permission
 from ..ingest_service import enqueue, run_job
 from ..models import IngestJob, ScrapeLog, Source, User
+from ..rbac import P_SCAN_RUN
 from ..schemas import LinkPreviewIn, LinkPreviewOut, ScanRequest, ScanResult, ScrapeLogOut
 from ..scraper import preview_url
 from ..worker import kick
@@ -45,7 +46,7 @@ def _job_as_log(job: IngestJob, source: Source | None) -> ScrapeLogOut:
 def run_scan(
     payload: ScanRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(require_role("editor")),
+    user: User = Depends(require_permission(P_SCAN_RUN)),
 ):
     query = db.query(Source).filter(Source.scrape_enabled == True)  # noqa: E712
     if payload.source_ids:
@@ -58,6 +59,11 @@ def run_scan(
         )
 
     jobs = enqueue(db, sources, triggered_by=user.email, origin="manual")
+    if not jobs:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Las fuentes elegidas están retiradas del inventario vigente; no hay nada que encolar.",
+        )
     kick()
     by_id = {s.id: s for s in sources}
     logs = [_job_as_log(j, by_id.get(j.source_id)) for j in jobs]
@@ -68,12 +74,27 @@ def run_scan(
 def run_scan_source(
     source_id: int,
     db: Session = Depends(get_db),
-    user: User = Depends(require_role("editor")),
+    user: User = Depends(require_permission(P_SCAN_RUN)),
 ):
     source = db.get(Source, source_id)
     if not source:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fuente no encontrada")
+    if source.retired or source.catalog_active is False:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La fuente está retirada del inventario vigente y la cola de ingesta la ignora.",
+        )
+    if not source.scrape_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La ingesta de esta fuente está deshabilitada. Habilítela en el catálogo de fuentes.",
+        )
     jobs = enqueue(db, [source], triggered_by=user.email, origin="manual")
+    if not jobs:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se pudo encolar la fuente.",
+        )
     job = run_job(db, jobs[0].id)
     return _job_as_log(job, source)
 
@@ -81,7 +102,7 @@ def run_scan_source(
 @router.post("/preview", response_model=LinkPreviewOut)
 def preview_link(
     payload: LinkPreviewIn,
-    user: User = Depends(require_role("editor")),
+    user: User = Depends(require_permission(P_SCAN_RUN)),
 ):
     """Previsualiza que informacion se extraeria de un enlace (sin guardar nada)."""
     return LinkPreviewOut(**preview_url(payload.url.strip()))
@@ -91,7 +112,14 @@ def preview_link(
 def list_logs(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    limit: int = Query(100, le=500),
+    limit: int = Query(100, ge=1, le=500),
+    source_id: int | None = Query(None),
+    status_filter: str | None = Query(None, alias="status"),
 ):
-    logs = db.query(ScrapeLog).order_by(ScrapeLog.started_at.desc()).limit(limit).all()
+    query = db.query(ScrapeLog)
+    if source_id:
+        query = query.filter(ScrapeLog.source_id == source_id)
+    if status_filter:
+        query = query.filter(ScrapeLog.status == status_filter)
+    logs = query.order_by(ScrapeLog.started_at.desc(), ScrapeLog.id.desc()).limit(limit).all()
     return [_log_to_out(log) for log in logs]

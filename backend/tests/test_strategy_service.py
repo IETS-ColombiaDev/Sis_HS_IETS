@@ -93,7 +93,7 @@ def test_public_fiche_hides_budget_and_confidential(db):
     assert "comparators_sgsss" not in fiche["body"]
     assert "mechanism" not in fiche["body"]
     assert fiche["body"]["health_condition"] == "Asma"
-    assert fiche["field_labels"]["health_condition"] == "Condicion de salud"
+    assert fiche["field_labels"]["health_condition"] == "Condición de salud"
     assert "budget_year_1" not in fiche["field_labels"]
 
 
@@ -132,7 +132,7 @@ def test_bulletin_cannot_publish_without_approval(db):
     db.commit()
     row = strategy_service.compile_bulletin(db, cycle, actor="admin@iets.org.co")
     row.approved_by = ""
-    with pytest.raises(StrategyRuleError, match="aprobacion"):
+    with pytest.raises(StrategyRuleError, match="aprobación"):
         strategy_service.publish_bulletin(db, row, actor="admin@iets.org.co")
 
 

@@ -6,12 +6,15 @@ import Button from "../components/Button";
 import Markdown from "../components/Markdown";
 import { Spinner } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
+import ConfirmDialog from "../components/ConfirmDialog";
+import InfoTip from "../components/InfoTip";
+import { GLOSSARY } from "../constants/glossary";
 
 const SUGGESTIONS = [
-  "Que tecnologias emergentes de oncologia se han detectado?",
+  "¿Qué tecnologías emergentes de oncología se han detectado?",
   "Resume los referentes internacionales de horizon scanning disponibles.",
-  "Que dispositivos medicos deberia priorizar el IETS?",
-  "Como se define el escaneo de horizonte y sus fases en el IETS?",
+  "¿Qué dispositivos médicos debería priorizar el IETS?",
+  "¿Cómo se define el escaneo de horizonte y sus fases en el IETS?",
 ];
 
 export default function Chat() {
@@ -23,7 +26,10 @@ export default function Chat() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const scrollRef = useRef(null);
+  const aiOn = Boolean(status?.ai_enabled || status?.gemini_enabled);
 
   const loadSessions = useCallback(async () => {
     try {
@@ -49,7 +55,7 @@ export default function Chat() {
       setActiveId(id);
       setMessages(data.messages);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo abrir la conversacion"));
+      toast.error(apiError(e, "No se pudo abrir la conversación"));
     }
   };
 
@@ -58,14 +64,19 @@ export default function Chat() {
     setMessages([]);
   };
 
-  const deleteSession = async (id, e) => {
-    e.stopPropagation();
+  const deleteSession = async () => {
+    const id = confirmDel?.id;
+    setDeleting(true);
     try {
       await api.delete(`/chat/sessions/${id}`);
       if (activeId === id) newChat();
+      toast.success("Conversación eliminada");
+      setConfirmDel(null);
       loadSessions();
     } catch (err) {
-      toast.error(apiError(err, "No se pudo eliminar"));
+      toast.error(apiError(err, "No se pudo eliminar la conversación"));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -93,22 +104,20 @@ export default function Chat() {
       {/* Sesiones */}
       <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, display: "flex", flexDirection: "column", overflow: "hidden" }} className="chat-sessions">
         <div style={{ padding: 14, borderBottom: "1px solid #E2E8F0" }}>
-          <Button onClick={newChat} style={{ width: "100%" }}>+ Nueva conversacion</Button>
+          <Button onClick={newChat} style={{ width: "100%" }}>+ Nueva conversación</Button>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
           {sessions.length === 0 && (
             <div style={{ padding: 16, fontSize: 13, color: "#94A3B8", textAlign: "center" }}>
-              Sin conversaciones aun.
+              Sin conversaciones aún.
             </div>
           )}
           {sessions.map((s) => (
             <div
               key={s.id}
-              onClick={() => openSession(s.id)}
+              data-testid={`chat-session-${s.id}`}
               style={{
-                padding: "10px 12px",
                 borderRadius: 8,
-                cursor: "pointer",
                 marginBottom: 4,
                 background: activeId === s.id ? "#EEF2FF" : "transparent",
                 display: "flex",
@@ -119,10 +128,23 @@ export default function Chat() {
               onMouseEnter={(e) => { if (activeId !== s.id) e.currentTarget.style.background = "#F1F5F9"; }}
               onMouseLeave={(e) => { if (activeId !== s.id) e.currentTarget.style.background = "transparent"; }}
             >
-              <span style={{ fontSize: 13, color: activeId === s.id ? "#4F46E5" : "#334155", fontWeight: activeId === s.id ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <button
+                type="button"
+                onClick={() => openSession(s.id)}
+                title={s.title}
+                style={{ flex: 1, minWidth: 0, textAlign: "left", border: "none", background: "none", padding: "10px 12px", cursor: "pointer", fontSize: 13, color: activeId === s.id ? "#4F46E5" : "#334155", fontWeight: activeId === s.id ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+              >
                 💬 {s.title}
-              </span>
-              <button onClick={(e) => deleteSession(s.id, e)} style={{ border: "none", background: "none", color: "#CBD5E1", fontSize: 15 }} aria-label="Eliminar">×</button>
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDel(s)}
+                style={{ border: "none", background: "none", color: "#94A3B8", fontSize: 16, cursor: "pointer", padding: "0 10px" }}
+                aria-label={`Eliminar conversación ${s.title}`}
+                title="Eliminar conversación"
+              >
+                ×
+              </button>
             </div>
           ))}
         </div>
@@ -133,11 +155,13 @@ export default function Chat() {
         <div style={{ padding: "14px 20px", borderBottom: "1px solid #E2E8F0", display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#6366F1,#3B82F6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17 }}>🤖</div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>Asistente de Escaneo de Horizonte</div>
+            <div style={{ fontWeight: 700, fontSize: 15, display: "inline-flex", alignItems: "center", gap: 6 }}>
+              Asistente de Escaneo de Horizonte <InfoTip text={GLOSSARY.fb_chat} label="Cómo responde el asistente" />
+            </div>
             <div style={{ fontSize: 12, color: "#94A3B8" }}>
               {status?.ai_enabled || status?.gemini_enabled
-                ? `${status.ai_provider === "gemini" ? "Gemini" : "MiniMax"} · ${status.ai_model || status.gemini_model || "modelo automatico"}`
-                : "Modo sin IA (configure MiniMax en Configuracion)"}
+                ? `${status.ai_provider === "gemini" ? "Gemini" : "MiniMax"} · ${status.ai_model || status.gemini_model || "modelo automático"}`
+                : "Modo sin IA: muestra lo encontrado en el sistema sin redactar (un superadministrador puede activar la IA en Configuración)"}
             </div>
           </div>
         </div>
@@ -148,8 +172,13 @@ export default function Chat() {
               <EmptyState
                 icon="💬"
                 title="Converse con la base de conocimiento"
-                message="Pregunte sobre las fuentes, hallazgos y tecnologias emergentes registradas en el sistema."
+                message="Pregunte sobre las fuentes, señales y tecnologías emergentes registradas en el sistema."
               />
+              {!aiOn && (
+                <p className="fb-public-note" data-testid="chat-degraded">
+                  La IA no está configurada: el asistente responderá mostrando la información relevante que encuentre en el sistema, sin redactar.
+                </p>
+              )}
               <div style={{ display: "grid", gap: 10, marginTop: 8 }}>
                 {SUGGESTIONS.map((s) => (
                   <button
@@ -171,7 +200,7 @@ export default function Chat() {
               ))}
               {sending && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#64748B", fontSize: 14 }}>
-                  <Spinner size={18} /> Analizando la informacion disponible...
+                  <Spinner size={18} /> Analizando la información disponible...
                 </div>
               )}
             </div>
@@ -189,7 +218,8 @@ export default function Chat() {
                   send();
                 }
               }}
-              placeholder="Escriba su pregunta... (Enter para enviar)"
+              placeholder="Escriba su pregunta... (Enter para enviar, Shift+Enter nueva línea)"
+              aria-label="Pregunta para el asistente"
               rows={1}
               style={{
                 flex: 1,
@@ -210,6 +240,15 @@ export default function Chat() {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={!!confirmDel}
+        onClose={() => setConfirmDel(null)}
+        onConfirm={deleteSession}
+        loading={deleting}
+        title="Eliminar conversación"
+        message={`Se eliminará "${confirmDel?.title || ""}" con todos sus mensajes. Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+      />
     </div>
   );
 }
@@ -234,7 +273,7 @@ function Bubble({ message }) {
           <>
             <Markdown>{message.content}</Markdown>
             {message.sources_used && (
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #E2E8F0", fontSize: 11, color: "#64748B" }}>
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #E2E8F0", fontSize: 11, color: "#64748B" }} title="Registros del sistema que se usaron como contexto para esta respuesta">
                 📎 Fuentes: {message.sources_used}
               </div>
             )}

@@ -197,6 +197,23 @@ def run_schema_migrations() -> None:
     if "users" in tables:
         from .rbac import LEGACY_ROLE_MAP
 
+        cols = _sqlite_columns(insp, "users")
+        user_additions = {
+            "first_name": "ALTER TABLE users ADD COLUMN first_name VARCHAR(255) DEFAULT ''",
+            "last_name": "ALTER TABLE users ADD COLUMN last_name VARCHAR(255) DEFAULT ''",
+            # Acceso con contrasena y bloqueo por intentos (produccion sin Google).
+            "password_hash": "ALTER TABLE users ADD COLUMN password_hash VARCHAR(255) DEFAULT ''",
+            "must_change_password": "ALTER TABLE users ADD COLUMN must_change_password BOOLEAN DEFAULT FALSE",
+            "password_changed_at": "ALTER TABLE users ADD COLUMN password_changed_at TIMESTAMP",
+            "failed_logins": "ALTER TABLE users ADD COLUMN failed_logins INTEGER DEFAULT 0",
+            "locked_until": "ALTER TABLE users ADD COLUMN locked_until TIMESTAMP",
+            "token_version": "ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0",
+        }
+        with engine.begin() as conn:
+            for name, stmt in user_additions.items():
+                if name not in cols:
+                    conn.execute(text(stmt))
+
         with engine.begin() as conn:
             for legacy, canonical in LEGACY_ROLE_MAP.items():
                 conn.execute(

@@ -38,7 +38,7 @@ export default function WorkflowStrip({ active }) {
   const current = resolveActive();
 
   return (
-    <nav className="workflow-strip methodology-strip" aria-label="Metodologia IETS">
+    <nav className="workflow-strip methodology-strip" aria-label="Metodología IETS">
       {IETS_PHASES.map((step, i) => {
         const isActive = step.key === current;
         return (
@@ -52,7 +52,7 @@ export default function WorkflowStrip({ active }) {
               <Icon name={step.icon} size={15} />
               <span className="workflow-step-label">{step.label}</span>
             </button>
-            <InfoTip text={step.help || step.hint} position="bottom" label={`Que es ${step.label}`} />
+            <InfoTip text={step.help || step.hint} position="bottom" label={`Qué es ${step.label}`} />
             {i < IETS_PHASES.length - 1 && <span className="workflow-arrow" aria-hidden="true" />}
           </div>
         );

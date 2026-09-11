@@ -1,33 +1,46 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { useToast } from "../components/Toast";
 import { apiError } from "../api/client";
 import Button from "../components/Button";
 import { Input } from "../components/Field";
+import PasswordField from "../components/PasswordField";
+
+const FEATURES = [
+  ["🌐", "Vigilancia automatizada de agencias, registros de ensayos y literatura internacional"],
+  ["🧭", "Ciclo metodológico IETS: filtrado, matriz P1-P6, evaluación temprana y pares"],
+  ["📊", "Tablero de gobernanza, boletines y alertas tempranas para el SGSSS"],
+];
 
 export default function Login() {
-  const { status, loginWithGoogle, loginDev } = useAuth();
-  const toast = useToast();
+  const { status, sessionNotice, loginWithPassword, loginWithGoogle, loginDev } = useAuth();
   const googleBtn = useRef(null);
-  const [devEmail, setDevEmail] = useState("");
-  const [devName, setDevName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
+  const [devEmail, setDevEmail] = useState("");
+  const [devName, setDevName] = useState("");
+  const [devOpen, setDevOpen] = useState(false);
+  const domain = status?.allowed_domain || "iets.org.co";
 
   useEffect(() => {
     if (!status?.google_login_enabled || !status?.google_client_id) return undefined;
     let tries = 0;
+    let cancelled = false;
     const init = () => {
+      if (cancelled) return;
       if (window.google?.accounts?.id) {
         window.google.accounts.id.initialize({
           client_id: status.google_client_id,
           callback: async (resp) => {
             try {
               setLoading(true);
+              setError("");
               await loginWithGoogle(resp.credential);
             } catch (e) {
-              toast.error(apiError(e, "No se pudo iniciar sesion con Google"));
+              setError(apiError(e, "No se pudo iniciar sesión con Google"));
             } finally {
               setLoading(false);
             }
@@ -40,7 +53,9 @@ export default function Login() {
       }
     };
     init();
-    return undefined;
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
@@ -49,48 +64,48 @@ export default function Login() {
       window.google.accounts.id.renderButton(googleBtn.current, {
         theme: "outline",
         size: "large",
-        width: 320,
+        width: 316,
         text: "signin_with",
         shape: "pill",
       });
     }
   }, [googleReady, status]);
 
-  const handleDev = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    if (!devEmail.trim()) return;
+    setError("");
+    if (!email.trim() || !password) {
+      setError("Escriba su correo y su contraseña.");
+      return;
+    }
     try {
       setLoading(true);
-      await loginDev(devEmail.trim(), devName.trim());
+      await loginWithPassword(email.trim(), password);
     } catch (err) {
-      toast.error(apiError(err, "No se pudo iniciar sesion"));
+      setError(apiError(err, "No se pudo iniciar sesión"));
+      setPassword("");
     } finally {
       setLoading(false);
     }
   };
 
-  const quickAccess = async () => {
+  const devLogin = async (targetEmail, targetName = "") => {
     try {
       setLoading(true);
-      await loginDev("admin@iets.org.co", "Administrador IETS");
+      setError("");
+      await loginDev(targetEmail, targetName);
     } catch (err) {
-      toast.error(apiError(err, "No se pudo iniciar sesion"));
+      setError(apiError(err, "No se pudo iniciar sesión"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-      }}
-      className="login-grid"
-    >
+    <div className="login-grid" style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "1fr 1fr" }}>
       {/* Panel de marca */}
       <div
+        className="login-brand"
         style={{
           background: "linear-gradient(135deg,#4F46E5 0%,#3B82F6 100%)",
           color: "#fff",
@@ -101,57 +116,37 @@ export default function Login() {
           position: "relative",
           overflow: "hidden",
         }}
-        className="login-brand"
       >
         <div style={{ position: "relative", zIndex: 2, maxWidth: 460 }}>
-          <div style={{ fontSize: 46, marginBottom: 20 }}>🔭</div>
+          <div style={{ fontSize: 46, marginBottom: 20 }} aria-hidden="true">🔭</div>
           <h1 style={{ fontSize: 34, fontWeight: 800, lineHeight: 1.15, color: "#fff" }}>
             Sistema de Escaneo de Horizonte
           </h1>
           <p style={{ fontSize: 16, opacity: 0.92, marginTop: 16, lineHeight: 1.6 }}>
-            Identificacion temprana de tecnologias sanitarias emergentes para Colombia.
-            Vigilancia de fuentes internacionales, analisis con IA y recomendaciones de adopcion.
+            Identificación temprana de tecnologías sanitarias emergentes para Colombia, con la
+            metodología oficial del IETS y trazabilidad completa en bitácora.
           </p>
           <div style={{ marginTop: 32, display: "flex", flexDirection: "column", gap: 14 }}>
-            {[
-              ["🌐", "Vigilancia automatizada de fuentes globales de horizon scanning"],
-              ["💡", "Recomendaciones de adopcion generadas con Gemini"],
-              ["📊", "Dashboards y hallazgos actualizados en tiempo real"],
-            ].map(([ic, t]) => (
+            {FEATURES.map(([ic, t]) => (
               <div key={t} style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 14 }}>
-                <span style={{ fontSize: 18 }}>{ic}</span>
+                <span style={{ fontSize: 18 }} aria-hidden="true">{ic}</span>
                 <span style={{ opacity: 0.95 }}>{t}</span>
               </div>
             ))}
           </div>
         </div>
         <div
-          style={{
-            position: "absolute",
-            width: 420,
-            height: 420,
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.08)",
-            bottom: -120,
-            right: -120,
-          }}
+          aria-hidden="true"
+          style={{ position: "absolute", width: 420, height: 420, borderRadius: "50%", background: "rgba(255,255,255,0.08)", bottom: -120, right: -120 }}
         />
       </div>
 
       {/* Panel de acceso */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 40,
-          background: "#F8FAFC",
-        }}
-      >
-        <div
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 40, background: "#F8FAFC" }}>
+        <main
           style={{
             width: "100%",
-            maxWidth: 380,
+            maxWidth: 400,
             background: "#fff",
             border: "1px solid #E2E8F0",
             borderRadius: 16,
@@ -159,95 +154,112 @@ export default function Login() {
             boxShadow: "var(--shadow-md)",
           }}
         >
-          <h2 style={{ fontSize: 22, fontWeight: 700 }}>Iniciar sesion</h2>
+          <h2 style={{ fontSize: 22, fontWeight: 700 }}>Iniciar sesión</h2>
           <p style={{ color: "#64748B", fontSize: 14, marginTop: 6 }}>
-            Acceso exclusivo con cuentas institucionales{" "}
-            <strong>@{status?.allowed_domain || "iets.org.co"}</strong>.
+            Ingrese con la cuenta que le asignó el administrador del sistema.
           </p>
 
-          <div style={{ marginTop: 26 }}>
-            {status?.google_login_enabled ? (
-              <div ref={googleBtn} style={{ display: "flex", justifyContent: "center" }} />
-            ) : (
-              <div
-                style={{
-                  background: "#FEF3C7",
-                  border: "1px solid #FDE68A",
-                  color: "#92400E",
-                  borderRadius: 8,
-                  padding: "10px 14px",
-                  fontSize: 13,
-                }}
-              >
-                Login con Google no configurado. Defina <code>GOOGLE_CLIENT_ID</code> en el backend.
+          {sessionNotice && (
+            <div role="status" className="login-notice login-notice-info">
+              {sessionNotice}
+            </div>
+          )}
+
+          <form onSubmit={submit} style={{ marginTop: 22 }} noValidate aria-label="Acceso con correo y contraseña">
+            <Input
+              id="login-email"
+              label="Correo"
+              hint={`Su correo institucional (@${domain}) o el que registró el administrador para su cuenta.`}
+              placeholder={`nombre.apellido@${domain}`}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              autoComplete="username"
+              autoFocus
+              required
+            />
+            <PasswordField
+              id="login-password"
+              label="Contraseña"
+              hint="Distingue mayúsculas y minúsculas. Tras 5 intentos fallidos la cuenta se bloquea 15 minutos."
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            {error && (
+              <div role="alert" className="login-notice login-notice-error">
+                {error}
               </div>
             )}
-          </div>
+            <Button type="submit" loading={loading} style={{ width: "100%", marginTop: 4 }}>
+              Ingresar
+            </Button>
+          </form>
+          <p style={{ fontSize: 12.5, color: "#64748B", marginTop: 12, textAlign: "center" }}>
+            ¿Olvidó su contraseña o no tiene cuenta? Solicítela al superadministrador del sistema.
+          </p>
 
-          {status?.dev_login_enabled && (
+          {status?.google_login_enabled && (
             <>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  margin: "24px 0 18px",
-                  color: "#94A3B8",
-                  fontSize: 12,
-                }}
-              >
-                <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
-                ACCESO DE DESARROLLO
-                <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
-              </div>
-              <Button
-                onClick={quickAccess}
-                loading={loading}
-                style={{ width: "100%", marginBottom: 16 }}
-              >
-                ⚡ Acceso rapido (Administrador)
-              </Button>
-              <div
-                style={{
-                  textAlign: "center",
-                  fontSize: 12,
-                  color: "#94A3B8",
-                  marginBottom: 14,
-                }}
-              >
-                o ingrese con otro correo
-              </div>
-              <form onSubmit={handleDev}>
-                <Input
-                  label="Correo institucional"
-                  placeholder={`usuario@${status?.allowed_domain || "iets.org.co"}`}
-                  value={devEmail}
-                  onChange={(e) => setDevEmail(e.target.value)}
-                  type="email"
-                  required
-                />
-                <Input
-                  label="Nombre (opcional)"
-                  placeholder="Nombre y apellido"
-                  value={devName}
-                  onChange={(e) => setDevName(e.target.value)}
-                />
-                <Button type="submit" loading={loading} style={{ width: "100%", marginTop: 6 }}>
-                  Ingresar
-                </Button>
-              </form>
-              <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 12, textAlign: "center" }}>
-                El primer usuario registrado obtiene rol de administrador.
-              </p>
+              <div className="login-divider">o</div>
+              <div ref={googleBtn} style={{ display: "flex", justifyContent: "center", minHeight: 44 }} />
             </>
           )}
-          <p style={{ fontSize: 13, color: "#64748B", marginTop: 18, textAlign: "center" }}>
-            ¿Desarrollador o sociedad cientifica?{" "}
+
+          {status?.dev_login_enabled && (
+            <div className="login-dev">
+              <button type="button" className="login-dev-toggle" onClick={() => setDevOpen((v) => !v)} aria-expanded={devOpen}>
+                <span>Acceso de desarrollo</span>
+                <span className="login-dev-badge">solo fuera de producción</span>
+                <span aria-hidden="true">{devOpen ? "▴" : "▾"}</span>
+              </button>
+              {devOpen && (
+                <div style={{ marginTop: 12 }}>
+                  <p style={{ fontSize: 12, color: "#92400E", marginBottom: 10 }}>
+                    Entra sin contraseña. Queda deshabilitado automáticamente con ENVIRONMENT=production.
+                  </p>
+                  <Button variant="secondary" onClick={() => devLogin("admin@iets.org.co", "Administrador IETS")} loading={loading} style={{ width: "100%", marginBottom: 12 }}>
+                    Acceso rápido como administrador
+                  </Button>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (devEmail.trim()) devLogin(devEmail.trim(), devName.trim());
+                    }}
+                  >
+                    <Input
+                      id="dev-email"
+                      label="Correo institucional"
+                      placeholder={`usuario@${domain}`}
+                      value={devEmail}
+                      onChange={(e) => setDevEmail(e.target.value)}
+                      type="email"
+                      required
+                    />
+                    <Input id="dev-name" label="Nombre (opcional)" placeholder="Nombre y apellido" value={devName} onChange={(e) => setDevName(e.target.value)} />
+                    <Button type="submit" variant="outline" loading={loading} style={{ width: "100%" }}>
+                      Ingresar sin contraseña
+                    </Button>
+                  </form>
+                </div>
+              )}
+            </div>
+          )}
+
+          <p style={{ fontSize: 13, color: "#64748B", marginTop: 20, textAlign: "center", lineHeight: 1.6 }}>
+            ¿Desarrollador o sociedad científica?{" "}
             <Link to="/postular" style={{ fontWeight: 700, color: "#4F46E5" }}>
-              Postule una tecnologia
+              Postule una tecnología
             </Link>
+            <br />
+            <Link to="/expedientes" style={{ color: "#4F46E5" }}>Consultar fichas públicas</Link>
+            {" · "}
+            <Link to="/transparencia" style={{ color: "#4F46E5" }}>Transparencia</Link>
           </p>
-        </div>
+          {status?.version && (
+            <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 10, textAlign: "center" }}>Versión {status.version}</p>
+          )}
+        </main>
       </div>
     </div>
   );

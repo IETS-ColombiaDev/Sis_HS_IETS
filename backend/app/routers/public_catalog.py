@@ -27,7 +27,7 @@ def _rate_limit(request: Request) -> None:
     if len(recent) >= MAX_HITS:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Demasiadas consultas desde esta direccion. Intente de nuevo en un minuto.",
+            detail="Demasiadas consultas desde esta dirección. Intente de nuevo en un minuto.",
         )
     recent.append(now)
     _hits[ip] = recent
@@ -38,7 +38,7 @@ def public_stats(request: Request, db: Session = Depends(get_db)):
     _rate_limit(request)
     data = strategy_service.public_stats(db)
     if "budget" in data or "comparators" in data:
-        raise HTTPException(status_code=500, detail="la vista publica no puede filtrar modelaciones")
+        raise HTTPException(status_code=500, detail="la vista pública no puede filtrar modelaciones")
     return PublicStatsOut(**data)
 
 

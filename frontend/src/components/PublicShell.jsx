@@ -21,7 +21,7 @@ export default function PublicShell({ kicker, title, lead, children, wide }) {
         <nav className="public-shell-nav">
           <NavLink to="/expedientes">Expedientes</NavLink>
           <NavLink to="/transparencia">Transparencia</NavLink>
-          <NavLink to="/postular">Postular tecnologia</NavLink>
+          <NavLink to="/postular">Postular tecnología</NavLink>
           <NavLink to="/login" className="public-shell-access">
             Acceso institucional
           </NavLink>
@@ -36,8 +36,8 @@ export default function PublicShell({ kicker, title, lead, children, wide }) {
       </main>
 
       <footer className="public-shell-foot">
-        Instituto de Evaluacion Tecnologica en Salud. Las fichas publicas no incluyen
-        modelaciones presupuestales ni informacion confidencial.
+        Instituto de Evaluación Tecnológica en Salud. Las fichas públicas no incluyen
+        modelaciones presupuestales ni información confidencial.
       </footer>
     </div>
   );

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import os
 import sys
 import uuid
 
@@ -67,6 +68,13 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default=DEFAULT_BASE)
     parser.add_argument("--skip-network", action="store_true", help="Omite pruebas que salen a internet")
+    parser.add_argument("--email", default="admin@iets.org.co", help="Cuenta superadministradora de la corrida")
+    parser.add_argument(
+        "--password",
+        default=os.environ.get("SMOKE_PASSWORD", ""),
+        help="Contrasena de --email. Obligatoria en produccion, donde no hay acceso de desarrollo "
+        "(tambien por la variable SMOKE_PASSWORD).",
+    )
     args = parser.parse_args()
 
     r = Runner(args.base)
@@ -85,18 +93,28 @@ def main() -> int:
     session = {}
 
     def login():
-        resp = r.client.post(
-            f"{r.api}/auth/dev-login",
-            json={"email": "admin@iets.org.co", "name": "Suite de regresion"},
-        )
+        if args.password:
+            resp = r.client.post(
+                f"{r.api}/auth/login", json={"email": args.email, "password": args.password}
+            )
+        else:
+            resp = r.client.post(
+                f"{r.api}/auth/dev-login",
+                json={"email": args.email, "name": "Suite de regresion"},
+            )
         resp.raise_for_status()
         data = resp.json()
+        if data["user"].get("must_change_password"):
+            raise RuntimeError("la cuenta de la suite tiene contrasena temporal: cambiela antes de correr")
         r.headers = {"Authorization": f"Bearer {data['access_token']}"}
         session.update(data["user"])
         if data["user"]["role"] != "superadmin":
             raise RuntimeError(f"se esperaba perfil superadmin, llego {data['user']['role']}")
 
-    r.check("dev-login como superadmin", login)
+    r.check(
+        "inicio de sesion con contrasena como superadmin" if args.password else "dev-login como superadmin",
+        login,
+    )
 
     def check_permissions():
         me = r.get("/auth/me")
@@ -124,6 +142,95 @@ def main() -> int:
             raise RuntimeError(f"perfiles inesperados: {codes}")
 
     r.check("catalogo de perfiles", check_roles_catalog)
+
+    # ----------------------------------------------------------------- #
+    print("\n-- Fase 7: acceso con contrasena y administracion de usuarios")
+    # Cuenta fija de la suite: se reutiliza entre corridas (se reactiva al empezar
+    # y se desactiva al terminar) para no sembrar cuentas en la base operativa.
+    probe_email = "suite.regresion.acceso@iets.org.co"
+    probe: dict = {}
+
+    def find_probe():
+        return next((u for u in r.get("/users") if u["email"] == probe_email), None)
+
+    def provision_probe():
+        existing = find_probe()
+        if existing is None:
+            created = r.post("/users", {"email": probe_email, "name": "Suite de regresion (acceso)", "role": "evaluador_clinico"}, expect=201)
+            probe.update(id=created["user"]["id"], temp=created["temporary_password"])
+        else:
+            if not existing["is_active"]:
+                r.put(f"/users/{existing['id']}", {"is_active": True, "role": "evaluador_clinico"})
+            reset = r.post(f"/users/{existing['id']}/reset-password")
+            probe.update(id=existing["id"], temp=reset["temporary_password"])
+        if len(probe["temp"]) < 10:
+            raise RuntimeError("la contrasena temporal no cumple la politica")
+
+    r.check("alta o reactivacion con contrasena temporal", provision_probe)
+
+    def first_login_forces_change():
+        resp = r.client.post(f"{r.api}/auth/login", json={"email": probe_email, "password": probe["temp"]})
+        resp.raise_for_status()
+        data = resp.json()
+        if not data["user"]["must_change_password"]:
+            raise RuntimeError("la contrasena temporal no exige cambio")
+        blocked = r.client.get(f"{r.api}/users/roles", headers={"Authorization": f"Bearer {data['access_token']}"})
+        if blocked.status_code != 403:
+            raise RuntimeError(f"con contrasena temporal debia responder 403, respondio {blocked.status_code}")
+        new_password = f"Regresion{uuid.uuid4().hex[:8]}9"
+        changed = r.client.post(
+            f"{r.api}/auth/change-password",
+            headers={"Authorization": f"Bearer {data['access_token']}"},
+            json={"current_password": probe["temp"], "new_password": new_password},
+        )
+        changed.raise_for_status()
+        probe["token"] = changed.json()["access_token"]
+        old = r.client.get(f"{r.api}/auth/me", headers={"Authorization": f"Bearer {data['access_token']}"})
+        if old.status_code != 401:
+            raise RuntimeError("el token anterior al cambio de contrasena sigue vivo")
+        probe["password"] = new_password
+
+    r.check("primer ingreso exige cambio y revoca el token anterior", first_login_forces_change)
+
+    def field_permissions_for_new_account():
+        me = r.client.get(f"{r.api}/auth/me", headers={"Authorization": f"Bearer {probe['token']}"}).json()
+        if me["rateable_criteria"] != ["P2", "P3", "P4"]:
+            raise RuntimeError(f"el evaluador clinico debia calificar P2-P4: {me['rateable_criteria']}")
+        denied = r.client.get(f"{r.api}/users", headers={"Authorization": f"Bearer {probe['token']}"})
+        if denied.status_code != 403:
+            raise RuntimeError("un evaluador no debe administrar usuarios")
+
+    r.check("perfil asignado y permisos efectivos", field_permissions_for_new_account)
+
+    def wrong_password_is_generic():
+        resp = r.client.post(f"{r.api}/auth/login", json={"email": probe_email, "password": "NoEsLaClave123"})
+        ghost = r.client.post(f"{r.api}/auth/login", json={"email": "no.existe.jamas@iets.org.co", "password": "NoEsLaClave123"})
+        if resp.status_code != 401 or ghost.status_code != 401:
+            raise RuntimeError(f"esperaba 401/401, recibio {resp.status_code}/{ghost.status_code}")
+        if resp.json()["detail"] != ghost.json()["detail"]:
+            raise RuntimeError("el mensaje revela si la cuenta existe")
+
+    r.check("error generico ante credenciales equivocadas", wrong_password_is_generic)
+
+    def deactivate_probe():
+        r.put(f"/users/{probe['id']}", {"is_active": False})
+        after = r.client.get(f"{r.api}/auth/me", headers={"Authorization": f"Bearer {probe['token']}"})
+        if after.status_code != 401:
+            raise RuntimeError("la sesion de una cuenta desactivada sigue abierta")
+        gone = r.client.delete(f"{r.api}/users/{probe['id']}", headers=r.headers)
+        if gone.status_code != 409:
+            raise RuntimeError(f"una cuenta con actividad no debe eliminarse (HTTP {gone.status_code})")
+
+    r.check("desactivar cierra la sesion; con actividad no se elimina", deactivate_probe)
+
+    def status_reports_access_modes():
+        status = r.client.get(f"{r.api}/status").json()
+        if "environment" not in status or "password_login_enabled" not in status:
+            raise RuntimeError("/status no informa el entorno ni el acceso con contrasena")
+        if status["environment"] == "production" and status["dev_login_enabled"]:
+            raise RuntimeError("el acceso de desarrollo esta habilitado en produccion")
+
+    r.check("estado publica entorno y modos de acceso", status_reports_access_modes)
 
     # ----------------------------------------------------------------- #
     print("\n-- Operacion heredada")
@@ -268,13 +375,51 @@ def main() -> int:
 
     r.check("bloquea asignacion sin cluster ni tipologia", reject_unclassified)
 
-    def classify_and_assign():
-        items = staged.get("items") or []
+    def own_staging_technology():
+        """La suite trabaja sobre una tecnologia propia, nunca sobre una real.
+
+        Antes tomaba la primera senal de la bandeja y le escribia fechas y
+        estado regulatorio de prueba: cada corrida contaminaba datos reales.
+        """
+        src = r.post(
+            "/sources",
+            {
+                "title": f"REG-Smoke-{suffix}",
+                "url": f"https://regresion.example/{suffix}",
+                "connector": "fixture",
+                "scrape_enabled": True,
+                "connector_config": {
+                    "records": [
+                        {
+                            "external_id": f"REG-{suffix}",
+                            "title": f"REG Suite regresion {suffix}",
+                            "commercial_name": f"REG Suite regresion {suffix}",
+                            "inn_name": f"regresionumab{suffix}",
+                            "manufacturer": "Suite de regresion",
+                            "indication": "Tumores solidos",
+                            "raw": {"id": f"REG-{suffix}", "phase": "PHASE3"},
+                        }
+                    ]
+                },
+            },
+        )
+        staged["own_sources"] = [src["id"]]
+        result = r.post("/ingest/run", {"source_ids": [src["id"]], "process_now": True})
+        if result.get("processed") != 1:
+            raise RuntimeError(f"no se proceso la fuente propia de la suite: {result}")
+        items = r.get("/technologies/staging", params={"q": f"REG Suite regresion {suffix}"})
         if not items:
-            raise RuntimeError("no hay senales en el staging para probar la asignacion")
+            raise RuntimeError("la tecnologia propia de la suite no llego al staging")
+        staged["own"] = items[0]
+
+    r.check("tecnologia propia de la suite en la bandeja", own_staging_technology)
+
+    def classify_and_assign():
+        if not staged.get("own"):
+            raise RuntimeError("no hay tecnologia propia de la suite para probar la asignacion")
         clusters = r.get("/clusters")
         types = r.get("/tech-types")
-        target = items[0]
+        target = staged["own"]
         r.put(
             f"/technologies/{target['id']}",
             {
@@ -438,6 +583,7 @@ def main() -> int:
                 },
             },
         )
+        staged.setdefault("own_sources", []).append(src["id"])
         result = r.post("/ingest/run", {"source_ids": [src["id"]], "process_now": True})
         if result.get("processed") != 1:
             raise RuntimeError(f"el job no se proceso en la peticion: {result}")
@@ -674,7 +820,7 @@ def main() -> int:
     def export_and_history():
         html = r.client.get(f"{r.api}/reports/{report['doc_id']}/export", headers=r.headers)
         html.raise_for_status()
-        if "Instituto de Evaluacion Tecnologica en Salud" not in html.text:
+        if "Instituto de Evaluación Tecnológica en Salud" not in html.text:
             raise RuntimeError("el HTML no trae la marca institucional")
         versions = r.get(f"/reports/{report['doc_id']}/versions")
         if len(versions) < 3:
@@ -750,7 +896,7 @@ def main() -> int:
             raise RuntimeError("la ficha publica expuso campos restringidos")
         html = r.client.get(f"{r.api}/public/technologies/{staged['tech_id']}/export")
         html.raise_for_status()
-        if "Ficha publica" not in html.text:
+        if "Ficha pública" not in html.text:
             raise RuntimeError("el HTML publico no trae la marca de ficha publica")
 
     r.check("ficha publica sin campos restringidos", public_fiche_of_published)
@@ -867,13 +1013,25 @@ def main() -> int:
     def drop_regression_cycle():
         """La suite no debe dejar ciclos REG-* en la base operativa."""
         if cycle.get("id"):
-            # No hay DELETE de ciclos: se deja marcado y el arranque lo expurga.
+            # No hay DELETE de ciclos: el arranque expurga los REG-*. Un ciclo ya
+            # cerrado no admite edicion, y no hace falta marcarlo.
+            current = r.get(f"/cycles/{cycle['id']}")
+            if current.get("status") == "cerrado_consolidado":
+                return
             r.put(
                 f"/cycles/{cycle['id']}",
                 {"notes": "[REGRESSION-DISCARD] ciclo temporal de la suite de regresion."},
             )
 
     r.check("marcar ciclo de regresion para expurgo", drop_regression_cycle)
+
+    def disable_own_sources():
+        """Las fuentes de prueba no se borran (sus senales son registro de
+        captura), pero se apagan para que la vigilancia programada no las rastree."""
+        for source_id in staged.get("own_sources", []):
+            r.put(f"/sources/{source_id}", {"scrape_enabled": False})
+
+    r.check("apagar las fuentes temporales de la suite", disable_own_sources)
 
     r.client.close()
 

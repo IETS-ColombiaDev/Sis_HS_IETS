@@ -26,6 +26,9 @@ TRACKING_PARAMS = {
     "mc_eid",
 }
 
+# Marca de las fuentes registradas a mano desde /fuentes (alta rapida o avanzada).
+LOCAL_SOURCE_MARK = "agregada_localmente"
+
 SOURCE_FIELDS = (
     "title",
     "url",
@@ -102,13 +105,17 @@ def sync_catalog(db: Session, *, triggered_by: str = "sistema") -> dict:
             continue
         if source.retired:
             continue
+        # Las fuentes que el equipo registro a mano no pertenecen al inventario
+        # anterior: retirarlas en cada arranque las borraba de la vigilancia.
+        if (source.verification_status or "").strip() == LOCAL_SOURCE_MARK:
+            continue
         source.retired = True
         source.scrape_enabled = False
         source.catalog_active = False
         if not source.catalog_note:
             source.catalog_note = (
-                "Retirada al cargar el catalogo verificado D-06. "
-                "Se conserva porque puede tener senales asociadas."
+                "Retirada al cargar el catálogo verificado D-06. "
+                "Se conserva porque puede tener señales asociadas."
             )
         retired += 1
 

@@ -13,9 +13,13 @@ from sqlalchemy.orm import Session
 from . import audit, rbac
 from .database import get_db
 from .models import User
-from .security import decode_access_token
+from .security import SESSION_TOKEN_TYPE, decode_access_token
 
 bearer_scheme = HTTPBearer(auto_error=False)
+
+PASSWORD_CHANGE_ALLOWED_PATHS = frozenset(
+    {"/api/auth/me", "/api/auth/change-password", "/api/realtime/version"}
+)
 
 # Equivalencia de los roles heredados con un permiso representativo.
 LEGACY_ROLE_PERMISSION = {
@@ -38,10 +42,27 @@ def get_current_user(
         )
     payload = decode_access_token(credentials.credentials)
     if payload is None or "sub" not in payload:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido o expirado")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido o expirado")
+    # Solo los tokens de sesion abren la aplicacion. Los emitidos antes de marcar
+    # el tipo (sin `typ`) se aceptan hasta que expiren; un token de revisor
+    # externo (`typ=review`) jamas.
+    if payload.get("typ", SESSION_TOKEN_TYPE) != SESSION_TOKEN_TYPE:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token no válido para iniciar sesión")
     user = db.query(User).filter(User.email == payload["sub"]).first()
     if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario inactivo o inexistente")
+    if int(payload.get("ver", 0) or 0) != int(user.token_version or 0):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="La sesión caduco porque cambiaron las credenciales. Ingrese de nuevo.",
+        )
+    # Con contrasena temporal (asignada por el administrador) solo se permite
+    # consultar el perfil y cambiarla: quien la conoce no debe poder operar.
+    if user.must_change_password and request.url.path not in PASSWORD_CHANGE_ALLOWED_PATHS:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Debe cambiar su contraseña temporal antes de continuar.",
+        )
     # El usuario autenticado alimenta la bitacora inmutable de esta peticion.
     audit.set_user_context(user)
     request.state.user = user

@@ -27,10 +27,10 @@ from .models import Cluster, Technology
 _ATC = re.compile(r"^[A-Z](\d{2}([A-Z]([A-Z](\d{2})?)?)?)?$")
 
 ATC_LEVEL_NAMES = {
-    1: "Grupo anatomico principal",
-    2: "Subgrupo terapeutico",
-    3: "Subgrupo farmacologico",
-    4: "Subgrupo quimico",
+    1: "Grupo anatómico principal",
+    2: "Subgrupo terapéutico",
+    3: "Subgrupo farmacológico",
+    4: "Subgrupo químico",
     5: "Principio activo",
 }
 
@@ -49,7 +49,7 @@ def validate_atc(value: str) -> tuple[bool, str]:
     if not code:
         return True, ""
     if not _ATC.match(code) or atc_level(code) == 0:
-        return False, f"'{value}' no tiene la forma de un codigo ATC (ejemplo: L01FF02)."
+        return False, f"'{value}' no tiene la forma de un código ATC (ejemplo: L01FF02)."
     return True, ""
 
 
@@ -70,7 +70,7 @@ def validate_icd10(value: str) -> tuple[bool, str]:
     if not code:
         return True, ""
     if not _ICD10.match(code):
-        return False, f"'{value}' no tiene la forma de un codigo CIE-10 (ejemplo: C50 o C509)."
+        return False, f"'{value}' no tiene la forma de un código CIE-10 (ejemplo: C50 o C509)."
     return True, ""
 
 
@@ -122,8 +122,8 @@ def validate_device_code(value: str) -> tuple[bool, str]:
     if _EMDN.match(code):
         return True, ""
     return False, (
-        f"'{value}' no corresponde a GMDN (cinco digitos) ni a EMDN "
-        "(letra de categoria y digitos, ejemplo: J0101)."
+        f"'{value}' no corresponde a GMDN (cinco dígitos) ni a EMDN "
+        "(letra de categoría y dígitos, ejemplo: J0101)."
     )
 
 
@@ -158,7 +158,7 @@ def normalize_technology(tech: Technology) -> dict:
     codes, bad = normalize_icd10_list(tech.icd10_codes)
     if bad:
         report["rechazado"]["icd10_codes"] = (
-            f"Codigos sin forma valida de CIE-10: {', '.join(bad)}."
+            f"Códigos sin forma válida de CIE-10: {', '.join(bad)}."
         )
     if codes != (tech.icd10_codes or []):
         report["corregido"]["icd10_codes"] = {"antes": tech.icd10_codes, "despues": codes}
@@ -191,12 +191,12 @@ def suggest_vocabularies(db: Session, tech: Technology) -> dict:
     una sugerencia de arranque, nunca una asignacion.
     """
     if not tech.cluster_id:
-        return {"icd10_prefixes": [], "mesh_terms": [], "reason": "Sin cluster asignado."}
+        return {"icd10_prefixes": [], "mesh_terms": [], "reason": "Sin clúster asignado."}
     cluster = db.get(Cluster, tech.cluster_id)
     if cluster is None:
-        return {"icd10_prefixes": [], "mesh_terms": [], "reason": "Cluster inexistente."}
+        return {"icd10_prefixes": [], "mesh_terms": [], "reason": "Clúster inexistente."}
     return {
         "icd10_prefixes": list(cluster.icd10_prefixes or []),
         "mesh_terms": normalize_mesh_list(cluster.mesh_terms),
-        "reason": f"Derivado del cluster '{cluster.name}'.",
+        "reason": f"Derivado del clúster '{cluster.name}'.",
     }

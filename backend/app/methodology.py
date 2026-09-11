@@ -23,10 +23,10 @@ CYCLE_STATUSES = (
 )
 
 CYCLE_STATUS_LABELS = {
-    "en_configuracion": "En configuracion",
+    "en_configuracion": "En configuración",
     "en_filtrado": "En filtrado",
-    "en_priorizacion": "En priorizacion",
-    "en_evaluacion": "En evaluacion",
+    "en_priorizacion": "En priorización",
+    "en_evaluacion": "En evaluación",
     "cerrado_consolidado": "Cerrado / consolidado",
 }
 
@@ -54,30 +54,30 @@ TECHNOLOGY_STATUSES = (
 TECHNOLOGY_STATUS_LABELS = {
     "capturada_no_asignada": "Capturada / no asignada",
     "asignada_a_ciclo": "Asignada al ciclo",
-    "filtrada_apta_priorizacion": "Filtrada / apta para priorizacion",
+    "filtrada_apta_priorizacion": "Filtrada / apta para priorización",
     "excluida": "Excluida",
     "priorizada": "Priorizada",
     "bajo_vigilancia": "Bajo vigilancia",
     "no_priorizada": "No priorizada",
-    "en_evaluacion": "En evaluacion",
+    "en_evaluacion": "En evaluación",
     "publicada": "Publicada",
 }
 
 CONDITIONS = ("emergente", "nueva")
 
 CONDITION_LABELS = {
-    "emergente": "Emergente - en fases clinicas avanzadas (II o III), previa a aprobacion",
-    "nueva": "Nueva - aprobada en agencia de referencia hace 12 meses o menos, sin adopcion en el SGSSS",
+    "emergente": "Emergente - en fases clínicas avanzadas (II o III), previa a aprobación",
+    "nueva": "Nueva - aprobada en agencia de referencia hace 12 meses o menos, sin adopción en el SGSSS",
 }
 
 # Motivos de exclusion tipificados (RF10 / RF12); inmutables una vez aplicados.
 EXCLUSION_REASONS = {
-    "ya_disponible": "Ya disponible en el pais con registro sanitario vigente",
-    "modificacion_menor": "Modificacion menor de una tecnologia existente",
-    "generico_convencional": "Generico o biosimilar convencional sin innovacion",
+    "ya_disponible": "Ya disponible en el país con registro sanitario vigente",
+    "modificacion_menor": "Modificación menor de una tecnología existente",
+    "generico_convencional": "Genérico o biosimilar convencional sin innovación",
     "duplicada": "Duplicada de otro registro del ciclo",
-    "fuera_alcance": "Fuera del alcance de tecnologia sanitaria",
-    "evidencia_insuficiente": "Evidencia insuficiente para caracterizar la senal",
+    "fuera_alcance": "Fuera del alcance de tecnología sanitaria",
+    "evidencia_insuficiente": "Evidencia insuficiente para caracterizar la señal",
 }
 
 # --------------------------------------------------------------------------- #
@@ -90,16 +90,16 @@ EXCLUSION_REASONS = {
 # porque la especificacion no las numera de forma explicita.
 NOVELTY_OPTIONS = {
     "no_disponible_en_pais": (
-        "No disponible en el pais: sin registro sanitario vigente ante el INVIMA"
+        "No disponible en el país: sin registro sanitario vigente ante el INVIMA"
     ),
     "nueva_indicacion": (
-        "Nueva indicacion terapeutica de una tecnologia ya registrada"
+        "Nueva indicación terapéutica de una tecnología ya registrada"
     ),
     "nueva_forma_farmaceutica": (
-        "Nueva forma farmaceutica o via de administracion con caracter disruptivo"
+        "Nueva forma farmacéutica o vía de administración con carácter disruptivo"
     ),
     "nueva_combinacion": (
-        "Nueva combinacion de principios activos o de tecnologias ya existentes"
+        "Nueva combinación de principios activos o de tecnologías ya existentes"
     ),
 }
 

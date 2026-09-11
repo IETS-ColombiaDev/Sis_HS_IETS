@@ -6,10 +6,16 @@ import { Card, SectionTitle } from "./Card";
 import Badge from "./Badge";
 import Button from "./Button";
 import Icon from "./Icon";
-import Tooltip from "./Tooltip";
-import { Input } from "./Field";
+import HintButton from "./HintButton";
+import InfoTip from "./InfoTip";
+import Modal from "./Modal";
+import ConfirmDialog from "./ConfirmDialog";
+import { Input, Textarea } from "./Field";
 import { LoadingBlock } from "./Spinner";
 import { PERM } from "../constants/methodology";
+import { GLOSSARY } from "../constants/glossary";
+
+const EMPTY_ITEM = { code: "", name: "", description: "", keywords: "", sort_order: 0 };
 
 /**
  * Gobierno metodologico: umbrales, taxonomias y enunciados de la matriz.
@@ -31,6 +37,12 @@ export default function MethodologyPanel() {
   const [criteria, setCriteria] = useState([]);
   const [draft, setDraft] = useState({});
   const [savingKey, setSavingKey] = useState("");
+  const [itemModal, setItemModal] = useState(null); // { kind, item|null }
+  const [itemForm, setItemForm] = useState(EMPTY_ITEM);
+  const [itemError, setItemError] = useState("");
+  const [itemSaving, setItemSaving] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -46,7 +58,7 @@ export default function MethodologyPanel() {
       setCriteria(cr.data);
       setDraft(Object.fromEntries(p.data.map((x) => [x.key, x.value])));
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar los parametros metodologicos"));
+      toast.error(apiError(e, "No se pudieron cargar los parámetros metodológicos"));
     } finally {
       setLoading(false);
     }
@@ -60,7 +72,7 @@ export default function MethodologyPanel() {
   const saveParam = async (param) => {
     const value = String(draft[param.key] ?? "").trim();
     if (!value) {
-      toast.error("El valor no puede quedar vacio");
+      toast.error("El valor no puede quedar vacío");
       return;
     }
     setSavingKey(param.key);
@@ -69,7 +81,7 @@ export default function MethodologyPanel() {
       setParams((prev) => prev.map((p) => (p.key === data.key ? data : p)));
       toast.success(`${param.key} actualizado a ${data.value}`);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo guardar el parametro"));
+      toast.error(apiError(e, "No se pudo guardar el parámetro"));
       setDraft((d) => ({ ...d, [param.key]: param.value }));
     } finally {
       setSavingKey("");
@@ -84,7 +96,73 @@ export default function MethodologyPanel() {
       setter((prev) => prev.map((x) => (x.id === data.id ? data : x)));
       toast.success(`${data.name}: ${data.is_active ? "activado" : "desactivado"}`);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo actualizar el catalogo"));
+      toast.error(apiError(e, "No se pudo actualizar el catálogo"));
+    }
+  };
+
+  const pathFor = (kind) => (kind === "cluster" ? "clusters" : "tech-types");
+
+  const openItem = (kind, item = null) => {
+    setItemError("");
+    setItemForm(
+      item
+        ? { code: item.code, name: item.name, description: item.description || "", keywords: (item.keywords || []).join(", "), sort_order: item.sort_order || 0 }
+        : EMPTY_ITEM
+    );
+    setItemModal({ kind, item });
+  };
+
+  const saveItem = async () => {
+    setItemError("");
+    const { kind, item } = itemModal;
+    if (!itemForm.name.trim()) {
+      setItemError("El nombre es obligatorio.");
+      return;
+    }
+    if (!item && !/^[a-z0-9][a-z0-9_]{1,59}$/.test(itemForm.code.trim())) {
+      setItemError("El código debe tener entre 2 y 60 caracteres: minúsculas, números y guion bajo.");
+      return;
+    }
+    const payload = {
+      name: itemForm.name.trim(),
+      description: itemForm.description,
+      keywords: itemForm.keywords.split(",").map((k) => k.trim()).filter(Boolean),
+      sort_order: Number(itemForm.sort_order) || 0,
+    };
+    setItemSaving(true);
+    try {
+      const setter = kind === "cluster" ? setClusters : setTypes;
+      if (item) {
+        const { data } = await api.put(`/${pathFor(kind)}/${item.id}`, payload);
+        setter((prev) => prev.map((x) => (x.id === data.id ? data : x)));
+        toast.success(`${data.name} actualizado`);
+      } else {
+        const { data } = await api.post(`/${pathFor(kind)}`, { ...payload, code: itemForm.code.trim() });
+        setter((prev) => [...prev, data]);
+        toast.success(`${data.name} creado`);
+      }
+      setItemModal(null);
+    } catch (e) {
+      setItemError(apiError(e, "No se pudo guardar"));
+    } finally {
+      setItemSaving(false);
+    }
+  };
+
+  const deleteItem = async () => {
+    const { kind, item } = confirmDel;
+    setDeleting(true);
+    try {
+      await api.delete(`/${pathFor(kind)}/${item.id}`);
+      const setter = kind === "cluster" ? setClusters : setTypes;
+      setter((prev) => prev.filter((x) => x.id !== item.id));
+      toast.success(`${item.name} eliminado`);
+      setConfirmDel(null);
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo eliminar"));
+      setConfirmDel(null);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -93,7 +171,7 @@ export default function MethodologyPanel() {
     [params, draft]
   );
 
-  if (loading) return <LoadingBlock label="Cargando parametros metodologicos..." />;
+  if (loading) return <LoadingBlock label="Cargando parámetros metodológicos..." />;
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -102,14 +180,14 @@ export default function MethodologyPanel() {
           right={<Badge tone={editable ? "info" : "default"}>{editable ? "Editable" : "Solo lectura"}</Badge>}
         >
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <Icon name="sliders" size={18} /> Parametros metodologicos
+            <Icon name="sliders" size={18} /> Parámetros metodológicos
           </span>
         </SectionTitle>
 
         <p style={{ fontSize: 13, color: "#64748B", marginTop: -6, marginBottom: 16 }}>
-          Umbrales que gobiernan calculos oficiales. Se aplican de inmediato a los ciclos abiertos;
+          Umbrales que gobiernan cálculos oficiales. Se aplican de inmediato a los ciclos abiertos;
           los ciclos cerrados conservan congelado el resultado que obtuvieron bajo los valores anteriores.
-          Cada cambio queda registrado en la bitacora con autor y valor previo.
+          Cada cambio queda registrado en la bitácora con autor y valor previo.
         </p>
 
         <div style={{ display: "grid", gap: 12 }}>
@@ -129,24 +207,28 @@ export default function MethodologyPanel() {
             >
               <div style={{ minWidth: 0 }}>
                 <code style={{ fontSize: 12.5, fontWeight: 700, color: "#0F172A" }}>{p.key}</code>
+                <InfoTip text={`${p.description || ""} ${GLOSSARY.fb_param}`.trim()} label={`Qué es ${p.key}`} />
                 <div style={{ fontSize: 12.5, color: "#64748B", marginTop: 3 }}>{p.description}</div>
               </div>
               <Input
+                aria-label={`Valor de ${p.key}`}
                 value={draft[p.key] ?? ""}
                 onChange={(e) => setDraft((d) => ({ ...d, [p.key]: e.target.value }))}
                 disabled={!editable}
                 inputMode={p.value_type === "int" ? "numeric" : "text"}
                 style={{ marginBottom: 0, textAlign: "center", fontWeight: 700 }}
               />
-              <Button
+              <HintButton
                 size="sm"
                 variant="secondary"
                 onClick={() => saveParam(p)}
                 loading={savingKey === p.key}
                 disabled={!editable || !dirty.includes(p.key)}
+                hint="Guardar el nuevo valor. Queda en la bitácora."
+                disabledHint={!editable ? "Solo el superadministrador cambia parámetros (permiso catalog:write)." : "Cambie el valor para poder guardarlo."}
               >
                 Guardar
-              </Button>
+              </HintButton>
             </div>
           ))}
         </div>
@@ -154,32 +236,38 @@ export default function MethodologyPanel() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }} className="dash-grid">
         <CatalogCard
-          title="Clusteres de salud"
-          hint="Taxonomia obligatoria de la especificacion. Desactivar un cluster lo retira de las nuevas clasificaciones sin alterar las tecnologias que ya lo tienen."
+          title="Clústeres de salud"
+          hint="Taxonomía obligatoria de la especificación. Desactivar un clúster lo retira de las nuevas clasificaciones sin alterar las tecnologías que ya lo tienen."
           items={clusters}
           editable={editable}
           onToggle={(item) => toggleCatalog("cluster", item)}
+          onCreate={() => openItem("cluster")}
+          onEdit={(item) => openItem("cluster", item)}
+          onDelete={(item) => setConfirmDel({ kind: "cluster", item })}
         />
         <CatalogCard
-          title="Tipologias tecnologicas"
-          hint="Las siete tipologias de la especificacion. Los cuatro tipos heredados se mapean automaticamente."
+          title="Tipologías tecnológicas"
+          hint="Las siete tipologías de la especificación. Los cuatro tipos heredados se mapean automáticamente."
           items={types}
           editable={editable}
           onToggle={(item) => toggleCatalog("type", item)}
+          onCreate={() => openItem("type")}
+          onEdit={(item) => openItem("type", item)}
+          onDelete={(item) => setConfirmDel({ kind: "type", item })}
         />
       </div>
 
       <Card>
         <SectionTitle right={<Badge tone="info">{`v${criteria[0]?.version ?? 1}`}</Badge>}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <Icon name="list" size={18} /> Matriz oficial de priorizacion
+            <Icon name="list" size={18} /> Matriz oficial de priorización
           </span>
         </SectionTitle>
 
         <p style={{ fontSize: 13, color: "#64748B", marginTop: -6, marginBottom: 16 }}>
-          Los enunciados se almacenan versionados, no como literales en codigo: un ajuste del Manual
-          Metodologico no obliga a desplegar, y cada calificacion emitida conserva la version bajo la
-          que se respondio.
+          Los enunciados se almacenan versionados, no como literales en código: un ajuste del Manual
+          Metodológico no obliga a desplegar, y cada calificación emitida conserva la versión bajo la
+          que se respondió.
         </p>
 
         <div style={{ display: "grid", gap: 8 }}>
@@ -203,7 +291,7 @@ export default function MethodologyPanel() {
                 <div style={{ fontSize: 13, color: "#0F172A" }}>{c.prompt}</div>
                 <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 4 }}>
                   Califica: {c.role_scope}
-                  {c.auto_prefill && " · con sugerencia automatica"}
+                  {c.auto_prefill && " · con sugerencia automática"}
                   {c.source_reference && ` · ${c.source_reference}`}
                 </div>
               </div>
@@ -211,15 +299,65 @@ export default function MethodologyPanel() {
           ))}
         </div>
       </Card>
+      <Modal
+        open={!!itemModal}
+        onClose={() => setItemModal(null)}
+        title={`${itemModal?.item ? "Editar" : "Nuevo"} ${itemModal?.kind === "cluster" ? "clúster de salud" : "tipología tecnológica"}`}
+        width={560}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setItemModal(null)} disabled={itemSaving}>Cancelar</Button>
+            <Button onClick={saveItem} loading={itemSaving}>Guardar</Button>
+          </>
+        }
+      >
+        {itemError && <p className="public-submit-error" role="alert">{itemError}</p>}
+        <Input
+          id="catalog-code"
+          label="Código"
+          hint={GLOSSARY.fb_cluster_codigo}
+          required
+          value={itemForm.code}
+          disabled={Boolean(itemModal?.item)}
+          onChange={(e) => setItemForm({ ...itemForm, code: e.target.value.toLowerCase() })}
+          placeholder="ej. enf_respiratorias"
+        />
+        <Input id="catalog-name" label="Nombre" required value={itemForm.name} onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })} />
+        <Textarea id="catalog-description" label="Descripción" rows={2} value={itemForm.description} onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })} />
+        <Input id="catalog-keywords" label="Palabras clave" hint={GLOSSARY.fb_palabras_clave} value={itemForm.keywords} onChange={(e) => setItemForm({ ...itemForm, keywords: e.target.value })} placeholder="asma, epoc, respiratorio" />
+        <Input id="catalog-order" label="Orden" hint="Posición en las listas: menor aparece primero." type="number" value={itemForm.sort_order} onChange={(e) => setItemForm({ ...itemForm, sort_order: e.target.value })} style={{ maxWidth: 140 }} />
+      </Modal>
+
+      <ConfirmDialog
+        open={!!confirmDel}
+        onClose={() => setConfirmDel(null)}
+        onConfirm={deleteItem}
+        loading={deleting}
+        title="Eliminar del catálogo"
+        message={`Se eliminará "${confirmDel?.item?.name}". Solo es posible si fue agregado localmente y ninguna tecnología lo usa; si no, desactívelo.`}
+        confirmLabel="Eliminar"
+      />
     </div>
   );
 }
 
-function CatalogCard({ title, hint, items, editable, onToggle }) {
+function CatalogCard({ title, hint, items, editable, onToggle, onCreate, onEdit, onDelete }) {
   const active = items.filter((i) => i.is_active).length;
+  const readOnly = "Solo el superadministrador edita los catálogos (permiso catalog:write).";
   return (
     <Card>
-      <SectionTitle right={<Badge tone="info">{`${active} de ${items.length} activos`}</Badge>}>
+      <SectionTitle
+        right={
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <Badge tone="info">{`${active} de ${items.length} activos`}</Badge>
+            {onCreate && (
+              <HintButton size="sm" variant="outline" disabled={!editable} disabledHint={readOnly} hint="Agregar un elemento al catálogo" onClick={onCreate}>
+                + Agregar
+              </HintButton>
+            )}
+          </div>
+        }
+      >
         {title}
       </SectionTitle>
       <p style={{ fontSize: 12.5, color: "#64748B", marginTop: -6, marginBottom: 14 }}>{hint}</p>
@@ -228,6 +366,7 @@ function CatalogCard({ title, hint, items, editable, onToggle }) {
         {items.map((item) => (
           <div
             key={item.id}
+            data-testid={`catalog-item-${item.code}`}
             style={{
               display: "flex",
               alignItems: "center",
@@ -243,16 +382,26 @@ function CatalogCard({ title, hint, items, editable, onToggle }) {
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{item.name}</div>
               <code style={{ fontSize: 11, color: "#94A3B8" }}>{item.code}</code>
             </div>
-            <Tooltip text={item.is_active ? "Retirar de nuevas clasificaciones" : "Volver a habilitar"}>
-              <Button
-                size="sm"
-                variant={item.is_active ? "secondary" : "success"}
-                onClick={() => onToggle(item)}
-                disabled={!editable}
-              >
-                {item.is_active ? "Desactivar" : "Activar"}
-              </Button>
-            </Tooltip>
+            {onEdit && (
+              <HintButton size="sm" variant="ghost" disabled={!editable} disabledHint={readOnly} hint="Editar nombre, descripción y palabras clave" onClick={() => onEdit(item)} aria-label={`Editar ${item.name}`}>
+                Editar
+              </HintButton>
+            )}
+            <HintButton
+              size="sm"
+              variant={item.is_active ? "secondary" : "success"}
+              onClick={() => onToggle(item)}
+              disabled={!editable}
+              disabledHint={readOnly}
+              hint={item.is_active ? "Retirar de nuevas clasificaciones sin tocar las tecnologías que ya lo tienen" : "Volver a habilitar"}
+            >
+              {item.is_active ? "Desactivar" : "Activar"}
+            </HintButton>
+            {onDelete && (
+              <HintButton size="sm" variant="ghost" style={{ color: editable ? "#DC2626" : undefined }} disabled={!editable} disabledHint={readOnly} hint="Eliminar: solo lo agregado localmente y sin uso" onClick={() => onDelete(item)} aria-label={`Eliminar ${item.name}`}>
+                ✕
+              </HintButton>
+            )}
           </div>
         ))}
       </div>

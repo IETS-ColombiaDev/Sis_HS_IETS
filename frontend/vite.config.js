@@ -4,10 +4,14 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
+    // API_TARGET y VITE_PORT permiten levantar varias instancias aisladas (QA, E2E).
+    port: Number(process.env.VITE_PORT) || 5173,
+    // IPv4 explicito: en Windows "localhost" puede resolver solo a ::1 y las
+    // herramientas que llaman a 127.0.0.1 (pruebas E2E) no encuentran el servidor.
+    host: process.env.VITE_HOST || "127.0.0.1",
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8000",
+        target: process.env.API_TARGET || "http://127.0.0.1:8000",
         changeOrigin: true,
       },
     },

@@ -1,7 +1,9 @@
-"""Cuatro ciclos formales de 2026, quemados y sincronizados en cada arranque.
+"""Cuatro ciclos formales de 2026, sembrados una vez y verificados en cada arranque.
 
 Elimina ciclos ambiguos (REG-*, TEST-*, Ciclo 0) y deja el ejercicio real:
 I cerrado, II en evaluacion, III vigente en priorizacion, IV diseminacion publicada.
+Los ciclos que crea la coordinacion y el avance de estado de los oficiales se
+conservan entre arranques.
 """
 from __future__ import annotations
 
@@ -261,23 +263,90 @@ def _ensure_showcase_technologies(db: Session) -> list[Technology]:
 
 
 def _restore_year_quota(db: Session) -> None:
+    """Repara la cuota anual solo si quedo con un valor invalido.
+
+    Antes la devolvia a 3 en cada arranque: un ajuste de la coordinacion
+    metodologica desde Configuracion se perdia al reiniciar el servidor. Se
+    conserva cualquier valor entre 1 y 5 (con ventanas de 10 semanas o mas no
+    caben mas de cinco ciclos en un ano); fuera de ese rango es un residuo, por
+    ejemplo el 999 que la suite de regresion pone mientras corre.
+    """
     row = db.get(MethodologyParam, "cycle.max_per_year")
     if row is None:
         return
-    if row.value != "3":
+    try:
+        valid = 1 <= int(str(row.value).strip()) <= 5
+    except (TypeError, ValueError):
+        valid = False
+    if not valid:
         row.value = "3"
         db.commit()
 
 
-def _purge_ambiguous(db: Session) -> dict[str, int]:
-    """Borra ciclos que no son los oficiales 2026 y residuos de suites de prueba."""
-    extras = db.query(Cycle).filter(~Cycle.code.in_(OFFICIAL_CODES)).all()
+AMBIGUOUS_PREFIXES = ("REG-", "TEST-")
+HISTORIC_CODES = ("Ciclo 0 - Historico",)
+
+
+def is_ambiguous(cycle: Cycle) -> bool:
+    """Residuo de suites de regresion o el historico retirado; nunca un ciclo real.
+
+    Antes se borraba TODO ciclo que no fuera uno de los cuatro oficiales de 2026:
+    un "Ciclo I - 2027" creado por la coordinacion desaparecia en el siguiente
+    arranque del servidor, con su trabajo.
+    """
+    code = (cycle.code or "").strip()
+    return bool(cycle.is_historic) or code in HISTORIC_CODES or code.upper().startswith(AMBIGUOUS_PREFIXES)
+
+
+def _delete_cycle_tree(db: Session, cycle_id: int) -> set[int]:
+    return cycle_service.delete_cycle_tree(db, cycle_id)
+
+
+def _release_technologies(db: Session, tech_ids: set[int]) -> None:
+    """Las tecnologias que ya no pertenecen a ningun ciclo vuelven a la bandeja."""
+    for tech_id in tech_ids:
+        still = db.query(CycleTechnology.id).filter(CycleTechnology.technology_id == tech_id).first()
+        tech = db.get(Technology, tech_id)
+        if still is None and tech is not None and tech.merged_into_id is None:
+            tech.status = "capturada_no_asignada"
+
+
+def _purge_orphans(db: Session) -> int:
+    """Elimina filas que apuntan a ciclos inexistentes (bases ya afectadas)."""
+    from .models import CycleDatamart, TimeToMarketSnapshot
+
+    live = {row[0] for row in db.query(Cycle.id).all()}
     removed = 0
+    touched: set[int] = set()
+    for model in (PriorityScore, NoveltyAssessment, CycleTechnology, TimeToMarketSnapshot, CycleDatamart):
+        rows = db.query(model).filter(~model.cycle_id.in_(live)).all() if live else db.query(model).all()
+        for row in rows:
+            if model is CycleTechnology:
+                touched.add(row.technology_id)
+            db.delete(row)
+            removed += 1
+    if removed:
+        db.flush()
+        _release_technologies(db, touched)
+    return removed
+
+
+def _purge_ambiguous(db: Session) -> dict[str, int]:
+    """Borra ciclos de regresion (REG-*, TEST-*) y el historico retirado.
+
+    Los ciclos creados por la coordinacion (cualquier otro codigo) se conservan.
+    """
+    extras = [c for c in db.query(Cycle).filter(~Cycle.code.in_(OFFICIAL_CODES)).all() if is_ambiguous(c)]
+    removed = 0
+    touched: set[int] = set()
     for cycle in extras:
+        touched |= _delete_cycle_tree(db, cycle.id)
         db.delete(cycle)
         removed += 1
     if removed:
         db.flush()
+        _release_technologies(db, touched)
+    orphans_removed = _purge_orphans(db)
 
     stale_merges = (
         db.query(MergeProposal)
@@ -285,7 +354,8 @@ def _purge_ambiguous(db: Session) -> dict[str, int]:
         .all()
     )
     cleared_merges = 0
-    official_ids = {c.id for c in db.query(Cycle).filter(Cycle.code.in_(OFFICIAL_CODES)).all()}
+    # Ids de los ciclos que siguen vivos (oficiales y los creados por la coordinacion).
+    official_ids = {c.id for c in db.query(Cycle).all()}
     for row in stale_merges:
         if row.cycle_id not in official_ids:
             row.cycle_id = None
@@ -345,6 +415,7 @@ def _purge_ambiguous(db: Session) -> dict[str, int]:
     db.commit()
     return {
         "cycles_removed": removed,
+        "orphans_removed": orphans_removed,
         "merges_cleared": cleared_merges,
         "invima_removed": invima_removed,
         "notes_removed": notes_removed,
@@ -531,7 +602,10 @@ def _already_populated(db: Session) -> bool:
     by_code = {c.code: c for c in cycles}
     for spec in OFFICIAL_CYCLES:
         cycle = by_code.get(spec["code"])
-        if cycle is None or cycle.status != spec["status"]:
+        # El estado NO se compara con la semilla: la coordinacion avanza los
+        # ciclos (Ciclo III de priorizacion a evaluacion) y reconstruirlos en el
+        # siguiente arranque borraba ese trabajo y devolvia el estado.
+        if cycle is None:
             return False
         count = (
             db.query(CycleTechnology)
@@ -555,8 +629,8 @@ def _already_populated(db: Session) -> bool:
                 < 1
             ):
                 return False
-    extras = db.query(Cycle).filter(~Cycle.code.in_(OFFICIAL_CODES)).count()
-    return extras == 0
+    # Los ciclos creados por la coordinacion no invalidan la semilla oficial.
+    return True
 
 
 def _populate(db: Session, cycles: dict[str, Cycle], techs: list[Technology]) -> None:

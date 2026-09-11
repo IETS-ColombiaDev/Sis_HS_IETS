@@ -27,10 +27,15 @@ def _resolve(db: Session, token: str):
         if detail == "TOKEN_EXPIRED":
             raise HTTPException(
                 status_code=401,
-                detail="El enlace de revision expiro. Solicite una nueva invitacion.",
+                detail="El enlace de revisión expiró. Solicite una nueva invitación.",
             ) from exc
         if detail == "TOKEN_INVALID":
-            raise HTTPException(status_code=401, detail="Enlace de revision invalido.") from exc
+            raise HTTPException(status_code=401, detail="Enlace de revisión inválido.") from exc
+        if detail == "TOKEN_REVOKED":
+            raise HTTPException(
+                status_code=401,
+                detail="La invitación fue revocada por la coordinación del IETS.",
+            ) from exc
         raise HTTPException(status_code=409, detail=detail) from exc
 
 
@@ -52,6 +57,10 @@ def _access(db, assignment, doc) -> ReviewerAccessOut:
         product_level=doc.product_level,
         product_level_label=catalog.PRODUCT_LEVEL_LABELS.get(doc.product_level, doc.product_level),
         status=doc.status,
+        status_label=catalog.EDITORIAL_STATUS_LABELS.get(doc.status, doc.status),
+        assignment_status=assignment.status,
+        submitted_at=assignment.submitted_at,
+        can_submit=doc.status not in ("borrador", "revision_interna", "publicado"),
         reviewer_name=assignment.reviewer_name,
         expires_at=assignment.expires_at,
         body=body,
@@ -92,7 +101,7 @@ def add_comment(token: str, payload: ReviewCommentIn, db: Session = Depends(get_
     if not assignment.coi_signed:
         raise HTTPException(
             status_code=403,
-            detail="Sin declaracion de conflicto de interes no se habilita la lectura.",
+            detail="Sin declaración de conflicto de interés no se habilita la lectura.",
         )
     try:
         row = evaluation_service.add_comment(

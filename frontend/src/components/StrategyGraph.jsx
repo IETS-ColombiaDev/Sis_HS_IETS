@@ -347,14 +347,14 @@ function GraphTool({ cycleId, filters, restricted }) {
     <aside className="sg-controller" aria-label="Controlador interno del grafo">
       <header>
         <strong>Controlador interno</strong>
-        <InfoTip text={HELP} label="Como usar el controlador" />
+        <InfoTip text={HELP} label="Cómo usar el controlador" />
       </header>
       <input
         ref={searchRef}
         className="sg-search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Buscar nodo, tecnologia o etapa..."
+        placeholder="Buscar nodo, tecnología o etapa..."
         aria-label="Buscar nodo"
       />
       <div className="sg-type-chips">
@@ -406,7 +406,7 @@ function GraphTool({ cycleId, filters, restricted }) {
         )}
       </div>
       <p className="sg-ctrl-hint">
-        {catalog.length} nodos · {visible.length} visibles · {selected ? selected.label : "sin seleccion"}
+        {catalog.length} nodos · {visible.length} visibles · {selected ? selected.label : "sin selección"}
       </p>
       <ul className="sg-node-list">
         {catalog.slice(0, 80).map((n) => {
@@ -450,7 +450,7 @@ function GraphTool({ cycleId, filters, restricted }) {
       <div className="sg-canvas-wrap">
         {lost && (
           <div className="sg-lost">
-            <span>El dibujo quedo fuera de vista.</span>
+            <span>El dibujo quedó fuera de vista.</span>
             <Button size="sm" onClick={() => applyView({ x: 0, y: 0, k: 1 })}>
               Volver a encajar
             </Button>
@@ -569,7 +569,7 @@ function GraphTool({ cycleId, filters, restricted }) {
       </div>
       <div className="sg-messages" ref={chatRef}>
         {messages.length === 0 && (
-          <p className="sg-chat-empty">Pregunte sobre este nodo. La conversacion se guarda y puede retomarla despues.</p>
+          <p className="sg-chat-empty">Pregunte sobre este nodo. La conversación se guarda y puede retomarla después.</p>
         )}
         {messages.map((m, i) => {
           const text = messageText(m);
@@ -683,7 +683,7 @@ export default function StrategyGraph(props) {
   return (
     <ErrorBoundary
       title="El grafo se detuvo"
-      hint="El tablero sigue disponible. Reintente el mapa o use Encajar si el dibujo quedo fuera de vista."
+      hint="El tablero sigue disponible. Reintente el mapa o use Encajar si el dibujo quedó fuera de vista."
     >
       <GraphTool {...props} />
     </ErrorBoundary>

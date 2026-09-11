@@ -9,8 +9,8 @@ from __future__ import annotations
 PRODUCT_LEVELS = ("ficha", "informe", "mini_hta")
 
 PRODUCT_LEVEL_LABELS = {
-    "ficha": "Ficha tecnica",
-    "informe": "Informe de evaluacion temprana",
+    "ficha": "Ficha técnica",
+    "informe": "Informe de evaluación temprana",
     "mini_hta": "Mini-HTA",
 }
 
@@ -24,11 +24,11 @@ EDITORIAL_STATUSES = (
 )
 
 EDITORIAL_STATUS_LABELS = {
-    "borrador": "Borrador en redaccion",
-    "revision_interna": "Revision interna de calidad",
-    "revision_externa": "Revision externa por pares",
+    "borrador": "Borrador en redacción",
+    "revision_interna": "Revisión interna de calidad",
+    "revision_externa": "Revisión externa por pares",
     "con_observaciones": "Con observaciones",
-    "aprobado_comite": "Aprobado por comite tecnico",
+    "aprobado_comite": "Aprobado por comité técnico",
     "publicado": "Publicado",
 }
 
@@ -77,25 +77,25 @@ OPTIONAL_FIELDS: tuple[str, ...] = (
 )
 
 FIELD_LABELS: dict[str, str] = {
-    "health_condition": "Condicion de salud",
-    "mechanism": "Mecanismo biologico o tecnologico",
-    "target_population_co": "Poblacion objetivo en Colombia",
-    "evidence_state": "Estado del arte de la evidencia clinica",
+    "health_condition": "Condición de salud",
+    "mechanism": "Mecanismo biológico o tecnológico",
+    "target_population_co": "Población objetivo en Colombia",
+    "evidence_state": "Estado del arte de la evidencia clínica",
     "comparators_sgsss": "Comparadores posibles en el SGSSS",
-    "adoption_risks": "Riesgos potenciales de adopcion",
+    "adoption_risks": "Riesgos potenciales de adopción",
     "narrative": "Narrativa del informe",
     "evidence_phases": "Fases de ensayos y desenlaces",
     "efficacy_outcomes": "Desenlaces de eficacia",
     "safety_outcomes": "Desenlaces de seguridad",
-    "pico_population": "PICO: poblacion",
-    "pico_intervention": "PICO: intervencion",
+    "pico_population": "PICO: población",
+    "pico_intervention": "PICO: intervención",
     "pico_comparator": "PICO: comparador",
     "pico_outcome": "PICO: desenlace",
-    "budget_year_1": "Impacto presupuestal anio 1",
-    "budget_year_2": "Impacto presupuestal anio 2",
-    "budget_year_3": "Impacto presupuestal anio 3",
-    "clinical_uncertainty": "Incertidumbre clinica",
-    "early_dialogue_notes": "Notas de dialogo temprano",
+    "budget_year_1": "Impacto presupuestal año 1",
+    "budget_year_2": "Impacto presupuestal año 2",
+    "budget_year_3": "Impacto presupuestal año 3",
+    "clinical_uncertainty": "Incertidumbre clínica",
+    "early_dialogue_notes": "Notas de diálogo temprano",
     "confidential_note": "Nota de confidencialidad",
 }
 

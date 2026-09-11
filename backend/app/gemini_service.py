@@ -95,7 +95,7 @@ def list_available_models() -> list[str]:
 def test_connection(api_key: str | None = None) -> dict:
     """Prueba la conexion con Gemini. Si se pasa api_key, prueba con esa (sin persistir)."""
     if not _GENAI_AVAILABLE:
-        return {"ok": False, "message": "La libreria google-generativeai no esta instalada en el backend.", "model": ""}
+        return {"ok": False, "message": "La librería google-generativeai no está instalada en el backend.", "model": ""}
     key = (api_key or _runtime_api_key or "").strip()
     if not key:
         return {"ok": False, "message": "No hay API key configurada. Ingrese un token de Gemini.", "model": ""}
@@ -107,25 +107,25 @@ def test_connection(api_key: str | None = None) -> dict:
             if "generateContent" in methods:
                 models.append(m.name.split("/")[-1])
         if not models:
-            return {"ok": False, "message": "La API key es valida pero no expone modelos con generateContent.", "model": ""}
+            return {"ok": False, "message": "La API key es válida pero no expone modelos con generateContent.", "model": ""}
         chosen = _pick_model(models, _runtime_model)
         # Prueba real de generacion (barata) para validar el token de extremo a extremo.
         model = genai.GenerativeModel(chosen)
         resp = model.generate_content("Responde solo con: OK")
         txt = (getattr(resp, "text", "") or "").strip()
         if not txt:
-            return {"ok": False, "message": "El modelo no devolvio contenido. Verifique cuotas/permisos.", "model": chosen}
+            return {"ok": False, "message": "El modelo no devolvió contenido. Verifique cuotas/permisos.", "model": chosen}
         # Restaurar configuracion con la key en runtime si era distinta.
         if _runtime_api_key and key != _runtime_api_key:
             genai.configure(api_key=_runtime_api_key)
         return {
             "ok": True,
-            "message": f"Conexion exitosa. Modelo activo: {chosen}. {len(models)} modelos disponibles.",
+            "message": f"Conexión exitosa. Modelo activo: {chosen}. {len(models)} modelos disponibles.",
             "model": chosen,
             "available_models": models,
         }
     except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "message": f"Error de conexion con Gemini: {exc}", "model": ""}
+        return {"ok": False, "message": f"Error de conexión con Gemini: {exc}", "model": ""}
 
 
 def _pick_model(available: list[str], preferred: str = "") -> str:
@@ -283,14 +283,14 @@ su titulo cuando corresponda. Se claro y conciso."""
 # --------------------------------------------------------------------------- #
 def _fallback_recommendation(finding, source) -> str:
     return (
-        f"### Recomendacion preliminar (modo sin IA)\n\n"
-        f"**Tecnologia:** {finding.technology or finding.title}\n\n"
+        f"### Recomendación preliminar (modo sin IA)\n\n"
+        f"**Tecnología:** {finding.technology or finding.title}\n\n"
         f"**Tipo:** {finding.technology_type or 'no determinado'} | "
         f"**Horizonte:** {finding.horizon or 'no determinado'}\n\n"
-        f"Este hallazgo proviene de *{source.title}*. Para generar una recomendacion de adopcion "
+        f"Este hallazgo proviene de *{source.title}*. Para generar una recomendación de adopción "
         f"detallada para Colombia, configure la variable `GEMINI_API_KEY` en el backend. "
-        f"Entretanto, se sugiere: (1) verificar la senal en INVIMA y en la ruta de ETS del IETS, "
-        f"(2) estimar carga de enfermedad y poblacion objetivo en Colombia, y (3) evaluar impacto "
+        f"Entretanto, se sugiere: (1) verificar la señal en INVIMA y en la ruta de ETS del IETS, "
+        f"(2) estimar carga de enfermedad y población objetivo en Colombia, y (3) evaluar impacto "
         f"presupuestal preliminar.\n\nIMPACTO: medio"
     )
 
@@ -299,12 +299,12 @@ def _fallback_chat(question: str, context: str) -> str:
     if context.strip():
         return (
             "Modo sin IA (configure `GEMINI_API_KEY` para respuestas generativas). "
-            "Segun la informacion disponible en el sistema, estos son los elementos mas relevantes "
+            "Según la información disponible en el sistema, estos son los elementos más relevantes "
             f"para su consulta:\n\n{context[:1500]}"
         )
     return (
-        "Modo sin IA. No se encontro contexto especifico para su consulta en la base de datos. "
-        "Configure `GEMINI_API_KEY` y ejecute un escaneo de las fuentes para enriquecer la informacion."
+        "Modo sin IA. No se encontró contexto específico para su consulta en la base de datos. "
+        "Configure `GEMINI_API_KEY` y ejecute un escaneo de las fuentes para enriquecer la información."
     )
 
 

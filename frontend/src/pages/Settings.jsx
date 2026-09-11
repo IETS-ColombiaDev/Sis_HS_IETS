@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api, { apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
@@ -11,17 +12,25 @@ import Tooltip from "../components/Tooltip";
 import { Input, Select } from "../components/Field";
 import { LoadingBlock } from "../components/Spinner";
 import MethodologyPanel from "../components/MethodologyPanel";
+import SchedulePanel from "../components/SchedulePanel";
 
 const TABS = [
-  { id: "metodologia", label: "Gobierno metodologico", icon: "sliders" },
-  { id: "ia", label: "Integracion con IA", icon: "spark" },
+  { id: "metodologia", label: "Gobierno metodológico", icon: "sliders" },
+  { id: "ia", label: "Integración con IA", icon: "spark" },
+  { id: "programacion", label: "Tareas programadas", icon: "clock" },
   { id: "fuentes", label: "Llaves de fuentes", icon: "globe" },
 ];
 
 export default function Settings() {
   const toast = useToast();
   const { refreshStatus } = useAuth();
-  const [tab, setTab] = useState("ia");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = TABS.some((t) => t.id === searchParams.get("tab")) ? searchParams.get("tab") : "metodologia";
+  const [tab, setTabState] = useState(initialTab);
+  const setTab = (id) => {
+    setTabState(id);
+    setSearchParams(id === "metodologia" ? {} : { tab: id }, { replace: true });
+  };
   const [cfg, setCfg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState("");
@@ -56,7 +65,7 @@ export default function Settings() {
       const { data } = await api.get("/config");
       applyCfg(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar la configuracion"));
+      toast.error(apiError(e, "No se pudo cargar la configuración"));
     } finally {
       setLoading(false);
     }
@@ -77,13 +86,13 @@ export default function Settings() {
       const { data } = await api.post("/config/test", payload);
       setBanner({ type: data.ok ? "ok" : "error", message: data.message });
       if (data.ok) {
-        toast.success(`Conexion ${who === "gemini" ? "Gemini" : "MiniMax"} verificada`);
+        toast.success(`Conexión ${who === "gemini" ? "Gemini" : "MiniMax"} verificada`);
         if (data.available_models?.length && who === "minimax") {
           setCfg((prev) => ({ ...prev, minimax_available_models: data.available_models, minimax_active_model: data.model }));
         }
-      } else toast.error("La prueba de conexion fallo");
+      } else toast.error("La prueba de conexión falló");
     } catch (e) {
-      const msg = apiError(e, "No se pudo probar la conexion");
+      const msg = apiError(e, "No se pudo probar la conexión");
       setBanner({ type: "error", message: msg });
       toast.error(msg);
     } finally {
@@ -136,13 +145,13 @@ export default function Settings() {
           type: "ok",
           message: `IA activa con ${data.ai_active_provider || "MiniMax"} · ${data.ai_model || data.minimax_active_model}. OCR ${data.ai_ocr_enabled ? "encendido" : "apagado"}.`,
         });
-        toast.success("Configuracion de IA guardada");
+        toast.success("Configuración de IA guardada");
       } else {
-        setBanner({ type: "warn", message: "Configuracion guardada, pero no hay una llave de IA valida." });
-        toast.success("Configuracion guardada");
+        setBanner({ type: "warn", message: "Configuración guardada, pero no hay una llave de IA válida." });
+        toast.success("Configuración guardada");
       }
     } catch (e) {
-      toast.error(apiError(e, "No se pudo guardar la configuracion"));
+      toast.error(apiError(e, "No se pudo guardar la configuración"));
     } finally {
       setSaving(false);
     }
@@ -166,7 +175,22 @@ export default function Settings() {
     }
   };
 
-  if (loading) return <LoadingBlock label="Cargando configuracion..." />;
+  const saveSourceKeys = async (payload, message) => {
+    setSaving(true);
+    try {
+      const { data } = await api.put("/config", payload);
+      applyCfg(data);
+      setOpenfdaKey("");
+      setNcbiKey("");
+      toast.success(message);
+    } catch (e) {
+      toast.error(apiError(e, "No se pudieron guardar las llaves"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <LoadingBlock label="Cargando configuración..." />;
 
   const aiOn = Boolean(cfg.ai_enabled);
   const models = cfg.minimax_available_models?.length
@@ -176,9 +200,9 @@ export default function Settings() {
   return (
     <div>
       <PageHeader
-        title="Configuracion del sistema"
+        title="Configuración del sistema"
         titleHint={GLOSSARY.minimax}
-        subtitle="Gobierne la metodologia, MiniMax (con OCR de sitios) y las llaves de las fuentes de nivel A."
+        subtitle="Gobierne la metodología, MiniMax (con OCR de sitios) y las llaves de las fuentes de nivel A."
       />
 
       <div
@@ -200,10 +224,10 @@ export default function Settings() {
         <StatusCard
           icon="globe"
           label="IA en sitios / OCR"
-          value={cfg.ai_ocr_enabled ? "OCR activo" : cfg.ai_web_enabled ? "Solo texto" : "Apagado"}
-          tone={cfg.ai_ocr_enabled ? "ok" : cfg.ai_web_enabled ? "info" : "neutral"}
-          sub={cfg.ai_ocr_enabled ? `Vision: ${cfg.minimax_vision_model || "MiniMax-M3"}` : "La IA puede leer paginas; el OCR es opcional"}
-          tip="Con OCR, MiniMax-M3 lee imagenes y PDF escaneados de las fuentes."
+          value={!aiOn ? "Requiere IA" : cfg.ai_ocr_enabled ? "OCR activo" : cfg.ai_web_enabled ? "Solo texto" : "Apagado"}
+          tone={!aiOn ? "neutral" : cfg.ai_ocr_enabled ? "ok" : cfg.ai_web_enabled ? "info" : "neutral"}
+          sub={cfg.ai_ocr_enabled ? `Visión: ${cfg.minimax_vision_model || "MiniMax-M3"}` : "La IA puede leer páginas; el OCR es opcional"}
+          tip="Con OCR, MiniMax-M3 lee imágenes y PDF escaneados de las fuentes."
         />
         <StatusCard
           icon="shield"
@@ -215,11 +239,11 @@ export default function Settings() {
         />
         <StatusCard
           icon="info"
-          label="Version del sistema"
+          label="Versión del sistema"
           value={`v${cfg.version}`}
           tone="neutral"
           sub={`${cfg.total_sources} fuentes · ${cfg.total_findings} hallazgos`}
-          tip="Version de la aplicacion y volumen del inventario."
+          tip="Versión de la aplicación y volumen del inventario."
         />
       </div>
 
@@ -236,6 +260,8 @@ export default function Settings() {
       </div>
 
       {tab === "metodologia" && <MethodologyPanel />}
+
+      {tab === "programacion" && <SchedulePanel />}
 
       {tab === "ia" && (
       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16 }} className="dash-grid">
@@ -254,8 +280,8 @@ export default function Settings() {
           </SectionTitle>
 
           <p style={{ fontSize: 13, color: "#64748B", marginTop: -6, marginBottom: 16 }}>
-            MiniMax entra a las paginas de las fuentes, estructura senales de horizonte y, si lo
-            habilita, lee imagenes y PDF escaneados con MiniMax-M3. La llave no se muestra completa.
+            MiniMax entra a las páginas de las fuentes, estructura señales de horizonte y, si lo
+            habilita, lee imágenes y PDF escaneados con MiniMax-M3. La llave no se muestra completa.
           </p>
 
           {banner && <AlertBanner type={banner.type} message={banner.message} onClose={() => setBanner(null)} />}
@@ -278,14 +304,14 @@ export default function Settings() {
             onChange={setMinimaxToken}
           />
 
-          <Select label="Proveedor" value={provider} onChange={(e) => setProvider(e.target.value)}>
-            <option value="auto">Automatico (MiniMax si hay llave; si no, Gemini)</option>
+          <Select label="Proveedor" hint="Automático usa MiniMax si tiene llave y, si falla, Gemini. Elija uno solo si quiere forzarlo." value={provider} onChange={(e) => setProvider(e.target.value)}>
+            <option value="auto">Automático (MiniMax si hay llave; si no, Gemini)</option>
             <option value="minimax">Solo MiniMax</option>
             <option value="gemini">Solo Gemini</option>
           </Select>
 
-          <Select label="Modelo MiniMax" value={minimaxModel} onChange={(e) => setMinimaxModel(e.target.value)}>
-            <option value="">Automatico (mejor modelo disponible)</option>
+          <Select label="Modelo MiniMax" hint="Automático elige el mejor modelo que responda con su llave. Use Detectar mejor modelo para probarlo." value={minimaxModel} onChange={(e) => setMinimaxModel(e.target.value)}>
+            <option value="">Automático (mejor modelo disponible)</option>
             {models.map((m) => (
               <option key={m} value={m}>{m}</option>
             ))}
@@ -298,13 +324,13 @@ export default function Settings() {
             checked={webEnabled}
             onChange={setWebEnabled}
             title="IA entra a los sitios web"
-            text="Durante el escaneo, MiniMax lee el contenido real de la pagina y extrae tecnologias."
+            text="Durante el escaneo, MiniMax lee el contenido real de la página y extrae tecnologías."
           />
           <ToggleRow
             checked={ocrEnabled}
             onChange={setOcrEnabled}
             title="Habilitar IA con OCR"
-            text={`MiniMax-M3 lee imagenes y PDF escaneados. Vision: ${cfg.minimax_vision_model || "MiniMax-M3"}.`}
+            text={`MiniMax-M3 lee imágenes y PDF escaneados. Visión: ${cfg.minimax_vision_model || "MiniMax-M3"}.`}
           />
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
@@ -338,7 +364,7 @@ export default function Settings() {
               onChange={setToken}
             />
             <Select label="Modelo Gemini" value={model} onChange={(e) => setModel(e.target.value)}>
-              <option value="">Automatico</option>
+              <option value="">Automático</option>
               {(cfg.available_models || []).map((m) => (
                 <option key={m} value={m}>{m}</option>
               ))}
@@ -350,12 +376,12 @@ export default function Settings() {
         </Card>
 
         <Card style={{ background: "#F8FAFC" }}>
-          <SectionTitle>Como funciona</SectionTitle>
+          <SectionTitle>Cómo funciona</SectionTitle>
           <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "#475569", lineHeight: 1.9 }}>
-            <li>La llave de MiniMax se carga desde el servidor o se pega aqui.</li>
-            <li>Pulse <b>Detectar mejor modelo</b> para probar cual responde en su cuenta.</li>
-            <li>Active <b>IA entra a los sitios</b> para extraer senales reales al escanear.</li>
-            <li>Active <b>OCR</b> si las fuentes publican imagenes o PDF escaneados.</li>
+            <li>La llave de MiniMax se carga desde el servidor o se pega aquí.</li>
+            <li>Pulse <b>Detectar mejor modelo</b> para probar cuál responde en su cuenta.</li>
+            <li>Active <b>IA entra a los sitios</b> para extraer señales reales al escanear.</li>
+            <li>Active <b>OCR</b> si las fuentes publican imágenes o PDF escaneados.</li>
             <li>Gemini queda como respaldo si MiniMax no responde.</li>
           </ol>
           <div style={{ marginTop: 18 }}>
@@ -363,9 +389,9 @@ export default function Settings() {
               Lo que habilita
             </div>
             {[
-              ["globe", "Visita real de HTML/PDF de cada fuente y extraccion estructurada."],
-              ["spark", "OCR con MiniMax-M3 sobre imagenes y paginas escaneadas."],
-              ["bulb", "Recomendaciones de adopcion para Colombia y asistente RAG."],
+              ["globe", "Visita real de HTML/PDF de cada fuente y extracción estructurada."],
+              ["spark", "OCR con MiniMax-M3 sobre imágenes y páginas escaneadas."],
+              ["bulb", "Recomendaciones de adopción para Colombia y asistente RAG."],
               ["chat", "Enriquecimiento de fichas y notas del equipo."],
             ].map(([ic, txt]) => (
               <div key={ic} style={{ display: "flex", gap: 10, marginBottom: 10, fontSize: 13, color: "#475569" }}>
@@ -383,46 +409,43 @@ export default function Settings() {
           <SectionTitle hint={GLOSSARY.nivel_a}>Llaves de fuentes de nivel A</SectionTitle>
           <p style={{ fontSize: 13, color: "#64748B", marginTop: -6 }}>
             openFDA y PubMed multiplican su cupo con una llave gratuita. Sin ellas el sistema funciona,
-            pero con un tope bajo que puede dejar corridas en ambar.
+            pero con un tope bajo que puede dejar corridas en ámbar. Las llaves no se muestran una vez guardadas.
           </p>
-          <div style={{ display: "grid", gap: 12, maxWidth: 520 }}>
+          <div style={{ display: "grid", gap: 12, maxWidth: 560 }}>
+            <KeyStatus label="openFDA" configured={cfg.openfda_has_key} onRemove={() => saveSourceKeys({ openfda_api_key: "" }, "Llave de openFDA eliminada")} saving={saving} />
             <Input
+              id="openfda-key"
               label="Llave openFDA (api.data.gov)"
+              hint={GLOSSARY.fb_llave_openfda}
               type="password"
+              autoComplete="off"
               value={openfdaKey}
               onChange={(e) => setOpenfdaKey(e.target.value)}
-              placeholder={cfg.openfda_has_key ? "Llave ya configurada" : "Pegue la llave gratuita"}
+              placeholder={cfg.openfda_has_key ? "Escriba una nueva para reemplazarla" : "Pegue la llave gratuita"}
             />
+            <KeyStatus label="NCBI / PubMed" configured={cfg.ncbi_has_key} onRemove={() => saveSourceKeys({ ncbi_api_key: "" }, "Llave de NCBI eliminada")} saving={saving} />
             <Input
+              id="ncbi-key"
               label="Llave NCBI / PubMed"
+              hint={GLOSSARY.fb_llave_ncbi}
               type="password"
+              autoComplete="off"
               value={ncbiKey}
               onChange={(e) => setNcbiKey(e.target.value)}
-              placeholder={cfg.ncbi_has_key ? "Llave ya configurada" : "Opcional; 10 peticiones por segundo"}
+              placeholder={cfg.ncbi_has_key ? "Escriba una nueva para reemplazarla" : "Opcional; 10 peticiones por segundo"}
             />
-            <Input
-              label="Correo institucional NCBI"
-              value={ncbiEmail}
-              onChange={(e) => setNcbiEmail(e.target.value)}
-            />
+            <Input id="ncbi-email" label="Correo institucional NCBI" hint={GLOSSARY.fb_correo_ncbi} type="email" value={ncbiEmail} onChange={(e) => setNcbiEmail(e.target.value)} />
             <div>
               <Button
-                onClick={async () => {
-                  setSaving(true);
-                  try {
-                    const payload = { ncbi_email: ncbiEmail };
-                    if (openfdaKey.trim()) payload.openfda_api_key = openfdaKey.trim();
-                    if (ncbiKey.trim()) payload.ncbi_api_key = ncbiKey.trim();
-                    const { data } = await api.put("/config", payload);
-                    applyCfg(data);
-                    setOpenfdaKey("");
-                    setNcbiKey("");
-                    toast.success("Llaves de fuentes guardadas");
-                  } catch (e) {
-                    toast.error(apiError(e, "No se pudieron guardar las llaves"));
-                  } finally {
-                    setSaving(false);
+                onClick={() => {
+                  if (ncbiEmail.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ncbiEmail.trim())) {
+                    toast.error("El correo de NCBI no es válido");
+                    return;
                   }
+                  const payload = { ncbi_email: ncbiEmail.trim() };
+                  if (openfdaKey.trim()) payload.openfda_api_key = openfdaKey.trim();
+                  if (ncbiKey.trim()) payload.ncbi_api_key = ncbiKey.trim();
+                  saveSourceKeys(payload, "Llaves de fuentes guardadas");
                 }}
                 loading={saving}
               >
@@ -431,6 +454,22 @@ export default function Settings() {
             </div>
           </div>
         </Card>
+      )}
+    </div>
+  );
+}
+
+function KeyStatus({ label, configured, onRemove, saving }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#475569" }} data-testid={`key-status-${label}`}>
+      <Badge tone={configured ? "ok" : "viewer"}>{configured ? "Configurada" : "Sin llave"}</Badge>
+      <span>{label}</span>
+      {configured && (
+        <Tooltip text="Borra la llave guardada desde esta pantalla. Si el servidor tiene una en su archivo .env, se vuelve a usar esa.">
+          <button type="button" onClick={onRemove} disabled={saving} style={{ marginLeft: "auto", border: "none", background: "transparent", color: "#EF4444", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+            Eliminar llave guardada
+          </button>
+        </Tooltip>
       )}
     </div>
   );

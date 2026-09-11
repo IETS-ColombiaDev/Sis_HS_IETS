@@ -1,0 +1,5 @@
+# Los scripts de shell se ejecutan en Linux (contenedor y servidor): siempre LF.
+*.sh text eol=lf
+Caddyfile text eol=lf
+# Los de PowerShell se ejecutan en Windows.
+*.ps1 text eol=crlf

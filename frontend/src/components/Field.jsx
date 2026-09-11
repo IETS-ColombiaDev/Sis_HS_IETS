@@ -40,7 +40,7 @@ export function Label({ children, htmlFor, required, hint }) {
         {children}
         {required && <span style={{ color: "#EF4444" }}> *</span>}
       </span>
-      <InfoTip text={hint} label={`Que es ${children}`} />
+      <InfoTip text={hint} label={`Qué es ${children}`} />
     </label>
   );
 }

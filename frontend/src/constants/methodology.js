@@ -7,42 +7,42 @@ export const IETS_PHASES = [
   {
     key: "identificacion",
     phase: "Fase 1",
-    label: "Identificacion",
-    short: "Vigilar fuentes y capturar senales",
+    label: "Identificación",
+    short: "Vigilar fuentes y capturar señales",
     to: "/vigilancia",
     icon: "radar",
-    hint: "Buscar en el mundo senales de tecnologias nuevas y guardarlas para revisarlas.",
-    help: "Paso 1. El equipo vigila fuentes (ensayos, agencias, literatura) y captura senales de tecnologias que aun no estan en Colombia. Nada se decide aqui: solo se detecta y se guarda en la bandeja.",
+    hint: "Buscar en el mundo señales de tecnologías nuevas y guardarlas para revisarlas.",
+    help: "Paso 1. El equipo vigila fuentes (ensayos, agencias, literatura) y captura señales de tecnologías que aún no están en Colombia. Nada se decide aquí: solo se detecta y se guarda en la bandeja.",
   },
   {
     key: "priorizacion",
     phase: "Fase 2",
-    label: "Priorizacion",
+    label: "Priorización",
     short: "Calificar la matriz P1 a P6",
     to: "/priorizacion",
     icon: "layers",
-    hint: "Ponerle nota a cada tecnologia con seis preguntas si/no (P1 a P6).",
-    help: "Paso 2. Cada tecnologia recibe seis preguntas oficiales (P1 a P6). Cada si suma 1 punto. Las que llegan al umbral pasan primero a evaluacion; las demas quedan en vigilancia o se descartan del ciclo.",
+    hint: "Ponerle nota a cada tecnología con seis preguntas sí/no (P1 a P6).",
+    help: "Paso 2. Cada tecnología recibe seis preguntas oficiales (P1 a P6). Cada sí suma 1 punto. Las que llegan al umbral pasan primero a evaluación; las demás quedan en vigilancia o se descartan del ciclo.",
   },
   {
     key: "caracterizacion",
     phase: "Fase 3",
-    label: "Evaluacion",
+    label: "Evaluación",
     short: "Ficha, informe o Mini-HTA",
     to: "/evaluacion",
     icon: "doc",
-    hint: "Redactar la ficha o el informe y pasarlo por revision de pares.",
-    help: "Paso 3. Se escribe la ficha, el informe o un Mini-HTA (informe mas profundo) y un revisor independiente lo revisa antes de publicarlo.",
+    hint: "Redactar la ficha o el informe y pasarlo por revisión de pares.",
+    help: "Paso 3. Se escribe la ficha, el informe o un Mini-HTA (informe más profundo) y un revisor independiente lo revisa antes de publicarlo.",
   },
   {
     key: "diseminacion",
     phase: "Fase 4",
-    label: "Diseminacion",
+    label: "Diseminación",
     short: "Informar, publicar y alertar",
     to: "/diseminacion",
     icon: "bulb",
     hint: "Compartir informes, boletines, tablero y alertas con quien decide.",
-    help: "Paso 4. Se publica lo ya evaluado: informes, boletin del ciclo, tablero de indicadores y alertas para MinSalud, INVIMA y otros tomadores de decision.",
+    help: "Paso 4. Se publica lo ya evaluado: informes, boletín del ciclo, tablero de indicadores y alertas para MinSalud, INVIMA y otros tomadores de decisión.",
   },
 ];
 
@@ -57,24 +57,24 @@ export const DEFAULT_WATCH_POINTS = 3;
 export const PRIORITY_CRITERIA_TOTAL = 6;
 
 export const HORIZON_LABELS = {
-  emergente: "Emergente — fases muy tempranas (preclinica / fase I)",
-  transicional: "Transicional — desarrollo clinico o evaluacion (fase II/III)",
-  inminente: "Inminente — proxima a autorizacion o lanzamiento",
+  emergente: "Emergente — fases muy tempranas (preclínica / fase I)",
+  transicional: "Transicional — desarrollo clínico o evaluación (fase II/III)",
+  inminente: "Inminente — próxima a autorización o lanzamiento",
 };
 
 /** Condicion del glosario de la especificacion: dimension distinta del horizonte. */
 export const CONDITION_LABELS = {
-  emergente: "Emergente — en fases clinicas avanzadas (II o III), previa a aprobacion",
+  emergente: "Emergente — en fases clínicas avanzadas (II o III), previa a aprobación",
   nueva: "Nueva — aprobada en agencia de referencia hace 12 meses o menos",
 };
 
 /** Vias del criterio de novedad (RF10). El backend es la fuente de verdad;
  *  estas etiquetas cortas son para las tablas, donde el enunciado no cabe. */
 export const NOVELTY_SHORT_LABELS = {
-  no_disponible_en_pais: "No disponible en el pais",
-  nueva_indicacion: "Nueva indicacion",
-  nueva_forma_farmaceutica: "Nueva forma farmaceutica",
-  nueva_combinacion: "Nueva combinacion",
+  no_disponible_en_pais: "No disponible en el país",
+  nueva_indicacion: "Nueva indicación",
+  nueva_forma_farmaceutica: "Nueva forma farmacéutica",
+  nueva_combinacion: "Nueva combinación",
 };
 
 /** Antiguedad maxima del indice del INVIMA antes de advertir (RF11). */
@@ -82,9 +82,9 @@ export const INVIMA_STALE_DAYS = 30;
 
 /** Estados de la senal capturada (modelo heredado, cola de cribado). */
 export const STATUS_LABELS = {
-  nuevo: "Senal nueva — pendiente de revision",
-  revisado: "Revisado — en evaluacion de prioridad",
-  priorizado: "Priorizado — pasa a caracterizacion profunda",
+  nuevo: "Señal nueva — pendiente de revisión",
+  revisado: "Revisado — en evaluación de prioridad",
+  priorizado: "Priorizado — pasa a caracterización profunda",
   descartado: "Descartado — bajo impacto o fuera de alcance",
 };
 
@@ -92,12 +92,12 @@ export const STATUS_LABELS = {
 export const TECH_STATUS_LABELS = {
   capturada_no_asignada: "Capturada / no asignada",
   asignada_a_ciclo: "Asignada al ciclo",
-  filtrada_apta_priorizacion: "Filtrada / apta para priorizacion",
+  filtrada_apta_priorizacion: "Filtrada / apta para priorización",
   excluida: "Excluida",
   priorizada: "Priorizada",
   bajo_vigilancia: "Bajo vigilancia",
   no_priorizada: "No priorizada",
-  en_evaluacion: "En evaluacion",
+  en_evaluacion: "En evaluación",
   publicada: "Publicada",
 };
 
@@ -115,10 +115,10 @@ export const TECH_STATUS_TONE = {
 
 /** Estados del ciclo operativo. */
 export const CYCLE_STATUS_LABELS = {
-  en_configuracion: "En configuracion",
+  en_configuracion: "En configuración",
   en_filtrado: "En filtrado",
-  en_priorizacion: "En priorizacion",
-  en_evaluacion: "En evaluacion",
+  en_priorizacion: "En priorización",
+  en_evaluacion: "En evaluación",
   cerrado_consolidado: "Cerrado / consolidado",
 };
 
@@ -133,8 +133,8 @@ export const CYCLE_STATUS_TONE = {
 /** Perfiles RBAC (Tabla 3 de la especificacion). */
 export const ROLE_LABELS = {
   superadmin: "Superadministrador",
-  evaluador_tecnico: "Evaluador tecnico",
-  evaluador_clinico: "Evaluador clinico",
+  evaluador_tecnico: "Evaluador técnico",
+  evaluador_clinico: "Evaluador clínico",
   tomador_decisiones: "Tomador de decisiones",
   revisor_pares: "Revisor por pares",
 };

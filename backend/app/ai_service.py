@@ -262,14 +262,14 @@ Contenido raw: {(finding.raw_content or '')[:800]}"""
 
 def _fallback_recommendation(finding, source) -> str:
     return (
-        f"### Recomendacion preliminar (modo sin IA)\n\n"
-        f"**Tecnologia:** {finding.technology or finding.title}\n\n"
+        f"### Recomendación preliminar (modo sin IA)\n\n"
+        f"**Tecnología:** {finding.technology or finding.title}\n\n"
         f"**Tipo:** {finding.technology_type or 'no determinado'} | "
         f"**Horizonte:** {finding.horizon or 'no determinado'}\n\n"
-        f"Este hallazgo proviene de *{source.title}*. Para generar una recomendacion de adopcion "
-        f"detallada para Colombia, configure MiniMax o Gemini en Configuracion. "
-        f"Entretanto, se sugiere: (1) verificar la senal en INVIMA y en la ruta de ETS del IETS, "
-        f"(2) estimar carga de enfermedad y poblacion objetivo en Colombia, y (3) evaluar impacto "
+        f"Este hallazgo proviene de *{source.title}*. Para generar una recomendación de adopción "
+        f"detallada para Colombia, configure MiniMax o Gemini en Configuración. "
+        f"Entretanto, se sugiere: (1) verificar la señal en INVIMA y en la ruta de ETS del IETS, "
+        f"(2) estimar carga de enfermedad y población objetivo en Colombia, y (3) evaluar impacto "
         f"presupuestal preliminar.\n\nIMPACTO: medio"
     )
 
@@ -277,11 +277,11 @@ def _fallback_recommendation(finding, source) -> str:
 def _fallback_chat(question: str, context: str) -> str:
     if context.strip():
         return (
-            "Modo sin IA (configure MiniMax en Configuracion para respuestas generativas). "
-            "Segun la informacion disponible en el sistema, estos son los elementos mas relevantes "
+            "Modo sin IA (configure MiniMax en Configuración para respuestas generativas). "
+            "Según la información disponible en el sistema, estos son los elementos más relevantes "
             f"para su consulta:\n\n{context[:1500]}"
         )
     return (
-        "Modo sin IA. No se encontro contexto especifico para su consulta en la base de datos. "
-        "Configure MiniMax y ejecute un escaneo de las fuentes para enriquecer la informacion."
+        "Modo sin IA. No se encontró contexto específico para su consulta en la base de datos. "
+        "Configure MiniMax y ejecute un escaneo de las fuentes para enriquecer la información."
     )

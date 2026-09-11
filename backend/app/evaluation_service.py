@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import datetime, timedelta, timezone
 from html import escape
 
@@ -73,8 +74,8 @@ def reviewer_token_days(db: Session) -> int:
 
 def _tech_title(tech: Technology | None) -> str:
     if tech is None:
-        return "Tecnologia"
-    return (tech.commercial_name or tech.inn_name or f"Tecnologia {tech.id}").strip()
+        return "Tecnología"
+    return (tech.commercial_name or tech.inn_name or f"Tecnología {tech.id}").strip()
 
 
 def ensure_document(
@@ -131,6 +132,67 @@ def ensure_document(
     db.flush()
     _snapshot(db, doc, note="Apertura del expediente", actor=actor)
     return doc
+
+
+def start_evaluation(
+    db: Session,
+    entry: CycleTechnology,
+    *,
+    actor: str = "",
+    product_level: str | None = None,
+) -> EvaluationDoc:
+    """Pasa una instancia priorizada a evaluacion y abre (o recupera) su expediente.
+
+    Es el unico camino para abrir un expediente de una tecnologia priorizada:
+    abrirlo sin mover la instancia dejaba la tecnologia "priorizada" con un
+    borrador en curso, fuera del bloqueo de cierre del ciclo y del embudo.
+    """
+    if entry.status == "priorizada" and not entry.frozen:
+        entry.status = "en_evaluacion"
+        tech = db.get(Technology, entry.technology_id)
+        if tech is not None:
+            previous_status = tech.status
+            tech.status = "en_evaluacion"
+            from . import strategy_service
+
+            db.flush()
+            strategy_service.watch_technology(
+                db,
+                tech,
+                previous_phase=tech.development_phase or "",
+                previous_status=previous_status,
+            )
+    return ensure_document(
+        db, entry.cycle_id, entry.technology_id, actor=actor, product_level=product_level
+    )
+
+
+def transition_hints(db: Session, doc: EvaluationDoc, actor) -> dict[str, str]:
+    """Motivo por el que cada transicion permitida aun no procede (vacio = procede).
+
+    Permite a la interfaz deshabilitar el boton con una explicacion en vez de
+    dejar que el usuario descubra la regla por un rechazo.
+    """
+    hints: dict[str, str] = {}
+    for target in catalog.EDITORIAL_TRANSITIONS.get(doc.status, ()):
+        needed = TRANSITION_PERMISSION.get((doc.status, target))
+        if needed and not has_permission(actor, needed):
+            hints[target] = f"Su perfil no tiene el permiso requerido ({needed})."
+            continue
+        if target == "revision_interna":
+            state = completeness(doc)
+            if not state["complete"]:
+                labels = catalog.FIELD_LABELS
+                missing = ", ".join(labels.get(k, k) for k in state["missing"])
+                hints[target] = f"Complete los campos obligatorios: {missing}."
+                continue
+        if target == "publicado":
+            ok, reason = can_publish(db, doc)
+            if not ok:
+                hints[target] = reason
+                continue
+        hints[target] = ""
+    return hints
 
 
 def completeness(doc: EvaluationDoc) -> dict:
@@ -212,17 +274,38 @@ def save_document(
     return doc
 
 
+def _counts_as_reviewer(db: Session, row: ReviewAssignment) -> bool:
+    """Un interno cuenta como revisor solo si su perfil redacta o revisa.
+
+    Cualquier usuario que abre el expediente queda con una asignacion interna
+    (para exigirle el COI antes de leer); un tomador de decisiones que solo
+    consulta no puede satisfacer el requisito de revision por pares.
+    """
+    if row.kind != "interno" or not row.reviewer_user_id:
+        return True
+    from .models import User
+
+    user = db.get(User, row.reviewer_user_id)
+    if user is None:
+        return False
+    return has_permission(user, P_REPORT_WRITE) or has_permission(user, P_REVIEW_SUBMIT)
+
+
 def _signed_kinds(db: Session, doc_id: int) -> set[str]:
     rows = db.query(ReviewAssignment).filter(ReviewAssignment.doc_id == doc_id).all()
-    return {row.kind for row in rows if row.coi_signed}
+    return {
+        row.kind
+        for row in rows
+        if row.coi_signed and row.status != "revocado" and _counts_as_reviewer(db, row)
+    }
 
 
 def can_publish(db: Session, doc: EvaluationDoc) -> tuple[bool, str]:
     kinds = _signed_kinds(db, doc.id)
     if "interno" not in kinds:
-        return False, "Falta un revisor interno con conflicto de interes declarado."
+        return False, "Falta un revisor interno con conflicto de interés declarado."
     if "externo" not in kinds:
-        return False, "Falta un revisor externo con conflicto de interes declarado."
+        return False, "Falta un revisor externo con conflicto de interés declarado."
     return True, ""
 
 
@@ -242,13 +325,13 @@ def transition(
     needed = TRANSITION_PERMISSION.get((doc.status, target))
     if needed and not has_permission(actor, needed):
         raise EvaluationRuleError(
-            f"El perfil no tiene permiso para esta transicion ({needed})."
+            f"El perfil no tiene permiso para esta transición ({needed})."
         )
     if target == "revision_interna":
         state = completeness(doc)
         if not state["complete"]:
             raise EvaluationRuleError(
-                "No se envia a revision interna con campos obligatorios vacios: "
+                "No se envía a revisión interna con campos obligatorios vacíos: "
                 + ", ".join(state["missing"])
             )
     if target == "publicado":
@@ -263,6 +346,18 @@ def transition(
     doc.updated_by = _actor_email(actor)
     if target == "publicado":
         doc.published_at = _utcnow()
+        # La instancia del ciclo tambien queda publicada: sin esto el embudo del
+        # ciclo (`summary.published`) nunca contaba lo que se publicaba.
+        entry = (
+            db.query(CycleTechnology)
+            .filter(
+                CycleTechnology.cycle_id == doc.cycle_id,
+                CycleTechnology.technology_id == doc.technology_id,
+            )
+            .first()
+        )
+        if entry is not None and not entry.frozen and entry.status in ("priorizada", "en_evaluacion"):
+            entry.status = "publicada"
         tech = db.get(Technology, doc.technology_id)
         if tech:
             previous_status = tech.status
@@ -272,7 +367,7 @@ def transition(
             strategy_service.watch_technology(
                 db, tech, previous_phase=tech.development_phase or "", previous_status=previous_status
             )
-    _snapshot(db, doc, note=note or f"Transicion {previous} -> {target}", actor=_actor_email(actor))
+    _snapshot(db, doc, note=note or f"Transición {previous} -> {target}", actor=_actor_email(actor))
     audit.record_action(
         db,
         entity_type="evaluation_docs",
@@ -320,12 +415,12 @@ def sign_coi(
     actor: str = "",
 ) -> ReviewAssignment:
     if not accepted:
-        raise EvaluationRuleError("Debe aceptar la declaracion de conflicto de interes.")
+        raise EvaluationRuleError("Debe aceptar la declaración de conflicto de interés.")
     assignment.coi_signed = True
     assignment.coi_statement = (statement or "").strip()
     assignment.coi_has_conflict = bool(has_conflict)
     assignment.coi_signed_at = _utcnow()
-    if assignment.status == "invitado":
+    if assignment.status in ("invitado", "invitacion_enviada"):
         assignment.status = "en_lectura"
     audit.record_action(
         db,
@@ -353,6 +448,10 @@ def invite_reviewer(
     name = (name or "").strip()
     if not email or not name:
         raise EvaluationRuleError("Nombre y correo del revisor son obligatorios.")
+    if not _EMAIL_RE.match(email):
+        raise EvaluationRuleError("El correo del revisor no tiene un formato válido.")
+    if doc.status == "publicado":
+        raise EvaluationRuleError("El documento ya está publicado: no admite nuevos revisores.")
 
     token = None
     row = ReviewAssignment(
@@ -389,13 +488,40 @@ def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def revoke_assignment(db: Session, assignment: ReviewAssignment, *, actor: str = "") -> ReviewAssignment:
+    """Revoca una invitacion (correo equivocado, revisor que declina).
+
+    La fila no se borra: la bitacora y el historial de revisores deben mostrar
+    que la invitacion existio. El token deja de abrir el portal.
+    """
+    if assignment.status in ("aprobado", "observado"):
+        raise EvaluationRuleError("La revisión ya fue enviada y no se revoca.")
+    if assignment.status == "revocado":
+        return assignment
+    assignment.status = "revocado"
+    assignment.token_hash = ""
+    audit.record_action(
+        db,
+        entity_type="review_assignments",
+        entity_id=assignment.id,
+        action="review:revoke",
+        new_value={"kind": assignment.kind, "email": assignment.reviewer_email, "actor": actor},
+    )
+    return assignment
+
+
 def resolve_reviewer_token(db: Session, token: str) -> tuple[ReviewAssignment, EvaluationDoc]:
     """Resuelve el JWT del portal. Un token caducado se registra y se niega."""
     payload = decode_access_token(token, verify_exp=True)
     if payload and payload.get("typ") == "review":
         assignment = db.get(ReviewAssignment, int(payload.get("aid") or 0))
         if assignment is None:
-            raise EvaluationRuleError("Invitacion inexistente.")
+            raise EvaluationRuleError("Invitación inexistente.")
+        if assignment.status == "revocado":
+            raise EvaluationRuleError("TOKEN_REVOKED")
         doc = db.get(EvaluationDoc, assignment.doc_id)
         if doc is None:
             raise EvaluationRuleError("El documento ya no existe.")
@@ -427,7 +553,7 @@ def add_comment(
 ) -> ReviewComment:
     text = (body or "").strip()
     if not text:
-        raise EvaluationRuleError("El comentario no puede ir vacio.")
+        raise EvaluationRuleError("El comentario no puede ir vacío.")
     latest = (
         db.query(EvaluationVersion)
         .filter(EvaluationVersion.doc_id == doc.id)
@@ -455,13 +581,20 @@ def submit_review(
     note: str = "",
 ) -> ReviewAssignment:
     if not assignment.coi_signed:
-        raise EvaluationRuleError("Sin declaracion de conflicto de interes no hay revision.")
+        raise EvaluationRuleError("Sin declaración de conflicto de interés no hay revisión.")
     verdict = (verdict or "").strip().lower()
     if verdict not in catalog.REVIEW_VERDICTS:
         raise EvaluationRuleError("El veredicto debe ser aprobado u observado.")
+    doc = db.get(EvaluationDoc, assignment.doc_id)
+    if doc is not None and doc.status in ("borrador", "revision_interna"):
+        raise EvaluationRuleError(
+            "El documento aún no está en revisión externa. Podrá enviar su veredicto "
+            "cuando la coordinación lo pase a esa etapa; mientras tanto puede dejar observaciones."
+        )
+    if doc is not None and doc.status == "publicado":
+        raise EvaluationRuleError("El documento ya fue publicado; la revisión está cerrada.")
     assignment.status = verdict
     assignment.submitted_at = _utcnow()
-    doc = db.get(EvaluationDoc, assignment.doc_id)
     if doc and doc.status == "revision_externa" and verdict == "observado":
         previous = doc.status
         doc.status = "con_observaciones"

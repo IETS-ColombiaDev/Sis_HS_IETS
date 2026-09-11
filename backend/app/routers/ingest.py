@@ -12,7 +12,7 @@ from ..deps import get_current_user, require_permission
 from ..ingest_service import enqueue, list_connectors, run_job, tick
 from ..models import IngestJob, RawRecord, Source, Technology, User
 from ..probe_service import health_board, probe_all, probe_source
-from ..rbac import P_SCAN_RUN, P_SOURCE_WRITE
+from ..rbac import P_CONFIG_MANAGE, P_SCAN_RUN, P_SOURCE_WRITE
 from ..schemas import (
     CatalogImportOut,
     ConnectorOut,
@@ -165,7 +165,7 @@ def raw_preview(
 ):
     tech = db.get(Technology, technology_id)
     if tech is None:
-        raise HTTPException(status_code=404, detail="Tecnologia no encontrada")
+        raise HTTPException(status_code=404, detail="Tecnología no encontrada")
 
     raw = (
         db.query(RawRecord)
@@ -191,3 +191,20 @@ def raw_preview(
         finding_id=tech.finding_id,
         source_title=source_title,
     )
+
+
+@router.post("/reprocess")
+def reprocess_from_raw(
+    target: str = Query("all", pattern="^(all|fda|pipeline)$"),
+    apply: bool = Query(False),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CONFIG_MANAGE)),
+):
+    """Vuelve a mapear lo ya capturado desde el crudo, sin consultar la fuente.
+
+    Sin `apply=true` es una simulacion: devuelve los cambios que haria. Ver
+    `reprocess_service` para el detalle de cada correccion.
+    """
+    from ..reprocess_service import reprocess_all
+
+    return reprocess_all(db, apply=apply, only=target, actor=user.email)

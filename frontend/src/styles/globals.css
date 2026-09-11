@@ -2065,6 +2065,15 @@ h4 {
   .screening-tabs {
     grid-template-columns: 1fr;
   }
+
+  /* Un nombre largo sin espacios no puede ensanchar la ficha mas alla de la pantalla. */
+  .merge-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .merge-card {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
 }
 
 /* ========================================================================= */
@@ -3283,3 +3292,298 @@ button.linkish {
 @media (max-width: 1100px) {
   .sg-layout { grid-template-columns: 1fr; }
 }
+
+/* --- Frente A: flujo metodologico (nombres largos, colas paginadas, ayudas) --- */
+.clamp-text-toggle {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #4f46e5;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.clamp-text-toggle:hover { text-decoration: underline; }
+.prio-item-name,
+.staging-name,
+.prio-detail-title { overflow-wrap: anywhere; }
+.fa-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+}
+.fa-toolbar-row { display: flex; gap: 8px; }
+.fa-toolbar-row > * { flex: 1; min-width: 0; }
+.fa-toolbar input,
+.fa-toolbar select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fff;
+  color: #0f172a;
+}
+.fa-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 12px;
+  color: #64748b;
+  background: #f8fafc;
+}
+.fa-pager button {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #0f172a;
+}
+.fa-pager button:disabled { opacity: 0.5; cursor: not-allowed; }
+.module-stat-label .info-tip { margin-left: 4px; vertical-align: middle; }
+.fa-notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+.fa-notice--warn { background: #fef3c7; border: 1px solid #fde68a; color: #92400e; }
+.fa-notice--info { background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3; }
+.fa-notice--ok { background: #f0fdf4; border: 1px solid #bbf7d0; color: #065f46; }
+.fa-link-box {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.fa-link-box code {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.fa-sub-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.fa-sub-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.fa-reviewer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.fa-alert-card.is-unread { border-left: 4px solid #6366f1; }
+.fa-alert-meta { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+/* ------------------------------------------------------------------------ */
+/* Frente B: tablas apiladas en movil, tareas programadas y ayudas           */
+/* ------------------------------------------------------------------------ */
+@media (max-width: 767px) {
+  .data-table--stack {
+    min-width: 0 !important;
+    table-layout: auto;
+  }
+  .data-table--stack colgroup,
+  .data-table--stack thead {
+    display: none;
+  }
+  .data-table--stack,
+  .data-table--stack tbody,
+  .data-table--stack tr,
+  .data-table--stack td {
+    display: block;
+    width: 100%;
+  }
+  .data-table--stack tr {
+    border-bottom: 1px solid #e2e8f0;
+    padding: 10px 4px;
+  }
+  .data-table--stack td {
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: none;
+    padding: 6px 12px;
+    text-align: left !important;
+  }
+  .data-table--stack td[data-label]:not([data-label=""])::before {
+    content: attr(data-label);
+    flex: 0 0 38%;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: #64748b;
+  }
+  .data-table--stack td > * {
+    min-width: 0;
+  }
+  .data-table--stack .data-table-empty::before {
+    content: none;
+  }
+}
+
+.fb-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.fb-readonly-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #475569;
+}
+.fb-schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.fb-schedule-card h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fb-schedule-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  font-size: 13px;
+  color: #475569;
+  margin: 12px 0;
+}
+.fb-schedule-meta dt {
+  color: #94a3b8;
+}
+.fb-schedule-meta dd {
+  margin: 0;
+  color: #0f172a;
+}
+.fb-inline-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.fb-inline-row > * {
+  flex: 1 1 180px;
+}
+.fb-preview {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  font-size: 13px;
+  margin-top: 10px;
+  overflow-wrap: anywhere;
+}
+.fb-preview ul {
+  margin: 6px 0 0 18px;
+  padding: 0;
+}
+.fb-json {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+}
+.fb-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 640px) {
+  .fb-grid-2 {
+    grid-template-columns: 1fr;
+  }
+  .fb-toolbar > * {
+    flex: 1 1 auto;
+  }
+}
+.fb-trail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.fb-trail li {
+  border-left: 3px solid #c7d2fe;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.fb-trail li strong {
+  color: #0f172a;
+}
+.fb-public-note {
+  font-size: 13px;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+.fb-public-note.is-ok {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+/* Frente A: el paso del flujo editorial solo pinta como circulo el numero; la
+   etiqueta (con su ayuda) quedaba encogida dentro de un circulo de 20px. */
+.editorial-stepper li > span.term-label,
+.editorial-stepper li > span.term-label span {
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  color: inherit;
+  font-weight: inherit;
+}
+.editorial-stepper li > span.term-label [role="tooltip"] { color: #fff; }
+/* Frente A: enlace directo ?tecnologia=<id>, resaltado breve del elemento abierto. */
+@keyframes fa-flash-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.55); background-color: #e0e7ff; }
+  70% { box-shadow: 0 0 0 8px rgba(99, 102, 241, 0); background-color: #eef2ff; }
+  100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+}
+.fa-flash,
+[data-flash="1"] { animation: fa-flash-pulse 1.2s ease-out 2; }
+.fa-link-notice { align-items: flex-start; }

@@ -9,8 +9,34 @@ export function downloadBlob(content, filename, mime = "text/plain;charset=utf-8
   URL.revokeObjectURL(url);
 }
 
-/** Descarga desde endpoint autenticado (axios blob). */
-export async function downloadFromApi(api, path, filename) {
-  const { data } = await api.get(path, { responseType: "blob" });
-  downloadBlob(data, filename);
+/** Nombre de archivo sugerido por el servidor (Content-Disposition), si lo hay. */
+function filenameFrom(headers, fallback) {
+  const raw = headers?.["content-disposition"] || "";
+  const match = /filename="?([^";]+)"?/i.exec(raw);
+  return match ? match[1] : fallback;
+}
+
+/**
+ * Descarga desde endpoint autenticado (axios blob).
+ *
+ * Con `responseType: "blob"` el error del servidor tambien llega como Blob, y
+ * `apiError` terminaba mostrando "Request failed with status code 403". Aqui se
+ * lee el cuerpo y se deja el `detail` en espanol donde `apiError` lo busca.
+ */
+export async function downloadFromApi(api, path, filename, config = {}) {
+  try {
+    const res = await api.get(path, { responseType: "blob", ...config });
+    downloadBlob(res.data, filenameFrom(res.headers, filename));
+    return res;
+  } catch (error) {
+    const data = error?.response?.data;
+    if (data instanceof Blob) {
+      try {
+        error.response.data = JSON.parse(await data.text());
+      } catch {
+        error.response.data = { detail: `No se pudo descargar (HTTP ${error.response.status}).` };
+      }
+    }
+    throw error;
+  }
 }

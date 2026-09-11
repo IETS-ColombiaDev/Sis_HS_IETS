@@ -12,7 +12,7 @@ from .base import CanonicalRecord, Connector, ConnectorResult, parse_compact_dat
 class FixtureConnector(Connector):
     code = "fixture"
     label = "Fixture de contrato (pruebas)"
-    description = "No consulta redes. Solo existe para pruebas de contrato y la suite de regresion."
+    description = "No consulta redes. Solo existe para pruebas de contrato y la suite de regresión."
     requires_url = False
 
     def fetch(self, *, config: dict, url: str = "") -> ConnectorResult:

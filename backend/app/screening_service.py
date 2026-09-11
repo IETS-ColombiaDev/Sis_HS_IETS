@@ -126,7 +126,7 @@ def confirm_merge(
     """
     proposal = db.get(MergeProposal, proposal_id)
     if proposal is None:
-        raise ScreeningRuleError("La propuesta de fusion no existe.")
+        raise ScreeningRuleError("La propuesta de fusión no existe.")
     if proposal.status != "propuesta":
         raise ScreeningRuleError(
             f"La propuesta ya fue resuelta como '{proposal.status}' y no se reabre."
@@ -142,7 +142,15 @@ def confirm_merge(
     keep = db.get(Technology, keep_id)
     drop = db.get(Technology, drop_id)
     if keep is None or drop is None:
-        raise ScreeningRuleError("Alguna de las tecnologias ya no existe.")
+        raise ScreeningRuleError("Alguna de las tecnologías ya no existe.")
+    absorbed = next((t for t in (keep, drop) if t.merged_into_id), None)
+    if absorbed is not None:
+        # Conservar un registro ya absorbido encadenaria fusiones y dejaria vivo
+        # en el Listado Unico algo que otra decision ya saco.
+        raise ScreeningRuleError(
+            f"La tecnología #{absorbed.id} ya fue fusionada con la #{absorbed.merged_into_id}. "
+            "Ejecute de nuevo el barrido para comparar contra el registro vigente."
+        )
 
     before = {
         "conservada": {"id": keep.id, "nct_ids": list(keep.nct_ids or [])},
@@ -153,13 +161,31 @@ def confirm_merge(
 
     drop.merged_into_id = keep.id
     drop.status = "excluida"
-    _mark_entries_excluded(db, drop.id, note=f"Fusionada con la tecnologia #{keep.id}.", actor=actor)
+    _mark_entries_excluded(db, drop.id, note=f"Fusionada con la tecnología #{keep.id}.", actor=actor)
 
     proposal.status = "confirmada"
     proposal.kept_technology_id = keep.id
     proposal.resolution_note = note
     proposal.resolved_by = actor
     proposal.resolved_at = _now()
+
+    # Las demas propuestas pendientes que involucran al absorbido quedan sin
+    # objeto: no se descartan (no es un juicio de "son distintas"), se marcan
+    # obsoletas con su motivo. El proximo barrido compara contra el superviviente.
+    stale = (
+        db.query(MergeProposal)
+        .filter(
+            MergeProposal.status == "propuesta",
+            MergeProposal.id != proposal.id,
+            (MergeProposal.technology_a_id == drop.id) | (MergeProposal.technology_b_id == drop.id),
+        )
+        .all()
+    )
+    for other in stale:
+        other.status = "obsoleta"
+        other.resolution_note = f"Sin objeto: la tecnología #{drop.id} fue absorbida por la #{keep.id}."
+        other.resolved_by = actor
+        other.resolved_at = _now()
 
     audit.record_action(
         db,
@@ -237,7 +263,7 @@ def discard_merge(db: Session, proposal_id: int, *, note: str = "", actor: str =
     """Marca el par como distinto. El motor no vuelve a proponerlo."""
     proposal = db.get(MergeProposal, proposal_id)
     if proposal is None:
-        raise ScreeningRuleError("La propuesta de fusion no existe.")
+        raise ScreeningRuleError("La propuesta de fusión no existe.")
     if proposal.status != "propuesta":
         raise ScreeningRuleError(f"La propuesta ya fue resuelta como '{proposal.status}'.")
 
@@ -287,7 +313,20 @@ def run_invima_check(
     """
     tech = db.get(Technology, technology_id)
     if tech is None:
-        raise ScreeningRuleError("La tecnologia no existe.")
+        raise ScreeningRuleError("La tecnología no existe.")
+    entry = (
+        db.query(CycleTechnology)
+        .filter(
+            CycleTechnology.cycle_id == cycle_id,
+            CycleTechnology.technology_id == technology_id,
+        )
+        .first()
+    )
+    if entry is None:
+        raise ScreeningRuleError("La tecnología no está asignada a este ciclo.")
+    if entry.frozen:
+        # La evidencia regulatoria de un ciclo cerrado es parte de lo congelado.
+        raise ScreeningRuleError("El ciclo está congelado: la verificación no se modifica.")
 
     result = invima.check_technology(db, tech)
     assessment = get_assessment(db, cycle_id, technology_id)
@@ -342,7 +381,7 @@ def save_novelty(
     """Registra la via de novedad elegida por el evaluador."""
     if option_code not in NOVELTY_OPTIONS:
         raise ScreeningRuleError(
-            f"Opcion de novedad invalida. Opciones: {', '.join(NOVELTY_OPTIONS)}."
+            f"Opción de novedad inválida. Opciones: {', '.join(NOVELTY_OPTIONS)}."
         )
 
     entry = (
@@ -354,9 +393,11 @@ def save_novelty(
         .first()
     )
     if entry is None:
-        raise ScreeningRuleError("La tecnologia no esta asignada a este ciclo.")
+        raise ScreeningRuleError("La tecnología no está asignada a este ciclo.")
     if entry.frozen:
-        raise ScreeningRuleError("El ciclo esta congelado: la verificacion no se modifica.")
+        raise ScreeningRuleError("El ciclo está congelado: la verificación no se modifica.")
+    if entry.status == "excluida":
+        raise ScreeningRuleError("La tecnología fue excluida del ciclo; su verificación ya no se edita.")
 
     assessment = get_assessment(db, cycle_id, technology_id)
     if assessment is None:
@@ -366,13 +407,13 @@ def save_novelty(
     text = (justification or "").strip()
     if option_code in NOVELTY_REQUIRES_JUSTIFICATION and len(text) < 20:
         raise ScreeningRuleError(
-            "Esta via de novedad exige justificacion explicita de al menos 20 caracteres."
+            "Esta vía de novedad exige justificación explícita de al menos 20 caracteres."
         )
     if assessment.has_valid_registry and option_code == "no_disponible_en_pais":
         raise ScreeningRuleError(
-            "El indice del INVIMA reporta registro sanitario vigente: no puede "
-            "declararse no disponible en el pais. Elija la via de novedad que "
-            "corresponda y justifiquela."
+            "El índice del INVIMA reporta registro sanitario vigente: no puede "
+            "declararse no disponible en el país. Elija la vía de novedad que "
+            "corresponda y justifíquela."
         )
 
     before = {"option_code": assessment.option_code, "justification": assessment.justification}
@@ -411,24 +452,24 @@ def novelty_gate(db: Session, cycle_id: int, technology_id: int) -> tuple[bool, 
     assessment = get_assessment(db, cycle_id, technology_id)
     if assessment is None or not assessment.option_code:
         return False, (
-            "Falta la verificacion del criterio de novedad (RF10). Registre la "
-            "via de novedad antes de calificar la tecnologia como apta."
+            "Falta la verificación del criterio de novedad (RF10). Registre la "
+            "vía de novedad antes de calificar la tecnología como apta."
         )
     if assessment.invima_checked_at is None:
         return False, (
-            "Falta cruzar la tecnologia con el indice de registros sanitarios "
+            "Falta cruzar la tecnología con el índice de registros sanitarios "
             "del INVIMA (RF11)."
         )
     if assessment.has_valid_registry and assessment.option_code == "no_disponible_en_pais":
         return False, (
-            "La tecnologia tiene registro sanitario vigente y la via de novedad "
+            "La tecnología tiene registro sanitario vigente y la vía de novedad "
             "declarada la contradice."
         )
     if (
         assessment.option_code in NOVELTY_REQUIRES_JUSTIFICATION
         and len((assessment.justification or "").strip()) < 20
     ):
-        return False, "La via de novedad declarada exige justificacion explicita."
+        return False, "La vía de novedad declarada exige justificación explícita."
     return True, ""
 
 
@@ -471,7 +512,7 @@ def unique_list(db: Session, cycle_id: int) -> dict:
     for entry, tech in rows:
         cluster = clusters.get(tech.cluster_id)
         code = cluster.code if cluster else "sin_cluster"
-        name = cluster.name if cluster else "Sin cluster asignado"
+        name = cluster.name if cluster else "Sin clúster asignado"
         bucket = grouped.setdefault(
             code,
             {"cluster_code": code, "cluster_name": name, "items": [], "count": 0},

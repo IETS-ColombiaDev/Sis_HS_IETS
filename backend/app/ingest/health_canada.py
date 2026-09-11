@@ -19,7 +19,7 @@ class HealthCanadaConnector(Connector):
     code = "health_canada"
     label = "Health Canada (MDALL / DPD)"
     description = (
-        "API oficial de dispositivos medicos y de productos farmaceuticos. "
+        "API oficial de dispositivos médicos y de productos farmacéuticos. "
         "Aporta nombre, titular y estado regulatorio."
     )
     min_interval = 0.4

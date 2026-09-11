@@ -28,8 +28,8 @@ ROLES: tuple[str, ...] = (
 
 ROLE_LABELS: dict[str, str] = {
     SUPERADMIN: "Superadministrador",
-    EVALUADOR_TECNICO: "Evaluador tecnico",
-    EVALUADOR_CLINICO: "Evaluador clinico",
+    EVALUADOR_TECNICO: "Evaluador técnico",
+    EVALUADOR_CLINICO: "Evaluador clínico",
     TOMADOR_DECISIONES: "Tomador de decisiones",
     REVISOR_PARES: "Revisor por pares",
 }
@@ -122,6 +122,59 @@ CRITERION_PERMISSION: dict[str, str] = {
     "P5": P_RATE_TECNICO,
     "P6": P_RATE_TECNICO,
 }
+
+
+# --------------------------------------------------------------------------- #
+#  Textos para la administracion (lo que el superadministrador lee al asignar)
+# --------------------------------------------------------------------------- #
+ROLE_DESCRIPTIONS: dict[str, str] = {
+    SUPERADMIN: (
+        "Control total: usuarios, configuración, catálogos, bitácora y cierre de ciclos. "
+        "Puede calificar los seis criterios."
+    ),
+    EVALUADOR_TECNICO: (
+        "Opera la vigilancia, la bandeja de entrada, el filtrado y los ciclos; sincroniza "
+        "el índice INVIMA y califica P1, P5 y P6."
+    ),
+    EVALUADOR_CLINICO: (
+        "Opera la vigilancia, la bandeja de entrada y el filtrado; redacta informes y "
+        "califica P2, P3 y P4."
+    ),
+    TOMADOR_DECISIONES: (
+        "Consulta el sistema y los tableros restringidos (presupuestos y comparadores); "
+        "puede escribir notas. No modifica la metodología."
+    ),
+    REVISOR_PARES: (
+        "Consulta y registra revisiones por pares. El experto externo no necesita cuenta: "
+        "entra con el enlace temporal de la invitación."
+    ),
+}
+
+PERMISSION_LABELS: dict[str, tuple[str, str]] = {
+    P_READ: ("Consultar", "Ver todos los módulos en modo lectura."),
+    P_SOURCE_WRITE: ("Editar fuentes", "Crear, editar, habilitar y retirar fuentes del inventario."),
+    P_SCAN_RUN: ("Ejecutar vigilancia", "Lanzar la captura masiva o por fuente."),
+    P_STAGING_ASSIGN: ("Asignar al ciclo", "Clasificar señales y asignarlas por lotes al ciclo."),
+    P_TECHNOLOGY_WRITE: ("Editar tecnologías", "Modificar la ficha base de una tecnología."),
+    P_CYCLE_WRITE: ("Gestionar ciclos", "Crear, editar y cambiar de estado los ciclos."),
+    P_CYCLE_CLOSE: ("Cerrar ciclos", "Cerrar y consolidar un ciclo; congela los puntajes."),
+    P_CATALOG_WRITE: ("Editar catálogos", "Clústeres, tipologías, criterios y parámetros metodológicos."),
+    P_SCREENING_WRITE: ("Filtrar", "Fusionar duplicados, verificar novedad y excluir con causa."),
+    P_INVIMA_SYNC: ("Sincronizar INVIMA", "Actualizar el índice local de registros sanitarios."),
+    P_RATE_TECNICO: ("Calificar P1, P5, P6", "Criterios técnico-regulatorios de la matriz %P."),
+    P_RATE_CLINICO: ("Calificar P2, P3", "Criterios de relevancia clínica y carga de enfermedad."),
+    P_RATE_ORGANIZACIONAL: ("Calificar P4", "Criterio de impacto organizacional."),
+    P_REPORT_WRITE: ("Redactar informes", "Fichas, informes, Mini-HTA y diseminación."),
+    P_REVIEW_SUBMIT: ("Revisar por pares", "Registrar observaciones y veredicto de revisión."),
+    P_NOTE_WRITE: ("Escribir notas", "Notas internas del equipo."),
+    P_AUDIT_READ: ("Ver bitácora", "Consultar la bitácora inmutable de auditoría."),
+    P_USER_MANAGE: ("Gestionar usuarios", "Crear cuentas, asignar perfiles y restablecer contraseñas."),
+    P_CONFIG_MANAGE: ("Configurar el sistema", "IA, llaves de fuentes y parámetros institucionales."),
+    P_RESTRICTED_ANALYTICS: ("Tableros restringidos", "Ver montos presupuestales y comparadores del SGSSS."),
+}
+
+# Orden de presentacion de la matriz de permisos.
+PERMISSION_ORDER: tuple[str, ...] = tuple(PERMISSION_LABELS)
 
 
 def canonical_role(role: str | None) -> str:

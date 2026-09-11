@@ -30,7 +30,7 @@ export function PriorityGauge({ state }) {
           <>
             <strong className="term-label">
               {pct}%
-              <InfoTip text={GLOSSARY.pct_p} label="Que es el porcentaje P" />
+              <InfoTip text={GLOSSARY.pct_p} label="Qué es el porcentaje P" />
             </strong>
             <span>
               {state.points} de {state.total_criteria} criterios
@@ -56,40 +56,47 @@ export function PriorityGauge({ state }) {
         <Badge tone={classification}>{TECH_STATUS_LABELS[classification]}</Badge>
       ) : (
         <span className="pm-gauge-hint">
-          Faltan {state.missing.join(", ")}. El indice %P no se calcula con criterios pendientes.
+          Faltan {state.missing.join(", ")}. El índice %P no se calcula con criterios pendientes.
         </span>
       )}
     </div>
   );
 }
 
-function CriterionRow({ criterion, score, onRate, disabled }) {
+const ROLE_SCOPE_LABEL = {
+  evaluador_tecnico: "evaluador técnico",
+  evaluador_clinico: "evaluador clínico",
+};
+
+function CriterionRow({ criterion, score, onRate, disabled, blockedReason, busy }) {
   const [justification, setJustification] = useState(score?.justification || "");
   const [open, setOpen] = useState(false);
   const value = score?.value;
   const canRate = score?.can_rate && !disabled;
+  const roleLabel = ROLE_SCOPE_LABEL[criterion.role_scope] || (criterion.role_scope || "").replace(/_/g, " ");
+  const lockedWhy = blockedReason || `${GLOSSARY.fa_criterio_bloqueado} Lo califica el ${roleLabel}.`;
 
   useEffect(() => {
     setJustification(score?.justification || "");
   }, [score?.justification]);
 
   return (
-    <div className="pm-row" data-rated={value != null ? "true" : "false"}>
+    <div className="pm-row" data-rated={value != null ? "true" : "false"} data-testid={`pm-row-${criterion.code}`}>
       <div className="pm-row-main">
         <div className="pm-row-head">
           <span className="pm-code term-label">
             {criterion.code}
-            <InfoTip text={criterion.prompt || GLOSSARY.p16} label={`Que es ${criterion.code}`} />
+            <InfoTip text={criterion.prompt || GLOSSARY.p16} label={`Qué es ${criterion.code}`} />
           </span>
           <span className="pm-short">{criterion.short_label}</span>
           {value != null && (
             <Badge tone={value === 1 ? "priorizada" : "no_priorizada"}>
-              {value === 1 ? "Si" : "No"}
+              {value === 1 ? "Sí" : "No"}
             </Badge>
           )}
           {!canRate && value == null && (
-            <span className="pm-locked">
-              <Icon name="cog" size={13} /> Califica {criterion.role_scope.replace("_", " ")}
+            <span className="pm-locked" title={lockedWhy}>
+              <Icon name="cog" size={13} /> Califica {roleLabel}
             </span>
           )}
         </div>
@@ -97,9 +104,9 @@ function CriterionRow({ criterion, score, onRate, disabled }) {
 
         {score?.auto_suggested != null && value == null && (
           <div className="pm-suggestion">
-            <strong>Sugerencia automatica: {score.auto_suggested === 1 ? "Si" : "No"}</strong>
+            <strong>Sugerencia automática: {score.auto_suggested === 1 ? "Sí" : "No"}</strong>
             <span>{score.auto_reason}</span>
-            <em>Requiere confirmacion del evaluador.</em>
+            <em>Requiere confirmación del evaluador.</em>
           </div>
         )}
 
@@ -115,7 +122,8 @@ function CriterionRow({ criterion, score, onRate, disabled }) {
           <textarea
             className="pm-justification"
             rows={2}
-            placeholder="Justificacion (opcional pero recomendada para auditoria)"
+            aria-label={`Justificación de ${criterion.code}`}
+            placeholder="Justificación (opcional pero recomendada para auditoría)"
             value={justification}
             onChange={(e) => setJustification(e.target.value)}
           />
@@ -129,13 +137,19 @@ function CriterionRow({ criterion, score, onRate, disabled }) {
               type="button"
               className={`pm-btn pm-btn-yes ${value === 1 ? "pm-btn-active" : ""}`}
               onClick={() => onRate(criterion.code, 1, justification)}
+              disabled={busy}
+              title={`Responder Sí a ${criterion.code}: suma 1 punto.`}
+              aria-label={`${criterion.code} Sí`}
             >
-              Si
+              Sí
             </button>
             <button
               type="button"
               className={`pm-btn pm-btn-no ${value === 0 ? "pm-btn-active" : ""}`}
               onClick={() => onRate(criterion.code, 0, justification)}
+              disabled={busy}
+              title={`Responder No a ${criterion.code}: no suma puntos.`}
+              aria-label={`${criterion.code} No`}
             >
               No
             </button>
@@ -143,13 +157,16 @@ function CriterionRow({ criterion, score, onRate, disabled }) {
               type="button"
               className="pm-btn pm-btn-note"
               onClick={() => setOpen((v) => !v)}
-              title="Agregar justificacion"
+              title={GLOSSARY.fa_justificacion_criterio}
+              aria-label={`Agregar justificación a ${criterion.code}`}
             >
               <Icon name="note" size={14} />
             </button>
           </>
         ) : (
-          <span className="pm-readonly">{value == null ? "Pendiente" : "Registrado"}</span>
+          <span className="pm-readonly" title={lockedWhy}>
+            {value == null ? "Pendiente" : "Registrado"}
+          </span>
         )}
       </div>
     </div>
@@ -159,6 +176,7 @@ function CriterionRow({ criterion, score, onRate, disabled }) {
 export default function PriorityMatrix({ cycleId, technologyId, onChange }) {
   const [state, setState] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const toast = useToast();
 
   const load = useCallback(async () => {
@@ -167,7 +185,7 @@ export default function PriorityMatrix({ cycleId, technologyId, onChange }) {
       const { data } = await api.get(`/priority/${cycleId}/${technologyId}`);
       setState(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar la matriz de priorizacion"));
+      toast.error(apiError(e, "No se pudo cargar la matriz de priorización"));
     } finally {
       setLoading(false);
     }
@@ -180,6 +198,7 @@ export default function PriorityMatrix({ cycleId, technologyId, onChange }) {
   }, [load]);
 
   const rate = async (criterion, value, justification) => {
+    setBusy(true);
     try {
       const { data } = await api.post(`/priority/${cycleId}/${technologyId}/rate`, {
         criterion,
@@ -198,7 +217,9 @@ export default function PriorityMatrix({ cycleId, technologyId, onChange }) {
       }
       onChange?.(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo registrar la calificacion"));
+      toast.error(apiError(e, "No se pudo registrar la calificación"));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -211,22 +232,31 @@ export default function PriorityMatrix({ cycleId, technologyId, onChange }) {
     <div className="pm">
       <div className="pm-header">
         <div>
-          <h3 className="pm-title">Matriz oficial de priorizacion</h3>
+          <h3 className="pm-title term-label">
+            Matriz oficial de priorización
+            <InfoTip text={GLOSSARY.p16} label="Qué es la matriz P1 a P6" />
+          </h3>
           <p className="pm-formula">
             %P = (suma de P1 a P6 / {state.total_criteria}) × 100 · Priorizada con{" "}
-            {state.threshold_points} puntos o mas · Bajo vigilancia con {state.watch_points}
+            {state.threshold_points} puntos o más · Bajo vigilancia con {state.watch_points}{" "}
+            <InfoTip text={GLOSSARY.fa_franjas} label="Cómo se clasifican las franjas" />
           </p>
         </div>
         <PriorityGauge state={state} />
       </div>
 
-      {state.frozen && (
+      {state.frozen ? (
         <div className="pm-frozen">
           <Icon name="cog" size={15} />
-          Ciclo cerrado: los puntajes estan congelados. Una reevaluacion debe hacerse en un ciclo
-          posterior y generara un registro nuevo.
+          Ciclo cerrado: los puntajes están congelados. Una reevaluación debe hacerse en un ciclo
+          posterior y generará un registro nuevo.
         </div>
-      )}
+      ) : state.rate_blocked_reason ? (
+        <div className="pm-frozen" data-testid="pm-blocked">
+          <Icon name="alert" size={15} />
+          {state.rate_blocked_reason}
+        </div>
+      ) : null}
 
       <div className="pm-rows">
         {state.criteria.map((c) => (
@@ -236,6 +266,8 @@ export default function PriorityMatrix({ cycleId, technologyId, onChange }) {
             score={scoreFor(c.code)}
             onRate={rate}
             disabled={state.frozen}
+            blockedReason={state.rate_blocked_reason}
+            busy={busy}
           />
         ))}
       </div>

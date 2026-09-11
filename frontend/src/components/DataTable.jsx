@@ -1,10 +1,14 @@
 /**
  * Tabla reutilizable con estilo consistente del sistema IETS.
+ *
+ * `stack` (opcional): por debajo de 768 px cada fila se dibuja como tarjeta,
+ * con el rotulo de la columna al lado de cada valor (`data-label`), en lugar de
+ * obligar a desplazarse en horizontal. Sin `stack` se comporta como antes.
  */
-export default function DataTable({ columns, rows, minWidth = 880, emptyMessage = "Sin registros" }) {
+export default function DataTable({ columns, rows, minWidth = 880, emptyMessage = "Sin registros", stack = false }) {
   return (
-    <div className="data-table-wrap">
-      <table className="data-table" style={{ minWidth }}>
+    <div className={`data-table-wrap${stack ? " data-table-wrap--stack" : ""}`}>
+      <table className={`data-table${stack ? " data-table--stack" : ""}`} style={{ minWidth }}>
         <colgroup>
           {columns.map((col) => (
             <col key={col.key} style={col.width ? { width: col.width } : undefined} />
@@ -31,7 +35,11 @@ export default function DataTable({ columns, rows, minWidth = 880, emptyMessage 
             rows.map((row, i) => (
               <tr key={row.key ?? i} className={i % 2 ? "data-table-row-alt" : ""}>
                 {columns.map((col) => (
-                  <td key={col.key} style={{ textAlign: col.align || "left" }}>
+                  <td
+                    key={col.key}
+                    style={{ textAlign: col.align || "left" }}
+                    data-label={col.mobileLabel ?? (typeof col.label === "string" ? col.label : "")}
+                  >
                     {col.render ? col.render(row.data, i) : row.data[col.key]}
                   </td>
                 ))}

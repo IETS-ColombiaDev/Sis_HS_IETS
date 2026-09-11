@@ -5,25 +5,34 @@ llaves de fuentes de nivel A.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from .. import __version__, ai_service, gemini_service, minimax_service, settings_store
+from .. import __version__, ai_service, gemini_service, minimax_service, scheduler_service, settings_store
 from ..config import settings
+from ..database import get_db
+from ..deps import get_current_user, require_permission
+from ..models import Finding, Source, User
+from ..rbac import P_CONFIG_MANAGE, has_permission, role_label
+from ..schemas import ConfigOut, ConfigUpdate, GeminiTestIn, GeminiTestOut
+
+# Valores del .env al importar el modulo (antes de que el arranque los pise con
+# los de la BD). Permiten que "eliminar la llave guardada" vuelva al .env en vez
+# de dejar viva en memoria la llave borrada hasta el proximo reinicio.
+_ENV_INGEST_KEYS = {
+    "openfda_api_key": settings.openfda_api_key,
+    "ncbi_api_key": settings.ncbi_api_key,
+    "ncbi_email": settings.ncbi_email,
+}
 
 
 def _apply_ingest_keys(db: Session) -> None:
     keys = settings_store.load_ingest_keys(db)
-    if keys["openfda_api_key"]:
-        settings.openfda_api_key = keys["openfda_api_key"]
-    if keys["ncbi_api_key"]:
-        settings.ncbi_api_key = keys["ncbi_api_key"]
-    if keys["ncbi_email"]:
-        settings.ncbi_email = keys["ncbi_email"]
-from ..database import get_db
-from ..deps import require_role
-from ..models import Finding, Source, User
-from ..schemas import ConfigOut, ConfigUpdate, GeminiTestIn, GeminiTestOut
+    for name, env_value in _ENV_INGEST_KEYS.items():
+        setattr(settings, name, keys[name] or env_value)
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
@@ -66,7 +75,7 @@ def _build_config_out(db: Session) -> ConfigOut:
         gemini_active_model=gemini_service.current_model() if gemini_on else "",
         available_models=gemini_service.list_available_models() if gemini_on else [],
         google_login_enabled=bool(settings.google_client_id),
-        dev_login_enabled=settings.allow_dev_login,
+        dev_login_enabled=settings.dev_login_enabled,
         allowed_domain=settings.allowed_email_domain,
         total_sources=db.query(Source).count(),
         total_findings=db.query(Finding).count(),
@@ -90,7 +99,7 @@ def _build_config_out(db: Session) -> ConfigOut:
 
 
 @router.get("", response_model=ConfigOut)
-def get_config(db: Session = Depends(get_db), user: User = Depends(require_role("admin"))):
+def get_config(db: Session = Depends(get_db), user: User = Depends(require_permission(P_CONFIG_MANAGE))):
     return _build_config_out(db)
 
 
@@ -98,7 +107,7 @@ def get_config(db: Session = Depends(get_db), user: User = Depends(require_role(
 def update_config(
     payload: ConfigUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_role("admin")),
+    user: User = Depends(require_permission(P_CONFIG_MANAGE)),
 ):
     if payload.gemini_api_key is not None:
         settings_store.set_value(db, settings_store.GEMINI_API_KEY, payload.gemini_api_key.strip())
@@ -130,7 +139,7 @@ def update_config(
 def test_ai(
     payload: GeminiTestIn,
     db: Session = Depends(get_db),
-    user: User = Depends(require_role("admin")),
+    user: User = Depends(require_permission(P_CONFIG_MANAGE)),
 ):
     who = (payload.provider or ai_service.active_provider() or "minimax").lower()
     key = payload.minimax_api_key if who == "minimax" else payload.gemini_api_key
@@ -151,7 +160,7 @@ def test_ai(
 @router.post("/detect-models", response_model=GeminiTestOut)
 def detect_models(
     db: Session = Depends(get_db),
-    user: User = Depends(require_role("admin")),
+    user: User = Depends(require_permission(P_CONFIG_MANAGE)),
 ):
     result = ai_service.detect_best_models()
     return GeminiTestOut(
@@ -165,3 +174,130 @@ def detect_models(
         available_models=result.get("available_models", []),
         provider="minimax",
     )
+
+
+# --------------------------------------------------------------------------- #
+#  Tareas programadas del worker (P0-4 vigilancia y P1-4 duplicados)
+# --------------------------------------------------------------------------- #
+class ScheduleRunOut(BaseModel):
+    id: int
+    task: str
+    label: str = ""
+    status: str
+    origin: str = ""
+    triggered_by: str = ""
+    started_at: datetime
+    finished_at: datetime | None = None
+    items_found: int = 0
+    items_new: int = 0
+    message: str = ""
+    jobs_total: int = 0
+    jobs_pending: int = 0
+    cycle_code: str = ""
+
+
+class ScheduleTaskOut(BaseModel):
+    task: str
+    label: str
+    enabled: bool
+    interval_hours: int
+    next_run_at: datetime | None = None
+    last_run: ScheduleRunOut | None = None
+
+
+class ScheduleOut(BaseModel):
+    scan_enabled: bool
+    scan_interval_hours: int
+    dedup_enabled: bool
+    dedup_interval_hours: int
+    worker_enabled: bool
+    worker_running: bool
+    worker_interval_seconds: int
+    tasks: list[ScheduleTaskOut]
+
+
+class ScheduleUpdate(BaseModel):
+    scan_enabled: bool | None = None
+    scan_interval_hours: int | None = None
+    dedup_enabled: bool | None = None
+    dedup_interval_hours: int | None = None
+
+
+def _schedule_out(db: Session) -> ScheduleOut:
+    from ..worker import is_running
+
+    data = scheduler_service.schedule_overview(db)
+    return ScheduleOut(
+        **data,
+        worker_enabled=bool(settings.ingest_worker_enabled),
+        worker_running=is_running(),
+        worker_interval_seconds=max(5, int(settings.ingest_worker_interval_seconds or 20)),
+    )
+
+
+@router.get("/schedule", response_model=ScheduleOut)
+def get_schedule(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Estado de las tareas programadas. Lectura para todo perfil autenticado."""
+    return _schedule_out(db)
+
+
+@router.put("/schedule", response_model=ScheduleOut)
+def update_schedule(
+    payload: ScheduleUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CONFIG_MANAGE)),
+):
+    before = settings_store.load_schedule(db)
+    try:
+        after = settings_store.save_schedule(db, **payload.model_dump(exclude_unset=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    from ..audit import record_action
+
+    record_action(
+        db,
+        entity_type="scheduled_runs",
+        entity_id="config",
+        action="schedule:config",
+        old_value=before,
+        new_value=after,
+    )
+    db.commit()
+    return _schedule_out(db)
+
+
+@router.get("/schedule/runs", response_model=list[ScheduleRunOut])
+def list_schedule_runs(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    task: str | None = Query(None),
+    limit: int = Query(30, ge=1, le=200),
+):
+    """Registro de ejecucion de las tareas programadas, la mas reciente primero."""
+    return scheduler_service.list_runs(db, task=task, limit=limit)
+
+
+@router.post("/schedule/{task}/run", response_model=ScheduleRunOut)
+def run_schedule_task(
+    task: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Ejecuta ya la tarea, fuera de su horario. Queda registrada como manual."""
+    meta = scheduler_service.TASKS.get(task)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Tarea programada desconocida.")
+    if not has_permission(user, meta["permission"]):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"El perfil '{role_label(user.role)}' no tiene el permiso requerido "
+                f"({meta['permission']}) para ejecutar {meta['label'].lower()}."
+            ),
+        )
+    run = scheduler_service.run_task(db, task, origin="manual", triggered_by=user.email)
+    if task == scheduler_service.TASK_SCAN and run.status == "en_curso":
+        from ..worker import kick
+
+        kick()
+    return scheduler_service.run_out(db, run)
