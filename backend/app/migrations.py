@@ -220,6 +220,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s [%(name)s] %(message)s")
 
     action = upgrade_database()
+    print(f"status={action}")
     print(f"Migración: {action}. Revisión actual: {current_revision()} (head {head_revision()}).")
     if args.bootstrap:
         _bootstrap()
