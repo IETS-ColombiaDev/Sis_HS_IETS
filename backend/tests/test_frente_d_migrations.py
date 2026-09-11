@@ -58,7 +58,10 @@ def _run_upgrade(db_path: Path) -> str:
         timeout=300,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    line = next(ln for ln in proc.stdout.splitlines() if ln.startswith("Migración:"))
+    status = next((ln.split("=", 1)[1].strip() for ln in proc.stdout.splitlines() if ln.startswith("status=")), "")
+    if status:
+        return status
+    line = next(ln for ln in proc.stdout.splitlines() if ln.startswith("Migración:") or ln.startswith("Migracion:"))
     return line.split(":", 1)[1].split(".", 1)[0].strip()
 
 

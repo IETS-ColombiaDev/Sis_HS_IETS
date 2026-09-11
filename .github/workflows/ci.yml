@@ -106,9 +106,9 @@ jobs:
           DATABASE_URL: ${{ env.PG_BASE }}/iets_ci
         run: |
           python -m app.migrations | tee first.txt
-          grep -q "Migracion: created" first.txt
+          grep -q "status=created" first.txt
           python -m app.migrations | tee second.txt
-          grep -q "Migracion: current" second.txt
+          grep -q "status=current" second.txt
           python -m alembic check
       - name: Base heredada (create_all sin Alembic) -> stamped
         env:
@@ -125,8 +125,8 @@ jobs:
           Base.metadata.create_all(bind=engine)
           EOF
           python -m app.migrations | tee legacy.txt
-          grep -q "Migracion: stamped" legacy.txt
-          python -m app.migrations | grep -q "Migracion: current"
+          grep -q "status=stamped" legacy.txt
+          python -m app.migrations | grep -q "status=current"
       - name: Indices GIN pg_trgm y extensiones presentes en ambas bases
         run: |
           python - <<'EOF'
