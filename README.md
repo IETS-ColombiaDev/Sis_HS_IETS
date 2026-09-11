@@ -16,11 +16,12 @@ corporativa definida en [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md).
 > **v7.0 — Producto de producción.** Sobre las fases 0 a 6 del
 > [plan de actualización](Plan_Fases_Actualizacion_Plataforma_EH_IETS.md), esta versión
 > cierra la fase 0 pendiente y el endurecimiento de la fase 7: acceso con correo y
-> contraseña (Google queda opcional), módulo de administración de usuarios completo,
-> perfil de entorno de producción, migraciones Alembic, contenedores, CI/CD, vigilancia
-> y barrido de duplicados programados, correo, reCAPTCHA real, paquete de diseminación,
-> bandeja de trabajo por perfil y tablero de gobernanza completo. Cada flujo está
-> cubierto por pruebas unitarias, de regresión de API y de navegador (E2E).
+> contraseña (Google queda opcional), nombres institucionales tomados de Firestore
+> cuando el correo coincide, módulo de administración de usuarios, perfil de
+> producción, migraciones Alembic, contenedores, CI/CD, vigilancia y barrido
+> programados, correo, reCAPTCHA, paquete de diseminación, bandeja de trabajo por
+> perfil y tablero de gobernanza con grafo consultable (chat por nodo y vistas
+> guardadas). Cada flujo está cubierto por pruebas unitarias, de API y de navegador.
 > Despliegue: [`DEPLOY.md`](DEPLOY.md) · Cumplimiento: [`BACKLOG.md`](BACKLOG.md).
 
 ---
@@ -67,7 +68,7 @@ Cuatro conceptos ordenan todo el sistema. Entenderlos evita la mayor parte de la
 
 | Fase | Módulo | Ruta | Qué hace |
 |---|---|---|---|
-| **Operación** | Bandeja de trabajo | `/` | Indicadores del ciclo activo y cola de pendientes del perfil |
+| **Operación** | Bandeja de trabajo | `/` | Pendientes del perfil (`my-work`) e indicadores del ciclo; cada tarjeta enlaza a la acción |
 | **1. Identificación** | Vigilancia | `/vigilancia` | Conectores API (ClinicalTrials, FDA, EMA, PubMed) y HTML de último recurso, en cola |
 | **Canal reactivo** | Postulación pública | `/postular` | Formulario externo con conflicto de interés; entra a moderación, no al catálogo |
 | **Canal reactivo** | Postulaciones | `/postulaciones` | Cola de aceptación o rechazo; lo aceptado llega a la bandeja como reactivo |
@@ -81,11 +82,11 @@ Cuatro conceptos ordenan todo el sistema. Entenderlos evita la mayor parte de la
 | **5. Evaluación** | Revisión por pares | `/revisar/:token` | Portal externo sin cuenta; token JWT de 10 días |
 | **4. Diseminación** | Informes de adopción | `/diseminacion` | Recomendaciones para Colombia (IA o manual) |
 | **4. Diseminación** | Notas | `/notas` | Anotaciones vinculadas a señales, fuentes e informes |
-| **6. Diseminación** | Tablero estratégico | `/dashboards` | Cluster, TTM, embudo y calor presupuestal (restringido) |
+| **6. Diseminación** | Tablero estratégico | `/dashboards` | Cluster, TTM, embudo, calor presupuestal (restringido) y grafo de gobernanza (ampliable, chat por nodo, vistas guardadas) |
 | **6. Diseminación** | Ficha pública | `/expedientes` | Buscador y ficha sin autenticación |
 | **6. Diseminación** | Boletines | `/boletines` | Compilación al cierre; aprobación del líder |
 | **6. Diseminación** | Alertas | `/alertas` | Fase III en país y alto riesgo presupuestal |
-| **Análisis** | Asistente IA | `/chat` | Chat con contexto sobre los datos del sistema |
+| **Análisis** | Asistente IA | `/chat` | Chat con contexto del sistema; las consultas por nodo del grafo se guardan aparte |
 | **Gobierno** | **Auditoría** | `/auditoria` | Bitácora inmutable con filtros y vida completa de cada entidad |
 | **Admin** | Usuarios y perfiles | `/usuarios` | Alta, edición, perfil, contraseña temporal, desbloqueo, activación y baja de cuentas; matriz de permisos |
 | **Admin** | Configuración | `/configuracion` | IA, llaves de fuentes, tareas programadas, catálogos y parámetros metodológicos |
@@ -263,6 +264,12 @@ El frontend no reimplementa la autorización: `GET /api/auth/me` devuelve `permi
 3. En el primer ingreso la persona debe cambiarla: hasta hacerlo, la API solo le permite consultar su perfil y cambiar la contraseña.
 4. Para retirar a alguien se **desactiva** la cuenta (se cierra su sesión de inmediato y su historia se conserva). Eliminar solo es posible en cuentas que nunca se usaron.
 
+### Nombre visible (directorio Firestore)
+
+El nombre que se muestra en la interfaz **no es el residual de la base local**. Si el correo institucional coincide con un documento de la colección `usuarios` de Firestore (RRHH), se arrastran `nombres` y `apellidos` de ahí. Solo si no hay coincidencia se usa un nombre real ya capturado; los placeholders (`Administrador IETS`, el usuario del correo, etc.) no se muestran.
+
+La coincidencia es por correo en minúsculas. El resultado se cachea dos minutos para no consultar Firestore en cada petición autenticada. Sin credenciales o si el directorio no responde, la sesión sigue; no se inventa un nombre.
+
 ### Salvaguardas
 
 - **Contraseñas:** hash `scrypt` con sal (biblioteca estándar); política de 10 caracteres mínimo con letras y números y sin el usuario del correo. El hash nunca sale por la API ni se copia a la bitácora.
@@ -358,21 +365,27 @@ flowchart LR
     API["Routers /api/*"]
     GUARD["require_permission · audit middleware"]
     DOM["cycle_service · priority_engine<br/>technology_service · classification<br/>screening_service · dedup · normalization"]
-    SVC["scraper · invima · gemini_service · events"]
+    SVC["scraper · invima · minimax_service · gemini_service · events"]
+    DIR["firestore_directory"]
     DB[("SQLite dev · PostgreSQL prod")]
     API --> GUARD --> DOM --> DB
     API --> SVC --> DB
+    API --> DIR
   end
   subgraph Externos
     WEB["Referentes web"]
     SOC["datos.gov.co · Socrata"]
-    GEM["Gemini API"]
+    MM["MiniMax"]
+    GEM["Gemini (respaldo)"]
+    FS["Firestore RRHH"]
     GGL["Google OAuth"]
   end
   CTX -->|HTTPS| API
   SVC --> WEB
   SVC --> SOC
+  SVC --> MM
   SVC --> GEM
+  DIR --> FS
   API --> GGL
 ```
 
@@ -382,8 +395,9 @@ flowchart LR
 | Datos | SQLite en desarrollo · PostgreSQL 15 en producción (`pg_trgm`, `unaccent`, JSONB) |
 | Scraping | httpx · trafilatura · BeautifulSoup (lxml) · pypdf |
 | Similitud difusa | RapidFuzz (Levenshtein, Jaro-Winkler, token sort) |
-| IA | google-generativeai (Gemini, con autodetección de modelo) |
-| Auth | Google Identity Services · JWT (python-jose) |
+| IA | MiniMax (principal) · Gemini (respaldo); `AI_PROVIDER=auto` elige el disponible |
+| Directorio | Firestore (colección `usuarios` del sistema de permisos IETS), emparejado por correo |
+| Auth | Correo y contraseña (scrypt + JWT) · Google Identity Services opcional |
 | Frontend | React 18 · Vite 5 · React Router 6 · Recharts · axios |
 
 El código es **agnóstico del motor de base de datos**: el tipo `JSONType` resuelve a JSONB en PostgreSQL y a JSON en SQLite, y el endurecimiento de la bitácora aplica la estrategia de cada motor.
@@ -415,7 +429,10 @@ Sis_HS_IETS/
 │   │   ├── normalization.py        # ATC, CIE-10, MeSH, GMDN/EMDN
 │   │   ├── invima.py               # Índice local: Socrata y carga plana
 │   │   ├── scraper.py              # Pipeline de vigilancia
-│   │   ├── gemini_service.py       # Integración IA
+│   │   ├── minimax_service.py      # IA principal
+│   │   ├── gemini_service.py       # IA de respaldo
+│   │   ├── firestore_directory.py  # Nombres y apellidos por correo (RRHH)
+│   │   ├── graph_service.py        # Grafo de gobernanza y contexto por nodo
 │   │   ├── seed_data.py            # 29 referentes iniciales
 │   │   ├── security.py             # JWT de sesión, scrypt y política de contraseñas
 │   │   ├── ratelimit.py            # Límite de intentos por IP
@@ -432,8 +449,9 @@ Sis_HS_IETS/
 │   └── .env.example
 ├── frontend/
 │   ├── src/
-│   │   ├── pages/                  # Cycles, Staging, Screening, Prioritization, Audit, …
-│   │   ├── components/             # PriorityMatrix, TriageBoard, Layout, …
+│   │   ├── pages/                  # Dashboard, Dashboards, Cycles, Staging, Screening, …
+│   │   ├── components/             # StrategyGraph, PriorityMatrix, TriageBoard, Layout, …
+│   │   ├── graph/controller.js     # Cámara, búsqueda y layout del grafo
 │   │   ├── cycle/CycleContext.jsx  # Ciclo activo persistente
 │   │   ├── auth/AuthContext.jsx    # JWT y permisos
 │   │   ├── realtime/               # Polling de state_version
@@ -484,18 +502,19 @@ Sis_HS_IETS/
 | `EvaluationVersion` | Instantánea en cada guardado y transición |
 | `ReviewAssignment` | Revisor interno o externo; COI y token de 10 días |
 | `ReviewComment` | Observación anclada a campo y versión |
+| `StrategyGraph` | Vista guardada del grafo de gobernanza (nodos abiertos, posiciones, notas) |
 
 ### Entidades heredadas
 
 | Entidad | Descripción |
 |---|---|
-| `User` | Cuenta institucional con uno de los cinco perfiles |
+| `User` | Cuenta institucional; `first_name` / `last_name` se rellenan desde Firestore si el correo coincide |
 | `Source` | Referente del inventario |
 | `Finding` | Señal capturada; conserva `screening_score` y `content_hash` |
 | `Recommendation` | Informe de adopción vinculado a una señal |
 | `ScrapeLog` | Registro de cada ejecución de vigilancia |
 | `Note` | Nota del equipo |
-| `ChatSession` / `ChatMessage` | Historial del asistente IA |
+| `ChatSession` / `ChatMessage` | Historial del asistente; las consultas del grafo van con `scope=graph_node` y no aparecen en `/chat` |
 | `AppMeta` | Configuración runtime y `state_version` para tiempo real |
 
 `PriorityScore` es único por `(cycle_id, technology_id, criterion)`. Recalificar en un ciclo posterior crea filas nuevas; jamás modifica las congeladas.
@@ -525,7 +544,7 @@ Documentación interactiva: **`http://127.0.0.1:8000/docs`**
 | `/api/audit` | `GET /`, `GET /entity/{tipo}/{id}`, `GET /actions` |
 | `/api/reports` | Cola, CRUD de fichas, COI, transiciones, invitaciones, versiones, export HTML |
 | `/api/public/reviews` | Portal del revisor: lectura condicionada a COI, comentarios y veredicto |
-| `/api/strategy` | Tablero estratégico, datamart y capa restringida |
+| `/api/strategy` | Tablero, datamart, capa restringida, grafo (`GET /graph`) y vistas (`GET`·`POST`·`PUT`·`DELETE /graphs`) |
 | `/api/bulletins` | Compilar, aprobar, publicar y exportar el boletín |
 | `/api/alerts` | Bandeja y suscripciones |
 | `/api/public/strategy/stats` · `/api/public/technologies` | Transparencia y fichas públicas |
@@ -538,6 +557,8 @@ Documentación interactiva: **`http://127.0.0.1:8000/docs`**
 | `GET` · `POST /api/users` · `GET` · `PUT` · `DELETE /api/users/{id}` | CRUD de cuentas con salvaguardas de gobierno |
 | `POST /api/users/{id}/reset-password` · `/unlock` · `GET /api/users/permissions` | Contraseña temporal, desbloqueo y catálogo legible de permisos |
 | `GET /api/dashboard/my-work` | Pendientes accionables del perfil en la bandeja de trabajo |
+| `GET /api/strategy/graph` | Nodos y aristas del ciclo (mismos filtros que el tablero) |
+| `GET` · `POST` · `PUT` · `DELETE /api/strategy/graphs` | Vistas guardadas del grafo (expansión, posiciones, zoom, notas) |
 | `GET /api/strategy/dashboard/export` | Recorte del tablero en CSV o Excel, respetando la capa restringida |
 | `DELETE /api/cycles/{id}` | Eliminar un ciclo en configuración y sin trabajo |
 | `GET /api/technologies/{id}/locate` | Dónde está una tecnología en cada ciclo (enlaces directos `?tecnologia=`) |
@@ -558,15 +579,15 @@ Documentación interactiva: **`http://127.0.0.1:8000/docs`**
 | `/api/scan` | `POST /run`, `POST /source/{id}`, `POST /preview`, `GET /logs` |
 | `/api/ingest` | `POST /run`, `GET /jobs`, `GET /connectors`, `POST /sources/import`, `POST /sources/{id}/probe`, `GET /health`, `GET /coverage` |
 | `/api/findings` | CRUD, filtros, `POST /{id}/enhance-ai` |
-| `/api/recommendations` | CRUD, `POST /generate` (Gemini) |
-| `/api/dashboard` | `GET /stats`, `GET /workbench` |
+| `/api/recommendations` | CRUD, `POST /generate` (MiniMax o Gemini) |
+| `/api/dashboard` | `GET /stats`, `GET /workbench`, `GET /my-work` |
 | `/api/notes` | CRUD, export CSV, `POST /{id}/enhance-ai` |
-| `/api/chat` | Sesiones, `POST /send` |
+| `/api/chat` | Sesiones, `POST /send` (acepta `scope`, `node_key`, `cycle_id` para el grafo) |
 | `/api/users` | Listado, `GET /roles`, cambio de perfil, activación |
-| `/api/config` | Configuración Gemini |
+| `/api/config` | MiniMax, Gemini, llaves de fuentes y tareas programadas |
 | `/api/realtime/version` | Versión de estado para sincronización |
 
-**Cambio incompatible respecto a la v1:** `Finding.priority_score` se llama ahora `Finding.screening_score` en todas las respuestas. `UserOut` incorpora `role_label`, `permissions` y `rateable_criteria`.
+**Cambio incompatible respecto a la v1:** `Finding.priority_score` se llama ahora `Finding.screening_score` en todas las respuestas. `UserOut` incorpora `role_label`, `permissions`, `rateable_criteria`, `first_name` y `last_name` (estos dos últimos salen del directorio Firestore cuando el correo coincide).
 
 **Cambio de comportamiento en la v3:** `POST /api/technologies/{id}/cycles/{cid}/qualify` ya no depende solo del permiso. Responde **409** si la tecnología no tiene verificación de novedad registrada en ese ciclo, o si la registrada corresponde a un genérico o a una modificación menor. El cuerpo de la respuesta trae el motivo.
 
@@ -605,6 +626,7 @@ Al iniciar, el backend ejecuta en orden:
 6. Siembra de clústeres, tipologías, criterios P1–P6 y parámetros metodológicos
 7. Recálculo de `screening_score` en las señales existentes
 8. Migración de señales a tecnologías y creación del Ciclo 0 - Histórico
+9. Siembra de los ciclos oficiales 2026 (si `SEED_OFFICIAL_CYCLES` no está apagada)
 
 Todos los pasos son **idempotentes**: reiniciar no duplica nada.
 
@@ -721,8 +743,12 @@ Copie [`backend/.env.example`](backend/.env.example) como `.env`.
 | `PUBLIC_SUBMISSIONS_PER_WINDOW` · `PUBLIC_SUBMISSIONS_WINDOW_SECONDS` | Tope de postulaciones públicas por IP |
 | `FRONTEND_DIST` | Carpeta del frontend compilado que sirve el backend (defecto `frontend/dist`) |
 | `SEED_OFFICIAL_CYCLES` | Siembra de los ciclos oficiales 2026 al arrancar. Por defecto activa en desarrollo y **apagada en producción** (allí los ciclos los gobierna la coordinación); `true` la fuerza |
-| `GEMINI_API_KEY` | API key de [Google AI Studio](https://aistudio.google.com/app/apikey) |
-| `GEMINI_MODEL` | Opcional; vacío activa la autodetección |
+| `MINIMAX_API_KEY` · `MINIMAX_MODEL` | IA principal. Vacío el modelo se detecta solo |
+| `AI_PROVIDER` | `auto` · `minimax` · `gemini` |
+| `AI_WEB_ENABLED` · `AI_OCR_ENABLED` | La IA entra a sitios y, si se activa, lee PDF o imágenes escaneados |
+| `GEMINI_API_KEY` · `GEMINI_MODEL` | Respaldo de [Google AI Studio](https://aistudio.google.com/app/apikey); modelo vacío = autodetección |
+| `FIREBASE_PROJECT_ID` | Proyecto Firestore del directorio RRHH (defecto `sistema-permisos-iets`) |
+| `FIREBASE_SERVICE_ACCOUNT_KEY` · `FIREBASE_SERVICE_ACCOUNT_FILE` | Credencial de servicio. Si ambas van vacías, se intenta el `.env.local` del sistema RRHH hermano |
 | `CORS_ORIGINS` | Orígenes del frontend, separados por coma |
 | `DATABASE_URL` | Defecto `sqlite:///./iets_horizonte.db`; acepta `postgresql+psycopg://…` |
 
@@ -730,7 +756,7 @@ Copie [`backend/.env.example`](backend/.env.example) como `.env`.
 
 **Sin `GOOGLE_CLIENT_ID`:** use el acceso rápido de la pantalla de login o `POST /api/auth/dev-login` con un correo `@iets.org.co`.
 
-La configuración de Gemini también puede guardarse desde `/configuracion` y tiene prioridad sobre el `.env`.
+La configuración de MiniMax y Gemini también puede guardarse desde `/configuracion` y tiene prioridad sobre el `.env`.
 
 ---
 
@@ -779,7 +805,8 @@ El último punto es el único que cambia la operación de un ciclo en curso. Si 
 6. **Priorización** — pasar a *En priorización*. Cada perfil ve en `/priorizacion` solo lo que le corresponde calificar. Al completarse los seis criterios, el sistema calcula el `%P` y clasifica.
 7. **Caracterización y diseminación** — enviar las priorizadas a evaluación, completar las fichas y generar los informes.
 8. **Cierre** — pasar a *En evaluación* y cerrar. Se congelan los puntajes y lo que quedó bajo vigilancia se propone para el ciclo siguiente.
-9. **Auditoría** — en `/auditoria`, reconstruir la vida completa de cualquier ciclo, tecnología o calificación.
+9. **Tablero** — en `/dashboards`, recorte del ciclo, grafo de gobernanza (controlador interno, chat MiniMax por nodo, vistas guardadas) y capa presupuestal si el perfil la ve.
+10. **Auditoría** — en `/auditoria`, reconstruir la vida completa de cualquier ciclo, tecnología o calificación.
 
 ---
 
@@ -797,6 +824,8 @@ El último punto es el único que cambia la operación de un ciclo en curso. Si 
 | [`backend/app/dedup.py`](backend/app/dedup.py) | Motor difuso y sus umbrales calibrados |
 | [`backend/app/invima.py`](backend/app/invima.py) | Índice local del registro sanitario |
 | [`backend/app/rbac.py`](backend/app/rbac.py) | Matriz de permisos por módulo y por campo |
+| [`backend/app/firestore_directory.py`](backend/app/firestore_directory.py) | Empareja el correo con nombres y apellidos de Firestore |
+| [`backend/app/graph_service.py`](backend/app/graph_service.py) | Grafo del ciclo y contexto que recibe el chat de cada nodo |
 | [`backend/smoke_test.py`](backend/smoke_test.py) | Suite de regresión de extremo a extremo |
 | [`DEPLOY.md`](DEPLOY.md) | Despliegue en producción, HTTPS, migraciones, respaldo, restauración y reversión |
 | [`frontend/e2e/`](frontend/e2e/) | Pruebas de navegador (Playwright) por flujo y por perfil |
