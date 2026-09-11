@@ -24,9 +24,9 @@ EXPECTED_ID_KEYS = ("ctNumber", "euCtNumber", "eu_ct_number", "applicationNumber
 
 class CtisConnector(Connector):
     code = "ctis"
-    label = "CTIS (EMA, portal publico)"
+    label = "CTIS (EMA, portal público)"
     description = (
-        "Ensayos clinicos de la UE. JSON no contractual del portal; "
+        "Ensayos clínicos de la UE. JSON no contractual del portal; "
         "verifica el esquema en cada corrida y se apaga si cambia."
     )
     min_interval = 1.0
@@ -39,7 +39,7 @@ class CtisConnector(Connector):
             expected = clean_text(config.get("schema_signature"))
             if expected and result.schema_signature and result.schema_signature != expected:
                 raise SchemaChanged(
-                    f"El esquema de CTIS cambio (esperado {expected}, observado {result.schema_signature}). "
+                    f"El esquema de CTIS cambió (esperado {expected}, observado {result.schema_signature}). "
                     "Ingesta suspendida para no persistir basura."
                 )
             return result
@@ -61,7 +61,7 @@ class CtisConnector(Connector):
             )
         except ConnectorError as exc:
             raise ConnectorError(
-                f"CTIS no respondio con un JSON utilizable ({exc}). "
+                f"CTIS no respondió con un JSON utilizable ({exc}). "
                 "Entregue un lote en connector_config.records o revise el portal."
             ) from exc
 
@@ -69,14 +69,14 @@ class CtisConnector(Connector):
         expected = clean_text(config.get("schema_signature"))
         if expected and signature != expected:
             raise SchemaChanged(
-                f"El esquema de CTIS cambio (esperado {expected}, observado {signature}). "
+                f"El esquema de CTIS cambió (esperado {expected}, observado {signature}). "
                 "Ingesta suspendida para no persistir basura."
             )
 
         rows = _as_rows(data)
         if rows and not _has_trial_id(rows[0]):
             raise SchemaChanged(
-                "CTIS respondio JSON pero sin numero EU CT. El contrato del portal cambio."
+                "CTIS respondió JSON pero sin número EU CT. El contrato del portal cambió."
             )
 
         records = [self._to_record(row) for row in rows[:page_size]]

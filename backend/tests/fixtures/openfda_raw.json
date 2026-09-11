@@ -1,0 +1,285 @@
+{
+ "drug_anda215523": {
+  "submissions": [
+   {
+    "submission_type": "SUPPL",
+    "submission_number": "3",
+    "submission_status": "AP",
+    "submission_status_date": "20250115",
+    "review_priority": "STANDARD",
+    "submission_class_code": "LABELING",
+    "submission_class_code_description": "Labeling"
+   },
+   {
+    "submission_type": "SUPPL",
+    "submission_number": "4",
+    "submission_status": "AP",
+    "submission_status_date": "20260820",
+    "review_priority": "STANDARD",
+    "submission_class_code": "LABELING",
+    "submission_class_code_description": "Labeling"
+   },
+   {
+    "submission_type": "ORIG",
+    "submission_number": "1",
+    "submission_status": "AP",
+    "submission_status_date": "20211208",
+    "review_priority": "STANDARD",
+    "submission_class_code": "UNKNOWN"
+   }
+  ],
+  "application_number": "ANDA215523",
+  "sponsor_name": "ASCENT PHARMS INC",
+  "openfda": {
+   "application_number": [
+    "ANDA215523"
+   ],
+   "brand_name": [
+    "DEXMETHYLPHENIDATE HYDROCHLORIDE"
+   ],
+   "generic_name": [
+    "DEXMETHYLPHENIDATE HYDROCHLORIDE"
+   ],
+   "manufacturer_name": [
+    "Camber Pharmaceuticals, Inc."
+   ],
+   "product_ndc": [
+    "31722-229",
+    "31722-230",
+    "31722-231",
+    "31722-232",
+    "31722-233",
+    "31722-234",
+    "31722-235",
+    "31722-236"
+   ],
+   "product_type": [
+    "HUMAN PRESCRIPTION DRUG"
+   ],
+   "route": [
+    "ORAL"
+   ],
+   "substance_name": [
+    "DEXMETHYLPHENIDATE HYDROCHLORIDE"
+   ],
+   "rxcui": [
+    "899439",
+    "899461",
+    "899485",
+    "899495",
+    "899511",
+    "1006608",
+    "1101926",
+    "1101932"
+   ],
+   "spl_id": [
+    "81c8ba81-82ac-4c18-b28b-da9c71520f35"
+   ],
+   "spl_set_id": [
+    "77659abe-74be-4092-90fe-cc475726d4ec"
+   ],
+   "package_ndc": [
+    "31722-229-01",
+    "31722-230-01",
+    "31722-231-01",
+    "31722-232-01",
+    "31722-233-01",
+    "31722-234-01",
+    "31722-235-01",
+    "31722-236-01"
+   ],
+   "unii": [
+    "1678OK0E08"
+   ]
+  },
+  "products": [
+   {
+    "product_number": "008",
+    "reference_drug": "No",
+    "brand_name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+    "active_ingredients": [
+     {
+      "name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+      "strength": "40MG"
+     }
+    ],
+    "reference_standard": "No",
+    "dosage_form": "CAPSULE, EXTENDED RELEASE",
+    "route": "ORAL",
+    "marketing_status": "Prescription",
+    "te_code": "AB"
+   },
+   {
+    "product_number": "006",
+    "reference_drug": "No",
+    "brand_name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+    "active_ingredients": [
+     {
+      "name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+      "strength": "30MG"
+     }
+    ],
+    "reference_standard": "No",
+    "dosage_form": "CAPSULE, EXTENDED RELEASE",
+    "route": "ORAL",
+    "marketing_status": "Prescription",
+    "te_code": "AB"
+   },
+   {
+    "product_number": "004",
+    "reference_drug": "No",
+    "brand_name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+    "active_ingredients": [
+     {
+      "name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+      "strength": "20MG"
+     }
+    ],
+    "reference_standard": "No",
+    "dosage_form": "CAPSULE, EXTENDED RELEASE",
+    "route": "ORAL",
+    "marketing_status": "Prescription",
+    "te_code": "AB"
+   },
+   {
+    "product_number": "002",
+    "reference_drug": "No",
+    "brand_name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+    "active_ingredients": [
+     {
+      "name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+      "strength": "10MG"
+     }
+    ],
+    "reference_standard": "No",
+    "dosage_form": "CAPSULE, EXTENDED RELEASE",
+    "route": "ORAL",
+    "marketing_status": "Prescription",
+    "te_code": "AB"
+   },
+   {
+    "product_number": "007",
+    "reference_drug": "No",
+    "brand_name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+    "active_ingredients": [
+     {
+      "name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+      "strength": "35MG"
+     }
+    ],
+    "reference_standard": "No",
+    "dosage_form": "CAPSULE, EXTENDED RELEASE",
+    "route": "ORAL",
+    "marketing_status": "Prescription",
+    "te_code": "AB"
+   },
+   {
+    "product_number": "005",
+    "reference_drug": "No",
+    "brand_name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+    "active_ingredients": [
+     {
+      "name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+      "strength": "25MG"
+     }
+    ],
+    "reference_standard": "No",
+    "dosage_form": "CAPSULE, EXTENDED RELEASE",
+    "route": "ORAL",
+    "marketing_status": "Prescription",
+    "te_code": "AB"
+   },
+   {
+    "product_number": "003",
+    "reference_drug": "No",
+    "brand_name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+    "active_ingredients": [
+     {
+      "name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+      "strength": "15MG"
+     }
+    ],
+    "reference_standard": "No",
+    "dosage_form": "CAPSULE, EXTENDED RELEASE",
+    "route": "ORAL",
+    "marketing_status": "Prescription",
+    "te_code": "AB"
+   },
+   {
+    "product_number": "001",
+    "reference_drug": "No",
+    "brand_name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+    "active_ingredients": [
+     {
+      "name": "DEXMETHYLPHENIDATE HYDROCHLORIDE",
+      "strength": "5MG"
+     }
+    ],
+    "reference_standard": "No",
+    "dosage_form": "CAPSULE, EXTENDED RELEASE",
+    "route": "ORAL",
+    "marketing_status": "Prescription",
+    "te_code": "AB"
+   }
+  ]
+ },
+ "device_510k": {
+  "third_party_flag": "N",
+  "city": "Cambridge",
+  "advisory_committee_description": "Neurology",
+  "address_1": "1770 Massachusetts Ave.",
+  "address_2": "Suite 806",
+  "statement_or_summary": "Summary",
+  "product_code": "OLX",
+  "openfda": {
+   "registration_number": [
+    "9613619",
+    "1650946",
+    "3023707151",
+    "3017666517",
+    "3015929663",
+    "2031720",
+    "3014291198",
+    "9612330",
+    "3010749841",
+    "3033708293",
+    "3014137562",
+    "9680891"
+   ],
+   "fei_number": [
+    "3002716534",
+    "3002624053",
+    "3023707151",
+    "3015929663",
+    "3001090553",
+    "3002809369",
+    "3004674371",
+    "3006563303",
+    "3014291198",
+    "3010749841",
+    "3033708293",
+    "3014137562"
+   ],
+   "device_name": "Source Localization Software For Electroencephalograph Or Magnetoencephalograph",
+   "medical_specialty_description": "Neurology",
+   "regulation_number": "882.1400",
+   "device_class": "2"
+  },
+  "zip_code": "02140",
+  "applicant": "FIND Surgical Sciences Inc. D/B/A FIND Neuro",
+  "decision_date": "2026-08-16",
+  "decision_code": "SESE",
+  "country_code": "US",
+  "device_name": "CN-Suite",
+  "advisory_committee": "NE",
+  "contact": "Noam  Peled",
+  "expedited_review_flag": "",
+  "k_number": "K260563",
+  "state": "MA",
+  "date_received": "2026-02-19",
+  "review_advisory_committee": "NE",
+  "postal_code": "02140",
+  "decision_description": "Substantially Equivalent",
+  "clearance_type": "Traditional"
+ }
+}

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -86,7 +86,7 @@ def _to_out(db: Session, tech: Technology, entry: CycleTechnology | None = None)
 def _get(db: Session, technology_id: int) -> Technology:
     tech = db.get(Technology, technology_id)
     if not tech:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tecnologia no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tecnología no encontrada")
     return tech
 
 
@@ -106,6 +106,7 @@ def _entry_for(db: Session, cycle_id: int, technology_id: int) -> CycleTechnolog
 # --------------------------------------------------------------------------- #
 @router.get("/staging", response_model=list[TechnologyOut])
 def list_staging(
+    response: Response,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     q: str | None = Query(None),
@@ -132,8 +133,10 @@ def list_staging(
                 func.lower(Technology.summary).like(like),
             )
         )
+    # Total filtrado para paginar desde la interfaz sin cambiar el contrato de lista.
+    response.headers["X-Total-Count"] = str(query.with_entities(func.count(Technology.id)).scalar() or 0)
     rows = (
-        query.order_by(Technology.screening_score.desc(), Technology.captured_at.desc())
+        query.order_by(Technology.screening_score.desc(), Technology.captured_at.desc(), Technology.id.desc())
         .offset(offset)
         .limit(limit)
         .all()
@@ -199,12 +202,12 @@ def assign_to_cycle(
     if cycle is None:
         raise HTTPException(
             status_code=409,
-            detail="No hay un ciclo activo. Cree un ciclo antes de asignar senales.",
+            detail="No hay un ciclo activo. Cree un ciclo antes de asignar señales.",
         )
     if cycle.status == "cerrado_consolidado":
-        raise HTTPException(status_code=409, detail="El ciclo esta cerrado y no admite asignaciones.")
+        raise HTTPException(status_code=409, detail="El ciclo está cerrado y no admite asignaciones.")
     if cycle.is_historic:
-        raise HTTPException(status_code=409, detail="El ciclo historico no admite asignaciones.")
+        raise HTTPException(status_code=409, detail="El ciclo histórico no admite asignaciones.")
 
     assigned = 0
     skipped = 0
@@ -213,14 +216,14 @@ def assign_to_cycle(
     for tech_id in payload.technology_ids:
         tech = db.get(Technology, tech_id)
         if tech is None:
-            rejected.append(f"Tecnologia {tech_id}: no existe.")
+            rejected.append(f"Tecnología {tech_id}: no existe.")
             continue
         if _entry_for(db, cycle.id, tech_id) is not None:
             skipped += 1
             continue
         if tech.cluster_id is None or tech.tech_type_id is None:
             name = tech.commercial_name or tech.inn_name or f"ID {tech_id}"
-            rejected.append(f"{name}: requiere cluster y tipologia antes de asignarse.")
+            rejected.append(f"{name}: requiere clúster y tipología antes de asignarse.")
             continue
 
         db.add(
@@ -258,6 +261,7 @@ def assign_to_cycle(
 # --------------------------------------------------------------------------- #
 @router.get("", response_model=list[TechnologyOut])
 def list_technologies(
+    response: Response,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     cycle_id: int | None = Query(None),
@@ -296,7 +300,13 @@ def list_technologies(
             )
         )
 
-    rows = query.order_by(Technology.screening_score.desc(), Technology.captured_at.desc()).offset(offset).limit(limit).all()
+    response.headers["X-Total-Count"] = str(query.with_entities(func.count(Technology.id)).scalar() or 0)
+    rows = (
+        query.order_by(Technology.screening_score.desc(), Technology.captured_at.desc(), Technology.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
     if cycle_id:
         return [_to_out(db, tech, entry) for tech, entry in rows]
@@ -315,6 +325,55 @@ def get_technology(
     return _to_out(db, tech, entry)
 
 
+@router.get("/{technology_id}/locate")
+def locate_technology(
+    technology_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Donde vive la tecnologia: estado global y su instancia en cada ciclo.
+
+    Alimenta los enlaces directos `?tecnologia=<id>` de la bandeja y del
+    tablero: con esto cada pantalla decide si la muestra, a que pestana va o a
+    que ciclo debe cambiar el usuario.
+    """
+    tech = _get(db, technology_id)
+    merged_into = db.get(Technology, tech.merged_into_id) if tech.merged_into_id else None
+    rows = (
+        db.query(CycleTechnology, Cycle)
+        .join(Cycle, Cycle.id == CycleTechnology.cycle_id)
+        .filter(CycleTechnology.technology_id == tech.id)
+        .order_by(Cycle.opened_on.desc())
+        .all()
+    )
+    return {
+        "id": tech.id,
+        "name": tech.commercial_name or tech.inn_name or f"Tecnología {tech.id}",
+        "status": tech.status,
+        "status_label": TECHNOLOGY_STATUS_LABELS.get(tech.status, tech.status),
+        "merged_into_id": tech.merged_into_id,
+        "merged_into_name": (
+            (merged_into.commercial_name or merged_into.inn_name or f"Tecnología {merged_into.id}")
+            if merged_into
+            else ""
+        ),
+        "entries": [
+            {
+                "cycle_id": cycle.id,
+                "cycle_code": cycle.code,
+                "cycle_status": cycle.status,
+                "is_historic": bool(cycle.is_historic),
+                "status": entry.status,
+                "status_label": TECHNOLOGY_STATUS_LABELS.get(entry.status, entry.status),
+                "frozen": bool(entry.frozen),
+                "exclusion_reason": EXCLUSION_REASONS.get(entry.exclusion_reason_code or "", ""),
+                "exclusion_note": entry.exclusion_note or "",
+            }
+            for entry, cycle in rows
+        ],
+    }
+
+
 @router.put("/{technology_id}", response_model=TechnologyOut)
 def update_technology(
     technology_id: int,
@@ -327,11 +386,20 @@ def update_technology(
     data = payload.model_dump(exclude_unset=True)
 
     if "condition" in data and data["condition"] and data["condition"] not in CONDITIONS:
-        raise HTTPException(status_code=422, detail="Condicion invalida: use 'emergente' o 'nueva'.")
+        raise HTTPException(status_code=422, detail="Condición inválida: use 'emergente' o 'nueva'.")
     if data.get("cluster_id") and not db.get(Cluster, data["cluster_id"]):
-        raise HTTPException(status_code=422, detail="Cluster inexistente.")
+        raise HTTPException(status_code=422, detail="Clúster inexistente.")
     if data.get("tech_type_id") and not db.get(TechType, data["tech_type_id"]):
-        raise HTTPException(status_code=422, detail="Tipologia inexistente.")
+        raise HTTPException(status_code=422, detail="Tipología inexistente.")
+    # Regla de la fase 1: toda tecnologia asignada a un ciclo conserva cluster y
+    # tipologia. Solo en la bandeja se puede dejar la clasificacion en blanco.
+    if tech.status != "capturada_no_asignada":
+        for field, label in (("cluster_id", "el clúster"), ("tech_type_id", "la tipología")):
+            if field in data and data[field] is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"La tecnología ya está asignada a un ciclo: no se puede quitar {label}.",
+                )
 
     for key, value in data.items():
         setattr(tech, key, value)
@@ -395,9 +463,26 @@ def qualify_for_prioritization(
     """
     entry = _entry_for(db, cycle_id, technology_id)
     if entry is None:
-        raise HTTPException(status_code=404, detail="La tecnologia no esta asignada a este ciclo.")
+        raise HTTPException(status_code=404, detail="La tecnología no está asignada a este ciclo.")
     if entry.frozen:
-        raise HTTPException(status_code=409, detail="El ciclo esta congelado.")
+        raise HTTPException(status_code=409, detail="El ciclo está congelado.")
+    if entry.status == "excluida":
+        # La exclusion es inmutable (RF12): marcarla apta la resucitaria con la
+        # causa de exclusion todavia registrada.
+        raise HTTPException(
+            status_code=409,
+            detail="La tecnología fue excluida con causa tipificada y la exclusión no se revierte.",
+        )
+    if entry.status != "asignada_a_ciclo":
+        if entry.status == "filtrada_apta_priorizacion":
+            return _to_out(db, _get(db, technology_id), entry)
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "La tecnología ya superó el filtrado y está en "
+                f"'{TECHNOLOGY_STATUS_LABELS.get(entry.status, entry.status)}'."
+            ),
+        )
 
     allowed, reason = screening_service.novelty_gate(db, cycle_id, technology_id)
     if not allowed:
@@ -423,17 +508,25 @@ def exclude_from_cycle(
     if payload.reason_code not in EXCLUSION_REASONS:
         raise HTTPException(
             status_code=422,
-            detail=f"Motivo invalido. Opciones: {', '.join(EXCLUSION_REASONS)}",
+            detail=f"Motivo inválido. Opciones: {', '.join(EXCLUSION_REASONS)}",
         )
     entry = _entry_for(db, cycle_id, technology_id)
     if entry is None:
-        raise HTTPException(status_code=404, detail="La tecnologia no esta asignada a este ciclo.")
+        raise HTTPException(status_code=404, detail="La tecnología no está asignada a este ciclo.")
     if entry.frozen:
-        raise HTTPException(status_code=409, detail="El ciclo esta congelado.")
+        raise HTTPException(status_code=409, detail="El ciclo está congelado.")
     if entry.exclusion_reason_code:
         raise HTTPException(
             status_code=409,
-            detail="La causa de exclusion ya fue registrada y no es editable.",
+            detail="La causa de exclusión ya fue registrada y no es editable.",
+        )
+    if entry.status in ("en_evaluacion", "publicada"):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "La tecnología ya está en evaluación temprana o publicada; no se excluye "
+                "del ciclo. Registre la decisión en el expediente."
+            ),
         )
 
     entry.status = "excluida"
@@ -458,18 +551,15 @@ def send_to_evaluation(
     """Pasa una tecnologia priorizada a evaluacion temprana (fase 5 del plan)."""
     entry = _entry_for(db, cycle_id, technology_id)
     if entry is None:
-        raise HTTPException(status_code=404, detail="La tecnologia no esta asignada a este ciclo.")
+        raise HTTPException(status_code=404, detail="La tecnología no está asignada a este ciclo.")
+    if entry.frozen:
+        raise HTTPException(status_code=409, detail="El ciclo está cerrado y sus instancias congeladas.")
     if entry.status != "priorizada":
         raise HTTPException(
             status_code=409,
-            detail="Solo las tecnologias priorizadas pasan a evaluacion temprana.",
+            detail="Solo las tecnologías priorizadas pasan a evaluación temprana.",
         )
-    entry.status = "en_evaluacion"
-    tech = _get(db, technology_id)
-    tech.status = "en_evaluacion"
-    evaluation_service.ensure_document(
-        db, cycle_id, technology_id, actor=user.email
-    )
+    evaluation_service.start_evaluation(db, entry, actor=user.email)
     db.commit()
     bump_state_version(db)
-    return _to_out(db, tech, entry)
+    return _to_out(db, _get(db, technology_id), entry)

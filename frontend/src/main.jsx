@@ -6,6 +6,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import { RealtimeProvider } from "./realtime/RealtimeContext";
 import { ToastProvider } from "./components/Toast";
 import "./styles/globals.css";
+import "./styles/shell.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

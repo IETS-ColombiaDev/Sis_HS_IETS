@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api, { apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useCycle } from "../cycle/CycleContext";
@@ -7,14 +8,25 @@ import { useToast } from "../components/Toast";
 import { Card } from "../components/Card";
 import Badge from "../components/Badge";
 import Button from "../components/Button";
+import HintButton from "../components/HintButton";
+import ClampText from "../components/ClampText";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { Input, Select, Textarea } from "../components/Field";
 import EmptyState from "../components/EmptyState";
 import { LoadingBlock } from "../components/Spinner";
 import PhaseGuide, { ModuleStatsRow } from "../components/PhaseGuide";
 import ModuleHeader from "../components/ModuleHeader";
-import InfoTip from "../components/InfoTip";
+import InfoTip, { TermLabel } from "../components/InfoTip";
 import { PERM } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
+import {
+  TechLinkNotice,
+  buildTechNotice,
+  focusElement,
+  locateTech,
+  resolveTechLink,
+  useTechDeepLink,
+} from "../utils/techLink";
 
 const FICHA = [
   "health_condition",
@@ -37,25 +49,48 @@ const PICO = [
 ];
 
 const DEFAULT_LABELS = {
-  health_condition: "Condicion de salud",
-  mechanism: "Mecanismo biologico o tecnologico",
-  target_population_co: "Poblacion objetivo en Colombia",
-  evidence_state: "Estado del arte de la evidencia clinica",
+  health_condition: "Condición de salud",
+  mechanism: "Mecanismo biológico o tecnológico",
+  target_population_co: "Población objetivo en Colombia",
+  evidence_state: "Estado del arte de la evidencia clínica",
   comparators_sgsss: "Comparadores posibles en el SGSSS",
-  adoption_risks: "Riesgos potenciales de adopcion",
+  adoption_risks: "Riesgos potenciales de adopción",
   narrative: "Narrativa del informe",
   evidence_phases: "Fases de ensayos",
   efficacy_outcomes: "Desenlaces de eficacia",
   safety_outcomes: "Desenlaces de seguridad",
-  pico_population: "PICO: poblacion",
-  pico_intervention: "PICO: intervencion",
+  pico_population: "PICO: población",
+  pico_intervention: "PICO: intervención",
   pico_comparator: "PICO: comparador",
   pico_outcome: "PICO: desenlace",
-  budget_year_1: "Impacto presupuestal anio 1",
-  budget_year_2: "Impacto presupuestal anio 2",
-  budget_year_3: "Impacto presupuestal anio 3",
-  clinical_uncertainty: "Incertidumbre clinica",
-  early_dialogue_notes: "Notas de dialogo temprano",
+  budget_year_1: "Impacto presupuestal año 1",
+  budget_year_2: "Impacto presupuestal año 2",
+  budget_year_3: "Impacto presupuestal año 3",
+  clinical_uncertainty: "Incertidumbre clínica",
+  early_dialogue_notes: "Notas de diálogo temprano",
+};
+
+// Ayuda por campo tecnico del expediente (RF13 y RF14).
+const FIELD_HINTS = {
+  health_condition: "Enfermedad o problema de salud al que se dirige, con su carga en Colombia si se conoce.",
+  mechanism: "Cómo actúa la tecnología (mecanismo biológico o principio tecnológico).",
+  target_population_co: "Quiénes la usarían en Colombia y cuántos pacientes aproximadamente.",
+  evidence_state: "Fases de ensayos disponibles y calidad de la evidencia de eficacia y seguridad.",
+  comparators_sgsss: GLOSSARY.comparadores,
+  adoption_risks: "Riesgos para el sistema: presupuesto, infraestructura, entrenamiento, equidad.",
+  narrative: "Síntesis del informe en lenguaje para tomadores de decisión.",
+  evidence_phases: "Ensayos por fase, con identificadores (NCT) cuando existan.",
+  efficacy_outcomes: "Resultados de eficacia: desenlace, magnitud del efecto e incertidumbre.",
+  safety_outcomes: "Eventos adversos relevantes y su frecuencia.",
+  pico_population: "P de PICO: población de la pregunta de evaluación.",
+  pico_intervention: "I de PICO: la tecnología evaluada, dosis y vía.",
+  pico_comparator: "C de PICO: alternativa vigente en el SGSSS contra la que se compara.",
+  pico_outcome: "O de PICO: desenlaces que importan (clínicos y de calidad de vida).",
+  budget_year_1: "Impacto presupuestal estimado del primer año, en COP (ej. 3.200 millones).",
+  budget_year_2: "Impacto presupuestal estimado del segundo año, en COP.",
+  budget_year_3: "Impacto presupuestal estimado del tercer año, en COP.",
+  clinical_uncertainty: "Qué no se sabe todavía y cómo cambiaría la recomendación.",
+  early_dialogue_notes: "Registro opcional de diálogos tempranos con MSPS, INVIMA o desarrolladores (D-12).",
 };
 
 const EDITORIAL_STEPS = [
@@ -63,25 +98,36 @@ const EDITORIAL_STEPS = [
   { key: "revision_interna", label: "Interna", help: GLOSSARY.revision_interna },
   { key: "revision_externa", label: "Externa", help: GLOSSARY.revision_externa },
   { key: "con_observaciones", label: "Observado", help: GLOSSARY.observado },
-  { key: "aprobado_comite", label: "Comite", help: GLOSSARY.comite },
+  { key: "aprobado_comite", label: "Comité", help: GLOSSARY.comite },
   { key: "publicado", label: "Publicado", help: GLOSSARY.publicado },
 ];
 
 const ASSIGNMENT_STATUS = {
+  invitado: "Invitado",
   pendiente: "Pendiente",
-  invitacion_enviada: "Invitacion enviada",
+  invitacion_enviada: "Invitación enviada por correo",
   en_lectura: "En lectura",
   aprobado: "Aprobado",
   observado: "Con observaciones",
+  revocado: "Revocado",
 };
 
 const TRANSITION_LABELS = {
-  revision_interna: "Enviar a revision interna",
-  revision_externa: "Pasar a revision externa",
+  revision_interna: "Enviar a revisión interna",
+  revision_externa: "Pasar a revisión externa",
   con_observaciones: "Devolver con observaciones",
-  aprobado_comite: "Aprobar en comite",
+  aprobado_comite: "Aprobar en comité",
   publicado: "Publicar",
   borrador: "Regresar a borrador",
+};
+
+const TRANSITION_HINTS = {
+  revision_interna: GLOSSARY.fa_tr_revision_interna,
+  revision_externa: GLOSSARY.fa_tr_revision_externa,
+  con_observaciones: GLOSSARY.fa_tr_con_observaciones,
+  aprobado_comite: GLOSSARY.fa_tr_aprobado_comite,
+  publicado: GLOSSARY.fa_tr_publicado,
+  borrador: GLOSSARY.fa_tr_borrador,
 };
 
 function fieldsFor(level) {
@@ -91,9 +137,9 @@ function fieldsFor(level) {
 }
 
 function fieldGroups(level) {
-  const groups = [{ title: "Ficha tecnica", keys: FICHA }];
+  const groups = [{ title: "Ficha técnica", keys: FICHA }];
   if (level === "informe" || level === "mini_hta") {
-    groups.push({ title: "Informe de evaluacion", keys: INFORME });
+    groups.push({ title: "Informe de evaluación", keys: INFORME });
   }
   if (level === "mini_hta") {
     groups.push({ title: "Mini-HTA: PICO e impacto presupuestal", keys: PICO });
@@ -106,9 +152,9 @@ function ReportPreview({ title, levelLabel, statusLabel, cycleCode, labels, body
     <article className="iets-dossier">
       <header className="iets-dossier-mast">
         <div className="iets-dossier-brand">IETS</div>
-        <div>
-          <p className="iets-dossier-kicker">Instituto de Evaluacion Tecnologica en Salud · Colombia</p>
-          <h2>{title}</h2>
+        <div style={{ minWidth: 0 }}>
+          <p className="iets-dossier-kicker">Instituto de Evaluación Tecnológica en Salud · Colombia</p>
+          <ClampText as="h2" text={title} lines={3} expandable />
           <p className="iets-dossier-sub">
             {cycleCode || "Ciclo institucional"} · {levelLabel} · {statusLabel}
           </p>
@@ -118,17 +164,17 @@ function ReportPreview({ title, levelLabel, statusLabel, cycleCode, labels, body
         <section key={group.title} className="iets-dossier-chapter">
           <div className="iets-dossier-num">0{index + 1}</div>
           <h3>{group.title}</h3>
-          {group.keys.map((key) => (
-            <article key={key} className="iets-dossier-block">
-              <h4>{labels[key] || key}</h4>
-              {(String(body[key] || "").split("\n").map((p) => p.trim()).filter(Boolean).length
-                ? String(body[key] || "").split("\n").map((p) => p.trim()).filter(Boolean)
-                : ["—"]
-              ).map((para, i) => (
-                <p key={`${key}-${i}`}>{para}</p>
-              ))}
-            </article>
-          ))}
+          {group.keys.map((key) => {
+            const paras = String(body[key] || "").split("\n").map((p) => p.trim()).filter(Boolean);
+            return (
+              <article key={key} className="iets-dossier-block">
+                <h4>{labels[key] || key}</h4>
+                {(paras.length ? paras : ["—"]).map((para, i) => (
+                  <p key={`${key}-${i}`}>{para}</p>
+                ))}
+              </article>
+            );
+          })}
         </section>
       ))}
     </article>
@@ -140,14 +186,11 @@ function EditorialStepper({ status }) {
   return (
     <ol className="editorial-stepper" aria-label="Flujo editorial">
       {EDITORIAL_STEPS.map((step, i) => (
-        <li
-          key={step.key}
-          className={i < idx ? "is-done" : i === idx ? "is-current" : ""}
-        >
+        <li key={step.key} className={i < idx ? "is-done" : i === idx ? "is-current" : ""}>
           <span>{i + 1}</span>
           <span className="term-label">
             {step.label}
-            <InfoTip text={step.help} label={`Que es ${step.label}`} />
+            <InfoTip text={step.help} label={`Qué es ${step.label}`} />
           </span>
         </li>
       ))}
@@ -155,11 +198,18 @@ function EditorialStepper({ status }) {
   );
 }
 
+const EMPTY_COI = { accepted: false, has_conflict: false, statement: "" };
+const EMPTY_INVITE = { kind: "externo", reviewer_name: "", reviewer_email: "" };
+
 export default function Evaluation() {
-  const { cycle, cycleId, isClosed } = useCycle();
+  const { cycle, cycleId, isClosed, setCycleId } = useCycle();
+  const { techId, invalidParam, setTechId } = useTechDeepLink();
+  const [linkNotice, setLinkNotice] = useState(null);
+  const handledLink = useRef("");
   const { can } = useAuth();
   const { version } = useRealtime();
   const toast = useToast();
+  const navigate = useNavigate();
 
   const canWrite = can(PERM.REPORT_WRITE);
   const canInvite = can(PERM.CYCLE_WRITE);
@@ -170,17 +220,21 @@ export default function Evaluation() {
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState(null);
   const [doc, setDoc] = useState(null);
+  const [docLoading, setDocLoading] = useState(false);
   const [body, setBody] = useState({});
   const [title, setTitle] = useState("");
   const [level, setLevel] = useState("ficha");
   const [confidential, setConfidential] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [coi, setCoi] = useState({ accepted: false, has_conflict: false, statement: "" });
-  const [invite, setInvite] = useState({ kind: "externo", reviewer_name: "", reviewer_email: "" });
-  const [inviteLink, setInviteLink] = useState("");
+  const [opening, setOpening] = useState(false);
+  const [coi, setCoi] = useState(EMPTY_COI);
+  const [invite, setInvite] = useState(EMPTY_INVITE);
+  const [inviteResult, setInviteResult] = useState(null);
   const [comment, setComment] = useState({ field_key: "", body: "" });
   const [versions, setVersions] = useState([]);
   const [showDossier, setShowDossier] = useState(true);
+  const [confirmMove, setConfirmMove] = useState(null);
+  const [revoking, setRevoking] = useState(null);
 
   const loadQueue = useCallback(async () => {
     if (!cycleId) {
@@ -196,7 +250,7 @@ export default function Evaluation() {
           : data[0]?.technology_id || null
       );
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar la cola de evaluacion"));
+      toast.error(apiError(e, "No se pudo cargar la cola de evaluación"));
     } finally {
       setLoading(false);
     }
@@ -220,34 +274,79 @@ export default function Evaluation() {
     [queue, activeId]
   );
 
-  const openDoc = useCallback(
-    async (item) => {
-      if (!item) {
-        setDoc(null);
-        return;
-      }
+  // Enlace directo ?tecnologia=<id>: abre su expediente; si no esta en la cola
+  // de este ciclo, explica donde esta y ofrece cambiar de ciclo o de pantalla.
+  useEffect(() => {
+    if (invalidParam) {
+      setLinkNotice({ tone: "warn", message: "El enlace de tecnología no es válido.", actions: [] });
+      return;
+    }
+    if (!techId || !cycleId || loading) return;
+    const key = `${cycleId}:${techId}`;
+    if (queue.some((i) => i.technology_id === techId)) {
+      if (handledLink.current === key) return;
+      handledLink.current = key;
+      setLinkNotice(null);
+      setActiveId(techId);
+      focusElement(`eval-item-${techId}`);
+      return;
+    }
+    if (handledLink.current === key) return;
+    if (handledLink.current === `${key}:retry`) {
+      handledLink.current = key;
+      setLinkNotice({
+        tone: "info",
+        message: `La tecnología #${techId} no aparece en la cola de evaluación de ${cycle?.code || "este ciclo"}.`,
+        actions: [],
+      });
+      return;
+    }
+    handledLink.current = key;
+    let cancelled = false;
+    (async () => {
       try {
-        let id = item.doc_id;
-        if (!id && canWrite) {
-          const created = await api.post("/reports", {
-            cycle_id: cycleId,
-            technology_id: item.technology_id,
-            product_level: item.suggested_level,
-          });
-          id = created.data.id;
-        }
-        if (!id) {
-          setDoc(null);
+        const loc = await locateTech(api, techId);
+        if (cancelled) return;
+        const res = resolveTechLink(loc, {
+          cycleId,
+          accepts: (status) => ["priorizada", "en_evaluacion", "publicada"].includes(status),
+        });
+        if (res.kind === "ok") {
+          // La cola estaba desactualizada: se recarga una vez y el efecto la abre.
+          handledLink.current = `${key}:retry`;
+          loadQueue();
           return;
         }
+        setLinkNotice(buildTechNotice(res, { id: techId, page: "evaluacion", cycle, setCycleId, navigate }));
+      } catch (e) {
+        toast.error(apiError(e, "No se pudo abrir la tecnología del enlace"));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [techId, cycleId, loading, queue, invalidParam]);
+
+  const selectItem = (id) => {
+    handledLink.current = `${cycleId}:${id}`;
+    setLinkNotice(null);
+    setActiveId(id);
+    setTechId(id);
+  };
+  const activeDocId = active?.doc_id || null;
+
+  const fetchDoc = useCallback(
+    async (id) => {
+      setDocLoading(true);
+      try {
         const { data } = await api.get(`/reports/${id}`);
         setDoc(data);
         setTitle(data.title || "");
         setLevel(data.product_level || "ficha");
         setConfidential(Boolean(data.confidential));
         setBody(data.body || {});
-        setShowDossier(data.status === "publicado" || !["borrador", "con_observaciones"].includes(data.status));
-        setInviteLink("");
+        setShowDossier(!["borrador", "con_observaciones"].includes(data.status));
         if (!data.coi_required) {
           api
             .get(`/reports/${id}/versions`)
@@ -258,17 +357,46 @@ export default function Evaluation() {
         }
       } catch (e) {
         toast.error(apiError(e, "No se pudo abrir el expediente"));
+      } finally {
+        setDocLoading(false);
       }
     },
-    [canWrite, cycleId, toast]
+    [toast]
   );
 
+  // Seleccionar una tecnologia solo lee su expediente. Antes, entrar a la
+  // pantalla creaba expedientes en silencio para la primera priorizada.
   useEffect(() => {
-    if (active) openDoc(active);
-    else setDoc(null);
-  }, [active, openDoc]);
+    setInviteResult(null);
+    setCoi(EMPTY_COI);
+    setComment({ field_key: "", body: "" });
+    if (activeDocId) fetchDoc(activeDocId);
+    else {
+      setDoc(null);
+      setVersions([]);
+    }
+  }, [activeDocId, fetchDoc]);
 
-  const editable = canWrite && doc && !doc.coi_required && ["borrador", "con_observaciones"].includes(doc.status);
+  const openDossier = async () => {
+    if (!active) return;
+    setOpening(true);
+    try {
+      const { data } = await api.post("/reports", {
+        cycle_id: cycleId,
+        technology_id: active.technology_id,
+        product_level: active.suggested_level,
+      });
+      toast.success(`Expediente abierto como ${data.product_level_label}. Firme el COI para empezar.`);
+      await loadQueue();
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo abrir el expediente"));
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  const editable =
+    canWrite && doc && !doc.coi_required && ["borrador", "con_observaciones"].includes(doc.status);
 
   const save = async () => {
     if (!doc) return;
@@ -294,13 +422,11 @@ export default function Evaluation() {
   const signCoi = async () => {
     if (!doc) return;
     try {
-      const { data } = await api.post(`/reports/${doc.id}/coi`, coi);
-      setDoc(data);
-      setBody(data.body || {});
-      toast.success("Declaracion registrada. Ya puede leer el informe.");
-      openDoc(active);
+      await api.post(`/reports/${doc.id}/coi`, coi);
+      toast.success("Declaración registrada. Ya puede leer el informe.");
+      await fetchDoc(doc.id);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo firmar el conflicto de interes"));
+      toast.error(apiError(e, "No se pudo firmar el conflicto de interés"));
     }
   };
 
@@ -309,10 +435,11 @@ export default function Evaluation() {
     try {
       const { data } = await api.post(`/reports/${doc.id}/transition`, { status });
       setDoc(data);
-      toast.success(data.status_label);
+      setConfirmMove(null);
+      toast.success(`Estado editorial: ${data.status_label}`);
       loadQueue();
     } catch (e) {
-      toast.error(apiError(e, "La transicion fue rechazada"));
+      toast.error(apiError(e, "La transición fue rechazada"));
     }
   };
 
@@ -321,23 +448,48 @@ export default function Evaluation() {
     if (!doc) return;
     try {
       const { data } = await api.post(`/reports/${doc.id}/invite`, invite);
-      setInvite({ kind: "externo", reviewer_name: "", reviewer_email: "" });
+      setInvite(EMPTY_INVITE);
       if (data.invite_path) {
         const url = `${window.location.origin}${data.invite_path}`;
-        setInviteLink(url);
+        let copied = false;
         try {
           await navigator.clipboard.writeText(url);
-          toast.success("Invitacion creada. El enlace se copio al portapapeles.");
+          copied = true;
         } catch {
-          toast.success("Invitacion creada. Copie el enlace ahora: solo se muestra una vez.");
+          copied = false;
         }
+        setInviteResult({ url, email_sent: data.email_sent, detail: data.email_detail, copied });
+        if (data.email_sent) toast.success(`Invitación enviada por correo a ${data.assignment.reviewer_email}.`);
+        else if (copied) toast.success("Invitación creada. El enlace se copió al portapapeles.");
+        else toast.success("Invitación creada. Copie el enlace ahora: solo se muestra una vez.");
       } else {
-        toast.success("Revisor interno asignado");
+        setInviteResult(null);
+        toast.success("Revisor interno asignado. Debe firmar su COI al abrir el expediente.");
       }
-      const refreshed = await api.get(`/reports/${doc.id}`);
-      setDoc(refreshed.data);
+      await fetchDoc(doc.id);
     } catch (err) {
       toast.error(apiError(err, "No se pudo invitar"));
+    }
+  };
+
+  const copyInvite = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteResult.url);
+      setInviteResult((r) => ({ ...r, copied: true }));
+      toast.success("Enlace copiado.");
+    } catch {
+      toast.warning("El navegador no permitió copiar. Seleccione el enlace y cópielo a mano.");
+    }
+  };
+
+  const revoke = async () => {
+    try {
+      const { data } = await api.post(`/reports/${doc.id}/assignments/${revoking.id}/revoke`);
+      setDoc(data);
+      setRevoking(null);
+      toast.success("Invitación revocada. El enlace ya no abre el portal.");
+    } catch (err) {
+      toast.error(apiError(err, "No se pudo revocar la invitación"));
     }
   };
 
@@ -349,7 +501,7 @@ export default function Evaluation() {
       setComment({ field_key: "", body: "" });
       const { data } = await api.get(`/reports/${doc.id}`);
       setDoc(data);
-      toast.success("Observacion registrada");
+      toast.success("Observación registrada");
     } catch (err) {
       toast.error(apiError(err, "No se pudo comentar"));
     }
@@ -360,7 +512,8 @@ export default function Evaluation() {
     try {
       const { data } = await api.get(`/reports/${doc.id}/export`, { responseType: "blob" });
       const url = URL.createObjectURL(data);
-      window.open(url, "_blank", "noopener");
+      const win = window.open(url, "_blank", "noopener");
+      if (!win) toast.info("Si no se abrió una pestaña nueva, permita las ventanas emergentes para este sitio.");
     } catch (e) {
       toast.error(apiError(e, "No se pudo exportar"));
     }
@@ -368,69 +521,90 @@ export default function Evaluation() {
 
   if (!cycleId) {
     return (
-      <EmptyState
-        title="Seleccione un ciclo"
-        description="La evaluacion vive dentro del ciclo operativo."
-      />
+      <Card>
+        <EmptyState
+          icon="🗓️"
+          title="Seleccione un ciclo"
+          message="La evaluación vive dentro del ciclo operativo. Elija uno en la cabecera o en Ciclos de escaneo."
+          action={<Button onClick={() => navigate("/ciclos")}>Ir a ciclos</Button>}
+        />
+      </Card>
     );
   }
 
-  if (loading) return <LoadingBlock label="Cargando evaluacion..." />;
+  if (loading) return <LoadingBlock label="Cargando evaluación..." />;
 
   const stats = [
-    { label: "En cola", value: queue.length },
-    { label: "Con expediente", value: queue.filter((i) => i.doc_id).length },
-    { label: "Publicados", value: queue.filter((i) => i.doc_status === "publicado").length },
+    { label: "En cola", value: queue.length, hint: "Tecnologías priorizadas, en evaluación o publicadas en este ciclo." },
+    {
+      label: "Con expediente",
+      value: queue.filter((i) => i.doc_id).length,
+      hint: "Tienen ficha, informe o Mini-HTA abierto.",
+    },
+    {
+      label: "Publicados",
+      value: queue.filter((i) => i.doc_status === "publicado").length,
+      hint: GLOSSARY.publicado,
+    },
   ];
+
+  const activeAssignments = (doc?.assignments || []).filter((a) => a.status !== "revocado");
+  const hints = doc?.transition_hints || {};
 
   return (
     <div>
       <ModuleHeader
         step="caracterizacion"
-        title="Evaluacion"
+        title="Evaluación"
         titleHint={GLOSSARY.evaluacion}
         purpose={
           cycle
-            ? `Fase 3 · ${cycle.code}. Expediente editorial: ficha, informe o Mini-HTA con revision por pares.`
-            : "Fase 3 · Expediente editorial: ficha, informe o Mini-HTA con revision por pares."
+            ? `Fase 3 · ${cycle.code}. Expediente editorial: ficha, informe o Mini-HTA con revisión por pares.`
+            : "Fase 3 · Expediente editorial: ficha, informe o Mini-HTA con revisión por pares."
         }
       />
       <PhaseGuide
         phase="Fase 3"
         hint={GLOSSARY.evaluacion}
         tasks={[
-          "Complete la ficha, el informe o el Mini-HTA segun el puntaje de priorizacion",
-          "Declare conflicto de interes antes de leer o editar el expediente",
-          "Invite un revisor interno y uno externo. El enlace externo dura 10 dias.",
+          "Abra el expediente de cada priorizada y complete la ficha, el informe o el Mini-HTA según el puntaje.",
+          "Declare conflicto de interés antes de leer o editar el expediente.",
+          "Invite un revisor interno y uno externo. El enlace externo dura 10 días.",
         ]}
-        nextLabel="Diseminacion"
-        nextTo="/diseminacion"
+        nextLabel="Boletines del ciclo"
+        onNext={() => navigate("/boletines")}
       />
       <ModuleStatsRow items={stats} />
+      <TechLinkNotice notice={linkNotice} onClose={() => setLinkNotice(null)} />
 
       {queue.length === 0 ? (
-        <EmptyState
-          title="Nada en evaluacion"
-          description="Pase tecnologias priorizadas a evaluacion desde la matriz P1 a P6."
-        />
+        <Card>
+          <EmptyState
+            icon="📄"
+            title="Nada en evaluación"
+            message="Pase tecnologías priorizadas a evaluación desde la matriz P1 a P6."
+            action={<Button onClick={() => navigate("/priorizacion")}>Ir a priorización</Button>}
+          />
+        </Card>
       ) : (
         <div className="eval-layout">
           <Card>
             <h3 style={{ marginTop: 0 }}>Cola del ciclo</h3>
-            <ul className="eval-queue">
+            <ul className="eval-queue" data-testid="eval-queue">
               {queue.map((item) => (
                 <li key={item.technology_id}>
                   <button
                     type="button"
                     className={item.technology_id === activeId ? "is-active" : ""}
-                    onClick={() => setActiveId(item.technology_id)}
+                    onClick={() => selectItem(item.technology_id)}
+                    data-testid={`eval-item-${item.technology_id}`}
                   >
-                    <strong>{item.commercial_name || item.inn_name}</strong>
+                    <ClampText as="strong" text={item.commercial_name || item.inn_name} lines={3} />
                     <span>
                       {item.suggested_level_label}
-                      {item.doc_status_label ? ` · ${item.doc_status_label}` : " · sin abrir"}
+                      {item.doc_status_label ? ` · ${item.doc_status_label}` : " · sin expediente"}
                     </span>
-                    <em>{item.completeness_pct}%</em>
+                    <em title={GLOSSARY.fa_completitud}>{item.doc_id ? `${item.completeness_pct}%` : "—"}</em>
                   </button>
                 </li>
               ))}
@@ -438,18 +612,40 @@ export default function Evaluation() {
           </Card>
 
           <div>
-            {!doc && (
-              <EmptyState
-                title="Abra el expediente"
-                description="Necesita permiso de escritura de informes para crear la ficha."
-              />
+            {active && !active.doc_id && (
+              <Card>
+                <ClampText as="h3" text={active.commercial_name || active.inn_name} lines={3} expandable style={{ marginTop: 0 }} />
+                <p style={{ fontSize: 14, color: "#475569" }}>
+                  Esta tecnología priorizada ({active.priority_points ?? "—"} puntos) aún no tiene
+                  expediente. Se sugiere <strong>{active.suggested_level_label}</strong>.
+                </p>
+                {canWrite ? (
+                  <HintButton
+                    onClick={openDossier}
+                    loading={opening}
+                    disabled={isClosed}
+                    disabledHint="El ciclo está cerrado: no se abren expedientes nuevos."
+                    hint={GLOSSARY.fa_abrir_expediente}
+                    data-testid="eval-open"
+                  >
+                    Abrir expediente
+                  </HintButton>
+                ) : (
+                  <p className="muted-note">Su perfil no redacta informes; un evaluador debe abrirlo.</p>
+                )}
+              </Card>
             )}
+
+            {active?.doc_id && docLoading && !doc && <LoadingBlock label="Abriendo expediente..." />}
 
             {doc?.coi_required && (
               <Card>
-                <h3 style={{ marginTop: 0 }}>Declaracion de conflicto de interes</h3>
+                <h3 style={{ marginTop: 0 }} className="term-label">
+                  Declaración de conflicto de interés
+                  <InfoTip text={GLOSSARY.coi} label="Qué es el conflicto de interés" />
+                </h3>
                 <p>
-                  Sin declaracion firmada no se habilita la lectura del informe, tampoco
+                  Sin declaración firmada no se habilita la lectura del informe, tampoco
                   para el evaluador interno.
                 </p>
                 <label className="public-check">
@@ -457,6 +653,7 @@ export default function Evaluation() {
                     type="checkbox"
                     checked={coi.accepted}
                     onChange={(e) => setCoi({ ...coi, accepted: e.target.checked })}
+                    data-testid="eval-coi-accept"
                   />
                   Declaro no tener conflicto, o lo describo abajo, y acepto la confidencialidad.
                 </label>
@@ -469,14 +666,24 @@ export default function Evaluation() {
                   Tengo un conflicto que debo declarar
                 </label>
                 <Textarea
+                  id="eval-coi-statement"
                   label="Detalle del conflicto (si aplica)"
                   rows={3}
                   value={coi.statement}
                   onChange={(e) => setCoi({ ...coi, statement: e.target.value })}
                 />
-                <Button onClick={signCoi} disabled={!coi.accepted}>
+                <HintButton
+                  onClick={signCoi}
+                  disabled={!coi.accepted || (coi.has_conflict && !coi.statement.trim())}
+                  disabledHint={
+                    !coi.accepted
+                      ? "Marque la aceptación de la declaración para continuar."
+                      : "Describa el conflicto que declara."
+                  }
+                  data-testid="eval-coi-sign"
+                >
                   Firmar y continuar
-                </Button>
+                </HintButton>
               </Card>
             )}
 
@@ -488,45 +695,64 @@ export default function Evaluation() {
                     <Badge>{doc.status_label}</Badge>
                     <Badge>{doc.product_level_label}</Badge>
                     {doc.confidential && <Badge tone="warning">Confidencial</Badge>}
-                    <span className="eval-version">
+                    <span className="eval-version" title={GLOSSARY.fa_historial}>
                       v{doc.version_major}.{doc.version_minor}
                     </span>
                   </div>
                   <div className="eval-actions">
                     {editable && (
-                      <Button onClick={save} loading={saving} disabled={isClosed}>
+                      <HintButton
+                        onClick={save}
+                        loading={saving}
+                        disabled={isClosed}
+                        disabledHint="El ciclo está cerrado: el documento no se edita."
+                        data-testid="eval-save"
+                      >
                         Guardar
-                      </Button>
+                      </HintButton>
                     )}
                     <Button variant="outline" onClick={() => setShowDossier((v) => !v)}>
                       {showDossier ? "Ver campos" : "Ver expediente"}
                     </Button>
-                    <Button variant="secondary" onClick={exportHtml}>
+                    <HintButton variant="secondary" onClick={exportHtml} hint={GLOSSARY.fa_exportar_html}>
                       Exportar HTML institucional
-                    </Button>
-                    {(doc.allowed_transitions || []).map((status) => (
-                      <Button key={status} variant="outline" onClick={() => move(status)}>
-                        {TRANSITION_LABELS[status] || status}
-                      </Button>
-                    ))}
+                    </HintButton>
+                    {(doc.allowed_transitions || []).map((status) => {
+                      const block = hints[status] || "";
+                      return (
+                        <HintButton
+                          key={status}
+                          variant={status === "publicado" ? "success" : "outline"}
+                          disabled={Boolean(block)}
+                          disabledHint={block}
+                          hint={TRANSITION_HINTS[status]}
+                          onClick={() => (status === "publicado" ? setConfirmMove(status) : move(status))}
+                          data-testid={`eval-move-${status}`}
+                        >
+                          {TRANSITION_LABELS[status] || status}
+                        </HintButton>
+                      );
+                    })}
                   </div>
                 </div>
 
                 <Input
-                  label="Titulo"
+                  id="eval-title"
+                  label="Título"
                   value={title}
                   disabled={!editable}
                   onChange={(e) => setTitle(e.target.value)}
                 />
                 <Select
+                  id="eval-level"
                   label="Nivel de producto (sugerido por puntaje; se puede cambiar)"
-                  hint={GLOSSARY.mini_hta}
+                  hint={GLOSSARY.fa_nivel_producto}
                   value={level}
                   disabled={!editable}
                   onChange={(e) => setLevel(e.target.value)}
                 >
-                  <option value="ficha">Ficha tecnica</option>
-                  <option value="informe">Informe de evaluacion temprana</option>
+                  <option value="ficha">Ficha técnica</option>
+                  <option value="informe">Informe de evaluación temprana</option>
                   <option value="mini_hta">Mini-HTA</option>
                 </Select>
                 <label className="public-check">
@@ -536,12 +762,15 @@ export default function Evaluation() {
                     disabled={!editable}
                     onChange={(e) => setConfidential(e.target.checked)}
                   />
-                  Marcar como confidencial. No se publicara en el catalogo de expedientes.
+                  <span className="term-label">
+                    Marcar como confidencial. No se publicará en el catálogo de expedientes.
+                    <InfoTip text={GLOSSARY.fa_confidencial} label="Qué implica confidencial" />
+                  </span>
                 </label>
 
                 {doc.completeness && (
-                  <p className="eval-complete">
-                    Completitud {doc.completeness.pct}%
+                  <p className="eval-complete" data-testid="eval-completeness">
+                    <TermLabel tip={GLOSSARY.fa_completitud}>Completitud {doc.completeness.pct}%</TermLabel>
                     {doc.completeness.missing?.length
                       ? ` · Faltan: ${doc.completeness.missing.map((k) => labels[k] || k).join(", ")}`
                       : ""}
@@ -559,7 +788,7 @@ export default function Evaluation() {
                     groups={[
                       ...fieldGroups(level),
                       ...(body.early_dialogue_notes
-                        ? [{ title: "Dialogo temprano", keys: ["early_dialogue_notes"] }]
+                        ? [{ title: "Diálogo temprano", keys: ["early_dialogue_notes"] }]
                         : []),
                     ]}
                   />
@@ -571,7 +800,9 @@ export default function Evaluation() {
                         {group.keys.map((key) => (
                           <Textarea
                             key={key}
+                            id={`eval-field-${key}`}
                             label={labels[key] || key}
+                            hint={FIELD_HINTS[key]}
                             required
                             rows={key.startsWith("budget") ? 2 : 4}
                             value={body[key] || ""}
@@ -582,9 +813,11 @@ export default function Evaluation() {
                       </section>
                     ))}
                     <section className="eval-field-group">
-                      <h4>Dialogo temprano</h4>
+                      <h4>Diálogo temprano</h4>
                       <Textarea
+                        id="eval-field-early_dialogue_notes"
                         label={labels.early_dialogue_notes}
+                        hint={FIELD_HINTS.early_dialogue_notes}
                         rows={3}
                         value={body.early_dialogue_notes || ""}
                         disabled={!editable}
@@ -594,53 +827,103 @@ export default function Evaluation() {
                   </>
                 )}
 
-                {canInvite && (
+                {canInvite && doc.status !== "publicado" && (
                   <form onSubmit={sendInvite} className="eval-invite">
-                    <h4>Invitar revisor</h4>
+                    <h4 className="term-label">
+                      Invitar revisor
+                      <InfoTip text={GLOSSARY.fa_invitar_revisor} label="Cómo funciona la invitación" />
+                    </h4>
                     <Select
+                      id="eval-invite-kind"
                       label="Tipo"
                       value={invite.kind}
                       onChange={(e) => setInvite({ ...invite, kind: e.target.value })}
                     >
-                      <option value="externo">Externo (sin cuenta institucional, enlace de 10 dias)</option>
+                      <option value="externo">Externo (sin cuenta institucional, enlace de 10 días)</option>
                       <option value="interno">Interno</option>
                     </Select>
                     <Input
+                      id="eval-invite-name"
                       label="Nombre"
                       required
                       value={invite.reviewer_name}
                       onChange={(e) => setInvite({ ...invite, reviewer_name: e.target.value })}
                     />
                     <Input
+                      id="eval-invite-email"
                       label="Correo"
                       type="email"
                       required
                       value={invite.reviewer_email}
                       onChange={(e) => setInvite({ ...invite, reviewer_email: e.target.value })}
                     />
-                    <Button type="submit">Generar invitacion</Button>
-                    {inviteLink && (
-                      <p className="eval-link">
-                        Enlace de un solo vistazo: <code>{inviteLink}</code>
-                      </p>
+                    <Button type="submit" data-testid="eval-invite-submit">
+                      Generar invitación
+                    </Button>
+                    {inviteResult && (
+                      <div className="fa-notice fa-notice--info" style={{ marginTop: 12, display: "block" }} data-testid="eval-invite-result">
+                        {inviteResult.email_sent ? (
+                          <div>La invitación salió por correo. Guarde el enlace por si el revisor no la recibe.</div>
+                        ) : (
+                          <div>
+                            {inviteResult.detail || "Sin correo configurado."} El enlace es personal y solo se
+                            muestra ahora.
+                          </div>
+                        )}
+                        <div className="fa-link-box">
+                          <code data-testid="eval-invite-link">{inviteResult.url}</code>
+                          <Button type="button" size="sm" variant="secondary" onClick={copyInvite}>
+                            {inviteResult.copied ? "Copiado" : "Copiar enlace"}
+                          </Button>
+                        </div>
+                      </div>
                     )}
                   </form>
                 )}
 
-                <h4>Revisores</h4>
-                <ul className="eval-reviewers">
+                <h4 className="term-label">
+                  Revisores
+                  <InfoTip text={GLOSSARY.revision_pares} label="Qué es la revisión por pares" />
+                </h4>
+                {activeAssignments.length === 0 && (
+                  <p className="muted-note">Todavía no hay revisores asignados.</p>
+                )}
+                <ul className="eval-reviewers" data-testid="eval-reviewers">
                   {(doc.assignments || []).map((a) => (
-                    <li key={a.id}>
-                      {a.reviewer_name} ({a.kind === "externo" ? "externo" : "interno"}) ·{" "}
-                      {a.coi_signed ? "COI firmado" : "sin COI"} · {ASSIGNMENT_STATUS[a.status] || a.status}
+                    <li key={a.id} className="fa-reviewer-row">
+                      <span>
+                        {a.reviewer_name} ({a.kind === "externo" ? "externo" : "interno"}) ·{" "}
+                        {a.coi_signed ? "COI firmado" : "sin COI"} · {ASSIGNMENT_STATUS[a.status] || a.status}
+                        {a.expires_at && a.kind === "externo"
+                          ? ` · vence ${new Date(a.expires_at).toLocaleDateString("es-CO")}`
+                          : ""}
+                      </span>
+                      {canInvite &&
+                        a.kind === "externo" &&
+                        !["aprobado", "observado", "revocado"].includes(a.status) &&
+                        doc.status !== "publicado" && (
+                          <HintButton
+                            size="sm"
+                            variant="ghost"
+                            style={{ color: "#B91C1C" }}
+                            hint={GLOSSARY.fa_revocar}
+                            onClick={() => setRevoking(a)}
+                          >
+                            Revocar
+                          </HintButton>
+                        )}
                     </li>
                   ))}
                 </ul>
 
                 {canReview && (
                   <form onSubmit={addComment}>
-                    <h4>Observacion en linea</h4>
+                    <h4 className="term-label">
+                      Observación en línea
+                      <InfoTip text={GLOSSARY.fa_observacion} label="Qué es una observación en línea" />
+                    </h4>
                     <Select
+                      id="eval-comment-field"
                       label="Campo"
                       value={comment.field_key}
                       onChange={(e) => setComment({ ...comment, field_key: e.target.value })}
@@ -653,15 +936,21 @@ export default function Evaluation() {
                       ))}
                     </Select>
                     <Textarea
+                      id="eval-comment-body"
                       label="Comentario"
                       required
                       rows={3}
                       value={comment.body}
                       onChange={(e) => setComment({ ...comment, body: e.target.value })}
                     />
-                    <Button type="submit" variant="secondary">
-                      Registrar observacion
-                    </Button>
+                    <HintButton
+                      type="submit"
+                      variant="secondary"
+                      disabled={!comment.body.trim()}
+                      disabledHint="Escriba el comentario antes de registrarlo."
+                    >
+                      Registrar observación
+                    </HintButton>
                   </form>
                 )}
 
@@ -679,7 +968,7 @@ export default function Evaluation() {
 
                 {versions.length > 0 && (
                   <details className="eval-versions">
-                    <summary>Historial de versiones ({versions.length})</summary>
+                    <summary title={GLOSSARY.fa_historial}>Historial de versiones ({versions.length})</summary>
                     <ol>
                       {versions.map((v) => (
                         <li key={v.id}>
@@ -694,6 +983,24 @@ export default function Evaluation() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(confirmMove)}
+        onClose={() => setConfirmMove(null)}
+        onConfirm={() => move(confirmMove)}
+        title="Publicar documento"
+        confirmVariant="success"
+        confirmLabel="Publicar"
+        message="El documento quedará publicado en la plataforma y, si no es confidencial, en el catálogo público de expedientes. La publicación no se deshace."
+      />
+      <ConfirmDialog
+        open={Boolean(revoking)}
+        onClose={() => setRevoking(null)}
+        onConfirm={revoke}
+        title="Revocar invitación"
+        confirmLabel="Revocar"
+        message={`El enlace de ${revoking?.reviewer_name || "este revisor"} dejará de abrir el portal. La invitación queda en el historial.`}
+      />
     </div>
   );
 }

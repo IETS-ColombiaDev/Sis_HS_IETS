@@ -30,6 +30,12 @@ from .models import Cycle, CycleTechnology, PriorityCriterion, PriorityScore, Te
 
 CRITERIA_CODES = ("P1", "P2", "P3", "P4", "P5", "P6")
 
+# Estados en los que una tecnologia esta sujeta a calificacion. Antes del filtro
+# de novedad (asignada_a_ciclo) no entra a la matriz (criterio de exito 7), y
+# desde evaluacion en adelante la calificacion ya produjo su efecto: reabrirla
+# devolveria el estado a "priorizada" y sacaria la tecnologia de evaluacion.
+RATEABLE_STATUSES = ("filtrada_apta_priorizacion", "priorizada", "bajo_vigilancia", "no_priorizada")
+
 
 class PriorityRuleError(ValueError):
     """Violacion de una regla del motor de priorizacion."""
@@ -129,8 +135,8 @@ def suggest_values(db: Session, tech: Technology) -> dict[str, dict]:
         "reason": (
             f"Registro sanitario registrado en el sistema: {tech.invima_registry}"
             if has_registry
-            else "Sin registro sanitario colombiano en el sistema. Pendiente de verificacion "
-            "automatica contra INVIMA (fase 3)."
+            else "Sin registro sanitario colombiano en el sistema. Pendiente de verificación "
+            "automática contra INVIMA (fase 3)."
         ),
     }
 
@@ -146,15 +152,15 @@ def suggest_values(db: Session, tech: Technology) -> dict[str, dict]:
         suggestions["P5"] = {
             "value": 1 if (fda_recent or ema_recent) else 0,
             "reason": (
-                "Aprobacion reciente: " + ", ".join(agencies)
+                "Aprobación reciente: " + ", ".join(agencies)
                 if agencies
-                else "Aprobacion registrada con mas de 12 meses de antiguedad."
+                else "Aprobación registrada con más de 12 meses de antigüedad."
             ),
         }
     else:
         suggestions["P5"] = {
             "value": 0,
-            "reason": "Sin fechas de aprobacion FDA o EMA capturadas.",
+            "reason": "Sin fechas de aprobación FDA o EMA capturadas.",
         }
 
     # P6: tramite regulatorio formal en curso (6 meses o menos).
@@ -168,7 +174,7 @@ def suggest_values(db: Session, tech: Technology) -> dict[str, dict]:
         "reason": (
             f"Estado regulatorio declarado: {tech.regulatory_status}"
             if regulatory
-            else "Sin estado de tramite regulatorio capturado."
+            else "Sin estado de trámite regulatorio capturado."
         ),
     }
 
@@ -188,7 +194,7 @@ def _entry(db: Session, cycle_id: int, technology_id: int) -> CycleTechnology:
         .first()
     )
     if entry is None:
-        raise PriorityRuleError("La tecnologia no esta asignada a este ciclo.")
+        raise PriorityRuleError("La tecnología no está asignada a este ciclo.")
     return entry
 
 
@@ -207,16 +213,26 @@ def rate_criterion(
     if code not in CRITERIA_CODES:
         raise PriorityRuleError(f"Criterio desconocido: {criterion}")
     if value not in (0, 1):
-        raise PriorityRuleError("La calificacion debe ser binaria (0 o 1).")
+        raise PriorityRuleError("La calificación debe ser binaria (0 o 1).")
 
     entry = _entry(db, cycle_id, technology_id)
     if entry.frozen:
         raise PriorityRuleError(
-            "Los puntajes de este ciclo estan congelados. Una reevaluacion debe hacerse "
+            "Los puntajes de este ciclo están congelados. Una reevaluación debe hacerse "
             "en un ciclo posterior, generando un registro nuevo."
         )
     if entry.status == "excluida":
-        raise PriorityRuleError("La tecnologia fue excluida en el filtrado y no se califica.")
+        raise PriorityRuleError("La tecnología fue excluida en el filtrado y no se califica.")
+    if entry.status == "asignada_a_ciclo":
+        raise PriorityRuleError(
+            "La tecnología aún no pasa el filtrado: registre la verificación de novedad "
+            "y márquela como apta en Filtrado y depuración antes de calificarla (RF10)."
+        )
+    if entry.status not in RATEABLE_STATUSES:
+        raise PriorityRuleError(
+            "La tecnología ya pasó a evaluación temprana; su calificación quedó fija "
+            "para este ciclo."
+        )
 
     if not rbac.can_rate(user, code):
         raise PermissionError(
@@ -282,6 +298,18 @@ def recalculate(db: Session, cycle_id: int, technology_id: int, *, actor: str = 
     tech = db.get(Technology, technology_id)
     if tech is not None:
         tech.status = state["classification"]
+        if previous["status"] != entry.status:
+            # RF20: el cambio de franja de una tecnologia de alto riesgo
+            # presupuestal avisa a los suscriptores de su cluster.
+            from . import strategy_service
+
+            db.flush()
+            strategy_service.watch_technology(
+                db,
+                tech,
+                previous_phase=tech.development_phase or "",
+                previous_status=previous["status"],
+            )
 
     audit.record_action(
         db,

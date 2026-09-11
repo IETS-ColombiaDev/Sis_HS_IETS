@@ -21,8 +21,8 @@ class PcoriHsConnector(Connector):
     code = "pcori_hs"
     label = "PCORI Horizon Scanning"
     description = (
-        "Base publica de horizon scanning operada con ECRI. Fichas fechadas "
-        "por tecnologia y seis areas de interes."
+        "Base pública de horizon scanning operada con ECRI. Fichas fechadas "
+        "por tecnología y seis áreas de interés."
     )
     min_interval = 1.0
     adapter_version = "1"
@@ -76,7 +76,7 @@ class PcoriHsConnector(Connector):
             )
         return ConnectorResult(
             records=records,
-            message=f"{len(records)} fichas extraidas de la portada de PCORI.",
+            message=f"{len(records)} fichas extraídas de la portada de PCORI.",
             partial=True,
             adapter_version=self.adapter_version,
             endpoint=page,

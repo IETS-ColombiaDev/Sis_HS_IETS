@@ -189,9 +189,9 @@ def test_html_export_carries_institutional_marks(db, admin):
     doc = evaluation_service.ensure_document(db, cycle.id, tech.id, actor=admin.email)
     _fill(doc)
     html = evaluation_service.render_institutional_html(doc, tech)
-    assert "Instituto de Evaluacion Tecnologica en Salud" in html
+    assert "Instituto de Evaluación Tecnológica en Salud" in html
     assert "Alfamab" in html
-    assert "Condicion de salud" in html
+    assert "Condición de salud" in html
 
 
 def test_published_doc_unblocks_cycle_close(db, admin):

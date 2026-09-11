@@ -44,8 +44,8 @@ SOCRATA_PAGE_SIZE = 1000
 # estructurada (decision D-04 del BACKLOG).
 SOCRATA_DATASETS: tuple[tuple[str, str], ...] = (
     ("ui32-p9f2", "Registros sanitarios y NSO, vigentes y vencidos"),
-    ("y4qt-w6tk", "Registros sanitarios de dispositivos medicos"),
-    ("i7cb-raxc", "Codigo Unico de Medicamentos vigentes"),
+    ("y4qt-w6tk", "Registros sanitarios de dispositivos médicos"),
+    ("i7cb-raxc", "Código Único de Medicamentos vigentes"),
 )
 
 # Correspondencia entre las columnas del dato abierto y el modelo local. Cada
@@ -200,7 +200,7 @@ def sync_from_socrata(
     if failures == len(SOCRATA_DATASETS):
         log.status = "error"
         log.message += (
-            " Ningun conjunto respondio. El indice local conserva la version "
+            " Ningún conjunto respondió. El índice local conserva la versión "
             "anterior; use la carga de archivo plano como contingencia."
         )
     elif failures or ingested + changed == 0:
@@ -239,7 +239,7 @@ def sync_from_flat_file(
         if ingested + changed == 0:
             log.status = "parcial"
             log.message += (
-                " Ninguna fila tenia producto ni principio activo reconocibles; "
+                " Ninguna fila tenía producto ni principio activo reconocibles; "
                 "revise que el archivo corresponda al listado de registros sanitarios."
             )
     except Exception as exc:  # noqa: BLE001
@@ -274,13 +274,13 @@ def index_status(db: Session) -> dict:
     stale = total == 0 or age_days is None or age_days > INVIMA_STALE_DAYS
     if total == 0:
         warning = (
-            "El indice local esta vacio: la verificacion de novedad no puede "
-            "descartar que la tecnologia ya tenga registro sanitario."
+            "El índice local está vacío: la verificación de novedad no puede "
+            "descartar que la tecnología ya tenga registro sanitario."
         )
     elif stale:
         warning = (
-            f"El indice tiene {age_days} dias de antiguedad, por encima del "
-            f"maximo de {INVIMA_STALE_DAYS}. Sincronice antes de filtrar."
+            f"El índice tiene {age_days} días de antigüedad, por encima del "
+            f"máximo de {INVIMA_STALE_DAYS}. Sincronice antes de filtrar."
         )
     else:
         warning = ""

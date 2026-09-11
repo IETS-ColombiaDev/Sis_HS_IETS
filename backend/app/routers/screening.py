@@ -6,9 +6,11 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import invima as invima_module
@@ -103,6 +105,13 @@ def list_merges(
     query = db.query(MergeProposal)
     if status_filter:
         query = query.filter(MergeProposal.status == status_filter)
+    if status_filter == "propuesta":
+        # Un par cuyo registro ya fue absorbido por otra fusion no tiene objeto.
+        merged_ids = select(Technology.id).where(Technology.merged_into_id.isnot(None))
+        query = query.filter(
+            ~MergeProposal.technology_a_id.in_(merged_ids),
+            ~MergeProposal.technology_b_id.in_(merged_ids),
+        )
     if cycle_id is not None:
         query = query.filter(MergeProposal.cycle_id == cycle_id)
     rows = (
@@ -181,7 +190,7 @@ def novelty_options(user: User = Depends(require_permission(P_READ))):
 def _novelty_out(db: Session, cycle_id: int, technology_id: int, *, with_matches: bool) -> NoveltyOut:
     tech = db.get(Technology, technology_id)
     if tech is None:
-        raise HTTPException(status_code=404, detail="La tecnologia no existe.")
+        raise HTTPException(status_code=404, detail="La tecnología no existe.")
     assessment = screening_service.get_assessment(db, cycle_id, technology_id)
     can, reason = screening_service.novelty_gate(db, cycle_id, technology_id)
 
@@ -292,7 +301,7 @@ def normalize(
     """Canoniza ATC, CIE-10, MeSH y nomenclatura de dispositivos."""
     tech = db.get(Technology, technology_id)
     if tech is None:
-        raise HTTPException(status_code=404, detail="La tecnologia no existe.")
+        raise HTTPException(status_code=404, detail="La tecnología no existe.")
     report = normalization.normalize_technology(tech)
     db.commit()
     return NormalizationOut(
@@ -358,7 +367,10 @@ def export_unique_list(
                 ]
             )
 
-    filename = f"listado_unico_{data['cycle_code'] or cycle_id}.csv".replace(" ", "_")
+    # La cabecera HTTP solo admite latin-1: un codigo de ciclo con guion largo o
+    # tilde tumbaba la descarga con un 500. Se deja el nombre en ASCII seguro.
+    safe_code = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(data["cycle_code"] or cycle_id)).strip("_")
+    filename = f"listado_unico_{safe_code or cycle_id}.csv"
     # BOM para que Excel en español reconozca el UTF-8 sin pasos manuales.
     payload = "\ufeff" + buffer.getvalue()
     return StreamingResponse(

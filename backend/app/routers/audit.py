@@ -25,6 +25,7 @@ def list_audit(
     action: str | None = Query(None),
     user_email: str | None = Query(None),
     since: datetime | None = Query(None),
+    until: datetime | None = Query(None),
     limit: int = Query(100, le=500),
     offset: int = Query(0, ge=0),
 ):
@@ -39,6 +40,8 @@ def list_audit(
         query = query.filter(func.lower(AuditLog.user_email).like(f"%{user_email.lower()}%"))
     if since:
         query = query.filter(AuditLog.occurred_at >= since)
+    if until:
+        query = query.filter(AuditLog.occurred_at <= until)
 
     total = query.with_entities(func.count(AuditLog.id)).scalar() or 0
     rows = query.order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc()).offset(offset).limit(limit).all()
@@ -73,4 +76,14 @@ def distinct_actions(
     user: User = Depends(require_permission(P_AUDIT_READ)),
 ):
     rows = db.query(AuditLog.action).distinct().order_by(AuditLog.action).all()
+    return [r[0] for r in rows if r[0]]
+
+
+@router.get("/entities", response_model=list[str])
+def distinct_entities(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_AUDIT_READ)),
+):
+    """Tipos de entidad con al menos un registro, para el filtro de la pantalla."""
+    rows = db.query(AuditLog.entity_type).distinct().order_by(AuditLog.entity_type).all()
     return [r[0] for r in rows if r[0]]

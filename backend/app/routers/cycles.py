@@ -1,7 +1,7 @@
 """Ciclos operativos de escaneo (RF05, RF08). Eje de toda la metodologia."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from .. import cycle_service
@@ -72,17 +72,22 @@ def create_cycle(
     user: User = Depends(require_permission(P_CYCLE_WRITE)),
 ):
     if db.query(Cycle).filter(Cycle.code == payload.code).first():
-        raise HTTPException(status_code=400, detail=f"Ya existe un ciclo con el codigo '{payload.code}'.")
+        raise HTTPException(status_code=400, detail=f"Ya existe un ciclo con el código '{payload.code}'.")
 
     closing = payload.bulletin_due_on or payload.data_cutoff_on
     year = payload.opened_on.year
     try:
+        cycle_service.validate_dates(payload.opened_on, payload.data_cutoff_on, payload.bulletin_due_on)
         cycle_service.validate_year_quota(db, year)
         cycle_service.validate_window(db, payload.opened_on, closing)
     except CycleRuleError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    cycle = Cycle(year=year, status="en_configuracion", **payload.model_dump())
+    data = payload.model_dump()
+    data["code"] = data["code"].strip()
+    if not data["code"]:
+        raise HTTPException(status_code=422, detail="El código del ciclo es obligatorio.")
+    cycle = Cycle(year=year, status="en_configuracion", **data)
     db.add(cycle)
     db.commit()
     db.refresh(cycle)
@@ -102,13 +107,27 @@ def update_cycle(
         raise HTTPException(status_code=409, detail="Un ciclo cerrado no admite modificaciones.")
 
     data = payload.model_dump(exclude_unset=True)
+    if "code" in data:
+        code = (data["code"] or "").strip()
+        if not code:
+            raise HTTPException(status_code=422, detail="El código del ciclo es obligatorio.")
+        clash = db.query(Cycle.id).filter(Cycle.code == code, Cycle.id != cycle.id).first()
+        if clash:
+            # Sin esta verificacion la restriccion unica respondia 500.
+            raise HTTPException(status_code=400, detail=f"Ya existe un ciclo con el código '{code}'.")
+        data["code"] = code
+    for key in ("opened_on", "data_cutoff_on"):
+        if key in data and data[key] is None:
+            raise HTTPException(status_code=422, detail="Las fechas de apertura y corte son obligatorias.")
     for key, value in data.items():
         setattr(cycle, key, value)
     cycle.year = cycle.opened_on.year
 
     closing = cycle.bulletin_due_on or cycle.data_cutoff_on
     try:
-        cycle_service.validate_year_quota(db, cycle.year, exclude_id=cycle.id)
+        cycle_service.validate_dates(cycle.opened_on, cycle.data_cutoff_on, cycle.bulletin_due_on)
+        if not cycle.is_historic:
+            cycle_service.validate_year_quota(db, cycle.year, exclude_id=cycle.id)
         cycle_service.validate_window(db, cycle.opened_on, closing)
     except CycleRuleError as exc:
         db.rollback()
@@ -118,6 +137,32 @@ def update_cycle(
     db.refresh(cycle)
     bump_state_version(db)
     return _to_out(db, cycle)
+
+
+@router.delete("/{cycle_id}", status_code=204)
+def delete_cycle(
+    cycle_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CYCLE_WRITE)),
+):
+    """Elimina un ciclo creado por error (en configuracion y sin trabajo asociado).
+
+    La baja queda en la bitacora por el listener de auditoria, con el valor
+    anterior completo del ciclo.
+    """
+    cycle = _get(db, cycle_id)
+    reasons = cycle_service.delete_blockers(db, cycle)
+    if reasons:
+        raise HTTPException(
+            status_code=409,
+            detail="No se puede eliminar: " + " ".join(reasons) + " Edite el ciclo o ciérrelo.",
+        )
+    # Residuos sin instancia (bases antiguas) y vistas guardadas del ciclo.
+    cycle_service.delete_cycle_tree(db, cycle.id)
+    db.delete(cycle)
+    db.commit()
+    bump_state_version(db)
+    return Response(status_code=204)
 
 
 @router.get("/{cycle_id}/close-check")
@@ -136,7 +181,7 @@ def close_check(
         "message": (
             "El ciclo puede cerrarse."
             if not blocking
-            else f"{len(blocking)} tecnologia(s) en evaluacion sin informe final."
+            else f"{len(blocking)} tecnología(s) en evaluación sin informe final."
         ),
     }
 
@@ -193,5 +238,5 @@ def carry_over(
         "carried": carried,
         "source_cycle": source.code,
         "target_cycle": target.code,
-        "message": f"{carried} tecnologia(s) bajo vigilancia propuestas para {target.code}.",
+        "message": f"{carried} tecnología(s) bajo vigilancia propuestas para {target.code}.",
     }

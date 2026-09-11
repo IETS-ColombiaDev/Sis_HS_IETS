@@ -1,7 +1,9 @@
 """Punto de entrada de la API del Sistema de Escaneo de Horizonte del IETS."""
 from __future__ import annotations
 
+import logging
 import mimetypes
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -56,7 +58,13 @@ from .routers import (
 from .catalog_service import sync_catalog
 from .technology_service import backfill_technologies
 
-FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+# FRONTEND_DIST permite servir otra compilacion (contenedor, QA aislado).
+FRONTEND_DIST = Path(
+    os.environ.get("FRONTEND_DIST")
+    or Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+)
+
+log = logging.getLogger(__name__)
 
 
 def seed_sources_if_empty() -> None:
@@ -132,13 +140,56 @@ def migrate_to_technologies() -> None:
         db.close()
 
 
+def seed_official_cycles() -> None:
+    """Sincroniza los ciclos oficiales 2026 sin impedir nunca el arranque.
+
+    Sobre una base nueva (primer despliegue) todavia no hay tecnologias
+    suficientes para sembrarlos: el sistema debe arrancar igual y dejar que la
+    coordinacion cree sus ciclos. SEED_OFFICIAL_CYCLES=false apaga la siembra.
+    """
+    # En produccion los ciclos los gobierna la coordinacion: la siembra solo corre
+    # si se pide expresamente (SEED_OFFICIAL_CYCLES=true). En desarrollo, por defecto.
+    default = "false" if settings.is_production else "true"
+    if os.environ.get("SEED_OFFICIAL_CYCLES", default).strip().lower() in {"0", "false", "no"}:
+        log.info("Siembra de ciclos oficiales desactivada (SEED_OFFICIAL_CYCLES=false).")
+        return
+    from .cycle_seed import sync_official_cycles
+
+    db = SessionLocal()
+    try:
+        sync_official_cycles(db)
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        log.warning("Se omite la siembra de ciclos oficiales: %s", exc)
+    finally:
+        db.close()
+
+
 def seed_api_sources() -> None:
     """Compatibilidad: el catalogo D-06 ya incluye las fuentes con contrato."""
     return
 
+def assert_safe_configuration() -> None:
+    """En produccion no se arranca con secretos por defecto (P0-3)."""
+    problems = settings.production_problems()
+    if problems:
+        raise RuntimeError(
+            "Configuración insegura para ENVIRONMENT=production:\n- " + "\n- ".join(problems)
+        )
+    if settings.allow_dev_login and settings.is_production:
+        log.warning("ALLOW_DEV_LOGIN=true se ignora en produccion: el acceso de desarrollo queda apagado.")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    assert_safe_configuration()
     ensure_pg_extensions()
+    # Esquema versionado (P0-1): crea una base vacia con Alembic o marca en el
+    # baseline una base anterior. create_all y las migraciones ligeras siguen
+    # despues como red de seguridad idempotente.
+    from .migrations import upgrade_database
+
+    upgrade_database()
     Base.metadata.create_all(bind=engine)
     run_schema_migrations()
     harden_audit_log()
@@ -163,13 +214,7 @@ async def lifespan(app: FastAPI):
         db.close()
     backfill_screening_scores()
     migrate_to_technologies()
-    from .cycle_seed import sync_official_cycles
-
-    db = SessionLocal()
-    try:
-        sync_official_cycles(db)
-    finally:
-        db.close()
+    seed_official_cycles()
     seed_api_sources()
     from .worker import start_worker, stop_worker
 
@@ -182,7 +227,7 @@ app = FastAPI(
     title="Sistema de Escaneo de Horizonte del IETS",
     description=(
         "API del sistema de escaneo de horizonte (horizon scanning) del Instituto de "
-        "Evaluacion Tecnologica en Salud (IETS) de Colombia."
+        "Evaluación Tecnológica en Salud (IETS) de Colombia."
     ),
     version=__version__,
     lifespan=lifespan,
@@ -216,7 +261,47 @@ async def audit_context_middleware(request: Request, call_next):
     finally:
         audit.clear_context()
     response.headers["X-Request-ID"] = request_id
+    _apply_security_headers(request, response)
     return response
+
+
+# Politica de contenido de la SPA: solo recursos propios mas los servicios de
+# Google que la interfaz usa (Identity Services, reCAPTCHA y tipografia Inter).
+# Los estilos en linea son necesarios porque React los emite como atributos.
+_CSP = "; ".join(
+    [
+        "default-src 'self'",
+        "script-src 'self' https://accounts.google.com https://www.google.com https://www.gstatic.com",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https:",
+        "connect-src 'self' https://accounts.google.com",
+        "frame-src https://accounts.google.com https://www.google.com",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "object-src 'none'",
+    ]
+)
+# La documentacion interactiva de FastAPI carga Swagger UI desde un CDN.
+_CSP_EXEMPT = ("/docs", "/redoc", "/openapi.json")
+
+
+def _apply_security_headers(request: Request, response) -> None:
+    headers = response.headers
+    headers.setdefault("X-Content-Type-Options", "nosniff")
+    headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
+    path = request.url.path
+    if not path.startswith(_CSP_EXEMPT):
+        headers.setdefault("X-Frame-Options", "DENY")
+        if headers.get("content-type", "").startswith("text/html"):
+            headers.setdefault("Content-Security-Policy", _CSP)
+    if settings.is_production:
+        headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    if path.startswith("/api/"):
+        # Respuestas con datos del expediente: que ningun intermediario las guarde.
+        headers.setdefault("Cache-Control", "no-store")
 
 
 ROUTERS = (

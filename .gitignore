@@ -10,6 +10,12 @@ backend/iets_horizonte.db
 frontend/node_modules/
 frontend/dist/
 
+# Pruebas E2E (Playwright) y scripts exploratorios locales
+frontend/test-results/
+frontend/e2e-report/
+frontend/playwright-report/
+frontend/.tmp*
+
 # Editor / OS
 .vscode/
 .idea/

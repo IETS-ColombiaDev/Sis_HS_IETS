@@ -15,6 +15,8 @@ class UserOut(BaseModel):
     id: int
     email: str
     name: str
+    first_name: str = ""
+    last_name: str = ""
     picture: str
     role: str
     role_label: str = ""
@@ -23,22 +25,58 @@ class UserOut(BaseModel):
     is_active: bool
     created_at: datetime
     last_login: datetime | None = None
+    # Acceso con contrasena (produccion sin Google).
+    has_password: bool = False
+    must_change_password: bool = False
+    locked_until: datetime | None = None
+    failed_logins: int = 0
+    password_changed_at: datetime | None = None
+
+
+ROLE_PATTERN = "^(superadmin|evaluador_tecnico|evaluador_clinico|tomador_decisiones|revisor_pares)$"
 
 
 class UserRoleUpdate(BaseModel):
-    role: str = Field(
-        pattern="^(superadmin|evaluador_tecnico|evaluador_clinico|tomador_decisiones|revisor_pares)$"
-    )
+    role: str = Field(pattern=ROLE_PATTERN)
 
 
 class RoleOption(BaseModel):
     code: str
     label: str
     permissions: list[str]
+    description: str = ""
+
+
+class PermissionOption(BaseModel):
+    code: str
+    label: str
+    description: str
 
 
 class UserActiveUpdate(BaseModel):
     is_active: bool
+
+
+class UserCreate(BaseModel):
+    email: str = Field(min_length=5, max_length=255)
+    name: str = Field(default="", max_length=255)
+    role: str = Field(pattern=ROLE_PATTERN)
+    # Vacia: el sistema genera una contrasena temporal y la devuelve una sola vez.
+    password: str = Field(default="", max_length=128)
+
+
+class UserUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=255)
+    role: str | None = Field(default=None, pattern=ROLE_PATTERN)
+    is_active: bool | None = None
+
+
+class UserCredentialOut(BaseModel):
+    """Respuesta de alta o restablecimiento: la contrasena temporal viaja una vez."""
+
+    user: UserOut
+    temporary_password: str = ""
+    message: str = ""
 
 
 class GoogleLoginIn(BaseModel):
@@ -48,6 +86,16 @@ class GoogleLoginIn(BaseModel):
 class DevLoginIn(BaseModel):
     email: str
     name: str = ""
+
+
+class PasswordLoginIn(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class PasswordChangeIn(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=1, max_length=128)
 
 
 class TokenOut(BaseModel):
@@ -96,9 +144,10 @@ class SourceCreate(SourceBase):
 
 
 class SourceQuickCreate(BaseModel):
-    """Alta rapida: solo nombre y URL."""
+    """Alta rapida: solo nombre y URL (el bloque es opcional)."""
     title: str
     url: str
+    category: str = ""
 
 
 class SourceUpdate(BaseModel):
@@ -448,6 +497,9 @@ class SystemStatus(BaseModel):
     ai_model: str = ""
     ai_ocr_enabled: bool = False
     ai_web_enabled: bool = False
+    password_login_enabled: bool = True
+    environment: str = "development"
+    password_min_length: int = 10
 
 
 # --------------------------------------------------------------------------- #
@@ -549,6 +601,7 @@ class CatalogItemOut(BaseModel):
     description: str = ""
     sort_order: int = 0
     is_active: bool = True
+    keywords: list[str] | None = None
 
 
 class CatalogItemCreate(BaseModel):
@@ -783,6 +836,9 @@ class PriorityStateOut(BaseModel):
     threshold_pct_label: int = 70
     criteria: list[PriorityCriterionOut] = []
     scores: list[PriorityScoreOut] = []
+    # Frente A: estado de la instancia y motivo por el que no se puede calificar.
+    entry_status: str = ""
+    rate_blocked_reason: str = ""
 
 
 class RateCriterionIn(BaseModel):
@@ -806,6 +862,9 @@ class PriorityQueueItem(BaseModel):
     frozen: bool = False
     pending_for_me: bool = False
     screening_score: int = 0
+    # Frente A: referencia visible del arrastre entre ciclos.
+    previous_priority_pct: float | None = None
+    carried_from_cycle_id: int | None = None
 
 
 # =========================================================================== #
@@ -1213,6 +1272,9 @@ class ReviewInviteOut(BaseModel):
     assignment: ReviewAssignmentOut
     token: str | None = None
     invite_path: str = ""
+    # Frente A (P3-2): resultado del envio por correo cuando hay SMTP.
+    email_sent: bool = False
+    email_detail: str = ""
 
 
 class ReviewCommentIn(BaseModel):
@@ -1285,6 +1347,9 @@ class EvaluationDocOut(BaseModel):
     coi_required: bool = False
     assignments: list[ReviewAssignmentOut] = []
     comments: list[ReviewCommentOut] = []
+    # Frente A: motivo por el que cada transicion permitida no se puede ejecutar
+    # todavia (permiso, completitud o revisores). Vacio = disponible.
+    transition_hints: dict[str, str] = {}
 
 
 class ReviewerAccessOut(BaseModel):
@@ -1301,6 +1366,11 @@ class ReviewerAccessOut(BaseModel):
     confidential: bool = False
     comments: list[ReviewCommentOut] = []
     field_labels: dict[str, str] = {}
+    # Frente A: estado editorial y de la propia revision para guiar al revisor.
+    status_label: str = ""
+    assignment_status: str = ""
+    submitted_at: datetime | None = None
+    can_submit: bool = True
 
 
 # --------------------------------------------------------------------------- #
@@ -1321,8 +1391,15 @@ class StrategyDashboardOut(BaseModel):
     restricted: bool = False
     from_cache: bool = False
     refreshed_at: datetime | None = None
+    # RF17 (frente C): resumen del TTM, umbrales vigentes y filtros efectivos.
+    ttm_summary: dict = {}
+    ttm_thresholds: dict = {}
+    total_in_cycle: int = 0
+    filters_applied: dict = {}
+    # Capa restringida: solo viajan con `analytics:restricted`.
     budget_heatmap: list[dict] | None = None
     budget_items: list[dict] | None = None
+    budget_unparsed: int | None = None
     comparators: list[dict] | None = None
 
 

@@ -10,9 +10,11 @@ from .. import graph_service, strategy_service
 from ..database import get_db
 from ..deps import get_current_user, require_permission
 from ..events import bump_state_version
-from ..models import AlertEvent, AlertSubscription, Bulletin, Cycle, StrategyGraph, User
+from ..models import AlertEvent, AlertSubscription, Bulletin, Cluster, Cycle, StrategyGraph, User
 from ..rbac import P_CYCLE_WRITE, P_RESTRICTED_ANALYTICS, has_permission
+from ..methodology import TECHNOLOGY_STATUSES
 from ..strategy_service import StrategyRuleError
+from ..ttm import TTM_BANDS
 from ..schemas import (
     AlertEventOut,
     AlertSubscriptionIn,
@@ -34,17 +36,53 @@ def _cycle(db: Session, cycle_id: int) -> Cycle:
     return cycle
 
 
-@router.get("/api/strategy/dashboard", response_model=StrategyDashboardOut)
-def strategy_dashboard(
-    cycle_id: int = Query(...),
-    cluster_id: int | None = None,
-    tech_type_id: int | None = None,
+def dashboard_filters(
+    cluster_id: int | None = Query(None, ge=0),
+    tech_type_id: int | None = Query(None, ge=0),
     band: str = "",
     status: str = "",
     phase: str = "",
+    stage: str = "",
     date_from: date | None = None,
     date_to: date | None = None,
-    priority_min: int | None = None,
+    priority_min: int | None = Query(None, ge=0),
+) -> dict:
+    """Filtros del tablero (RF17), validados: un valor desconocido responde 422.
+
+    `cluster_id=0` y `tech_type_id=0` seleccionan lo que no tiene cluster o
+    tipologia. `stage` filtra por etapa alcanzada del embudo. Es una funcion (no
+    una clase) para que FastAPI resuelva las anotaciones diferidas.
+    """
+    problems = []
+    if band and band not in TTM_BANDS:
+        problems.append(f"Franja de time-to-market desconocida: {band}")
+    if phase and phase not in strategy_service.PHASE_LABELS:
+        problems.append(f"Fase clínica desconocida: {phase}")
+    if status and status not in TECHNOLOGY_STATUSES:
+        problems.append(f"Estado desconocido: {status}")
+    if stage and stage not in strategy_service.FUNNEL_STAGES:
+        problems.append(f"Etapa del embudo desconocida: {stage}")
+    if date_from and date_to and date_from > date_to:
+        problems.append("La fecha 'desde' es posterior a la fecha 'hasta'.")
+    if problems:
+        raise HTTPException(status_code=422, detail=" ".join(problems))
+    return dict(
+        cluster_id=cluster_id,
+        tech_type_id=tech_type_id,
+        band=band,
+        status=status,
+        phase=phase,
+        stage=stage,
+        date_from=date_from,
+        date_to=date_to,
+        priority_min=priority_min,
+    )
+
+
+@router.get("/api/strategy/dashboard", response_model=StrategyDashboardOut)
+def strategy_dashboard(
+    cycle_id: int = Query(...),
+    filters: dict = Depends(dashboard_filters),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -53,29 +91,42 @@ def strategy_dashboard(
         db,
         cycle,
         include_restricted=has_permission(user, P_RESTRICTED_ANALYTICS),
-        cluster_id=cluster_id,
-        tech_type_id=tech_type_id,
-        band=band,
-        status=status,
-        phase=phase,
-        date_from=date_from,
-        date_to=date_to,
-        priority_min=priority_min,
+        **filters,
     )
     return StrategyDashboardOut(**data)
+
+
+@router.get("/api/strategy/dashboard/export")
+def export_dashboard(
+    cycle_id: int = Query(...),
+    format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    filters: dict = Depends(dashboard_filters),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Descarga el recorte del tablero. Sin `analytics:restricted` no hay montos."""
+    cycle = _cycle(db, cycle_id)
+    restricted = has_permission(user, P_RESTRICTED_ANALYTICS)
+    data = strategy_service.dashboard_for(
+        db, cycle, include_restricted=restricted, **filters
+    )
+    content, media_type, filename = strategy_service.export_dashboard(
+        cycle, data, fmt=format, include_restricted=restricted
+    )
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.get("/api/strategy/graph")
 def strategy_graph(
     cycle_id: int = Query(...),
-    cluster_id: int | None = None,
-    tech_type_id: int | None = None,
-    band: str = "",
-    status: str = "",
-    phase: str = "",
-    date_from: date | None = None,
-    date_to: date | None = None,
-    priority_min: int | None = None,
+    filters: dict = Depends(dashboard_filters),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -84,14 +135,7 @@ def strategy_graph(
         db,
         cycle,
         include_restricted=has_permission(user, P_RESTRICTED_ANALYTICS),
-        cluster_id=cluster_id,
-        tech_type_id=tech_type_id,
-        band=band,
-        status=status,
-        phase=phase,
-        date_from=date_from,
-        date_to=date_to,
-        priority_min=priority_min,
+        **filters,
     )
 
 
@@ -191,9 +235,12 @@ def compile_bulletin(
     user: User = Depends(require_permission(P_CYCLE_WRITE)),
 ):
     cycle = _cycle(db, cycle_id)
+    if cycle.is_historic:
+        raise HTTPException(status_code=409, detail="El ciclo histórico no produce boletines.")
     row = strategy_service.compile_bulletin(db, cycle, actor=user.email)
     db.commit()
     db.refresh(row)
+    bump_state_version(db)
     return row
 
 
@@ -206,7 +253,7 @@ def approve_bulletin(
 ):
     row = db.get(Bulletin, bulletin_id)
     if row is None:
-        raise HTTPException(status_code=404, detail="Boletin no encontrado")
+        raise HTTPException(status_code=404, detail="Boletín no encontrado")
     try:
         strategy_service.approve_bulletin(db, row, actor=user.email, publish=False)
         if payload.publish:
@@ -215,6 +262,7 @@ def approve_bulletin(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     db.commit()
     db.refresh(row)
+    bump_state_version(db)
     return row
 
 
@@ -226,7 +274,7 @@ def export_bulletin(
 ):
     row = db.get(Bulletin, bulletin_id)
     if row is None:
-        raise HTTPException(status_code=404, detail="Boletin no encontrado")
+        raise HTTPException(status_code=404, detail="Boletín no encontrado")
     html = strategy_service.render_bulletin_html(row)
     return Response(
         content=html,
@@ -245,6 +293,32 @@ def list_alerts(
     if unread:
         q = q.filter(AlertEvent.read_at.is_(None))
     return q.order_by(AlertEvent.created_at.desc()).limit(50).all()
+
+
+@router.get("/api/alerts/channels")
+def alert_channels(user: User = Depends(get_current_user)):
+    """Canales de aviso disponibles: la bandeja siempre; el correo si hay SMTP."""
+    from .. import mailer
+
+    return {"in_app": True, "email": mailer.is_configured(), "email_to": user.email}
+
+
+@router.post("/api/alerts/read-all")
+def mark_all_read(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Marca como leidas todas las alertas pendientes del usuario."""
+    rows = (
+        db.query(AlertEvent)
+        .filter(AlertEvent.user_id == user.id, AlertEvent.read_at.is_(None))
+        .all()
+    )
+    now = strategy_service._utcnow()
+    for row in rows:
+        row.read_at = now
+    db.commit()
+    return {"updated": len(rows)}
 
 
 @router.post("/api/alerts/{alert_id}/read", response_model=AlertEventOut)
@@ -277,6 +351,8 @@ def upsert_sub(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    if payload.cluster_id is not None and db.get(Cluster, payload.cluster_id) is None:
+        raise HTTPException(status_code=422, detail="El clúster indicado no existe.")
     row = strategy_service.subscribe(db, user, payload.cluster_id)
     row.enabled = payload.enabled
     db.commit()

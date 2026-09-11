@@ -3,6 +3,7 @@ import { useAuth } from "./auth/AuthContext";
 import Layout from "./components/Layout";
 import { LoadingBlock } from "./components/Spinner";
 import Login from "./pages/Login";
+import ForcePasswordChange from "./pages/ForcePasswordChange";
 import Dashboard from "./pages/Dashboard";
 import Dashboards from "./pages/Dashboards";
 import Sources from "./pages/Sources";
@@ -37,7 +38,7 @@ function Protected({ children, permission }) {
   if (permission && !can(permission)) return <Navigate to="/" replace />;
   return (
     <Layout>
-      <ErrorBoundary title="Esta pantalla se detuvo" hint="El menu sigue disponible. Reintente o cambie de modulo.">
+      <ErrorBoundary title="Esta pantalla se detuvo" hint="El menú sigue disponible. Reintente o cambie de módulo.">
         {children}
       </ErrorBoundary>
     </Layout>
@@ -49,7 +50,7 @@ function LegacyRedirect({ to }) {
 }
 
 export default function App() {
-  const { loading, user } = useAuth();
+  const { loading, user, pendingPasswordChange } = useAuth();
 
   if (loading) {
     return (
@@ -58,6 +59,9 @@ export default function App() {
       </div>
     );
   }
+
+  // Con contrasena temporal no se abre ninguna pantalla interna hasta cambiarla.
+  if (pendingPasswordChange) return <ForcePasswordChange />;
 
   return (
     <CycleProvider>

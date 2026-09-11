@@ -22,7 +22,7 @@ export default function PublicCatalog() {
       setItems(list.data);
       setStats(st.data);
     } catch {
-      setError("No se pudo cargar el catalogo publico. Intente de nuevo.");
+      setError("No se pudo cargar el catálogo público. Intente de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -36,15 +36,15 @@ export default function PublicCatalog() {
   return (
     <PublicShell
       wide
-      kicker="Consulta publica"
-      title="Expedientes de tecnologias emergentes"
-      lead="Fichas tecnicas ya publicadas por el IETS. No incluye modelaciones presupuestales, comparadores estrategicos ni documentos confidenciales."
+      kicker="Consulta pública"
+      title="Expedientes de tecnologías emergentes"
+      lead="Fichas técnicas ya publicadas por el IETS. No incluye modelaciones presupuestales, comparadores estratégicos ni documentos confidenciales."
     >
       {stats && (
         <div className="public-kpis">
           <div>
             <b>{stats.published}</b>
-            <span>Fichas publicadas</span>
+            <span title="Tecnologías cuyo informe ya fue publicado. Algunas pueden no tener ficha pública por confidencialidad.">Tecnologías publicadas</span>
           </div>
           <div>
             <b>{stats.cycles}</b>
@@ -63,7 +63,7 @@ export default function PublicCatalog() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value.slice(0, 80))}
-          placeholder="Buscar por nombre comercial o denominacion comun internacional"
+          placeholder="Buscar por nombre comercial o denominación común internacional"
           aria-label="Buscar expediente"
         />
         <Button type="submit">Buscar</Button>
@@ -72,9 +72,9 @@ export default function PublicCatalog() {
       {error && <p className="public-submit-error">{error}</p>}
       {loading && <p className="public-submit-lead">Cargando expedientes…</p>}
 
-      {!loading && items.length === 0 && (
+      {!loading && !error && items.length === 0 && (
         <p className="public-submit-lead">
-          No hay expedientes publicos que coincidan con la busqueda.
+          {q ? "No hay expedientes públicos que coincidan con la búsqueda." : "Aún no hay expedientes publicados."}
         </p>
       )}
 

@@ -28,7 +28,7 @@ class WhoIctprConnector(Connector):
     code = "who_ictrp"
     label = "WHO ICTRP"
     description = (
-        "Registro Internacional de Ensayos Clinicos de la OMS. Se alimenta de "
+        "Registro Internacional de Ensayos Clínicos de la OMS. Se alimenta de "
         "un espejo JSON o de un lote descargado; el portal oficial no garantiza API."
     )
     min_interval = 0.6
@@ -46,7 +46,7 @@ class WhoIctprConnector(Connector):
         endpoint = clean_text(config.get("api_url") or url)
         if not endpoint:
             raise ConnectorError(
-                "WHO ICTRP no tiene un REST publico estable. Configure api_url "
+                "WHO ICTRP no tiene un REST público estable. Configure api_url "
                 "o entregue un lote en connector_config.records."
             )
 

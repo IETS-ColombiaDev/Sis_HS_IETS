@@ -87,11 +87,11 @@ async def sync_file(
     """Ruta de contingencia prevista en el plan: carga del listado en CSV."""
     content = await file.read()
     if not content:
-        raise HTTPException(status_code=422, detail="El archivo esta vacio.")
+        raise HTTPException(status_code=422, detail="El archivo está vacío.")
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(
             status_code=413,
-            detail=f"El archivo supera el maximo de {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+            detail=f"El archivo supera el máximo de {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
         )
     return invima_module.sync_from_flat_file(
         db, content=content, filename=file.filename or "", triggered_by=user.email

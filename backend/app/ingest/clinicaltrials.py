@@ -60,8 +60,8 @@ class ClinicalTrialsConnector(Connector):
     code = "clinicaltrials"
     label = "ClinicalTrials.gov (API v2)"
     description = (
-        "Registro de ensayos clinicos de los NIH. Filtra fases II, III y IV y "
-        "extrae fecha estimada de finalizacion, patrocinador e intervencion."
+        "Registro de ensayos clínicos de los NIH. Filtra fases II, III y IV y "
+        "extrae fecha estimada de finalización, patrocinador e intervención."
     )
     # Su WAF responde 403 a cualquier User-Agent que no reconozca. Con el
     # encabezado por defecto del cliente HTTP la peticion pasa.
@@ -106,7 +106,7 @@ class ClinicalTrialsConnector(Connector):
         next_token = clean_text(data.get("nextPageToken"))
         message = f"{len(records)} estudios de {total if total is not None else 'n/d'} disponibles."
         if next_token:
-            message += " Hay mas paginas; el cursor queda persistido."
+            message += " Hay más páginas; el cursor queda persistido."
         from .base import schema_signature
 
         return ConnectorResult(

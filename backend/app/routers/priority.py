@@ -2,8 +2,8 @@
 con permisos a nivel de campo."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from .. import priority_engine, rbac
@@ -12,7 +12,7 @@ from ..deps import get_current_user
 from ..events import bump_state_version
 from ..methodology import get_param
 from ..models import Cycle, CycleTechnology, PriorityScore, Technology, User
-from ..priority_engine import PriorityRuleError
+from ..priority_engine import RATEABLE_STATUSES, PriorityRuleError
 from ..schemas import (
     PriorityCriterionOut,
     PriorityQueueItem,
@@ -22,9 +22,6 @@ from ..schemas import (
 )
 
 router = APIRouter(prefix="/api/priority", tags=["priority"])
-
-# Estados en los que una tecnologia esta sujeta a calificacion.
-RATEABLE_STATUSES = ("filtrada_apta_priorizacion", "priorizada", "bajo_vigilancia", "no_priorizada")
 
 
 @router.get("/criteria", response_model=list[PriorityCriterionOut])
@@ -36,7 +33,7 @@ def list_criteria(db: Session = Depends(get_db), user: User = Depends(get_curren
 def _build_state(db: Session, cycle_id: int, technology_id: int, user: User) -> PriorityStateOut:
     tech = db.get(Technology, technology_id)
     if tech is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tecnologia no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tecnología no encontrada")
     entry = (
         db.query(CycleTechnology)
         .filter(
@@ -46,12 +43,24 @@ def _build_state(db: Session, cycle_id: int, technology_id: int, user: User) -> 
         .first()
     )
     if entry is None:
-        raise HTTPException(status_code=404, detail="La tecnologia no esta asignada a este ciclo.")
+        raise HTTPException(status_code=404, detail="La tecnología no está asignada a este ciclo.")
 
     state = priority_engine.evaluation_state(db, cycle_id, technology_id)
     criteria = priority_engine.active_criteria(db)
     stored = priority_engine.get_scores(db, cycle_id, technology_id)
     suggestions = priority_engine.suggest_values(db, tech)
+
+    blocked_reason = ""
+    if entry.frozen:
+        blocked_reason = "Ciclo cerrado: los puntajes están congelados."
+    elif entry.status == "asignada_a_ciclo":
+        blocked_reason = (
+            "Aún no pasa el filtrado: registre la verificación de novedad y márquela como apta."
+        )
+    elif entry.status == "excluida":
+        blocked_reason = "La tecnología fue excluida en el filtrado."
+    elif entry.status not in RATEABLE_STATUSES:
+        blocked_reason = "Ya pasó a evaluación temprana: la calificación quedó fija."
 
     scores: list[PriorityScoreOut] = []
     for crit in criteria:
@@ -66,20 +75,22 @@ def _build_state(db: Session, cycle_id: int, technology_id: int, user: User) -> 
                 rated_at=row.rated_at if row else None,
                 auto_suggested=suggestion["value"] if suggestion else None,
                 auto_reason=suggestion["reason"] if suggestion else "",
-                can_rate=(not entry.frozen) and rbac.can_rate(user, crit.code),
+                can_rate=(not blocked_reason) and rbac.can_rate(user, crit.code),
             )
         )
 
     return PriorityStateOut(
         cycle_id=cycle_id,
         technology_id=technology_id,
-        technology_name=tech.commercial_name or tech.inn_name or f"Tecnologia {tech.id}",
+        technology_name=tech.commercial_name or tech.inn_name or f"Tecnología {tech.id}",
         frozen=entry.frozen,
         threshold_points=int(get_param(db, "priority.points_prioritized", 4) or 4),
         watch_points=int(get_param(db, "priority.points_watch", 3) or 3),
         threshold_pct_label=int(get_param(db, "priority.threshold_pct_label", 70) or 70),
         criteria=[PriorityCriterionOut.model_validate(c) for c in criteria],
         scores=scores,
+        entry_status=entry.status,
+        rate_blocked_reason=blocked_reason,
         **state,
     )
 
@@ -89,12 +100,24 @@ def _build_state(db: Session, cycle_id: int, technology_id: int, user: User) -> 
 @router.get("/{cycle_id}/queue", response_model=list[PriorityQueueItem])
 def priority_queue(
     cycle_id: int,
+    response: Response,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     only_pending: bool = Query(False, description="Solo lo que este usuario puede calificar"),
-    limit: int = Query(200, le=500),
+    q: str | None = Query(None, description="Búsqueda por nombre comercial, DCI o indicación"),
+    status_filter: str | None = Query(None, alias="status", description="Estado de la instancia"),
+    cluster_id: int | None = Query(None),
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    focus: int | None = Query(None, description="Tecnología que debe quedar en la página devuelta"),
 ):
-    """Bandeja de calificacion del ciclo, filtrable por lo pendiente para el perfil."""
+    """Bandeja de calificacion del ciclo, filtrable por lo pendiente para el perfil.
+
+    Pagina en el servidor (P5-2): con cientos de tecnologias la cola no se
+    dibuja completa. El total filtrado viaja en la cabecera `X-Total-Count`,
+    de modo que la respuesta sigue siendo una lista para los consumidores
+    existentes.
+    """
     cycle = db.get(Cycle, cycle_id)
     if cycle is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ciclo no encontrado")
@@ -103,17 +126,36 @@ def priority_queue(
     my_criteria = set(rbac.rateable_criteria(user))
     all_codes = [c.code for c in priority_engine.active_criteria(db)]
 
-    rows = (
+    statuses = RATEABLE_STATUSES
+    if status_filter:
+        if status_filter not in RATEABLE_STATUSES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Estado no válido para la cola. Opciones: {', '.join(RATEABLE_STATUSES)}.",
+            )
+        statuses = (status_filter,)
+
+    query = (
         db.query(Technology, CycleTechnology)
         .join(CycleTechnology, CycleTechnology.technology_id == Technology.id)
         .filter(
             CycleTechnology.cycle_id == cycle_id,
-            CycleTechnology.status.in_(RATEABLE_STATUSES),
+            CycleTechnology.status.in_(statuses),
         )
-        .order_by(Technology.screening_score.desc())
-        .limit(limit)
-        .all()
     )
+    if cluster_id:
+        query = query.filter(Technology.cluster_id == cluster_id)
+    text = (q or "").strip().lower()
+    if text:
+        like = f"%{text}%"
+        query = query.filter(
+            or_(
+                func.lower(Technology.commercial_name).like(like),
+                func.lower(Technology.inn_name).like(like),
+                func.lower(Technology.indication).like(like),
+            )
+        )
+    rows = query.order_by(Technology.screening_score.desc(), Technology.id.asc()).all()
 
     rated_map: dict[int, set[str]] = {}
     for tech_id, criterion in (
@@ -133,7 +175,7 @@ def priority_queue(
             PriorityQueueItem(
                 technology_id=tech.id,
                 cycle_id=cycle_id,
-                name=tech.commercial_name or tech.inn_name or f"Tecnologia {tech.id}",
+                name=tech.commercial_name or tech.inn_name or f"Tecnología {tech.id}",
                 cluster_name=tech.cluster.name if tech.cluster else "",
                 tech_type_name=tech.tech_type.name if tech.tech_type else "",
                 condition=tech.condition or "",
@@ -145,9 +187,22 @@ def priority_queue(
                 frozen=entry.frozen,
                 pending_for_me=pending_for_me,
                 screening_score=tech.screening_score or 0,
+                previous_priority_pct=(
+                    float(entry.previous_priority_pct) if entry.previous_priority_pct is not None else None
+                ),
+                carried_from_cycle_id=entry.carried_from_cycle_id,
             )
         )
-    return items
+    response.headers["X-Total-Count"] = str(len(items))
+    if focus is not None:
+        # Enlace directo: se devuelve la pagina que contiene la tecnologia pedida
+        # y el desplazamiento efectivo, para que la interfaz se ubique en ella.
+        position = next((i for i, item in enumerate(items) if item.technology_id == focus), None)
+        response.headers["X-Focus-Found"] = "1" if position is not None else "0"
+        if position is not None:
+            offset = position - position % limit
+    response.headers["X-Offset"] = str(offset)
+    return items[offset : offset + limit]
 
 
 @router.get("/{cycle_id}/stats")

@@ -17,18 +17,18 @@ def _paras(text: str) -> str:
 def render_evaluation_html(doc, tech=None, cycle_code: str = "") -> str:
     body = doc.body or {}
     fields = catalog.required_fields(doc.product_level)
-    groups = [("Identificacion y contexto", [k for k in fields if k in catalog.FICHA_FIELDS])]
+    groups = [("Identificación y contexto", [k for k in fields if k in catalog.FICHA_FIELDS])]
     extra = [k for k in fields if k in catalog.INFORME_EXTRA_FIELDS]
     pico = [k for k in fields if k in catalog.MINI_HTA_EXTRA_FIELDS]
     if extra:
-        groups.append(("Evaluacion temprana", extra))
+        groups.append(("Evaluación temprana", extra))
     if pico:
         groups.append(("Mini-HTA · PICO e impacto", pico))
     optional = []
     if (body.get("early_dialogue_notes") or "").strip():
         optional.append("early_dialogue_notes")
     if optional:
-        groups.append(("Dialogo temprano", optional))
+        groups.append(("Diálogo temprano", optional))
 
     sections = []
     index = 1
@@ -47,7 +47,7 @@ def render_evaluation_html(doc, tech=None, cycle_code: str = "") -> str:
         )
         index += 1
 
-    tech_name = escape((getattr(tech, "commercial_name", None) or doc.title or "Tecnologia"))
+    tech_name = escape((getattr(tech, "commercial_name", None) or doc.title or "Tecnología"))
     inn = escape((getattr(tech, "inn_name", None) or ""))
     maker = escape((getattr(tech, "manufacturer", None) or ""))
     level = escape(catalog.PRODUCT_LEVEL_LABELS.get(doc.product_level, doc.product_level))
@@ -100,8 +100,8 @@ def render_evaluation_html(doc, tech=None, cycle_code: str = "") -> str:
         <div style="display:flex; gap:12px; align-items:center">
           <div class="brand-mark">IETS</div>
           <div>
-            <div class="kicker">Instituto de Evaluacion Tecnologica en Salud · Colombia</div>
-            <div class="sub">Escaneo de horizonte · evaluacion temprana de tecnologias sanitarias</div>
+            <div class="kicker">Instituto de Evaluación Tecnológica en Salud · Colombia</div>
+            <div class="sub">Escaneo de horizonte · evaluación temprana de tecnologías sanitarias</div>
           </div>
         </div>
         <h1>{escape(doc.title or tech_name)}</h1>
@@ -116,12 +116,12 @@ def render_evaluation_html(doc, tech=None, cycle_code: str = "") -> str:
       <div><b>Producto</b><span>{level}</span></div>
       <div><b>Estado editorial</b><span>{status}</span></div>
       <div><b>Ciclo</b><span>{cycle or "—"}</span></div>
-      <div><b>Version</b><span>v{escape(version)}</span></div>
+      <div><b>Versión</b><span>v{escape(version)}</span></div>
     </div>
     {''.join(sections)}
     <footer>
       Documento generado por la plataforma de escaneo de horizonte del IETS.
-      Uso institucional. La adopcion en el SGSSS requiere ruta INVIMA y concepto de ETS cuando corresponda.
+      Uso institucional. La adopción en el SGSSS requiere ruta INVIMA y concepto de ETS cuando corresponda.
     </footer>
   </div>
 </body>
@@ -164,7 +164,7 @@ def render_bulletin_html(bulletin) -> str:
 <body>
   <div class="sheet">
     <header>
-      <div class="kicker">IETS · Boletin epidemiologico y financiero</div>
+      <div class="kicker">IETS · Boletín epidemiológico y financiero</div>
       <h1>{escape(bulletin.title)}</h1>
       <p>Estado: {escape(bulletin.status)} · Compilado: {escape(str(body.get("compiled_on") or "—"))}</p>
     </header>
@@ -174,11 +174,11 @@ def render_bulletin_html(bulletin) -> str:
       <div class="kpi"><b>{funnel.get("prioritized", 0)}</b><span>Priorizadas</span></div>
       <div class="kpi"><b>{funnel.get("published", funnel.get("evaluated", 0))}</b><span>Publicadas / evaluadas</span></div>
     </div>
-    <h2>Distribucion por cluster</h2>
-    <table><thead><tr><th>Cluster</th><th>N</th></tr></thead><tbody>{cluster_rows or "<tr><td>Sin datos</td><td>0</td></tr>"}</tbody></table>
+    <h2>Distribución por clúster</h2>
+    <table><thead><tr><th>Clúster</th><th>N</th></tr></thead><tbody>{cluster_rows or "<tr><td>Sin datos</td><td>0</td></tr>"}</tbody></table>
     <h2>Time-to-market</h2>
     <table><thead><tr><th>Banda</th><th>N</th></tr></thead><tbody>{band_rows or "<tr><td>Sin datos</td><td>0</td></tr>"}</tbody></table>
-    <footer>Boletin de la plataforma de escaneo de horizonte del IETS. Difusion formal solo con aprobacion del lider de ciclo.</footer>
+    <footer>Boletín de la plataforma de escaneo de horizonte del IETS. Difusión formal solo con aprobación del líder de ciclo.</footer>
   </div>
 </body>
 </html>"""
@@ -201,7 +201,7 @@ def render_public_fiche_html(data: dict) -> str:
 <html lang="es">
 <head>
   <meta charset="utf-8"/>
-  <title>{escape(data.get("title") or "Ficha publica")} — IETS</title>
+  <title>{escape(data.get("title") or "Ficha pública")} — IETS</title>
   <style>
     body {{ font-family:"Segoe UI", Calibri, Arial, sans-serif; color:#0F172A; margin:0; }}
     .sheet {{ max-width:860px; margin:0 auto; padding:18px 16px 32px; }}
@@ -215,13 +215,13 @@ def render_public_fiche_html(data: dict) -> str:
 <body>
   <div class="sheet">
     <header>
-      <div class="kicker">Ficha publica · Escaneo de horizonte IETS</div>
+      <div class="kicker">Ficha pública · Escaneo de horizonte IETS</div>
       <h1>{escape(data.get("title") or "")}</h1>
       <p>{escape(data.get("ttm_band_label") or "")} · {escape(data.get("cluster") or "")}</p>
     </header>
     {''.join(blocks)}
-    <h2>Ensayos clinicos asociados</h2>
-    <ul>{ncts or "<li>Sin identificadores NCT publicos</li>"}</ul>
+    <h2>Ensayos clínicos asociados</h2>
+    <ul>{ncts or "<li>Sin identificadores NCT públicos</li>"}</ul>
   </div>
 </body>
 </html>"""

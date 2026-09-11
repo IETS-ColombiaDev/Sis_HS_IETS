@@ -7,10 +7,11 @@ from sqlalchemy.orm import Session
 
 from .. import ai_service
 from ..database import get_db
-from ..deps import get_current_user, require_role
+from ..deps import get_current_user, require_permission
 from ..events import bump_state_version
-from ..models import Finding, Note, Recommendation, Source, Technology, User
-from ..priority import compute_screening_score
+from ..models import CycleTechnology, Finding, Note, RawRecord, Recommendation, Source, Technology, User
+from ..priority import SCREENING_QUEUE_THRESHOLD, compute_screening_score
+from ..rbac import P_TECHNOLOGY_WRITE
 from ..schemas import FindingCreate, FindingOut, FindingUpdate
 from ..technology_service import sync_technology_from_finding
 
@@ -27,6 +28,21 @@ def _apply_screening(finding: Finding) -> None:
         technology=finding.technology,
         title=finding.title,
     )
+
+
+FINDING_STATUSES = {"nuevo", "revisado", "priorizado", "descartado"}
+FINDING_TYPES = {"medicamento", "dispositivo", "digital", "otro", ""}
+FINDING_HORIZONS = {"emergente", "transicional", "inminente", ""}
+
+
+def _check_choices(data: dict) -> None:
+    """Rechaza valores fuera de los catalogos que la interfaz ofrece."""
+    if data.get("status") is not None and data["status"] not in FINDING_STATUSES:
+        raise HTTPException(status_code=422, detail="Estado de señal inválido.")
+    if data.get("technology_type") is not None and data["technology_type"] not in FINDING_TYPES:
+        raise HTTPException(status_code=422, detail="Tipo de tecnología inválido.")
+    if data.get("horizon") is not None and data["horizon"] not in FINDING_HORIZONS:
+        raise HTTPException(status_code=422, detail="Horizonte inválido.")
 
 
 def _to_out(db: Session, finding: Finding) -> FindingOut:
@@ -53,18 +69,7 @@ def _to_out(db: Session, finding: Finding) -> FindingOut:
     return out
 
 
-@router.get("", response_model=list[FindingOut])
-def list_findings(
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-    source_id: int | None = Query(None),
-    horizon: str | None = Query(None),
-    technology_type: str | None = Query(None),
-    status_filter: str | None = Query(None, alias="status"),
-    q: str | None = Query(None),
-    limit: int = Query(200, le=1000),
-    offset: int = Query(0, ge=0),
-):
+def _filtered(db: Session, *, source_id=None, horizon=None, technology_type=None, status_filter=None, q=None):
     query = db.query(Finding)
     if source_id:
         query = query.filter(Finding.source_id == source_id)
@@ -77,8 +82,58 @@ def list_findings(
     if q:
         like = f"%{q.lower()}%"
         query = query.filter(
-            func.lower(Finding.title).like(like) | func.lower(Finding.summary).like(like)
+            func.lower(Finding.title).like(like)
+            | func.lower(Finding.summary).like(like)
+            | func.lower(Finding.technology).like(like)
         )
+    return query
+
+
+@router.get("/stats")
+def findings_stats(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    source_id: int | None = Query(None),
+    horizon: str | None = Query(None),
+    technology_type: str | None = Query(None),
+    status_filter: str | None = Query(None, alias="status"),
+    q: str | None = Query(None),
+):
+    """Conteos sobre el total filtrado, no sobre la pagina que se ve en pantalla."""
+    base = _filtered(
+        db, source_id=source_id, horizon=horizon, technology_type=technology_type,
+        status_filter=status_filter, q=q,
+    )
+    by_status = dict(
+        base.with_entities(Finding.status, func.count(Finding.id)).group_by(Finding.status).all()
+    )
+    return {
+        "total": sum(by_status.values()),
+        "by_status": {k or "sin_estado": v for k, v in by_status.items()},
+        "high_priority": base.filter(Finding.screening_score >= SCREENING_QUEUE_THRESHOLD)
+        .with_entities(func.count(Finding.id))
+        .scalar()
+        or 0,
+        "threshold": SCREENING_QUEUE_THRESHOLD,
+    }
+
+
+@router.get("", response_model=list[FindingOut])
+def list_findings(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    source_id: int | None = Query(None),
+    horizon: str | None = Query(None),
+    technology_type: str | None = Query(None),
+    status_filter: str | None = Query(None, alias="status"),
+    q: str | None = Query(None),
+    limit: int = Query(200, le=1000),
+    offset: int = Query(0, ge=0),
+):
+    query = _filtered(
+        db, source_id=source_id, horizon=horizon, technology_type=technology_type,
+        status_filter=status_filter, q=q,
+    )
     findings = query.order_by(Finding.created_at.desc()).offset(offset).limit(limit).all()
     return [_to_out(db, f) for f in findings]
 
@@ -95,7 +150,7 @@ def get_finding(finding_id: int, db: Session = Depends(get_db), user: User = Dep
 def create_finding(
     payload: FindingCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_role("editor")),
+    user: User = Depends(require_permission(P_TECHNOLOGY_WRITE)),
 ):
     source = db.get(Source, payload.source_id)
     if not source:
@@ -119,12 +174,16 @@ def update_finding(
     finding_id: int,
     payload: FindingUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_role("editor")),
+    user: User = Depends(require_permission(P_TECHNOLOGY_WRITE)),
 ):
     finding = db.get(Finding, finding_id)
     if not finding:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hallazgo no encontrado")
-    for key, value in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    _check_choices(data)
+    if "title" in data and not (data["title"] or "").strip():
+        raise HTTPException(status_code=422, detail="El título de la señal no puede quedar vacío.")
+    for key, value in data.items():
         setattr(finding, key, value)
     _apply_screening(finding)
     db.commit()
@@ -138,11 +197,11 @@ def update_finding(
 def enhance_finding_ai(
     finding_id: int,
     db: Session = Depends(get_db),
-    user: User = Depends(require_role("editor")),
+    user: User = Depends(require_permission(P_TECHNOLOGY_WRITE)),
 ):
     """Enriquece resumen y clasificacion de un hallazgo con MiniMax / Gemini."""
     if not ai_service.is_enabled():
-        raise HTTPException(status_code=400, detail="IA no configurada. Configure MiniMax en Configuracion.")
+        raise HTTPException(status_code=400, detail="IA no configurada. Configure MiniMax en Configuración.")
     finding = db.get(Finding, finding_id)
     if not finding:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hallazgo no encontrado")
@@ -165,11 +224,53 @@ def enhance_finding_ai(
 def delete_finding(
     finding_id: int,
     db: Session = Depends(get_db),
-    user: User = Depends(require_role("editor")),
+    user: User = Depends(require_permission(P_TECHNOLOGY_WRITE)),
 ):
+    """Elimina una senal capturada por error (ruido, pagina no pertinente).
+
+    Solo mientras su tecnologia siga en la bandeja sin asignar: una vez que entro
+    a un ciclo es parte del expediente metodologico y se descarta con el estado
+    `descartado`, no se borra. La tecnologia huerfana se elimina con ella para que
+    no quede en la bandeja de entrada una ficha sin captura de origen.
+    """
     finding = db.get(Finding, finding_id)
     if not finding:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hallazgo no encontrado")
+    tech = db.query(Technology).filter(Technology.finding_id == finding.id).first()
+    if tech is not None:
+        in_cycle = (
+            db.query(func.count(CycleTechnology.id))
+            .filter(CycleTechnology.technology_id == tech.id)
+            .scalar()
+            or 0
+        )
+        if in_cycle or tech.status != "capturada_no_asignada" or tech.merged_into_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "La señal ya originó una tecnología asignada a un ciclo: forma parte del "
+                    "expediente y no se elimina. Márquela como descartada."
+                ),
+            )
+        absorbed = db.query(func.count(Technology.id)).filter(Technology.merged_into_id == tech.id).scalar() or 0
+        if absorbed:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Otra tecnología se fusionó en esta; no se puede eliminar. Márquela como descartada.",
+            )
+    db.query(RawRecord).filter(RawRecord.finding_id == finding.id).update(
+        {RawRecord.finding_id: None, RawRecord.technology_id: None}, synchronize_session=False
+    )
+    db.query(Note).filter(Note.entity_type == "finding", Note.entity_id == finding.id).delete(
+        synchronize_session=False
+    )
+    if tech is not None:
+        from ..models import MergeProposal
+
+        db.query(MergeProposal).filter(
+            (MergeProposal.technology_a_id == tech.id) | (MergeProposal.technology_b_id == tech.id)
+        ).delete(synchronize_session=False)
+        db.delete(tech)
     db.delete(finding)
     db.commit()
     bump_state_version(db)

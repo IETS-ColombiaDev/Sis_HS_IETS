@@ -12,9 +12,10 @@ from sqlalchemy.orm import Session
 
 from .. import ai_service
 from ..database import get_db
-from ..deps import get_current_user, require_role
+from ..deps import get_current_user, require_permission
 from ..events import bump_state_version
 from ..models import Finding, Note, Recommendation, Source, User
+from ..rbac import P_NOTE_WRITE, P_USER_MANAGE, has_permission
 from ..schemas import AiEnhanceOut, NoteCreate, NoteOut, NoteUpdate
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
@@ -33,8 +34,27 @@ def _entity_label(db: Session, entity_type: str, entity_id: int | None) -> str:
         return row.title[:120] if row else f"Fuente #{entity_id}"
     if entity_type == "recommendation":
         row = db.get(Recommendation, entity_id)
-        return row.title[:120] if row else f"Recomendacion #{entity_id}"
+        return row.title[:120] if row else f"Recomendación #{entity_id}"
     return ""
+
+
+ENTITY_MODELS = {"finding": Finding, "source": Source, "recommendation": Recommendation}
+
+
+def _check_owner(user: User, note: Note, action: str) -> None:
+    """Editar o borrar la nota ajena solo lo hace el superadministrador.
+
+    Fijarla si lo puede cualquier perfil con `note:write`: fijar ordena la vista
+    del equipo, no altera lo que otra persona escribio.
+    """
+    if (note.author_email or "").lower() == (user.email or "").lower():
+        return
+    if has_permission(user, P_USER_MANAGE):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"Solo el autor de la nota o un superadministrador puede {action}.",
+    )
 
 
 def _to_out(db: Session, note: Note) -> NoteOut:
@@ -102,7 +122,7 @@ def export_notes(
         ])
     buf.seek(0)
     return StreamingResponse(
-        iter([buf.getvalue()]),
+        iter([chr(0xFEFF) + buf.getvalue()]),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="notas_iets.csv"'},
     )
@@ -124,12 +144,19 @@ def get_note(
 def create_note(
     payload: NoteCreate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_role("editor")),
+    user: User = Depends(require_permission(P_NOTE_WRITE)),
 ):
     if payload.entity_type not in ENTITY_TYPES:
-        raise HTTPException(status_code=400, detail="Tipo de entidad invalido")
+        raise HTTPException(status_code=400, detail="Tipo de entidad inválido")
     if not payload.content.strip():
         raise HTTPException(status_code=400, detail="El contenido es obligatorio")
+    if payload.entity_type != "general":
+        model = ENTITY_MODELS.get(payload.entity_type)
+        if not payload.entity_id or model is None or db.get(model, payload.entity_id) is None:
+            raise HTTPException(
+                status_code=404,
+                detail="El elemento al que se quiere vincular la nota no existe.",
+            )
     note = Note(
         entity_type=payload.entity_type,
         entity_id=payload.entity_id,
@@ -150,14 +177,15 @@ def create_note(
 def enhance_note_ai(
     note_id: int,
     db: Session = Depends(get_db),
-    user: User = Depends(require_role("editor")),
+    user: User = Depends(require_permission(P_NOTE_WRITE)),
 ):
     """Mejora el contenido de una nota con MiniMax / Gemini y la guarda."""
     if not ai_service.is_enabled():
-        raise HTTPException(status_code=400, detail="IA no configurada. Configure MiniMax en Configuracion.")
+        raise HTTPException(status_code=400, detail="IA no configurada. Configure MiniMax en Configuración.")
     note = db.get(Note, note_id)
     if not note:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nota no encontrada")
+    _check_owner(user, note, "mejorarla")
     ctx = _entity_label(db, note.entity_type, note.entity_id)
     improved, model = ai_service.enhance_note_content(note.title, note.content, ctx)
     note.content = improved
@@ -172,17 +200,19 @@ def update_note(
     note_id: int,
     payload: NoteUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(require_role("editor")),
+    user: User = Depends(require_permission(P_NOTE_WRITE)),
 ):
     note = db.get(Note, note_id)
     if not note:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nota no encontrada")
     data = payload.model_dump(exclude_unset=True)
+    if any(data.get(k) is not None for k in ("title", "content")):
+        _check_owner(user, note, "editarla")
     if "title" in data and data["title"] is not None:
         note.title = data["title"][:390]
     if "content" in data and data["content"] is not None:
         if not data["content"].strip():
-            raise HTTPException(status_code=400, detail="El contenido no puede estar vacio")
+            raise HTTPException(status_code=400, detail="El contenido no puede estar vacío")
         note.content = data["content"].strip()
     if data.get("pinned") is not None:
         note.pinned = data["pinned"]
@@ -196,11 +226,12 @@ def update_note(
 def delete_note(
     note_id: int,
     db: Session = Depends(get_db),
-    user: User = Depends(require_role("editor")),
+    user: User = Depends(require_permission(P_NOTE_WRITE)),
 ):
     note = db.get(Note, note_id)
     if not note:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nota no encontrada")
+    _check_owner(user, note, "eliminarla")
     db.delete(note)
     db.commit()
     bump_state_version(db)

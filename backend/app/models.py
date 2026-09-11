@@ -36,6 +36,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(255), default="")
+    first_name: Mapped[str] = mapped_column(String(255), default="")
+    last_name: Mapped[str] = mapped_column(String(255), default="")
     picture: Mapped[str] = mapped_column(String(1024), default="")
     # Perfiles RBAC (Tabla 3 de la especificacion): superadmin | evaluador_tecnico |
     # evaluador_clinico | tomador_decisiones | revisor_pares. Los valores heredados
@@ -44,6 +46,16 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Acceso con correo y contrasena. El hash (scrypt) jamas se copia a la
+    # bitacora ni sale por la API; ver `security.hash_password`.
+    password_hash: Mapped[str] = mapped_column(String(255), default="")
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_logins: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Se incrementa al cambiar o restablecer la contrasena y al desactivar la
+    # cuenta: invalida de inmediato las sesiones emitidas antes.
+    token_version: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class Source(Base):
@@ -195,7 +207,7 @@ class ChatSession(Base):
     __tablename__ = "chat_sessions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    title: Mapped[str] = mapped_column(String(400), default="Nueva conversacion")
+    title: Mapped[str] = mapped_column(String(400), default="Nueva conversación")
     user_email: Mapped[str] = mapped_column(String(255), default="", index=True)
     scope: Mapped[str] = mapped_column(String(40), default="", index=True)
     node_key: Mapped[str] = mapped_column(String(120), default="", index=True)
@@ -989,3 +1001,30 @@ class StrategyGraph(Base):
     payload: Mapped[dict | None] = mapped_column(JSONType, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# --------------------------------------------------------------------------- #
+#  Frente B: tareas programadas del worker (P0-4 vigilancia, P1-4 duplicados)
+# --------------------------------------------------------------------------- #
+class ScheduledRun(Base):
+    """Registro de cada ejecucion de una tarea programada del worker.
+
+    `task` es `vigilancia` (encola las fuentes vencidas) o `duplicados` (barrido
+    difuso del ciclo activo). La corrida de vigilancia queda `en_curso` hasta que
+    terminan sus jobs; entonces se consolidan los totales y se avisa en la bandeja.
+    """
+
+    __tablename__ = "scheduled_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    task: Mapped[str] = mapped_column(String(40), index=True)
+    # en_curso | ok | parcial | error | sin_trabajo
+    status: Mapped[str] = mapped_column(String(20), default="en_curso", index=True)
+    origin: Mapped[str] = mapped_column(String(20), default="programado")  # programado | manual
+    triggered_by: Mapped[str] = mapped_column(String(255), default="programador")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    items_found: Mapped[int] = mapped_column(Integer, default=0)
+    items_new: Mapped[int] = mapped_column(Integer, default=0)
+    message: Mapped[str] = mapped_column(Text, default="")
+    detail: Mapped[dict | None] = mapped_column(JSONType, default=dict)

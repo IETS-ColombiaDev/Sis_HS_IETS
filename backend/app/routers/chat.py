@@ -106,7 +106,7 @@ def list_sessions(
 def get_session(session_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     session = db.get(ChatSession, session_id)
     if not session or session.user_email != user.email:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversacion no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversación no encontrada")
     return ChatSessionDetail.model_validate(session)
 
 
@@ -114,7 +114,7 @@ def get_session(session_id: int, db: Session = Depends(get_db), user: User = Dep
 def delete_session(session_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     session = db.get(ChatSession, session_id)
     if not session or session.user_email != user.email:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversacion no encontrada")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversación no encontrada")
     db.delete(session)
     db.commit()
     return None
@@ -123,12 +123,12 @@ def delete_session(session_id: int, db: Session = Depends(get_db), user: User = 
 @router.post("/send", response_model=ChatSendOut)
 def send_message(payload: ChatSendIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     if not payload.message.strip():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El mensaje no puede estar vacio")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El mensaje no puede estar vacío")
 
     if payload.session_id:
         session = db.get(ChatSession, payload.session_id)
         if not session or session.user_email != user.email:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversacion no encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversación no encontrada")
     else:
         title = payload.message.strip()[:80]
         if payload.node_key:

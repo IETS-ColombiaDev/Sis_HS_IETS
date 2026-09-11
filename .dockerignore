@@ -1,0 +1,38 @@
+# Contexto de construccion de la imagen (Dockerfile en la raiz).
+# Nada de secretos, bases locales, dependencias instaladas ni artefactos.
+.git
+.github
+.gitattributes
+.gitignore
+.pytest_cache
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+*.log
+*.md
+.vscode
+.idea
+
+# Backend: entorno virtual, secretos y bases SQLite locales
+backend/.venv
+backend/.env
+backend/.env.*
+!backend/.env.example
+backend/*.db
+backend/*.db-journal
+backend/*.db-wal
+backend/*.db-shm
+
+# Frontend: se reinstala y recompila dentro de la imagen
+frontend/node_modules
+frontend/dist
+frontend/test-results
+frontend/e2e-report
+frontend/playwright-report
+frontend/.tmp*
+
+# Despliegue: secretos reales y respaldos
+.env
+deploy/.env*
+deploy/backups
+*.dump

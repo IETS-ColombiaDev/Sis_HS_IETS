@@ -11,9 +11,9 @@ export const TYPE_COLOR = {
 
 export const TYPE_LABEL = {
   cycle: "Ciclo",
-  cluster: "Cluster",
+  cluster: "Clúster",
   funnel: "Embudo",
-  technology: "Tecnologia",
+  technology: "Tecnología",
   ttm: "Time-to-market",
   evidence: "Evidencia",
   budget: "Presupuesto",

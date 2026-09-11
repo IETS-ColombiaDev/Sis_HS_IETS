@@ -82,12 +82,12 @@ def probe_source(db: Session, source: Source, *, persist: bool = True) -> dict:
             previous = (source.schema_signature or "").strip()
             if previous and signature and previous != signature:
                 detail["schema_changed"] = True
-                detail["message"] = "El esquema cambio respecto de la ultima corrida exitosa."
+                detail["message"] = "El esquema cambió respecto de la última corrida exitosa."
                 _store(db, source, "ambar", detail, persist, signature=signature, suspend=True)
                 return detail
             if _looks_empty(body):
                 detail["zero_records"] = True
-                detail["message"] = "Responde con cero registros donde se esperaba senal."
+                detail["message"] = "Responde con cero registros donde se esperaba señal."
                 _store(db, source, "ambar", detail, persist, signature=signature)
                 return detail
 
@@ -97,7 +97,7 @@ def probe_source(db: Session, source: Source, *, persist: bool = True) -> dict:
             source.robots_checked_at = now
             source.robots_allowed = robots.get("allowed")
             if robots.get("allowed") is False:
-                detail["message"] = "robots.txt desaconseja el rastreo automatico."
+                detail["message"] = "robots.txt desaconseja el rastreo automático."
                 _store(db, source, "ambar", detail, persist, suspend=True)
                 return detail
 

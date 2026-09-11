@@ -103,7 +103,8 @@ def test_fda_maps_application_number():
                 "manufacturer_name": ["Acme Biologics"],
             },
             "products": [{"active_ingredients": [{"name": "examplemab"}], "dosage_form": "INJECTION"}],
-            "submissions": [{"submission_status_date": "20260501"}],
+            # openFDA siempre trae tipo y estado: solo la ORIG aprobada (AP) es aprobacion.
+            "submissions": [{"submission_type": "ORIG", "submission_status": "AP", "submission_status_date": "20260501"}],
         },
         "drug/drugsfda",
     )

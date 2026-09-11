@@ -88,6 +88,33 @@ def enqueue_due(db: Session, *, triggered_by: str = "programador") -> list[Inges
     return enqueue(db, due, triggered_by=triggered_by, origin="programado") if due else []
 
 
+def recover_stale(db: Session, *, minutes: int = 30) -> int:
+    """Devuelve a la cola los jobs que quedaron `ejecutando` tras una caida.
+
+    Sin esto, un job huerfano bloquea su fuente para siempre: `enqueue` reutiliza
+    el job pendiente o en ejecucion en lugar de crear uno nuevo.
+    """
+    limit = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    stale = []
+    for job in db.query(IngestJob).filter(IngestJob.status == "ejecutando").all():
+        started = job.started_at or job.created_at
+        if started is not None and started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        if started is None or started < limit:
+            stale.append(job)
+    for job in stale:
+        job.finished_at = datetime.now(timezone.utc)
+        job.message = "Interrumpido: el proceso se detuvo durante la ejecución."
+        if (job.attempts or 0) < (job.max_attempts or 3):
+            job.status = "pendiente"
+            job.scheduled_for = datetime.now(timezone.utc)
+        else:
+            job.status = "error"
+    if stale:
+        db.commit()
+    return len(stale)
+
+
 def tick(db: Session, *, limit: int = 4) -> list[IngestJob]:
     """Toma hasta `limit` jobs vencidos y los ejecuta. Aislados entre si."""
     now = datetime.now(timezone.utc)
@@ -100,6 +127,16 @@ def tick(db: Session, *, limit: int = 4) -> list[IngestJob]:
     )
     done: list[IngestJob] = []
     for job in pending:
+        # Reclamo atomico: el worker regular y un `kick` pueden haber leido el
+        # mismo job pendiente. Solo quien lo pasa a `ejecutando` lo corre.
+        claimed = (
+            db.query(IngestJob)
+            .filter(IngestJob.id == job.id, IngestJob.status == "pendiente")
+            .update({IngestJob.status: "ejecutando"}, synchronize_session=False)
+        )
+        db.commit()
+        if not claimed:
+            continue
         done.append(run_job(db, job.id))
     return done
 
@@ -317,14 +354,14 @@ def list_connectors() -> list[dict]:
     ] + [
         {
             "code": "html",
-            "label": "Rastreo HTML / PDF (ultimo recurso)",
-            "description": "El scraper generico se conserva para referentes sin API.",
+            "label": "Rastreo HTML / PDF (último recurso)",
+            "description": "El scraper genérico se conserva para referentes sin API.",
             "min_interval": 0.0,
             "requires_url": True,
         },
         {
             "code": "pdf",
-            "label": "Extraccion de PDF",
+            "label": "Extracción de PDF",
             "description": "Documentos oficiales sin capa de datos (MHRA, ACE).",
             "min_interval": 0.0,
             "requires_url": True,

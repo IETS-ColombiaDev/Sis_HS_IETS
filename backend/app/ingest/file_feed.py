@@ -44,7 +44,7 @@ class FileFeedConnector(Connector):
         if not endpoint:
             raise ConnectorError(
                 "file_feed necesita download_url o un lote en connector_config.records. "
-                "Para TGA, descargue el CSV/XLSX del ARTG y carguelo como lote."
+                "Para TGA, descargue el CSV/XLSX del ARTG y cárguelo como lote."
             )
 
         payload, content_type = request_bytes(
@@ -128,7 +128,7 @@ def _parse_xlsx(payload: bytes) -> list[dict]:
         from openpyxl import load_workbook
     except ImportError as exc:
         raise ConnectorError(
-            "Para leer XLSX instale openpyxl (ya esta en requirements.txt)."
+            "Para leer XLSX instale openpyxl (ya está en requirements.txt)."
         ) from exc
     book = load_workbook(io.BytesIO(payload), read_only=True, data_only=True)
     sheet = book.active

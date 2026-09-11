@@ -1,11 +1,13 @@
 """Editor de fichas, informes y Mini-HTA (RF13-RF15)."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.orm import Session
 
+from .. import audit, mailer
 from .. import evaluation as catalog
 from .. import evaluation_service
+from ..config import settings
 from ..database import get_db
 from ..deps import get_current_user, require_permission
 from ..evaluation_service import EvaluationRuleError
@@ -62,6 +64,7 @@ def _to_out(
     out.comments = [
         ReviewCommentOut.model_validate(c) for c in evaluation_service.comments_of(db, doc.id)
     ]
+    out.transition_hints = evaluation_service.transition_hints(db, doc, user)
     if not include_body or not coi_ok:
         out.body = None
     return out
@@ -131,13 +134,39 @@ def open_document(
     db: Session = Depends(get_db),
     user: User = Depends(require_permission(P_REPORT_WRITE)),
 ):
+    entry = (
+        db.query(CycleTechnology)
+        .filter(
+            CycleTechnology.cycle_id == payload.cycle_id,
+            CycleTechnology.technology_id == payload.technology_id,
+        )
+        .first()
+    )
+    if entry is None:
+        raise HTTPException(status_code=404, detail="La tecnología no está asignada a este ciclo.")
+    if entry.status not in ("priorizada", "en_evaluacion", "publicada"):
+        raise HTTPException(
+            status_code=409,
+            detail="Solo las tecnologías priorizadas abren expediente de evaluación temprana.",
+        )
+    existing = (
+        db.query(EvaluationDoc.id)
+        .filter(
+            EvaluationDoc.cycle_id == payload.cycle_id,
+            EvaluationDoc.technology_id == payload.technology_id,
+        )
+        .first()
+    )
+    if existing is None and entry.frozen:
+        raise HTTPException(
+            status_code=409,
+            detail="El ciclo está cerrado: no se abren expedientes nuevos en el.",
+        )
     try:
-        doc = evaluation_service.ensure_document(
-            db,
-            payload.cycle_id,
-            payload.technology_id,
-            actor=user.email,
-            product_level=payload.product_level,
+        # Abrir el expediente de una priorizada la pasa a evaluacion: es el
+        # mismo gesto que "Pasar a evaluacion" desde la matriz.
+        doc = evaluation_service.start_evaluation(
+            db, entry, actor=user.email, product_level=payload.product_level
         )
     except EvaluationRuleError as exc:
         raise _http(exc) from exc
@@ -183,7 +212,7 @@ def update_document(
     if not assignment.coi_signed:
         raise HTTPException(
             status_code=403,
-            detail="Sin declaracion de conflicto de interes no se habilita la edicion.",
+            detail="Sin declaración de conflicto de interés no se habilita la edición.",
         )
     try:
         evaluation_service.save_document(
@@ -253,6 +282,7 @@ def transition_document(
 def invite_reviewer(
     doc_id: int,
     payload: ReviewInviteIn,
+    request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(require_permission(P_CYCLE_WRITE)),
 ):
@@ -271,11 +301,61 @@ def invite_reviewer(
     db.commit()
     db.refresh(assignment)
     path = f"/revisar/{token}" if token else ""
+
+    # P3-2: con SMTP configurado el enlace viaja por correo; sin el, la interfaz
+    # lo muestra una sola vez para copiarlo (comportamiento previo).
+    email_sent = False
+    email_detail = ""
+    if token:
+        base = (settings.public_base_url or str(request.base_url)).rstrip("/")
+        result = mailer.reviewer_invitation(
+            to=assignment.reviewer_email,
+            reviewer_name=assignment.reviewer_name,
+            doc_title=doc.title or f"Documento {doc.id}",
+            link=f"{base}{path}",
+            days=evaluation_service.reviewer_token_days(db),
+        )
+        email_sent, email_detail = result.sent, result.detail
+        if email_sent:
+            assignment.status = "invitacion_enviada" if assignment.status == "invitado" else assignment.status
+            audit.record_action(
+                db,
+                entity_type="review_assignments",
+                entity_id=assignment.id,
+                action="review:invite_email",
+                new_value={"email": assignment.reviewer_email, "actor": user.email},
+            )
+            db.commit()
+            db.refresh(assignment)
     return ReviewInviteOut(
         assignment=ReviewAssignmentOut.model_validate(assignment),
         token=token,
         invite_path=path,
+        email_sent=email_sent,
+        email_detail=email_detail,
     )
+
+
+@router.post("/{doc_id}/assignments/{assignment_id}/revoke", response_model=EvaluationDocOut)
+def revoke_reviewer(
+    doc_id: int,
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CYCLE_WRITE)),
+):
+    """Revoca una invitacion pendiente: el enlace deja de abrir el portal."""
+    doc = _get_doc(db, doc_id)
+    assignment = db.get(ReviewAssignment, assignment_id)
+    if assignment is None or assignment.doc_id != doc.id:
+        raise HTTPException(status_code=404, detail="Invitación no encontrada")
+    try:
+        evaluation_service.revoke_assignment(db, assignment, actor=user.email)
+    except EvaluationRuleError as exc:
+        raise _http(exc) from exc
+    db.commit()
+    db.refresh(doc)
+    bump_state_version(db)
+    return _to_out(db, doc, include_body=True, user=user)
 
 
 @router.get("/{doc_id}/versions", response_model=list[EvaluationVersionOut])
@@ -289,7 +369,7 @@ def list_versions(
     if not assignment.coi_signed:
         raise HTTPException(
             status_code=403,
-            detail="Sin declaracion de conflicto de interes no se habilita la lectura.",
+            detail="Sin declaración de conflicto de interés no se habilita la lectura.",
         )
     return [
         EvaluationVersionOut.model_validate(v)
@@ -309,14 +389,14 @@ def add_internal_comment(
     ):
         raise HTTPException(
             status_code=403,
-            detail="Se requiere permiso de informe o de revision para comentar.",
+            detail="Se requiere permiso de informe o de revisión para comentar.",
         )
     doc = _get_doc(db, doc_id)
     assignment = evaluation_service.ensure_internal_assignment(db, doc, user)
     if not assignment.coi_signed:
         raise HTTPException(
             status_code=403,
-            detail="Sin declaracion de conflicto de interes no se habilitan comentarios.",
+            detail="Sin declaración de conflicto de interés no se habilitan comentarios.",
         )
     try:
         row = evaluation_service.add_comment(
@@ -345,7 +425,7 @@ def export_html(
     if not assignment.coi_signed:
         raise HTTPException(
             status_code=403,
-            detail="Sin declaracion de conflicto de interes no se habilita la exportacion.",
+            detail="Sin declaración de conflicto de interés no se habilita la exportación.",
         )
     tech = db.get(Technology, doc.technology_id)
     cycle = db.get(Cycle, doc.cycle_id)

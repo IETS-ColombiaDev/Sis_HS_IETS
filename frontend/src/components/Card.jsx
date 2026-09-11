@@ -5,10 +5,14 @@ import InfoTip from "./InfoTip";
  * varias pantallas venian repitiendo a mano: un `SectionTitle` seguido de un
  * parrafo de contexto. Sin ellos el componente se comporta como antes.
  */
-export function Card({ children, style, padding = 24, title, hint, actions }) {
+export function Card({ children, style, padding = 24, title, hint, actions, className, "data-testid": testId }) {
   const hasHeader = Boolean(title || actions);
   return (
     <div
+      // `className` se ignoraba: las paginas que lo pasaban (tarjetas del
+      // catalogo, paneles de vigilancia) no recibian sus estilos.
+      className={className}
+      data-testid={testId}
       style={{
         background: "#fff",
         border: "1px solid #E2E8F0",
@@ -45,7 +49,7 @@ export function PageHeader({ title, subtitle, actions, titleHint }) {
     typeof title === "string" && titleHint ? (
       <span className="term-label">
         {title}
-        <InfoTip text={titleHint} label={`Que es ${title}`} />
+        <InfoTip text={titleHint} label={`Qué es ${title}`} />
       </span>
     ) : (
       title
@@ -87,7 +91,7 @@ export function SectionTitle({ children, right, hint }) {
         {hint ? (
           <InfoTip
             text={hint}
-            label={typeof children === "string" ? `Que es ${children}` : "Mas informacion"}
+            label={typeof children === "string" ? `Qué es ${children}` : "Más información"}
           />
         ) : null}
       </h3>

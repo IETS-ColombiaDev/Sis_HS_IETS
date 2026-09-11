@@ -10,30 +10,33 @@ import Icon from "./Icon";
 import Tooltip from "./Tooltip";
 import InfoTip from "./InfoTip";
 import SafeAvatar from "./SafeAvatar";
+import Modal from "./Modal";
+import ChangePasswordForm from "./ChangePasswordForm";
+import { useToast } from "./Toast";
 
 const NAV = [
-  { section: "Operacion diaria" },
+  { section: "Operación diaria" },
   { to: "/", label: "Bandeja de trabajo", icon: "home", end: true, help: GLOSSARY.bandeja_trabajo },
   { to: "/ciclos", label: "Ciclos de escaneo", icon: "calendar", help: GLOSSARY.ciclo },
-  { section: "Metodologia IETS" },
+  { section: "Metodología IETS" },
   { to: "/vigilancia", label: "1. Vigilancia", icon: "radar", help: GLOSSARY.vigilancia },
-  { to: "/fuentes", label: "Catalogo de fuentes", icon: "globe", help: GLOSSARY.catalogo_fuentes },
+  { to: "/fuentes", label: "Catálogo de fuentes", icon: "globe", help: GLOSSARY.catalogo_fuentes },
   { to: "/bandeja-entrada", label: "Bandeja de entrada", icon: "inbox", help: GLOSSARY.bandeja_entrada },
   { to: "/postulaciones", label: "Postulaciones", icon: "note", help: GLOSSARY.postulacion },
-  { to: "/filtrado", label: "Filtrado y depuracion", icon: "filter", help: GLOSSARY.filtrado },
-  { to: "/priorizacion", label: "2. Priorizacion", icon: "layers", help: GLOSSARY.priorizacion },
-  { to: "/evaluacion", label: "3. Evaluacion", icon: "doc", help: GLOSSARY.evaluacion },
-  { to: "/diseminacion", label: "4. Diseminacion", icon: "bulb", help: GLOSSARY.diseminacion },
+  { to: "/filtrado", label: "Filtrado y depuración", icon: "filter", help: GLOSSARY.filtrado },
+  { to: "/priorizacion", label: "2. Priorización", icon: "layers", help: GLOSSARY.priorizacion },
+  { to: "/evaluacion", label: "3. Evaluación", icon: "doc", help: GLOSSARY.evaluacion },
+  { to: "/diseminacion", label: "4. Diseminación", icon: "bulb", help: GLOSSARY.diseminacion },
   { to: "/boletines", label: "Boletines del ciclo", icon: "doc", help: GLOSSARY.boletin },
-  { to: "/notas", label: "Notas del equipo", icon: "note", help: "Notas internas del equipo, vinculadas a senales, fuentes o informes. No son el informe publico." },
-  { section: "Analisis y alertas" },
-  { to: "/dashboards", label: "Tablero estrategico", icon: "chart", help: GLOSSARY.tablero },
+  { to: "/notas", label: "Notas del equipo", icon: "note", help: "Notas internas del equipo, vinculadas a señales, fuentes o informes. No son el informe público." },
+  { section: "Análisis y alertas" },
+  { to: "/dashboards", label: "Tablero estratégico", icon: "chart", help: GLOSSARY.tablero },
   { to: "/alertas", label: "Alertas tempranas", icon: "pulse", help: GLOSSARY.alertas },
-  { to: "/senales", label: "Senales capturadas", icon: "list", help: GLOSSARY.senal },
+  { to: "/senales", label: "Señales capturadas", icon: "list", help: GLOSSARY.senal },
   { to: "/chat", label: "Asistente IA", icon: "chat", help: GLOSSARY.minimax },
-  { section: "Administracion", permission: "config:manage" },
-  { to: "/auditoria", label: "Bitacora de auditoria", icon: "shield", permission: "audit:read", help: GLOSSARY.bitacora },
-  { to: "/configuracion", label: "Configuracion", icon: "cog", permission: "config:manage", help: "Parametros de la metodologia, el modelo de IA y las llaves de las fuentes automaticas." },
+  { section: "Administración", permission: "config:manage" },
+  { to: "/auditoria", label: "Bitácora de auditoría", icon: "shield", permission: "audit:read", help: GLOSSARY.bitacora },
+  { to: "/configuracion", label: "Configuración", icon: "cog", permission: "config:manage", help: "Parámetros de la metodología, el modelo de IA y las llaves de las fuentes automáticas." },
   { to: "/usuarios", label: "Usuarios y perfiles", icon: "users", permission: "user:manage", help: GLOSSARY.rbac },
 ];
 
@@ -180,14 +183,14 @@ function Sidebar({ open, onClose }) {
                   )}
                 </NavLink>
                 {item.help && (
-                  <InfoTip text={item.help} position="right" label={`Que es ${item.label}`} />
+                  <InfoTip text={item.help} position="right" label={`Qué es ${item.label}`} />
                 )}
               </div>
             );
           })}
         </nav>
         <div style={{ padding: 16, borderTop: "1px solid #E2E8F0", fontSize: 11, color: "#94A3B8" }}>
-          Sistema de alerta temprana de tecnologias sanitarias.
+          Sistema de alerta temprana de tecnologías sanitarias.
         </div>
       </aside>
     </>
@@ -205,7 +208,7 @@ function GeminiPill({ status, isAdmin }) {
     ? `Inteligencia artificial activa (${label}).${status?.ai_ocr_enabled ? " OCR de sitios habilitado." : ""}${isAdmin ? " Clic para gestionar." : ""}`
     : isAdmin
     ? "La IA no tiene token. Clic para configurar MiniMax."
-    : "La IA no esta configurada. Solicite a un administrador la llave de MiniMax.";
+    : "La IA no está configurada. Solicite a un administrador la llave de MiniMax.";
   return (
     <Tooltip text={tip}>
       <button
@@ -262,7 +265,7 @@ function CycleSelector() {
 
   if (cycles.length === 0) {
     return (
-      <Tooltip text="Aun no hay ciclos operativos. La priorizacion requiere uno.">
+      <Tooltip text="Aún no hay ciclos operativos. La priorización requiere uno.">
         <button className="cycle-pill cycle-pill-empty" onClick={() => navigate("/ciclos")}>
           <Icon name="calendar" size={15} />
           Crear ciclo de trabajo
@@ -276,7 +279,7 @@ function CycleSelector() {
 
   return (
     <div className="cycle-switcher" ref={boxRef}>
-      <InfoTip text={GLOSSARY.ciclo} position="bottom" label="Que es un ciclo de escaneo" />
+      <InfoTip text={GLOSSARY.ciclo} position="bottom" label="Qué es un ciclo de escaneo" />
       <button
         type="button"
         className="cycle-pill cycle-pill-button"
@@ -318,7 +321,7 @@ function CycleSelector() {
           )}
           {historic.length > 0 && (
             <div className="cycle-switcher-group">
-              <div className="cycle-switcher-label">Historicos / cerrados</div>
+              <div className="cycle-switcher-label">Históricos / cerrados</div>
               {historic.map((c) => (
                 <CycleOption
                   key={c.id}
@@ -352,13 +355,51 @@ function CycleOption({ cycle, selected, onPick }) {
         <span className={`cycle-option-status tone-${cycle.status || "en_configuracion"}`}>
           {cycleStatusLabel(cycle)}
         </span>
-        {cycle.is_historic && <span className="cycle-option-hist">Historico</span>}
+        {cycle.is_historic && <span className="cycle-option-hist">Histórico</span>}
       </div>
       <div className="cycle-option-dates">
         Apertura {cycle.opened_on || "—"} · Corte {cycle.data_cutoff_on || "—"}
-        {cycle.bulletin_due_on ? ` · Boletin ${cycle.bulletin_due_on}` : ""}
+        {cycle.bulletin_due_on ? ` · Boletín ${cycle.bulletin_due_on}` : ""}
       </div>
     </button>
+  );
+}
+
+// Titulo de la cabecera por ruta: coincide con el nombre del modulo en el menu.
+const TITLES = {
+  "/": "Bandeja de trabajo",
+  "/ciclos": "Ciclos de escaneo",
+  "/dashboards": "Tablero estratégico",
+  "/vigilancia": "Vigilancia",
+  "/fuentes": "Catálogo de fuentes",
+  "/bandeja-entrada": "Bandeja de entrada",
+  "/postulaciones": "Postulaciones",
+  "/filtrado": "Filtrado y depuración",
+  "/senales": "Señales capturadas",
+  "/priorizacion": "Priorización",
+  "/evaluacion": "Evaluación temprana",
+  "/diseminacion": "Diseminación",
+  "/boletines": "Boletines del ciclo",
+  "/alertas": "Alertas tempranas",
+  "/notas": "Notas del equipo",
+  "/chat": "Asistente IA",
+  "/auditoria": "Bitácora de auditoría",
+  "/usuarios": "Usuarios y perfiles",
+  "/configuracion": "Configuración",
+};
+
+function EnvironmentBanner() {
+  const { status } = useAuth();
+  const env = status?.environment;
+  if (!env || env === "production") return null;
+  const label = env === "testing" ? "Entorno de pruebas" : "Entorno de desarrollo";
+  return (
+    <div className="env-banner" role="note">
+      <strong>{label}.</strong>{" "}
+      {status?.dev_login_enabled
+        ? "El acceso sin contraseña está habilitado; en producción se apaga solo."
+        : "Los datos pueden no ser los oficiales."}
+    </div>
   );
 }
 
@@ -366,32 +407,27 @@ function Header({ onToggle }) {
   const { user, logout, status, isAdmin } = useAuth();
   const { updatedAt } = useRealtime();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pwdOpen, setPwdOpen] = useState(false);
+  const toast = useToast();
   const location = useLocation();
 
-  const titles = {
-    "/": "Bandeja de trabajo",
-    "/ciclos": "Ciclos de escaneo",
-    "/dashboards": "Indicadores",
-    "/vigilancia": "Vigilancia",
-    "/escaneo": "Vigilancia",
-    "/fuentes": "Inventario de fuentes",
-    "/bandeja-entrada": "Bandeja de entrada",
-    "/filtrado": "Filtrado y depuracion",
-    "/senales": "Senales capturadas",
-    "/priorizacion": "Priorizacion",
-    "/hallazgos": "Senales capturadas",
-    "/caracterizacion": "Caracterizacion",
-    "/diseminacion": "Diseminacion",
-    "/recomendaciones": "Diseminacion",
-    "/notas": "Notas",
-    "/chat": "Asistente IA",
-    "/auditoria": "Bitacora de auditoria",
-    "/usuarios": "Usuarios y perfiles",
-    "/configuracion": "Configuracion",
-  };
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onKey = (ev) => {
+      if (ev.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+
+  const title = TITLES[location.pathname] || "IETS";
+  useEffect(() => {
+    document.title = `${title} | Escaneo de Horizonte IETS`;
+  }, [title]);
 
   return (
     <header
+      className="app-header"
       style={{
         height: 64,
         background: "rgba(255,255,255,0.9)",
@@ -406,10 +442,10 @@ function Header({ onToggle }) {
         padding: "0 24px",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+      <div className="app-header-left" style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
         <button
           onClick={onToggle}
-          aria-label="Menu"
+          aria-label="Abrir menú de módulos"
           className="hamburger"
           style={{
             border: "1px solid #E2E8F0",
@@ -423,13 +459,13 @@ function Header({ onToggle }) {
         >
           ☰
         </button>
-        <h2 style={{ fontSize: 20, fontWeight: 700 }}>{titles[location.pathname] || "IETS"}</h2>
+        <h2 className="header-title" style={{ fontSize: 20, fontWeight: 700 }}>{title}</h2>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div className="app-header-right" style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
         <CycleSelector />
 
-        <Tooltip text={`Sincronizacion en tiempo real.${updatedAt ? ` Ultima: ${new Date(updatedAt).toLocaleTimeString()}.` : ""}`}>
+        <Tooltip text={`Sincronización en tiempo real.${updatedAt ? ` Última: ${new Date(updatedAt).toLocaleTimeString()}.` : ""}`}>
           <div className="header-status" title="En vivo">
             <span className="header-status-dot" />
             <span className="header-status-label">En vivo</span>
@@ -443,6 +479,9 @@ function Header({ onToggle }) {
         <div style={{ position: "relative" }}>
           <button
             onClick={() => setMenuOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label={`Menú de ${user?.name || "usuario"}`}
             style={{
               display: "flex",
               alignItems: "center",
@@ -455,8 +494,8 @@ function Header({ onToggle }) {
             <SafeAvatar user={user} />
             <div style={{ textAlign: "left" }} className="user-meta">
               <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{user?.name}</div>
-              <div style={{ fontSize: 11, color: "#94A3B8", textTransform: "capitalize" }}>
-                {user?.role}
+              <div style={{ fontSize: 11, color: "#94A3B8" }}>
+                {user?.role_label || user?.role}
               </div>
             </div>
           </button>
@@ -480,9 +519,25 @@ function Header({ onToggle }) {
                 <div style={{ padding: "12px 16px", borderBottom: "1px solid #E2E8F0" }}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.name}</div>
                   <div style={{ fontSize: 12, color: "#64748B" }}>{user?.email}</div>
+                  <div style={{ fontSize: 11, color: "#4F46E5", fontWeight: 600, marginTop: 4 }}>
+                    {user?.role_label}
+                    {user?.rateable_criteria?.length ? ` · califica ${user.rateable_criteria.join(", ")}` : ""}
+                  </div>
                 </div>
                 <button
-                  onClick={logout}
+                  role="menuitem"
+                  className="user-menu-item"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setPwdOpen(true);
+                  }}
+                >
+                  <Icon name="shield" size={17} />
+                  Cambiar contraseña
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={() => logout()}
                   style={{
                     width: "100%",
                     textAlign: "left",
@@ -499,13 +554,22 @@ function Header({ onToggle }) {
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   <Icon name="logout" size={17} />
-                  Cerrar sesion
+                  Cerrar sesión
                 </button>
               </div>
             </>
           )}
         </div>
       </div>
+      <Modal open={pwdOpen} onClose={() => setPwdOpen(false)} title="Cambiar contraseña" width={460}>
+        <ChangePasswordForm
+          onCancel={() => setPwdOpen(false)}
+          onDone={() => {
+            setPwdOpen(false);
+            toast.success("Contraseña actualizada. Sus otras sesiones se cerraron.");
+          }}
+        />
+      </Modal>
     </header>
   );
 }
@@ -514,10 +578,12 @@ export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   return (
     <div>
+      <a href="#contenido" className="skip-link">Saltar al contenido</a>
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="content-shell" style={{ marginLeft: 280, minHeight: "100vh" }}>
+        <EnvironmentBanner />
         <Header onToggle={() => setSidebarOpen((v) => !v)} />
-        <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }} className="fade-in">
+        <main id="contenido" tabIndex={-1} style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }} className="fade-in">
           {children}
         </main>
       </div>

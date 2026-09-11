@@ -339,7 +339,7 @@ def test_connection(api_key: str | None = None) -> dict:
         if not text or text.startswith("[Error"):
             return {
                 "ok": False,
-                "message": text or "El modelo no devolvio contenido.",
+                "message": text or "El modelo no devolvió contenido.",
                 "model": used or chosen,
                 "available_models": models,
             }
@@ -349,13 +349,13 @@ def test_connection(api_key: str | None = None) -> dict:
             extra = f" {remains['summary']}"
         return {
             "ok": True,
-            "message": f"Conexion MiniMax exitosa. Modelo activo: {used}.{extra}",
+            "message": f"Conexión MiniMax exitosa. Modelo activo: {used}.{extra}",
             "model": used,
             "available_models": models,
             "coding_plan": remains,
         }
     except Exception as exc:  # noqa: BLE001
-        return {"ok": False, "message": f"Error de conexion con MiniMax: {exc}", "model": ""}
+        return {"ok": False, "message": f"Error de conexión con MiniMax: {exc}", "model": ""}
 
 
 def coding_plan_remains(api_key: str | None = None) -> dict:

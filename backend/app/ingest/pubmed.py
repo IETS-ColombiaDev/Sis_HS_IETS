@@ -33,8 +33,8 @@ class PubmedConnector(Connector):
     code = "pubmed"
     label = "PubMed (E-Utilities)"
     description = (
-        "Indice de literatura del NCBI. Recupera articulos recientes de "
-        "escaneo de horizonte y tecnologias emergentes como evidencia."
+        "Índice de literatura del NCBI. Recupera artículos recientes de "
+        "escaneo de horizonte y tecnologías emergentes como evidencia."
     )
     min_interval = 0.12
     adapter_version = "2"
@@ -60,7 +60,7 @@ class PubmedConnector(Connector):
         )
         idlist = ((search.get("esearchresult") or {}).get("idlist")) or []
         if not idlist:
-            return ConnectorResult(records=[], message="PubMed no devolvio identificadores.")
+            return ConnectorResult(records=[], message="PubMed no devolvió identificadores.")
 
         summary = request_json(
             ESUMMARY,
@@ -76,7 +76,7 @@ class PubmedConnector(Connector):
                 records.append(rec)
         return ConnectorResult(
             records=records,
-            message=f"{len(records)} articulos de PubMed.",
+            message=f"{len(records)} artículos de PubMed.",
             schema_signature=schema_signature(summary),
             adapter_version=self.adapter_version,
             endpoint=ESUMMARY,

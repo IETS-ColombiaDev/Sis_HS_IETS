@@ -11,13 +11,17 @@ Inspirado en el modelo operativo del
 [NIHR Innovation Observatory](https://io.nihr.ac.uk/) y construido sobre la línea gráfica
 corporativa definida en [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md).
 
-**Versión:** 6.1.0 · **Stack:** FastAPI + React 18 + SQLite (compatible con PostgreSQL 15)
+**Versión:** 7.0.0 · **Stack:** FastAPI + React 18 · PostgreSQL 15 en producción (SQLite en desarrollo) · Alembic · Docker
 
-> **v6.0 — Fases 0 a 6 del [plan de actualización](Plan_Fases_Actualizacion_Plataforma_EH_IETS.md).**
-> El ciclo es el eje, la priorización usa la matriz P1–P6, la evaluación temprana
-> tiene ficha/Mini-HTA y pares, y la cara visible ya está: tablero estratégico,
-> ficha pública, boletín trimestral con aprobación y alertas en plataforma.
-> El detalle de cumplimiento está en [`BACKLOG.md`](BACKLOG.md).
+> **v7.0 — Producto de producción.** Sobre las fases 0 a 6 del
+> [plan de actualización](Plan_Fases_Actualizacion_Plataforma_EH_IETS.md), esta versión
+> cierra la fase 0 pendiente y el endurecimiento de la fase 7: acceso con correo y
+> contraseña (Google queda opcional), módulo de administración de usuarios completo,
+> perfil de entorno de producción, migraciones Alembic, contenedores, CI/CD, vigilancia
+> y barrido de duplicados programados, correo, reCAPTCHA real, paquete de diseminación,
+> bandeja de trabajo por perfil y tablero de gobernanza completo. Cada flujo está
+> cubierto por pruebas unitarias, de regresión de API y de navegador (E2E).
+> Despliegue: [`DEPLOY.md`](DEPLOY.md) · Cumplimiento: [`BACKLOG.md`](BACKLOG.md).
 
 ---
 
@@ -29,6 +33,7 @@ corporativa definida en [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md).
 - [Filtrado, desduplicación e INVIMA](#filtrado-desduplicación-e-invima)
 - [Matriz oficial de priorización %P](#matriz-oficial-de-priorización-p)
 - [Perfiles y permisos](#perfiles-y-permisos)
+- [Acceso, cuentas y seguridad](#acceso-cuentas-y-seguridad)
 - [Bitácora de auditoría](#bitácora-de-auditoría)
 - [Catálogos y parámetros metodológicos](#catálogos-y-parámetros-metodológicos)
 - [Arquitectura](#arquitectura)
@@ -82,8 +87,8 @@ Cuatro conceptos ordenan todo el sistema. Entenderlos evita la mayor parte de la
 | **6. Diseminación** | Alertas | `/alertas` | Fase III en país y alto riesgo presupuestal |
 | **Análisis** | Asistente IA | `/chat` | Chat con contexto sobre los datos del sistema |
 | **Gobierno** | **Auditoría** | `/auditoria` | Bitácora inmutable con filtros y vida completa de cada entidad |
-| **Admin** | Usuarios y perfiles | `/usuarios` | Perfiles RBAC y cuentas |
-| **Admin** | Configuración | `/configuracion` | Gemini, catálogos y parámetros metodológicos |
+| **Admin** | Usuarios y perfiles | `/usuarios` | Alta, edición, perfil, contraseña temporal, desbloqueo, activación y baja de cuentas; matriz de permisos |
+| **Admin** | Configuración | `/configuracion` | IA, llaves de fuentes, tareas programadas, catálogos y parámetros metodológicos |
 
 **Rutas heredadas** (redirección automática): `/escaneo → /vigilancia`, `/hallazgos → /senales`, `/recomendaciones → /diseminacion`, `/caracterizacion → /evaluacion`.
 
@@ -241,6 +246,44 @@ El frontend no reimplementa la autorización: `GET /api/auth/me` devuelve `permi
 
 ---
 
+## Acceso, cuentas y seguridad
+
+### Cómo se entra
+
+| Vía | Cuándo | Notas |
+|---|---|---|
+| **Correo y contraseña** | Siempre (vía principal de producción) | Cuentas creadas por el superadministrador en `/usuarios` |
+| Google institucional | Solo con `GOOGLE_CLIENT_ID` | Sin la variable, el botón no aparece |
+| Acceso de desarrollo | Solo fuera de producción | Se apaga solo con `ENVIRONMENT=production`, aunque `ALLOW_DEV_LOGIN=true`; el intento queda en bitácora |
+
+### Ciclo de vida de una cuenta
+
+1. El superadministrador crea la cuenta en `/usuarios` (o la primera, por consola: `python -m app.cli create-admin --email persona@iets.org.co --name "Nombre"`).
+2. El sistema genera una **contraseña temporal** que se muestra **una sola vez**.
+3. En el primer ingreso la persona debe cambiarla: hasta hacerlo, la API solo le permite consultar su perfil y cambiar la contraseña.
+4. Para retirar a alguien se **desactiva** la cuenta (se cierra su sesión de inmediato y su historia se conserva). Eliminar solo es posible en cuentas que nunca se usaron.
+
+### Salvaguardas
+
+- **Contraseñas:** hash `scrypt` con sal (biblioteca estándar); política de 10 caracteres mínimo con letras y números y sin el usuario del correo. El hash nunca sale por la API ni se copia a la bitácora.
+- **Fuerza bruta:** bloqueo de la cuenta 15 minutos tras 5 intentos fallidos, más un límite de 30 intentos por IP cada 5 minutos. El mensaje de error es el mismo exista o no la cuenta.
+- **Sesiones:** JWT firmado con `typ=session` y versión de credenciales. Cambiar o restablecer la contraseña, o desactivar la cuenta, invalida las sesiones abiertas. El enlace del revisor externo (`typ=review`) no abre sesión interna.
+- **Gobierno:** nunca queda el sistema sin un superadministrador activo; nadie se quita su propio perfil ni se desactiva.
+- **Producción (`ENVIRONMENT=production`):** el servidor no arranca con la `SECRET_KEY` de ejemplo o corta; se envían `Strict-Transport-Security`, `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options` y `Referrer-Policy`; las respuestas de la API llevan `Cache-Control: no-store`.
+- **Bitácora de acceso:** `auth:login`, `auth:login_failed` (los intentos sin cuenta quedan como `anonimo:<correo>`), `auth:locked`, `auth:unlocked`, `auth:password_changed`, `auth:password_reset`, `auth:dev_login_denied`, `users:delete`.
+
+### Comandos de administración (desde `backend/`)
+
+| Comando | Uso |
+|---|---|
+| `python -m app.cli create-admin --email X --name "Y"` | Crea o promueve un superadministrador (sin `--password` genera una temporal; `--password -` la pide sin eco) |
+| `python -m app.cli reset-password --email X` | Asigna una contraseña temporal |
+| `python -m app.cli list-users` | Lista cuentas, perfil, estado y si tienen contraseña |
+| `python -m app.cli check-config` | Valida la configuración del entorno; sale con código 1 si la de producción es insegura |
+| `python -m app.migrations` | Lleva la base a la última migración de Alembic |
+
+---
+
 ## Bitácora de auditoría
 
 Toda creación, modificación y borrado sobre las entidades sensibles queda registrado con **usuario, correo, IP, ruta, identificador de petición, valor anterior y valor nuevo**.
@@ -374,10 +417,17 @@ Sis_HS_IETS/
 │   │   ├── scraper.py              # Pipeline de vigilancia
 │   │   ├── gemini_service.py       # Integración IA
 │   │   ├── seed_data.py            # 29 referentes iniciales
-│   │   └── routers/                # auth, cycles, technologies, priority,
+│   │   ├── security.py             # JWT de sesión, scrypt y política de contraseñas
+│   │   ├── ratelimit.py            # Límite de intentos por IP
+│   │   ├── cli.py                  # create-admin, reset-password, check-config
+│   │   ├── migrations.py           # Adopción y ejecución de Alembic
+│   │   ├── scheduler_service.py    # Vigilancia y barrido de duplicados programados
+│   │   ├── mailer.py               # Correo de invitaciones y alertas (SMTP)
+│   │   └── routers/                # auth, users, cycles, technologies, priority,
 │   │                               # screening, invima, catalogs, audit, …
-│   ├── tests/                      # 134 pruebas unitarias
-│   ├── smoke_test.py               # Suite de regresión E2E (63 verificaciones)
+│   ├── alembic/                    # Migraciones versionadas (baseline 0001)
+│   ├── tests/                      # Pruebas unitarias e integración (pytest)
+│   ├── smoke_test.py               # Suite de regresión E2E de la API
 │   ├── requirements.txt
 │   └── .env.example
 ├── frontend/
@@ -388,8 +438,14 @@ Sis_HS_IETS/
 │   │   ├── auth/AuthContext.jsx    # JWT y permisos
 │   │   ├── realtime/               # Polling de state_version
 │   │   └── constants/methodology.js
+│   ├── e2e/                        # Pruebas de navegador (Playwright)
 │   └── dist/                       # Build servido por FastAPI en producción
-├── start.ps1                       # Arranque rápido en Windows
+├── deploy/                         # Entrypoint, Caddy, .env de producción, respaldos
+├── .github/workflows/ci.yml        # CI: pytest, PostgreSQL, build, E2E, regresión, imagen
+├── Dockerfile · docker-compose.yml # Imagen y servicios de producción
+├── DEPLOY.md                       # Guía de despliegue y operación
+├── start.ps1                       # Arranque rápido en Windows (desarrollo)
+├── start-prod.ps1                  # Arranque de producción en Windows sin contenedores
 ├── Plan_Fases_Actualizacion_Plataforma_EH_IETS.md
 ├── BACKLOG.md                      # Trazabilidad RF, diagramas y roadmap
 ├── linea-grafica-y-ux-ui.md        # Design system
@@ -474,12 +530,30 @@ Documentación interactiva: **`http://127.0.0.1:8000/docs`**
 | `/api/alerts` | Bandeja y suscripciones |
 | `/api/public/strategy/stats` · `/api/public/technologies` | Transparencia y fichas públicas |
 
+### Nueva en v7.0 (producción)
+
+| Método y ruta | Propósito |
+|---|---|
+| `POST /api/auth/login` · `POST /api/auth/change-password` | Acceso con contraseña (bloqueo y límite por IP) y cambio de contraseña propia |
+| `GET` · `POST /api/users` · `GET` · `PUT` · `DELETE /api/users/{id}` | CRUD de cuentas con salvaguardas de gobierno |
+| `POST /api/users/{id}/reset-password` · `/unlock` · `GET /api/users/permissions` | Contraseña temporal, desbloqueo y catálogo legible de permisos |
+| `GET /api/dashboard/my-work` | Pendientes accionables del perfil en la bandeja de trabajo |
+| `GET /api/strategy/dashboard/export` | Recorte del tablero en CSV o Excel, respetando la capa restringida |
+| `DELETE /api/cycles/{id}` | Eliminar un ciclo en configuración y sin trabajo |
+| `GET /api/technologies/{id}/locate` | Dónde está una tecnología en cada ciclo (enlaces directos `?tecnologia=`) |
+| `POST /api/reports/{id}/assignments/{aid}/revoke` | Revocar una invitación de revisión |
+| `POST /api/alerts/read-all` · `GET /api/alerts/channels` | Bandeja de alertas y canales activos (plataforma, correo) |
+| `GET` · `PUT /api/config/schedule` · `GET /schedule/runs` · `POST /schedule/{task}/run` | Vigilancia y barrido de duplicados programados |
+| `GET /api/recommendations/package/{cycle_id}` | Paquete ZIP de diseminación del ciclo (sin confidenciales) |
+| `POST /api/ingest/reprocess` | Reproceso del crudo con el mapeo vigente (simulación por defecto) |
+| `DELETE /api/clusters/{id}` · `/api/tech-types/{id}` · `GET /api/findings/stats` · `GET /api/audit/entities` | Complementos de los CRUD existentes |
+
 ### Operación heredada
 
 | Prefijo | Endpoints principales |
 |---|---|
-| `/api/health` · `/api/status` | Estado del servicio |
-| `/api/auth` | `POST /google`, `POST /dev-login`, `GET /me` |
+| `/api/health` · `/api/status` | Estado del servicio (entorno y modos de acceso) |
+| `/api/auth` | `POST /login`, `POST /change-password`, `POST /google`, `POST /dev-login`, `GET /me` |
 | `/api/sources` | CRUD, categorías, export CSV, alta rápida |
 | `/api/scan` | `POST /run`, `POST /source/{id}`, `POST /preview`, `GET /logs` |
 | `/api/ingest` | `POST /run`, `GET /jobs`, `GET /connectors`, `POST /sources/import`, `POST /sources/{id}/probe`, `GET /health`, `GET /coverage` |
@@ -558,6 +632,13 @@ npm run build      # genera frontend/dist
 
 Con `frontend/dist` presente, **solo hace falta el backend**: sirve la SPA en `/` y la API en `/api/*`.
 
+Para un servidor de producción siga [`DEPLOY.md`](DEPLOY.md): Docker Compose con PostgreSQL 15 y HTTPS, o `start-prod.ps1` en Windows sin contenedores. Resumen:
+
+1. Defina `ENVIRONMENT=production` y una `SECRET_KEY` propia (`python -m app.cli check-config` lo valida).
+2. Cree el primer superadministrador: `python -m app.cli create-admin --email persona@iets.org.co --name "Nombre"`.
+3. Arranque: las migraciones de Alembic se aplican solas y el acceso de desarrollo queda apagado.
+4. Verifique con la suite de regresión usando contraseña: `smoke_test.py --base https://… --email persona@iets.org.co --password …`.
+
 ---
 
 ## Verificación
@@ -569,7 +650,18 @@ cd backend
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-134 pruebas sobre el motor de priorización, la máquina de estados del ciclo, el RBAC, los catálogos, el filtrado, la evaluación temprana (COI, seis estados, Mini-HTA y token de revisor) y la bitácora.
+Cubren el motor de priorización y sus bordes, la máquina de estados del ciclo, el RBAC por campo, los catálogos, el filtrado difuso e INVIMA, la ingesta y los conectores con crudo real, la evaluación temprana, los tableros (900 combinaciones de filtros contra conteos independientes y bordes de franjas TTM), el acceso con contraseña y la administración de cuentas, las migraciones de Alembic y el arranque sobre una base vacía.
+
+### Pruebas de navegador (E2E, Playwright)
+
+```powershell
+cd frontend
+npm run build
+npx playwright test                                        # autocontenido: levanta el backend sobre SQLite temporal
+$env:E2E_BASE_URL="http://127.0.0.1:8000"; npx playwright test   # contra un servidor ya levantado
+```
+
+Recorren la interfaz con los cinco perfiles: navegación sin errores de consola, acceso y administración de usuarios, cada CRUD, el ciclo completo (captura, bandeja, filtrado, priorización, evaluación, pares, cierre, boletín y alertas), enlaces directos, tableros por perfil y ausencia de desbordes en un teléfono de 390 px. Usan el Chrome instalado (`E2E_CHANNEL=chromium` en CI).
 
 ### Suite de regresión de extremo a extremo
 
@@ -577,14 +669,16 @@ Con el servidor en marcha:
 
 ```powershell
 cd backend
-.\.venv\Scripts\python.exe smoke_test.py
 .\.venv\Scripts\python.exe smoke_test.py --base http://127.0.0.1:8000 --skip-network
+# En producción (sin acceso de desarrollo):
+.\.venv\Scripts\python.exe smoke_test.py --base https://… --skip-network --email persona@iets.org.co --password …
 ```
 
-63 verificaciones agrupadas por fase:
+La suite trabaja sobre datos propios (tecnología, fuentes y ciclo `REG-*`): nunca modifica tecnologías reales, apaga sus fuentes temporales al terminar y el arranque purga su ciclo. Verificaciones agrupadas por fase:
 
 - **Disponibilidad** — health y status.
-- **Fase 0** — dev-login, matriz de permisos, catálogo de los cinco perfiles.
+- **Fase 0** — inicio de sesión, matriz de permisos, catálogo de los cinco perfiles.
+- **Fase 7, acceso** — alta con contraseña temporal, cambio obligatorio en el primer ingreso con revocación del token anterior, permisos efectivos del perfil, error genérico ante credenciales equivocadas, desactivación que cierra la sesión y entorno informado por `/status`.
 - **Operación heredada** — fuentes, señales, notas, recomendaciones, escaneos, tableros, exportaciones y CRUD de nota.
 - **Fase 1, catálogos** — 6 clústeres, 7 tipologías, parámetros y estados.
 - **Fase 1, ciclo** — rechazo de ventana corta, creación válida, rechazo de transición inválida, recorrido hasta priorización.
@@ -614,12 +708,19 @@ Copie [`backend/.env.example`](backend/.env.example) como `.env`.
 
 | Variable | Descripción |
 |---|---|
-| `SECRET_KEY` | Clave para firmar JWT (cámbiela en producción) |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Duración del token (defecto 720 min) |
-| `GOOGLE_CLIENT_ID` | Client ID OAuth 2.0 para el login institucional |
-| `ALLOWED_EMAIL_DOMAIN` | Dominio permitido (defecto `iets.org.co`) |
-| `ADMIN_EMAILS` | Correos que reciben el perfil de superadministrador al primer login |
-| `ALLOW_DEV_LOGIN` | Login sin Google. **`false` en producción**: el intento denegado queda en bitácora |
+| `ENVIRONMENT` | `development` · `testing` · `production`. En producción apaga el acceso de desarrollo, exige `SECRET_KEY` propia y envía HSTS |
+| `SECRET_KEY` | Clave para firmar JWT. En producción, 32+ caracteres aleatorios o el servidor no arranca |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Duración de la sesión (defecto 720 min) |
+| `PASSWORD_MIN_LENGTH` · `LOGIN_MAX_ATTEMPTS` · `LOGIN_LOCKOUT_MINUTES` | Política de contraseñas y bloqueo (defectos 10 · 5 · 15) |
+| `GOOGLE_CLIENT_ID` | Opcional. Client ID OAuth 2.0; vacío oculta el botón de Google |
+| `ALLOWED_EMAIL_DOMAIN` | Dominio permitido para Google y acceso de desarrollo (defecto `iets.org.co`) |
+| `ADMIN_EMAILS` | Correos que reciben el perfil de superadministrador al primer ingreso |
+| `ALLOW_DEV_LOGIN` | Acceso sin contraseña para desarrollo local. Se ignora en producción; el intento denegado queda en bitácora |
+| `SMTP_HOST` · `SMTP_PORT` · `SMTP_USER` · `SMTP_PASSWORD` · `SMTP_FROM` · `SMTP_TLS` · `PUBLIC_BASE_URL` | Correo de invitaciones y alertas. Vacío: la interfaz ofrece copiar el enlace |
+| `RECAPTCHA_SECRET` · `RECAPTCHA_SITE_KEY` · `RECAPTCHA_MIN_SCORE` | reCAPTCHA v3 del portal `/postular`; sin llaves, modo degradado explícito |
+| `PUBLIC_SUBMISSIONS_PER_WINDOW` · `PUBLIC_SUBMISSIONS_WINDOW_SECONDS` | Tope de postulaciones públicas por IP |
+| `FRONTEND_DIST` | Carpeta del frontend compilado que sirve el backend (defecto `frontend/dist`) |
+| `SEED_OFFICIAL_CYCLES` | Siembra de los ciclos oficiales 2026 al arrancar. Por defecto activa en desarrollo y **apagada en producción** (allí los ciclos los gobierna la coordinación); `true` la fuerza |
 | `GEMINI_API_KEY` | API key de [Google AI Studio](https://aistudio.google.com/app/apikey) |
 | `GEMINI_MODEL` | Opcional; vacío activa la autodetección |
 | `CORS_ORIGINS` | Orígenes del frontend, separados por coma |
@@ -670,7 +771,7 @@ El último punto es el único que cambia la operación de un ciclo en curso. Si 
 
 ## Flujo de uso sugerido
 
-1. **Iniciar sesión** — Google institucional o acceso de desarrollo.
+1. **Iniciar sesión** — con el correo y la contraseña que asignó el superadministrador (en el primer ingreso se reemplaza la temporal). La bandeja de trabajo muestra de inmediato los pendientes de su perfil, cada uno con enlace directo a la tecnología.
 2. **Abrir un ciclo** en `/ciclos`: código, apertura, corte de datos y fecha de boletín. El sistema valida la ventana y la cuota anual.
 3. **Vigilancia** — ejecutar el rastreo masivo o por referente.
 4. **Bandeja de entrada** — clasificar las señales capturadas (clúster, tipología, condición, fechas regulatorias) apoyándose en la sugerencia asistida, y asignarlas por lotes al ciclo. Sin clúster ni tipología, el sistema no permite asignar.
@@ -697,5 +798,7 @@ El último punto es el único que cambia la operación de un ciclo en curso. Si 
 | [`backend/app/invima.py`](backend/app/invima.py) | Índice local del registro sanitario |
 | [`backend/app/rbac.py`](backend/app/rbac.py) | Matriz de permisos por módulo y por campo |
 | [`backend/smoke_test.py`](backend/smoke_test.py) | Suite de regresión de extremo a extremo |
+| [`DEPLOY.md`](DEPLOY.md) | Despliegue en producción, HTTPS, migraciones, respaldo, restauración y reversión |
+| [`frontend/e2e/`](frontend/e2e/) | Pruebas de navegador (Playwright) por flujo y por perfil |
 
-**Siguiente fase:** la 5 (evaluación temprana, Mini-HTA y revisión por pares). Su alcance y las decisiones D-07 a D-09 y D-12 están en [`BACKLOG.md`](BACKLOG.md#backlog-priorizado).
+**Pendiente:** lo que depende de infraestructura o de decisiones institucionales (cifrado en reposo, alta disponibilidad, interoperabilidad OAuth2 con socios internacionales, acceso estructurado al dato del INVIMA) está en [`BACKLOG.md`](BACKLOG.md#backlog-priorizado).

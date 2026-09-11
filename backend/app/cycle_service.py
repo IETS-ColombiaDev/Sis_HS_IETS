@@ -37,8 +37,97 @@ def validate_window(db: Session, opened_on: date, closing_on: date) -> None:
     if weeks < wmin or weeks > wmax:
         raise CycleRuleError(
             f"La ventana del ciclo es de {weeks:.1f} semanas y debe estar entre "
-            f"{wmin} y {wmax} semanas (parametro metodologico)."
+            f"{wmin} y {wmax} semanas (parámetro metodológico)."
         )
+
+
+def validate_dates(opened_on: date, data_cutoff_on: date, bulletin_due_on: date | None) -> None:
+    """Coherencia de las tres fechas del ciclo (RF05).
+
+    El corte de datos cae dentro de la ventana: despues de la apertura y, si hay
+    fecha de boletin, no despues de ella (el boletin resume datos ya cortados).
+    """
+    if data_cutoff_on <= opened_on:
+        raise CycleRuleError("El corte de datos debe ser posterior a la fecha de apertura.")
+    if bulletin_due_on is not None and bulletin_due_on < data_cutoff_on:
+        raise CycleRuleError(
+            "La fecha proyectada de boletín no puede ser anterior al corte de datos."
+        )
+
+
+def delete_blockers(db: Session, cycle: Cycle) -> list[str]:
+    """Motivos por los que un ciclo no se puede eliminar.
+
+    Solo se elimina un ciclo recien creado por error: en configuracion y sin
+    ningun trabajo metodologico colgando de el. Todo lo demas se conserva por
+    trazabilidad y se corrige editando o cerrando.
+
+    Calificaciones y verificaciones solo existen sobre tecnologias asignadas,
+    asi que el bloqueo por asignacion las cubre; las que no tengan instancia son
+    residuos (bases antiguas) y se limpian al eliminar.
+    """
+    from .models import Bulletin
+
+    reasons: list[str] = []
+    if cycle.is_historic:
+        reasons.append("El ciclo histórico no se elimina.")
+    if cycle.status != "en_configuracion":
+        reasons.append("Solo se elimina un ciclo en configuración.")
+    checks = (
+        (CycleTechnology, CycleTechnology.cycle_id, "tiene tecnologías asignadas"),
+        (EvaluationDoc, EvaluationDoc.cycle_id, "tiene expedientes de evaluación"),
+        (Bulletin, Bulletin.cycle_id, "tiene boletines"),
+    )
+    for model, column, label in checks:
+        if (db.query(func.count(model.id)).filter(column == cycle.id).scalar() or 0) > 0:
+            reasons.append(f"El ciclo {label}.")
+    return reasons
+
+
+def delete_cycle_tree(db: Session, cycle_id: int) -> set[int]:
+    """Borra todo lo que cuelga de un ciclo y devuelve las tecnologias tocadas.
+
+    SQLite no aplica las llaves foraneas en cascada: borrar solo la fila del
+    ciclo dejaba puntajes y verificaciones huerfanos que un ciclo nuevo heredaba
+    al reutilizar el mismo id. No borra la fila del ciclo.
+    """
+    from .models import (
+        Bulletin,
+        CycleDatamart,
+        EvaluationVersion,
+        MergeProposal,
+        NoveltyAssessment,
+        PriorityScore,
+        ReviewAssignment,
+        ReviewComment,
+        StrategyGraph,
+        TimeToMarketSnapshot,
+    )
+
+    tech_ids = {
+        row[0]
+        for row in db.query(CycleTechnology.technology_id).filter(CycleTechnology.cycle_id == cycle_id).all()
+    }
+    doc_ids = [row[0] for row in db.query(EvaluationDoc.id).filter(EvaluationDoc.cycle_id == cycle_id).all()]
+    if doc_ids:
+        db.query(ReviewComment).filter(ReviewComment.doc_id.in_(doc_ids)).delete(synchronize_session=False)
+        db.query(ReviewAssignment).filter(ReviewAssignment.doc_id.in_(doc_ids)).delete(synchronize_session=False)
+        db.query(EvaluationVersion).filter(EvaluationVersion.doc_id.in_(doc_ids)).delete(synchronize_session=False)
+        db.query(EvaluationDoc).filter(EvaluationDoc.id.in_(doc_ids)).delete(synchronize_session=False)
+    for model in (
+        PriorityScore,
+        NoveltyAssessment,
+        CycleTechnology,
+        Bulletin,
+        CycleDatamart,
+        TimeToMarketSnapshot,
+        StrategyGraph,
+    ):
+        db.query(model).filter(model.cycle_id == cycle_id).delete(synchronize_session=False)
+    db.query(MergeProposal).filter(MergeProposal.cycle_id == cycle_id).update(
+        {MergeProposal.cycle_id: None}, synchronize_session=False
+    )
+    return tech_ids
 
 
 def validate_year_quota(db: Session, year: int, *, exclude_id: int | None = None) -> None:
@@ -51,7 +140,7 @@ def validate_year_quota(db: Session, year: int, *, exclude_id: int | None = None
     limit = get_param(db, "cycle.max_per_year", 3)
     if existing >= limit:
         raise CycleRuleError(
-            f"El ano {year} ya tiene {existing} ciclos formales y el maximo metodologico "
+            f"El año {year} ya tiene {existing} ciclos formales y el máximo metodológico "
             f"es {limit}. Cierre o reprograme un ciclo antes de crear otro."
         )
 
@@ -66,8 +155,8 @@ def transition(db: Session, cycle: Cycle, target: str, *, actor: str = "") -> Cy
     if not can_transition(cycle.status, target):
         allowed = ", ".join(CYCLE_TRANSITIONS.get(cycle.status, ())) or "ninguna"
         raise CycleRuleError(
-            f"Transicion no permitida de '{cycle.status}' a '{target}'. "
-            f"Transiciones validas: {allowed}."
+            f"Transición no permitida de '{cycle.status}' a '{target}'. "
+            f"Transiciones válidas: {allowed}."
         )
     if target == "cerrado_consolidado":
         return close_cycle(db, cycle, actor=actor)
@@ -125,13 +214,13 @@ def blocking_entries(db: Session, cycle: Cycle) -> list[CycleTechnology]:
 def close_cycle(db: Session, cycle: Cycle, *, actor: str = "", force_note: str = "") -> Cycle:
     """Cierra el ciclo: valida, congela puntajes y arrastra el monitoreo activo."""
     if cycle.status == "cerrado_consolidado":
-        raise CycleRuleError("El ciclo ya esta cerrado.")
+        raise CycleRuleError("El ciclo ya está cerrado.")
 
     blocking = blocking_entries(db, cycle)
     if blocking and not force_note.strip():
         raise CycleRuleError(
-            f"No se puede cerrar: {len(blocking)} tecnologia(s) siguen en evaluacion sin "
-            "informe final. Publique el informe o registre una justificacion de cierre."
+            f"No se puede cerrar: {len(blocking)} tecnología(s) siguen en evaluación sin "
+            "informe final. Publique el informe o registre una justificación de cierre."
         )
     if blocking and force_note.strip():
         for entry in blocking:
@@ -178,7 +267,11 @@ def carry_over_watchlist(db: Session, source_cycle: Cycle, target_cycle: Cycle, 
     una reevaluacion crea registros nuevos, nunca modifica los congelados.
     """
     if target_cycle.status == "cerrado_consolidado":
-        raise CycleRuleError("El ciclo destino esta cerrado.")
+        raise CycleRuleError("El ciclo destino está cerrado.")
+    if target_cycle.id == source_cycle.id:
+        raise CycleRuleError("El ciclo destino debe ser distinto del ciclo de origen.")
+    if target_cycle.is_historic:
+        raise CycleRuleError("El ciclo histórico no recibe arrastres.")
 
     watch = (
         db.query(CycleTechnology)
@@ -209,6 +302,10 @@ def carry_over_watchlist(db: Session, source_cycle: Cycle, target_cycle: Cycle, 
                 assigned_by=actor or "sistema",
             )
         )
+        tech = db.get(Technology, entry.technology_id)
+        if tech is not None:
+            # El estado global refleja la instancia vigente: vuelve a la cola.
+            tech.status = "filtrada_apta_priorizacion"
         carried += 1
 
     if carried:

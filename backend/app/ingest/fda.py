@@ -27,10 +27,10 @@ class FdaConnector(Connector):
     label = "FDA openFDA (multiconjunto)"
     description = (
         "Aprobaciones de medicamentos y dispositivos. Extrae nombre comercial, "
-        "principio activo, titular y fecha de presentacion o decision."
+        "principio activo, titular y fecha de presentación o decisión."
     )
     min_interval = 0.25
-    adapter_version = "2"
+    adapter_version = "3"
 
     def fetch(self, *, config: dict, url: str = "") -> ConnectorResult:
         config = config or {}
@@ -105,7 +105,8 @@ class FdaConnector(Connector):
             clean_text(i.get("name")) for i in ingredients if isinstance(i, dict) and i.get("name")
         ) or (generics[0] if generics else "")
 
-        approval = _latest_submission_date(submissions)
+        regulatory = drug_regulatory(submissions)
+        approval = regulatory["approval_date"]
         brand = brands[0] if brands else (product.get("brand_name") or inn or app_no)
 
         return CanonicalRecord(
@@ -125,11 +126,14 @@ class FdaConnector(Connector):
             manufacturer=clean_text(makers[0] if makers else "", 300),
             indication=clean_text(product.get("route"), 2000),
             technology_type="medicamento",
-            development_phase="Aprobado",
+            development_phase="Aprobado" if approval else "En revision regulatoria",
             horizon="inminente",
+            # Solo la aprobacion de la solicitud original (ORIG con estado AP) es
+            # "aprobacion FDA". Un suplemento de etiquetado no lo es, y una fecha
+            # de sometimiento va al estado del tramite (P6), nunca aqui (P5 y TTM).
             fda_approval_date=parse_compact_date(approval),
-            regulatory_status="Aprobado por FDA" if approval else "Registro FDA",
-            published_date=approval or "",
+            regulatory_status=regulatory["status"],
+            published_date=approval or regulatory["last_date"] or "",
             raw=row,
         )
 
@@ -157,12 +161,9 @@ class FdaConnector(Connector):
             or (openfda.get("manufacturer_name") or [None])[0],
             300,
         )
-        decision = clean_text(
-            row.get("decision_date")
-            or row.get("date_received")
-            or row.get("fed_reg_notice_date")
-        )
         kind = "510(k)" if "510k" in dataset else "PMA" if "pma" in dataset else "dispositivo"
+        regulatory = device_regulatory(row, kind)
+        decision = regulatory["approval_date"]
         return CanonicalRecord(
             external_id=ident or name[:80],
             title=name or ident,
@@ -173,11 +174,11 @@ class FdaConnector(Connector):
             commercial_name=clean_text(name, 400),
             manufacturer=maker,
             technology_type="dispositivo",
-            development_phase="Aprobado",
+            development_phase="Aprobado" if decision else "En revision regulatoria",
             horizon="inminente",
             fda_approval_date=parse_compact_date(decision),
-            regulatory_status=f"FDA {kind}",
-            published_date=decision,
+            regulatory_status=regulatory["status"],
+            published_date=decision or regulatory["last_date"],
             raw=row,
         )
 
@@ -200,16 +201,76 @@ def _as_list(value) -> list[str]:
     return [clean_text(value)]
 
 
-def _latest_submission_date(submissions: list) -> str:
-    dates = []
-    for item in submissions:
-        if not isinstance(item, dict):
-            continue
-        raw = item.get("submission_status_date")
-        if raw:
-            dates.append(str(raw))
-    dates.sort(reverse=True)
-    return dates[0] if dates else ""
+def _iso(raw: str) -> str:
+    value = parse_compact_date(raw)
+    return value.isoformat() if value else ""
+
+
+# Estados de drugs@FDA: AP aprobada, TA aprobacion tentativa (patentes/exclusividad
+# pendientes, no comercializable). Cualquier otro estado es tramite en curso.
+APPROVED_STATUSES = {"AP"}
+TENTATIVE_STATUSES = {"TA"}
+
+
+def drug_regulatory(submissions: list) -> dict:
+    """Aprobacion y estado del tramite a partir de las solicitudes de drugs@FDA.
+
+    - Aprobacion = fecha de la solicitud ORIGINAL (ORIG) aprobada (AP). Los
+      suplementos (SUPPL) cambian etiquetado o fabricacion: no son aprobacion.
+    - Aprobacion tentativa (TA) no es aprobacion: queda en el estado.
+    - Si no hay aprobacion, la ultima fecha de sometimiento va al estado del
+      tramite ("Sometido a revision FDA (...)"), que es lo que lee P6.
+    """
+    items = [s for s in submissions or [] if isinstance(s, dict)]
+    orig = [s for s in items if str(s.get("submission_type") or "").upper() == "ORIG"]
+    approved = sorted(
+        str(s.get("submission_status_date") or "")
+        for s in orig
+        if str(s.get("submission_status") or "").upper() in APPROVED_STATUSES and s.get("submission_status_date")
+    )
+    dates = sorted(str(s.get("submission_status_date") or "") for s in items if s.get("submission_status_date"))
+    last = _iso(dates[-1]) if dates else ""
+    if approved:
+        return {"approval_date": approved[0], "status": "Aprobado por FDA", "last_date": last}
+    tentative = sorted(
+        str(s.get("submission_status_date") or "")
+        for s in orig
+        if str(s.get("submission_status") or "").upper() in TENTATIVE_STATUSES
+    )
+    if tentative:
+        return {"approval_date": "", "status": f"Aprobacion tentativa FDA ({_iso(tentative[-1])})", "last_date": last}
+    if items:
+        return {"approval_date": "", "status": f"Sometido a revision FDA ({last or 'fecha n/d'})", "last_date": last}
+    return {"approval_date": "", "status": "Registro FDA sin solicitudes", "last_date": ""}
+
+
+def device_regulatory(row: dict, kind: str) -> dict:
+    """Decision de dispositivos: solo una decision favorable es aprobacion.
+
+    510(k): decision_code SE* (sustancialmente equivalente) = autorizado.
+    PMA: decision_code APPR = aprobado. `date_received` es la fecha en que se
+    sometio la solicitud: sin decision favorable va al estado del tramite.
+    """
+    code = clean_text(row.get("decision_code")).upper()
+    decision_date = clean_text(row.get("decision_date"))
+    received = clean_text(row.get("date_received"))
+    description = clean_text(row.get("decision_description")).lower()
+    # Sin codigo, una fecha de decision se toma como favorable salvo que la
+    # descripcion diga lo contrario (openFDA publica sobre todo lo autorizado).
+    negative = any(word in description for word in ("not substantially", "denied", "withdrawn", "deny"))
+    if kind == "510(k)":
+        favorable = code.startswith("SE") if code else (bool(decision_date) and not negative)
+    elif kind == "PMA":
+        favorable = code in {"APPR", "APRL"} if code else (bool(decision_date) and not negative)
+    else:
+        favorable = bool(decision_date) and not negative
+    if favorable and decision_date:
+        return {"approval_date": decision_date, "status": f"Autorizado por FDA ({kind})", "last_date": decision_date}
+    if decision_date and code:
+        return {"approval_date": "", "status": f"Decision FDA {kind} desfavorable ({code})", "last_date": decision_date}
+    if received:
+        return {"approval_date": "", "status": f"Sometido a revision FDA ({kind}, {_iso(received) or received})", "last_date": received}
+    return {"approval_date": "", "status": f"FDA {kind}", "last_date": ""}
 
 
 register(FdaConnector())

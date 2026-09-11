@@ -80,6 +80,7 @@ def build_graph(
     date_from: date | None = None,
     date_to: date | None = None,
     priority_min: int | None = None,
+    stage: str = "",
 ) -> dict:
     dash = dashboard_for(
         db,
@@ -93,6 +94,7 @@ def build_graph(
         date_from=date_from,
         date_to=date_to,
         priority_min=priority_min,
+        stage=stage,
     )
     scatter = dash.get("ttm_scatter") or []
     funnel = dash.get("funnel") or {}
@@ -117,11 +119,11 @@ def build_graph(
             cycle_id,
             "cycle",
             cycle.code,
-            subtitle=f"{len(scatter)} tecnologias · {cycle.status}",
+            subtitle=f"{len(scatter)} tecnologías · {cycle.status}",
             prompts=[
-                "Resuma este ciclo para un tomador de decision de MinSalud: que avanzo y que falta.",
-                "Que tecnologias del ciclo merecen vigilancia estrecha o Mini-HTA y por que?",
-                "Donde se atasca el embudo y que habria que desbloquear antes del boletin?",
+                "Resuma este ciclo para un tomador de decisión de MinSalud: qué avanzó y qué falta.",
+                "¿Qué tecnologías del ciclo merecen vigilancia estrecha o Mini-HTA y por qué?",
+                "¿Dónde se atasca el embudo y qué habría que desbloquear antes del boletín?",
             ],
             meta={"cycle_id": cycle.id, "status": cycle.status},
         )
@@ -139,10 +141,10 @@ def build_graph(
                 "funnel",
                 label,
                 parent=cycle_id,
-                subtitle=f"{count} tecnologias",
+                subtitle=f"{count} tecnologías",
                 prompts=[
-                    f"Que significa que {count} tecnologias esten en '{label}' en este ciclo?",
-                    "Que riesgo operativo hay si esta etapa no avanza?",
+                    f"¿Qué significa que {count} tecnologías estén en '{label}' en este ciclo?",
+                    "¿Qué riesgo operativo hay si esta etapa no avanza?",
                 ],
                 meta={"step": code, "count": count},
             )
@@ -159,7 +161,7 @@ def build_graph(
         cid = f"cluster:{tech.cluster_id or 0}"
         if cid not in cluster_children:
             cluster_children[cid] = []
-            cname = cluster_names.get(tech.cluster_id) or row.get("cluster") or "Sin cluster"
+            cname = cluster_names.get(tech.cluster_id) or row.get("cluster") or "Sin clúster"
             nodes.append(
                 _node(
                     cid,
@@ -169,8 +171,8 @@ def build_graph(
                     subtitle="Grupo de enfermedad",
                     collapsed=True,
                     prompts=[
-                        f"Que tecnologias de {cname} concentran mas riesgo para el SGSSS?",
-                        "Compare time-to-market y puntaje P1-P6 dentro de este cluster.",
+                        f"¿Qué tecnologías de {cname} concentran más riesgo para el SGSSS?",
+                        "Compare time-to-market y puntaje P1-P6 dentro de este clúster.",
                     ],
                     meta={"cluster_id": tech.cluster_id, "cluster": cname},
                 )
@@ -200,9 +202,9 @@ def build_graph(
                 collapsed=True,
                 children=child_ids,
                 prompts=[
-                    f"Explique {_tech_name(tech)} para un comite: evidencia, fase y cercania al mercado.",
-                    "Que implicaria su llegada al SGSSS en los proximos 24 meses?",
-                    "Que vacios de evidencia o de registro INVIMA deberia pedirle el IETS al desarrollador?",
+                    f"Explique {_tech_name(tech)} para un comité: evidencia, fase y cercanía al mercado.",
+                    "¿Qué implicaría su llegada al SGSSS en los próximos 24 meses?",
+                    "¿Qué vacíos de evidencia o de registro INVIMA debería pedirle el IETS al desarrollador?",
                 ],
                 meta={
                     "technology_id": tech.id,
@@ -218,7 +220,9 @@ def build_graph(
             )
         )
         edges.append({"source": parent, "target": tid, "kind": "contains"})
-        step = STATUS_TO_FUNNEL.get(row.get("status") or "", "")
+        # La etapa la calcula el datamart con el expediente del ciclo: una
+        # tecnologia `en_evaluacion` con informe publicado cuelga de "Publicadas".
+        step = row.get("stage") or STATUS_TO_FUNNEL.get(row.get("status") or "", "")
         if step:
             edges.append({"source": f"funnel:{step}", "target": tid, "kind": "status"})
 
@@ -230,7 +234,7 @@ def build_graph(
                 parent=tid,
                 subtitle=f"{row.get('band_label') or row.get('band')} · {row.get('months') if row.get('months') is not None else 's/d'} m",
                 prompts=[
-                    f"Interprete el time-to-market de {_tech_name(tech)} y que franja deberia usar el tablero.",
+                    f"Interprete el time-to-market de {_tech_name(tech)} y qué franja debería usar el tablero.",
                 ],
                 meta={"band": row.get("band"), "months": row.get("months"), "basis": row.get("basis")},
             )
@@ -248,9 +252,9 @@ def build_graph(
                 "evidence",
                 "Evidencia y ensayos",
                 parent=tid,
-                subtitle=evidence_bits[0] if evidence_bits else "Sin NCT publico",
+                subtitle=evidence_bits[0] if evidence_bits else "Sin NCT público",
                 prompts=[
-                    f"Que ensayos o evidencia sostienen a {_tech_name(tech)} y que falta para Colombia?",
+                    f"¿Qué ensayos o evidencia sostienen a {_tech_name(tech)} y qué falta para Colombia?",
                 ],
                 meta={
                     "nct_ids": ncts,
@@ -270,7 +274,7 @@ def build_graph(
                     "budget",
                     "Impacto presupuestal",
                     parent=tid,
-                    subtitle="Anios 1-3",
+                    subtitle="Años 1-3",
                     prompts=[
                         f"Comente el orden de magnitud presupuestal de {_tech_name(tech)} y sus supuestos.",
                     ],
@@ -302,7 +306,7 @@ def build_graph(
         if node["type"] == "cluster":
             kids = cluster_children.get(node["id"], [])
             node["children"] = kids
-            node["subtitle"] = f"{len(kids)} tecnologias"
+            node["subtitle"] = f"{len(kids)} tecnologías"
 
     roots = [cycle_id]
     return {
@@ -334,7 +338,7 @@ def node_context(db: Session, cycle: Cycle, node_key: str, *, include_restricted
     if node["type"] == "technology" and meta.get("technology_id"):
         tech = db.get(Technology, int(meta["technology_id"]))
         if tech:
-            lines.append(f"Indicacion: {(tech.indication or '')[:400]}")
+            lines.append(f"Indicación: {(tech.indication or '')[:400]}")
             lines.append(f"Resumen: {(tech.summary or '')[:500]}")
             lines.append(f"Fase: {tech.development_phase or 's/d'}")
             lines.append(f"Regulatorio: {tech.regulatory_status or 's/d'}")
@@ -349,7 +353,7 @@ def node_context(db: Session, cycle: Cycle, node_key: str, *, include_restricted
                 lines.append(f"Informe: {doc.product_level} · {doc.status}")
     if node["type"] == "cycle":
         funnel = next((n for n in graph["nodes"] if n["id"] == f"funnel:published"), None)
-        lines.append(f"Tecnologias en el grafo: {sum(1 for n in graph['nodes'] if n['type'] == 'technology')}")
+        lines.append(f"Tecnologías en el grafo: {sum(1 for n in graph['nodes'] if n['type'] == 'technology')}")
         if funnel:
             lines.append(f"Publicadas: {funnel.get('subtitle')}")
     children = [n for n in graph["nodes"] if n.get("parent") == node_key]

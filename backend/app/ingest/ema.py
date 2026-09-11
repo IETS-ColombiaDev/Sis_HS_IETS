@@ -30,7 +30,7 @@ class EmaConnector(Connector):
     label = "EMA medicamentos (descarga + RSS)"
     description = (
         "Tablas oficiales descargables de la EMA, con el canal RSS como "
-        "contingencia cuando el archivo no esta disponible."
+        "contingencia cuando el archivo no está disponible."
     )
     min_interval = 0.5
     adapter_version = "2"

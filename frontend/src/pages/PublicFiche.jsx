@@ -17,7 +17,7 @@ export default function PublicFiche() {
       .then((r) => setData(r.data))
       .catch((err) => {
         const detail = err?.response?.data?.detail;
-        setError(typeof detail === "string" ? detail : "Esta ficha no esta disponible en la consulta publica.");
+        setError(typeof detail === "string" ? detail : "Esta ficha no está disponible en la consulta pública.");
       });
   }, [id]);
 
@@ -26,7 +26,7 @@ export default function PublicFiche() {
 
   return (
     <PublicShell
-      kicker="Ficha publica"
+      kicker="Ficha pública"
       title={data?.title || (error ? "Expediente no disponible" : "Cargando…")}
       lead={
         data
@@ -41,7 +41,7 @@ export default function PublicFiche() {
           <header className="iets-dossier-mast">
             <div className="iets-dossier-brand">IETS</div>
             <div>
-              <p className="iets-dossier-kicker">Consulta publica · Escaneo de horizonte</p>
+              <p className="iets-dossier-kicker">Consulta pública · Escaneo de horizonte</p>
               <h2>{data.title}</h2>
               <p className="iets-dossier-sub">
                 {[data.commercial_name, data.inn_name && `DCI ${data.inn_name}`, data.manufacturer]
@@ -53,7 +53,7 @@ export default function PublicFiche() {
 
           <div className="public-fiche-meta">
             <div>
-              <b>Cluster</b>
+              <b>Clúster</b>
               <span>{data.cluster || "—"}</span>
             </div>
             <div>
@@ -82,7 +82,7 @@ export default function PublicFiche() {
           ))}
 
           <section className="iets-dossier-block">
-            <h4>Ensayos clinicos asociados</h4>
+            <h4>Ensayos clínicos asociados</h4>
             {(data.nct_ids || []).length === 0 ? (
               <p>Sin identificadores NCT registrados.</p>
             ) : (
@@ -103,7 +103,7 @@ export default function PublicFiche() {
               variant="secondary"
               onClick={() => window.open(`/api/public/technologies/${id}/export`, "_blank", "noopener")}
             >
-              Descargar ficha tecnica
+              Descargar ficha técnica
             </Button>
             <Link to="/expedientes">Volver al buscador</Link>
           </div>

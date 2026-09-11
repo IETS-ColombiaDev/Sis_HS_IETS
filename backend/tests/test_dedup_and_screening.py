@@ -315,7 +315,7 @@ def test_an_empty_index_is_reported_as_stale(db):
 
     assert status["stale"] is True
     assert status["total_records"] == 0
-    assert "vacio" in status["warning"]
+    assert "vacío" in status["warning"]
 
 
 def test_the_index_finds_the_registry_by_active_principle(db):
@@ -436,7 +436,7 @@ def test_a_new_indication_without_justification_is_rejected(db, cycle):
     tech = make_tech(db, inn_name="Pembrolizumab")
     assign(db, cycle, tech)
 
-    with pytest.raises(ScreeningRuleError, match="justificacion"):
+    with pytest.raises(ScreeningRuleError, match="justificación"):
         screening_service.save_novelty(
             db, cycle.id, tech.id, option_code="nueva_indicacion", justification="nueva"
         )

@@ -3,7 +3,9 @@
 Documento vivo de producto, arquitectura y trazabilidad metodológica.
 Ordenado según el [Plan de actualización por fases](Plan_Fases_Actualizacion_Plataforma_EH_IETS.md), cuya recomendación 5 exige mantener aquí el estado de cumplimiento de cada requerimiento funcional para que la trazabilidad ante entes de control esté siempre disponible.
 
-**Versión del sistema:** v6.1.0 · **Fases cerradas:** 0, 1, 2, 3, 4, 5 y 6 · **Fase en curso:** 7 · **D-06 cerrado en código:** catálogo de 53 fuentes
+**Versión del sistema:** v7.0.0 · **Fases cerradas:** 0 (incluida la infraestructura), 1, 2, 3, 4, 5 y 6 · **Fase 7:** cerrada en lo que depende del software; abierta en lo que depende de infraestructura institucional · **D-06 cerrado en código:** catálogo de 53 fuentes
+
+> **v7.0 — paso a producción.** Ver [Qué cambió en v7.0](#qué-cambió-en-v70). Cada ítem cerrado del backlog priorizado indica su evidencia en código y en pruebas.
 
 ---
 
@@ -47,21 +49,21 @@ Ordenado según el [Plan de actualización por fases](Plan_Fases_Actualizacion_P
 | **4** | Ingesta ampliada: conectores y portal reactivo | RF01, RF02, RF03, RF04 | **Cerrada** (WHO ICTRP por lote; sin Celery/Redis) | `ingest/`, `ingest_service.py`, `/postular`, `/postulaciones` |
 | **5** | Evaluación temprana, Mini-HTA y revisión por pares | RF13, RF14, RF15, RF16 | **Cerrada** (PDF por HTML/impresión; sin SMTP) | `evaluation_service.py`, `/evaluacion`, `/revisar/:token` |
 | **6** | Dashboard estratégico, ficha pública, boletines | RF17, RF18, RF19, RF20 | **Cerrada** (sin SMTP; Recharts conservado) | `strategy_service.py`, `ttm.py`, `/dashboards`, `/expedientes`, `/boletines` |
-| **7** | Endurecimiento e interoperabilidad | RNF de seguridad y disponibilidad | **Pendiente** | — |
+| **7** | Endurecimiento e interoperabilidad | RNF de seguridad y disponibilidad | **Cerrada en software** (HTTPS por proxy, encabezados de seguridad, perfil de producción, p95 medido, OpenAPI). **Abierta en infraestructura**: cifrado en reposo, alta disponibilidad, OAuth2 con socios | `security.py`, `main.py`, `DEPLOY.md`, `deploy/Caddyfile`, `test_auth_and_users.py` |
 
-### Detalle de lo pendiente en la fase 0
+### Detalle de la fase 0
 
-La fase 0 se cerró en su núcleo metodológico (bitácora, RBAC, regresión) pero deliberadamente **no** en su componente de infraestructura, porque exigía cambiar el entorno de despliegue de la institución y no era condición necesaria para las fases 1 y 2:
+En v6 la fase 0 se había cerrado solo en su núcleo metodológico. En v7.0 se completó su componente de infraestructura:
 
 | Punto del plan | Estado | Nota |
 |---|---|---|
 | Bitácora inmutable `audit_log` append-only | Hecho | Listener `after_flush` + middleware. Triggers en SQLite, `REVOKE` en PostgreSQL |
-| RBAC de cinco perfiles con permisos por módulo y por campo | Hecho | 20 permisos declarativos, granularidad P1–P6 |
-| Ampliación de `smoke_test.py` a suite de regresión | Hecho | 68 verificaciones de extremo a extremo + 141 pruebas unitarias |
-| Compatibilidad con PostgreSQL 15 (`pg_trgm`, `unaccent`, JSONB) | Hecho | `ensure_pg_extensions`, tipo `JSONType` portable. **Sin ejecutar en producción** |
-| Alembic para migraciones versionadas | Pendiente (**P0-1**) | Hoy operan migraciones ligeras idempotentes en `database.py` |
-| Docker, `docker-compose` y pipeline CI/CD | Pendiente (**P0-2**) | — |
-| Separación formal de entornos y desactivación de `ALLOW_DEV_LOGIN` | Parcial (**P0-3**) | La bandera existe y el intento denegado ya queda en bitácora (`auth:dev_login_denied`); falta el perfil de entorno con secretos independientes |
+| RBAC de cinco perfiles con permisos por módulo y por campo | Hecho | 20 permisos declarativos, granularidad P1–P6; permisos legibles en `/usuarios` |
+| Ampliación de `smoke_test.py` a suite de regresión | Hecho | Trabaja con datos propios; corre también en producción con `--email/--password` |
+| Compatibilidad con PostgreSQL 15 (`pg_trgm`, `unaccent`, JSONB) | Hecho | `ensure_pg_extensions`, `JSONType` portable, índices GIN trigram en el baseline. El job `postgres` del CI ejecuta las migraciones contra PostgreSQL real |
+| Alembic para migraciones versionadas | **Hecho (P0-1)** | `backend/alembic/`, baseline `0001`, `app/migrations.py` (crea, marca o actualiza; candado entre procesos en PostgreSQL) |
+| Docker, `docker-compose` y pipeline CI/CD | **Hecho (P0-2)** | `Dockerfile`, `docker-compose.yml` (db, api, worker, caddy), `.github/workflows/ci.yml` |
+| Separación formal de entornos y desactivación de `ALLOW_DEV_LOGIN` | **Hecho (P0-3)** | `ENVIRONMENT=production` apaga el acceso de desarrollo, exige `SECRET_KEY` propia y activa HSTS; `python -m app.cli check-config` |
 
 ---
 
@@ -229,6 +231,31 @@ El tablero de `/dashboards` pasó a ser el de gobernanza: filtros, distribución
 El TTM se calcula desde fase III más `ttm.regulatory_review_days` (o desde la aprobación de agencia) y se versiona por ciclo al cerrar. Las franjas son dato (D-10). Al cerrar también se refresca el datamart y se deja un boletín en `pendiente_aprobacion`; no se publica sin el visto del líder.
 
 `/expedientes` lista solo fichas `publicado` y no confidenciales, sin presupuestos. Las alertas viven en `/alertas` (in-app). Recharts se conserva (D-11).
+
+---
+
+## Qué cambió en v7.0
+
+### El acceso dejó de depender de Google y del modo de desarrollo
+
+Sin `GOOGLE_CLIENT_ID`, la única vía era el acceso de desarrollo sin contraseña, incompatible con producción. Ahora hay cuentas con correo y contraseña administradas por el superadministrador: contraseña temporal de un solo uso, cambio obligatorio en el primer ingreso, bloqueo por intentos, límite por IP, revocación de sesiones al cambiar credenciales y bitácora de cada evento de acceso. Google queda como vía opcional.
+
+### Seguridad corregida al pasar a producción
+
+- El acceso de desarrollo promovía en silencio a "tomador de decisiones" a "evaluador técnico" en cada ingreso (escalada de privilegios).
+- El token de 10 días del revisor externo servía como sesión interna si el correo coincidía con una cuenta.
+- La vista previa de enlaces aceptaba direcciones internas (SSRF); los permisos de notas, fuentes y señales no coincidían con la matriz RBAC.
+
+### Integridad de los datos
+
+- Cada reinicio borraba los ciclos creados por la coordinación, reconstruía los oficiales y retiraba las fuentes agregadas a mano.
+- La suite de regresión escribía fechas regulatorias de prueba sobre tecnologías reales; ahora trabaja con datos propios.
+- El conector de openFDA tomaba la fecha de un suplemento de etiquetado como fecha de aprobación, y el del pipeline de fabricantes guardaba la fila completa como nombre. `python -m app.reprocess_service --apply` corrige lo capturado desde el crudo.
+- El embudo del tablero mezclaba ciclos, los montos en formato colombiano se leían mal y el TTM confundía "0 meses" con "sin dato".
+
+### Operación
+
+Bandeja de trabajo por perfil con enlaces directos a cada tecnología, tablero con filtros en la URL, profundización y exportación CSV/Excel, vigilancia y barrido de duplicados programados, correo, reCAPTCHA real, paquete ZIP de diseminación, paginación de la cola de priorización, tooltips en cada indicador y acción, botones deshabilitados que explican el porqué e interfaz sin desbordes en teléfonos.
 
 ---
 
@@ -1029,10 +1056,10 @@ Los **enunciados de P1 a P6 también son datos**, no literales: viven en `priori
 
 | ID | Área | Item | Problema | Solución | Esfuerzo |
 |---|---|---|---|---|---|
-| P0-1 | Infra | Alembic + PostgreSQL 15 | Las migraciones ligeras no son versionadas ni reversibles | Baseline Alembic sobre el esquema actual, ensayo de migración con conteos de control y ventana de retorno a SQLite | L |
-| P0-2 | DevOps | Docker Compose + CI/CD | Despliegue manual, sin pruebas obligatorias en merge | `api`, `worker`, `postgres`, `redis` + pipeline con pytest, suite de regresión y build | L |
-| P0-3 | Seguridad | Separación de entornos | `ALLOW_DEV_LOGIN` convive con la configuración productiva | Perfil por entorno (`development`, `testing`, `production`) con secretos independientes y valores por defecto seguros | M |
-| P0-4 | Vigilancia | Escaneo programado | La captura sigue siendo manual | Worker con cron sobre Redis + alertas en la bandeja de entrada | L |
+| P0-1 | Infra | Alembic + PostgreSQL 15 | ~~Las migraciones ligeras no son versionadas ni reversibles~~ | **Hecho v7.0**: baseline `0001`, `app/migrations.py`, arranque sobre base vacía probado (`test_frente_d_migrations.py`, `test_startup_empty_db.py`) | L |
+| P0-2 | DevOps | Docker Compose + CI/CD | ~~Despliegue manual, sin pruebas obligatorias en merge~~ | **Hecho v7.0**: `Dockerfile`, `docker-compose.yml`, `ci.yml` (pytest, PostgreSQL, build, E2E, regresión, imagen). Redis no se adoptó: la cola vive en la base (ver P2-1) | L |
+| P0-3 | Seguridad | Separación de entornos | ~~`ALLOW_DEV_LOGIN` convive con la configuración productiva~~ | **Hecho v7.0**: `ENVIRONMENT`, arranque bloqueado con secretos por defecto, acceso con contraseña, encabezados de seguridad (`test_auth_and_users.py`) | M |
+| P0-4 | Vigilancia | Escaneo programado | ~~La captura sigue siendo manual~~ | **Hecho v7.0**: `scheduler_service.py`, configurable en `/configuracion`, alerta de señales nuevas (`test_frente_b_scheduler.py`) | L |
 
 ### P1 — Cierre pendiente de la fase 3
 
@@ -1042,8 +1069,8 @@ Los cuatro RF de la fase están entregados. Queda lo que depende de gestión ins
 |---|---|---|---|---|---|
 | P1-1 | RF11 | Actas de la Sala Especializada | El concepto se transcribe a mano en un campo de texto | Extracción asistida del acta en PDF con enlace al documento original | M |
 | P1-2 | RF11 | Principio activo en el índice | Los conjuntos abiertos disponibles solo exponen el nombre del producto, así que el cruce por DCI queda degradado | Reclamar la republicación del CUM ante el INVIMA (**D-04**) o acordar la ruta estructurada | M |
-| P1-3 | RF09 | Similitud en el motor de base de datos | El prefiltro `LIKE '%…%'` no usa índice; a 300.000 registros el p95 queda en 76 ms, con poco margen | `pg_trgm` con índice GIN una vez ejecutada la migración a PostgreSQL (**P0-1**) | M |
-| P1-4 | RF09 | Barrido programado | El barrido difuso se dispara a mano desde la pantalla | Tarea periódica en el worker de **P0-4**, con aviso en la bandeja al aparecer propuestas | S |
+| P1-3 | RF09 | Similitud en el motor de base de datos | ~~El prefiltro `LIKE` no usa índice~~ | **Hecho v7.0**: índices GIN `pg_trgm` en el baseline de Alembic (solo PostgreSQL) | M |
+| P1-4 | RF09 | Barrido programado | ~~El barrido difuso se dispara a mano~~ | **Hecho v7.0**: tarea periódica con aviso a quien tiene `screening:write` | S |
 
 ### P2 — Cierre pendiente de la fase 4
 
@@ -1051,9 +1078,9 @@ Los cuatro RF de la fase están entregados. Queda lo que depende de infraestruct
 
 | ID | RF | Item | Problema | Solución | Esfuerzo |
 |---|---|---|---|---|---|
-| P2-1 | RF01 | Cola externa Celery + Redis | El worker vive en el mismo proceso que la API | Extraer `run_job` a un worker Celery cuando exista Redis institucional (**P0-2**) | M |
-| P2-2 | RF01 | WHO ICTRP en vivo | El portal de la OMS no garantiza REST | Acordar espejo JSON o lote periódico (**D-06**) | M |
-| P2-3 | RF02 | reCAPTCHA en producción | Sin clave, el portal omite la verificación anti-robot | Configurar `RECAPTCHA_SECRET` y `RECAPTCHA_SITE_KEY` | S |
+| P2-1 | RF01 | Cola externa Celery + Redis | El worker vive en el mismo proceso que la API | **Mitigado v7.0**: servicio `worker` separado en `docker-compose.yml` (un proceso), reclamo atómico de trabajos y recuperación de huérfanos. Celery sigue siendo opcional | M |
+| P2-2 | RF01 | WHO ICTRP en vivo | El portal de la OMS no garantiza REST | Acordar espejo JSON o lote periódico (**D-06**). Pendiente institucional | M |
+| P2-3 | RF02 | reCAPTCHA en producción | ~~Sin clave, el portal omite la verificación~~ | **Hecho v7.0**: verificación v3 real (puntaje y acción); sin llaves, modo degradado explícito y registrado. Falta configurar las llaves institucionales | S |
 
 ### P3 — Cierre pendiente de la fase 5
 
@@ -1062,7 +1089,7 @@ Los cuatro RF de la fase están entregados. Queda lo que depende de infraestruct
 | ID | RF | Item | Problema | Solución | Esfuerzo |
 |---|---|---|---|---|---|
 | P3-1 | RF13 | Editor enriquecido TipTap | El cuerpo es formulario estructurado, no ProseMirror | Adoptar TipTap cuando haya tiempo de UX | M |
-| P3-2 | RF16 | Envío de correo | No hay SMTP institucional; el enlace se copia | Conectar el token al correo cuando exista el canal | S |
+| P3-2 | RF16 | Envío de correo | ~~El enlace se copia~~ | **Hecho v7.0**: `mailer.py` envía la invitación cuando `SMTP_HOST` está configurado; sin SMTP se sigue ofreciendo copiar el enlace. Falta el servidor institucional | S |
 | P3-3 | RF13 | PDF nativo WeasyPrint/Playwright | En Windows WeasyPrint es frágil; hoy se exporta HTML institucional | Renderizar PDF en el entorno Linux de despliegue | M |
 
 ### P4 — Cierre pendiente de la fase 6
@@ -1070,18 +1097,18 @@ Los cuatro RF de la fase están entregados. Queda lo que depende de infraestruct
 | ID | RF | Item | Problema | Solución | Esfuerzo |
 |---|---|---|---|---|---|
 | P4-1 | RF19 | PDF nativo del boletín | Hoy se exporta HTML ejecutivo | Playwright/WeasyPrint en el entorno Linux | M |
-| P4-2 | RF20 | Correo de alertas | No hay SMTP institucional | Conectar el canal cuando exista | S |
+| P4-2 | RF20 | Correo de alertas | ~~No hay canal de correo~~ | **Hecho v7.0**: alertas por correo con SMTP configurado; se agregó la alerta por cambio de franja de alto riesgo presupuestal | S |
 
 ### P5 — Transversales y mejora continua
 
 | ID | Área | Item | Solución | Esfuerzo |
 |---|---|---|---|---|
-| P5-1 | QA | Tests E2E Playwright | Recorrido completo de un ciclo, de la captura al cierre | L |
-| P5-2 | UX | Paginación de la cola | La priorización se degrada con más de 200 tecnologías | M |
-| P5-3 | UX | Tour guiado por fases | Onboarding sin documentación externa | M |
-| P5-4 | Export | Paquete de diseminación | ZIP con informes, notas y listado único del ciclo | M |
-| P5-5 | A11y | WCAG AA | Auditoría axe sobre las vistas nuevas | M |
-| P5-6 | Mobile | Tablas responsive | Vista de tarjetas por debajo de 768 px | M |
+| P5-1 | QA | Tests E2E Playwright | **Hecho v7.0**: `frontend/e2e/` recorre el ciclo completo, cada CRUD, los cinco perfiles, acceso, tableros y móvil; corre en CI | L |
+| P5-2 | UX | Paginación de la cola | **Hecho v7.0**: paginación en servidor (`X-Total-Count`), búsqueda y filtros; enlace directo aunque la tecnología esté en otra página | M |
+| P5-3 | UX | Tour guiado por fases | Parcial: guías de fase, notas de ayuda y tooltips en cada indicador y acción. Falta el recorrido guiado interactivo | M |
+| P5-4 | Export | Paquete de diseminación | **Hecho v7.0**: ZIP por ciclo sin documentos confidenciales | M |
+| P5-5 | A11y | WCAG AA | Parcial: enlace "saltar al contenido", etiquetas accesibles, foco visible, navegación por teclado en el tablero. Falta la auditoría axe formal | M |
+| P5-6 | Mobile | Tablas responsive | **Hecho v7.0**: tarjetas bajo 768 px y prueba E2E que exige que ninguna pantalla desborde en 390 px | M |
 | P5-7 | IA | Modelo por tarea | Flash para cribado, Pro para informes | M |
 | P5-8 | IA | Chat con embeddings | RAG sobre `pgvector` en lugar de recuperación simple | L |
 | P5-9 | Notificaciones | Centro de actividad | Escaneos, menciones y vencimientos del ciclo | L |
@@ -1116,13 +1143,15 @@ Bloquean fases futuras. Ninguna se resolvió por supuesto del equipo de desarrol
 
 | Riesgo | Impacto | Mitigación |
 |---|---|---|
-| SQLite en producción multiusuario | Alto | P0-1. El código ya es agnóstico del motor; falta ejecutar la migración |
-| Migraciones ligeras sin versionado ni reversión | Alto | P0-1 Alembic con baseline sobre el esquema actual |
+| SQLite en producción multiusuario | Alto | Mitigado: el despliegue de referencia usa PostgreSQL 15 (`docker-compose.yml`); `DEPLOY.md` documenta la migración de datos desde SQLite |
+| Migraciones ligeras sin versionado ni reversión | Alto | Mitigado: Alembic con baseline `0001`; las migraciones ligeras quedan como red de seguridad idempotente |
+| Worker de ingesta duplicado al escalar | Medio | El entrypoint se niega a arrancar con `INGEST_WORKER_ENABLED=true` y varios procesos; los trabajos se reclaman de forma atómica |
+| Cifrado en reposo y alta disponibilidad (RNF de la fase 7) | Alto | Pendiente de infraestructura institucional: cifrado del volumen de PostgreSQL, réplica y respaldo con recuperación puntual |
 | El índice de INVIMA queda sin principio activo | Alto | Mitigado a medias: se sincronizan los conjuntos que sí responden y hay carga plana; el cruce por DCI sigue degradado hasta resolver D-04 |
 | El índice regulatorio envejece sin que nadie lo note | Medio | Mitigado: alerta de obsolescencia a los 30 días, visible en la pantalla de filtrado y en el estado del índice |
 | Una fusión errónea colapsa dos tecnologías distintas | Alto | Mitigado: la fusión nunca es automática; la propuesta muestra su evidencia por algoritmo y queda en la bitácora con actor y momento |
 | La decisión D-02 se reabre tras ciclos cerrados | Alto | Umbrales parametrizados; recálculo posible sin desplegar, pero exigiría reabrir ciclos congelados |
-| `ALLOW_DEV_LOGIN` habilitado en un entorno productivo | Alto | P0-3 separación de entornos y registro del intento |
+| `ALLOW_DEV_LOGIN` habilitado en un entorno productivo | Alto | Mitigado: con `ENVIRONMENT=production` el acceso de desarrollo se apaga siempre y el intento queda en bitácora |
 | Cambios en taxonomías ya implementadas | Medio | Mitigado: clústeres y tipologías son datos, no código |
 | Dependencia de Gemini para contenido publicable | Medio, reputacional | Toda salida de IA es borrador atribuido, sujeto a validación humana |
 | Rate limiting o cambios de contrato en APIs externas | Medio | Adaptadores desacoplados y pruebas de contrato en P2-1 |
@@ -1130,9 +1159,11 @@ Bloquean fases futuras. Ninguna se resolvió por supuesto del equipo de desarrol
 
 **Deuda técnica conocida:**
 
-- Sin migraciones Alembic; `run_schema_migrations` es idempotente pero no versionado.
-- Sin pruebas automatizadas de frontend ni recorrido E2E de navegador.
-- El escaneo es síncrono dentro del ciclo de petición; sin worker ni cola.
+- ~~Sin migraciones Alembic~~ (resuelto en v7.0). `run_schema_migrations` se conserva como red de seguridad; todo cambio de esquema nuevo va en una revisión de Alembic.
+- ~~Sin pruebas de navegador~~ (resuelto en v7.0 con Playwright). Sigue sin haber pruebas unitarias de componentes React.
+- ~~El escaneo es síncrono~~ (resuelto): corre en segundo plano y de forma programada; la cola vive en la base, sin Redis.
+- El PDF institucional sigue siendo HTML imprimible (P3-3, P4-1).
+- El límite de intentos por IP vive en memoria de cada proceso: con N procesos de uvicorn el tope efectivo se multiplica por N (el bloqueo por cuenta no se ve afectado).
 - El chat RAG recupera por coincidencia simple, sin embeddings vectoriales.
 - Rutas heredadas mantenidas por compatibilidad con enlaces existentes.
 - `Finding` coexiste con `Technology` durante el periodo de transición: la primera sigue siendo el registro de captura y la segunda la unidad metodológica.
@@ -1187,4 +1218,4 @@ Bloquean fases futuras. Ninguna se resolvió por supuesto del equipo de desarrol
 
 ---
 
-*Última actualización: cierre de la fase 6 — v6.0.0. Revisar al cerrar cada fase.*
+*Última actualización: paso a producción — v7.0.0. Revisar al cerrar cada fase.*

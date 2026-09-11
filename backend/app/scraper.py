@@ -481,8 +481,21 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
 
         new_count = 0
         new_findings: list[Finding] = []
+        pipeline_parts: dict[int, tuple[str, dict]] = {}
+        from .ingest.pipeline_rows import (
+            ROW_PREFIX,
+            compact_title,
+            is_pipeline_source,
+            parse_row,
+            structured_summary,
+        )
+
+        pipeline = is_pipeline_source(source)
         for data in findings_data:
-            content_hash = _hash(data["title"], data["url"])
+            row = data["title"]
+            # La huella se calcula sobre la fila original: estable entre corridas
+            # aunque el titulo visible ahora sea el nombre del producto.
+            content_hash = _hash(row, data["url"])
             exists = (
                 db.query(Finding)
                 .filter(Finding.source_id == source.id, Finding.content_hash == content_hash)
@@ -490,6 +503,18 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             )
             if exists:
                 continue
+            parsed = parse_row(row) if pipeline else None
+            if parsed:
+                # Fila de tabla de pipeline: cada celda a su campo; la fila queda en el crudo.
+                data = {
+                    **data,
+                    "title": compact_title(parsed),
+                    "technology": parsed["name"][:390],
+                    "phase": parsed.get("phase", "")[:110],
+                    "therapeutic_area": (parsed.get("indication") or data.get("therapeutic_area") or "")[:290],
+                    "summary": structured_summary(parsed, source.title)[:1000],
+                    "raw_content": (ROW_PREFIX + row + chr(10) + (data.get("raw_content") or ""))[:5000],
+                }
             finding = Finding(
                 source_id=source.id,
                 content_hash=content_hash,
@@ -507,13 +532,20 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             )
             db.add(finding)
             new_findings.append(finding)
+            if parsed:
+                pipeline_parts[id(finding)] = (row, parsed)
             new_count += 1
 
         # Cada senal capturada se proyecta al staging metodologico (RF03/RF04).
         if new_findings:
             db.flush()
+            from .ingest.pipeline_rows import apply_pipeline_fields
+
             for finding in new_findings:
-                sync_technology_from_finding(db, finding, captured_by=triggered_by or "scraper")
+                tech = sync_technology_from_finding(db, finding, captured_by=triggered_by or "scraper")
+                if id(finding) in pipeline_parts:
+                    row, parsed = pipeline_parts[id(finding)]
+                    apply_pipeline_fields(finding, tech, row, parsed, source.title)
 
         log.items_found = len(findings_data)
         log.items_new = new_count
@@ -544,6 +576,33 @@ class _PreviewSource:
         self.description = ""
 
 
+def is_internal_url(url: str) -> bool:
+    """True si el host resuelve a una red interna (loopback, privada o enlace local).
+
+    La vista previa hace que el servidor visite la URL que escribe el usuario: sin
+    este control serviria para sondear la red interna del instituto (SSRF).
+    """
+    import ipaddress
+    import socket
+    from urllib.parse import urlsplit
+
+    host = (urlsplit(url).hostname or "").strip("[]")
+    if not host:
+        return True
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return False
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            continue
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            return True
+    return False
+
+
 def preview_url(url: str) -> dict:
     """Previsualiza que informacion se extraeria de un enlace, sin persistir nada."""
     result: dict = {
@@ -558,13 +617,18 @@ def preview_url(url: str) -> dict:
         "message": "",
     }
     if not url or not url.lower().startswith(("http://", "https://")):
-        result["message"] = "URL invalida. Debe iniciar con http:// o https://"
+        result["message"] = "URL inválida. Debe iniciar con http:// o https://"
+        return result
+    from .config import settings
+
+    if getattr(settings, "is_production", False) and is_internal_url(url):
+        result["message"] = "Por seguridad no se previsualizan direcciones de la red interna."
         return result
     try:
         status_code, content_type, text, raw = fetch_url(url, timeout=25.0)
         result["content_type"] = content_type
         if status_code >= 400:
-            result["message"] = f"El servidor respondio HTTP {status_code}."
+            result["message"] = f"El servidor respondió HTTP {status_code}."
             return result
 
         is_pdf = "pdf" in content_type or url.lower().endswith(".pdf")
@@ -577,10 +641,10 @@ def preview_url(url: str) -> dict:
                     description=_summarize(pdf_text, 400),
                     main_text=pdf_text[:2500],
                     candidates_count=1,
-                    message=f"PDF procesado ({len(raw)} bytes). Se creara 1 hallazgo con el resumen del documento.",
+                    message=f"PDF procesado ({len(raw)} bytes). Se creará 1 hallazgo con el resumen del documento.",
                 )
             else:
-                result["message"] = "Documento binario/PDF sin texto extraible."
+                result["message"] = "Documento binario/PDF sin texto extraíble."
             return result
 
         soup = BeautifulSoup(text, "lxml")
@@ -604,7 +668,7 @@ def preview_url(url: str) -> dict:
             main_text=main_text[:2500],
             candidates=sample,
             candidates_count=len(cands),
-            message=f"Se detectaron {len(cands)} hallazgos potenciales en la pagina.",
+            message=f"Se detectaron {len(cands)} hallazgos potenciales en la página.",
         )
         return result
     except httpx.HTTPError as exc:

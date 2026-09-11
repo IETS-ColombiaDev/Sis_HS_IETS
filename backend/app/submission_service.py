@@ -6,6 +6,7 @@ payload original y la declaracion de conflicto de interes adjuntos.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -21,33 +22,43 @@ class SubmissionRuleError(ValueError):
     """Regla de negocio incumplida: el formulario no se guarda."""
 
 
-def create_submission(db: Session, data: dict, *, ip: str = "") -> Submission:
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def create_submission(db: Session, data: dict, *, ip: str = "", captcha: str = "") -> Submission:
     commercial = (data.get("commercial_name") or "").strip()
     inn = (data.get("inn_name") or "").strip()
     if not commercial or not inn:
         raise SubmissionRuleError("El nombre comercial y la DCI son obligatorios.")
     if not (data.get("mechanism") or "").strip():
-        raise SubmissionRuleError("El mecanismo de accion es obligatorio.")
+        raise SubmissionRuleError("El mecanismo de acción es obligatorio.")
     if not (data.get("manufacturer") or "").strip():
         raise SubmissionRuleError("El fabricante o desarrollador es obligatorio.")
     if not (data.get("indication") or "").strip():
-        raise SubmissionRuleError("La indicacion es obligatoria.")
+        raise SubmissionRuleError("La indicación es obligatoria.")
     if not (data.get("development_phase") or "").strip():
         raise SubmissionRuleError("La fase de desarrollo es obligatoria.")
     links = data.get("evidence_links") or []
     if not isinstance(links, list) or not [lk for lk in links if str(lk).strip()]:
         raise SubmissionRuleError("Debe adjuntar al menos un enlace a evidencia.")
+    bad = [str(lk).strip() for lk in links if str(lk).strip() and not str(lk).strip().lower().startswith(("http://", "https://"))]
+    if bad:
+        raise SubmissionRuleError(
+            f"Los enlaces a evidencia deben iniciar con http:// o https:// (revise: {bad[0][:80]})."
+        )
     if not (data.get("submitter_name") or "").strip() or not (data.get("submitter_email") or "").strip():
         raise SubmissionRuleError("Nombre y correo de quien postula son obligatorios.")
+    if not EMAIL_RE.match((data.get("submitter_email") or "").strip()):
+        raise SubmissionRuleError("El correo de quien postula no es válido.")
 
     has_conflict = bool(data.get("has_conflict"))
     statement = (data.get("conflict_statement") or "").strip()
     if has_conflict and len(statement) < 20:
         raise SubmissionRuleError(
-            "Si declara un conflicto de interes, debe describirlo (al menos 20 caracteres)."
+            "Si declara un conflicto de interés, debe describirlo (al menos 20 caracteres)."
         )
     if not data.get("coi_accepted"):
-        raise SubmissionRuleError("Debe firmar la declaracion de conflicto de interes.")
+        raise SubmissionRuleError("Debe firmar la declaración de conflicto de interés.")
 
     row = Submission(
         commercial_name=commercial[:400],
@@ -72,7 +83,13 @@ def create_submission(db: Session, data: dict, *, ip: str = "") -> Submission:
         entity_type="submissions",
         entity_id=str(row.id),
         action="submission_received",
-        new_value={"commercial_name": row.commercial_name, "email": row.submitter_email},
+        new_value={
+            "commercial_name": row.commercial_name,
+            "email": row.submitter_email,
+            "has_conflict": row.has_conflict,
+            # verificado | omitido (modo degradado sin llaves de reCAPTCHA)
+            "captcha": captcha or "omitido",
+        },
     )
     db.commit()
     db.refresh(row)
@@ -168,7 +185,7 @@ def reject_submission(db: Session, submission: Submission, *, reviewer: str, not
     if submission.status != "recibida":
         raise SubmissionRuleError("Solo se rechazan postulaciones en estado recibida.")
     if not (note or "").strip():
-        raise SubmissionRuleError("El rechazo exige un motivo visible para la bitacora.")
+        raise SubmissionRuleError("El rechazo exige un motivo visible para la bitácora.")
     submission.status = "rechazada"
     submission.review_note = note.strip()
     submission.reviewed_by = reviewer

@@ -1,0 +1,7 @@
+# Secretos reales y respaldos: nunca al repositorio.
+.env.production
+.env.*.local
+backups/
+*.dump
+*.sql.gz
+*.db
