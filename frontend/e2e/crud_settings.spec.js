@@ -101,6 +101,22 @@ test.describe("configuracion · superadministrador", () => {
     await expectToast(page, "Llaves de fuentes guardadas");
     expectClean(errors);
   });
+
+  test("prompts de vigilancia: guarda y restaura desde el panel", async ({ page }) => {
+    const errors = watchErrors(page);
+    const api = await apiAs(page.request);
+    const original = await api.get("/config/prompts");
+    await loginAs(page, "superadmin", "/configuracion?tab=prompts");
+    await settle(page);
+    const panel = page.getByTestId("prompts-panel");
+    await expect(panel).toBeVisible();
+    await page.locator("#prompt-system").fill("Analista E2E de horizonte sanitario.");
+    await page.getByRole("button", { name: "Guardar prompts" }).click();
+    await expectToast(page, "Prompts de vigilancia guardados");
+    await api.post("/config/prompts/reset");
+    expect(original.system).toBeTruthy();
+    expectClean(errors);
+  });
 });
 
 test.describe("configuracion · permisos", () => {

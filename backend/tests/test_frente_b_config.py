@@ -60,3 +60,39 @@ def test_removing_a_saved_source_key_takes_effect_without_restart(api, monkeypat
     out = api.put("/api/config", json={"openfda_api_key": ""}).json()
     assert out["openfda_has_key"] is False
     assert settings.openfda_api_key == ""
+
+
+def test_scan_prompts_can_be_edited_and_restored(api):
+    original = api.get("/api/config/prompts").json()
+    assert "{content}" in original["user"]
+    updated = api.put("/api/config/prompts", json={"system": "Analista de prueba", "max_pages": 5})
+    assert updated.status_code == 200
+    body = updated.json()
+    assert body["system"] == "Analista de prueba" and body["max_pages"] == 5
+    restored = api.post("/api/config/prompts/reset").json()
+    assert restored["system"] == original["defaults"]["system"]
+    assert restored["max_pages"] == original["defaults"]["max_pages"]
+
+
+def test_token_usage_counter_is_visible_in_admin_config(api):
+    from app import usage_meter
+
+    usage_meter.reset()
+    usage_meter.record(prompt_tokens=3, completion_tokens=2, total_tokens=5, model="MiniMax-M3")
+    cfg = api.get("/api/config").json()
+    assert cfg["ai_usage_calls"] >= 1
+    assert cfg["ai_usage_total_tokens"] >= 5
+    reset = api.post("/api/config/usage/reset").json()
+    assert reset["ai_usage_calls"] == 0
+
+
+def test_scan_timing_knobs_are_saved(api):
+    out = api.put(
+        "/api/config",
+        json={"scan_fetch_timeout": 18, "scan_retries": 2, "scan_pause_ms": 200, "scan_child_timeout": 12},
+    ).json()
+    assert out["scan_fetch_timeout"] == 18
+    assert out["scan_retries"] == 2
+    assert out["scan_pause_ms"] == 200
+    traces = api.get("/api/config/scan-traces")
+    assert traces.status_code == 200 and isinstance(traces.json(), list)

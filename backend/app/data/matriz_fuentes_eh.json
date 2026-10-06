@@ -1,0 +1,3351 @@
+{
+ "sheet": "MATRIZ FI EH",
+ "generated_at": "2026-10-06T16:32:56+00:00",
+ "rows": [
+  {
+   "excel_row": 3,
+   "matrix_ref": "MATRIZ FI EH fila 3",
+   "codes": [
+    "FP-MF-16"
+   ],
+   "name": "Abbott",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Estados Unidos/ Global",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.abbott.com/en-us/products-solutions",
+    "https://www.abbott.com/for-healthcare-professionals.html",
+    "https://www.abbott.com/en-us/corpnewsroom/strategy-and-strength/guiding-future-innovation"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Portafolio de productos\n2. Información general\n3. Información de tecnologias Innovadoras",
+   "access_path": "3. En el link 3 abbott.com → guiding- future- innovation → * Businees updtaes *Medical Devices *Diabetes *Hearth Health * Medicines *Nutrition * Diagnostics",
+   "consult_info": "Tendencias tecnológicas, I+D, dispositivos médicos, neuromodulación, diagnósticos, diabetes y nuevas tecnologías. Abbott señala que su comité científico analiza tendencias de tecnología sanitaria y perspectivas de I+D",
+   "observations": "La informacion despues de ingresar a las opciones disponibles da un acceso variado, a articulos, tipos de tecnologias y avances tecnologicos verificar pertinencia de los links de acceso",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 4,
+   "matrix_ref": "MATRIZ FI EH fila 4",
+   "codes": [
+    "FP-MF-01"
+   ],
+   "name": "Abbvie",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.abbvie.com/our-science/pipeline.html"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado de medicamentos",
+   "access_path": "",
+   "consult_info": "",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 5,
+   "matrix_ref": "MATRIZ FI EH fila 5",
+   "codes": [
+    "FP-MF-02"
+   ],
+   "name": "AMGEN",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.amgenpipeline.com/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado de medicamentos",
+   "access_path": "",
+   "consult_info": "",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 6,
+   "matrix_ref": "MATRIZ FI EH fila 6",
+   "codes": [
+    "FP-MF-03"
+   ],
+   "name": "AstraZeneca",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Reino Unido",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.astrazeneca.com/our-therapy-areas/pipeline.html"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado de medicamentos",
+   "access_path": "",
+   "consult_info": "",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 7,
+   "matrix_ref": "MATRIZ FI EH fila 7",
+   "codes": [
+    "FP-MF-17"
+   ],
+   "name": "Baxter",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "DM"
+   ],
+   "tech_types_raw": "DM",
+   "consult_urls": [
+    "https://www.baxter.com/",
+    "https://emeamedicationdelivery.baxter.com/products"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Página principal\n2. Productos innovadores",
+   "access_path": "2. En el link 2 → *Ambulatory Infusion systems\n*Pharmacy Tools\n*Advances patiene monitoring\n*Digital Health\n*Intravenous & Irrigation Solutions",
+   "consult_info": "Innovación en terapias de infusión, cirugía, sistemas de salud, productos y soluciones digitales. Baxter reporta inversión importante en I+D y tecnologías para el cuidado.",
+   "observations": "La información permite explorar de los siguientes productos:\n*Ambulatory Infusion systems\n*Pharmacy Tools\n*Advances patiene monitoring\n*Digital Health\n*Intravenous & Irrigation Solutions\nes información general pero no es como un listado verificar pertinencia de los links de acceso",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 8,
+   "matrix_ref": "MATRIZ FI EH fila 8",
+   "codes": [
+    "FP-MF-04"
+   ],
+   "name": "Bayer",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Alemania",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.bayer.com/en/pharma/development-pipeline",
+    "https://www.bayer.com/en/portfolio/pharmaceuticals/pharma-innovation/pipeline-overview"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado de medicamentos\n2. Pharma Innovation and Pipeline",
+   "access_path": "",
+   "consult_info": "Development Pipeline de Pharmaceuticals y presenta principalmente moléculas, terapias celulares/génicas, radioterapias",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 9,
+   "matrix_ref": "MATRIZ FI EH fila 9",
+   "codes": [
+    "FP-MF-18"
+   ],
+   "name": "BD (Becton, Dickinson and Compañy)",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "BIOM",
+    "DM"
+   ],
+   "tech_types_raw": "BIOM-DM",
+   "consult_urls": [
+    "https://www.bd.com/es-es/our-products",
+    "https://www.bd.com/en-us/about-bd/innovation-at-bd",
+    "https://www.bd.com/es-latam/about-bd/innovation-at-bd"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Portafolio de productos\n2. Información de innovación IA, dispositivos inteligentes\n3. Información tecnologias e Innovación",
+   "access_path": "bd.com →acerca BD → Innovacion en BD→ Tecnologias BD→ *Diagnosticos Avanzados *Ingenieria aistida por computadoras, dispositivos intelientes y cinecias de datos",
+   "consult_info": "Nuevos productos, innovación en dispositivos médicos, I+D, tecnologías y desarrollo temprano de ideas. BD indica que introduce nuevos productos y extensiones de línea anualmente",
+   "observations": "La información permite explorar *Diagnosticos Avanzados *Ingenieria aistida por computadoras, dispositivos intelientes y cieccias de datos es información general pero no es como un listado verificar pertinencia de los links de acceso",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 10,
+   "matrix_ref": "MATRIZ FI EH fila 10",
+   "codes": [
+    "FP-MF-05"
+   ],
+   "name": "Boehringer Ingelheim",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Aleman",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.boehringer-ingelheim.com/human-pharma-clinical-pipeline"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado de medicamentos",
+   "access_path": "",
+   "consult_info": "",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 11,
+   "matrix_ref": "MATRIZ FI EH fila 11",
+   "codes": [
+    "FP-MF-19"
+   ],
+   "name": "Boston Scientific",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "AGREGADA",
+   "country": "EE. UU. / Global",
+   "tech_types": [
+    "DM"
+   ],
+   "tech_types_raw": "DM",
+   "consult_urls": [
+    "https://www.bostonscientific.com/en-US/home.html",
+    "https://www.bostonscientific.com/en-US/medical-specialties.html"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Información general de Innovación\n2. Busqueda de tecnologias por especialidad medica",
+   "access_path": "2. En el link 2 se da la opcion por especialidad medica →* Critical Care\n*Electrophysiology *Gastroenterology *Gastrointestinal Surgery*Gynecology *Interventional Cardiology *Interventional Radiology\n*Interventional Oncology *Neurological Surgery *Otolaryngology *Pain Management\n*Pelvic Health *Pulmonology *Structural Heart *Urology *Vascular Surgery",
+   "consult_info": "Innovaciones en cardiología, endoscopia, neuromodulación, intervencionismo, dispositivos implantables y nuevas tecnologías",
+   "observations": "La información permite explorar por especiliades medicas pero no es como un listado verificar pertinencia de los links de acceso",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Ingles",
+   "interface": "Sitio web corporativo",
+   "restrictions": "traer datos de este sitio web de manera automatizada no es recomendable, ya que viola sus políticas legales y su infraestructura técnica bloqueará activamente tus scripts"
+  },
+  {
+   "excel_row": 12,
+   "matrix_ref": "MATRIZ FI EH fila 12",
+   "codes": [
+    "FP-MF-06"
+   ],
+   "name": "Brystol Myers Squibb",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.bms.com/research-and-development/pipeline.html"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado de medicamentos",
+   "access_path": "",
+   "consult_info": "",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 13,
+   "matrix_ref": "MATRIZ FI EH fila 13",
+   "codes": [
+    "FP-MF-20"
+   ],
+   "name": "GE HealthCare",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "EE. UU. / Global",
+   "tech_types": [
+    "MED",
+    "IA"
+   ],
+   "tech_types_raw": "MED-IA",
+   "consult_urls": [
+    "https://latam.gehealthcare.com/",
+    "https://www.gehealthcare.com/en-us/products/software",
+    "https://research.gehealthcare.com/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Portafolio de productos\n2. Software y soluciones de IA\n3. Innovación en inteligencia artificial",
+   "access_path": "Los links 2 y3 dan acceso a diferentes articulos",
+   "consult_info": "A/ML, tecnología avanzada, investigación, dispositivos médicos, imágenes, monitorización, software y conceptos tecnológicos en desarrollo. GE señala que su centro HTIC desarrolla investigación exploratoria y tecnologías para innovación futura",
+   "observations": "La información permite explorar por diferentes articulo pero no es como un listado verificar pertinencia de los links de acceso",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 14,
+   "matrix_ref": "MATRIZ FI EH fila 14",
+   "codes": [
+    "FP-MF-07"
+   ],
+   "name": "GILEAD",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.gilead.com/science-and-medicine/pipeline"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado de medicamentos",
+   "access_path": "",
+   "consult_info": "",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 15,
+   "matrix_ref": "MATRIZ FI EH fila 15",
+   "codes": [
+    "FP-MF-08"
+   ],
+   "name": "GSK",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Reino Unido",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.gsk.com/en-gb/research-and-development/our-pipeline/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado de medicamentos",
+   "access_path": "",
+   "consult_info": "",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 16,
+   "matrix_ref": "MATRIZ FI EH fila 16",
+   "codes": [
+    "FP-MF-09"
+   ],
+   "name": "Johnson & Johnson",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MED",
+    "DM"
+   ],
+   "tech_types_raw": "MED-DM",
+   "consult_urls": [
+    "https://www.investor.jnj.com/pipeline/development-pipeline/default.aspx",
+    "https://www.jnj.com/innovativemedicine/us/our-innovation"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado desarrollo- Lista de patente medicamentos\n2. Información de Innovación",
+   "access_path": "",
+   "consult_info": "Development Pipeline, que es principalmente farmacéutico.\nTerapias innovadoras, pipeline, nuevas tecnologías, ciencia de datos, salud digital y MedTech.",
+   "observations": "La información permite explorar por diferentes articulo con multiples accesos pero no es como un listado verificar pertinencia de los links de acceso",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 17,
+   "matrix_ref": "MATRIZ FI EH fila 17",
+   "codes": [
+    "FP-MF-10"
+   ],
+   "name": "Lilly a medicine company",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.lilly.com/discovery/clinical-development-pipeline"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado de medicamentos",
+   "access_path": "",
+   "consult_info": "",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 18,
+   "matrix_ref": "MATRIZ FI EH fila 18",
+   "codes": [
+    "FP-MF-21"
+   ],
+   "name": "Medtronic",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "por_definir",
+   "source_level_raw": "",
+   "origin": "FVEH042025",
+   "country": "EE. UU. / Global",
+   "tech_types": [
+    "DM",
+    "IA"
+   ],
+   "tech_types_raw": "DM-IA",
+   "consult_urls": [
+    "https://www.medtronic.com/us-en/healthcare-professionals/services/innovation-lab.html",
+    "https://www.medtronic.com/en-us/l/e/neurovascular/clinical-research.html",
+    "https://news.medtronic.com/innovation"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Portafolio de productos\n2. Información de productos Neurovascular\n3. Información de innovación tecnologica",
+   "access_path": "",
+   "consult_info": "Nuevos dispositivos, cirugía, cardiovascular, neuromodulación",
+   "observations": "La información permite explorar por diferentes articulo con multiples accesos pero no es como un listado verificar pertinencia de los links de acceso",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 19,
+   "matrix_ref": "MATRIZ FI EH fila 19",
+   "codes": [
+    "FP-MF-11"
+   ],
+   "name": "Merck",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Alemania",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.merck.com/research-and-products/product-pipeline/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado de medicamentos",
+   "access_path": "",
+   "consult_info": "",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 20,
+   "matrix_ref": "MATRIZ FI EH fila 20",
+   "codes": [
+    "FP-MF-25"
+   ],
+   "name": "Mindray",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "AGREGADA",
+   "country": "China",
+   "tech_types": [
+    "DM"
+   ],
+   "tech_types_raw": "DM",
+   "consult_urls": [
+    "https://www.mindray.com/na/about-us/",
+    "https://www.mindray.com/en/media-center/news",
+    "https://www.mindray.com/en/innovation"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Portafolio de productos\n2 y 3. Informacion de innovación",
+   "access_path": "",
+   "consult_info": "Equipos biomédicos, monitorización, diagnóstico in vitro, imágenes médicas, innovación y nuevos productos.",
+   "observations": "La información permite explorar por diferentes articulo con multiples accesos pero no es como un listado verificar pertinencia de los links de acceso",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 21,
+   "matrix_ref": "MATRIZ FI EH fila 21",
+   "codes": [
+    "FP-MF-12"
+   ],
+   "name": "Novartis",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Suiza",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.novartis.com/research-development/novartis-pipeline"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado de medicamentos",
+   "access_path": "",
+   "consult_info": "",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 22,
+   "matrix_ref": "MATRIZ FI EH fila 22",
+   "codes": [
+    "FP-MF-13"
+   ],
+   "name": "Pfizer",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.pfizer.com/science/drug-product-pipeline"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Avances",
+   "access_path": "",
+   "consult_info": "",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 23,
+   "matrix_ref": "MATRIZ FI EH fila 23",
+   "codes": [
+    "FP-MF-22"
+   ],
+   "name": "Philips HealthTech",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Países Bajos / Global",
+   "tech_types": [
+    "DM",
+    "IA"
+   ],
+   "tech_types_raw": "DM-IA",
+   "consult_urls": [
+    "https://www.usa.philips.com/healthcare/solutions",
+    "https://www.philips.com/a-w/about/innovation",
+    "https://www.philips.com/a-w/about/news-and-insights/innovation-spotlight.html"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Portafolio de productos\n2. Información de Innovación",
+   "access_path": "",
+   "consult_info": "Innovación en monitorización, intervencionismo, imagen, informática clínica, IA, software y salud personal.",
+   "observations": "La información permite explorar por diferentes articulo con multiples accesos pero no es como un listado verificar pertinencia de los links de acceso",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 24,
+   "matrix_ref": "MATRIZ FI EH fila 24",
+   "codes": [
+    "FP-MF-14"
+   ],
+   "name": "Roche Diagnostics",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Global",
+   "tech_types": [
+    "DM",
+    "BIOM",
+    "IA"
+   ],
+   "tech_types_raw": "DM-BIOM-IA",
+   "consult_urls": [
+    "https://www.roche.com/innovation/partnering/diagnostics",
+    "https://www.roche.com/solutions/pipeline",
+    "https://diagnostics.roche.com/global/en/about/innovation.html"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1 y 3. Página principal de innovación\n2. Listado de productos en desarrollo",
+   "access_path": "",
+   "consult_info": "Biomarcadores, química clínica, inmunoquímica, POCT, diagnóstico descentralizado",
+   "observations": "La información permite explorar por diferentes articulo con multiples accesos pero no es como un listado verificar pertinencia de los links de acceso",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 25,
+   "matrix_ref": "MATRIZ FI EH fila 25",
+   "codes": [
+    "FP-MF-15"
+   ],
+   "name": "SANOFI",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Francia",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.sanofi.com/en/science-and-innovation/research-and-development/rd-pipeline"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado de medicamentos",
+   "access_path": "",
+   "consult_info": "",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 26,
+   "matrix_ref": "MATRIZ FI EH fila 26",
+   "codes": [
+    "FP-MF-23"
+   ],
+   "name": "Siemens Healthineers",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Alemania / Global",
+   "tech_types": [
+    "DM",
+    "IA"
+   ],
+   "tech_types_raw": "DM-IA",
+   "consult_urls": [
+    "https://www.siemens-healthineers.com/innovations"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Informacion desarrollos da la compañía e innovación",
+   "access_path": "",
+   "consult_info": "Innovación, imagenología, diagnóstico, IA, terapias",
+   "observations": "La información permite explorar por diferentes articulo con multiples accesos pero no es como un listado verificar pertinencia de los links de acceso",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 27,
+   "matrix_ref": "MATRIZ FI EH fila 27",
+   "codes": [
+    "FP-MF-24"
+   ],
+   "name": "Stryker",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "FVEH042025",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "DM"
+   ],
+   "tech_types_raw": "DM",
+   "consult_urls": [
+    "https://www.stryker.com/co/es/portfolios/i/medical-surgical-equipment.html"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Portafolio de productos",
+   "access_path": "",
+   "consult_info": "",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 28,
+   "matrix_ref": "MATRIZ FI EH fila 28",
+   "codes": [
+    "FP-MF-26"
+   ],
+   "name": "Nihon kohden",
+   "entity_label": "Fabricantes I+D",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
+   "origin": "AGREGADA",
+   "country": "Japón",
+   "tech_types": [
+    "DM"
+   ],
+   "tech_types_raw": "DM",
+   "consult_urls": [
+    "https://in.nihonkohden.com/en/innovative-technologies"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Tecnologias innovadoras",
+   "access_path": "",
+   "consult_info": "dispositivos portátiles, analytics, monitorización",
+   "observations": "La información permite explorar por diferentes articulo con multiples accesos pero no es como un listado verificar pertinencia de los links de acceso",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 29,
+   "matrix_ref": "MATRIZ FI EH fila 29",
+   "codes": [
+    "FP-RG-01",
+    "FP-RG-02",
+    "FP-RG-03"
+   ],
+   "name": "FDA – Food and Drug Administration",
+   "entity_label": "Agencia regulatoria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "FVEH042025",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.fda.gov/medical-devices/device-approvals-and-clearances/recently-approved-devices",
+    "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfPMA/pma.cfm",
+    "https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm?event=reportsSearch.process",
+    "https://www.fda.gov/vaccines-blood-biologics/cellular-gene-therapy-products/approved-cellular-and-gene-therapy-products",
+    "https://www.fda.gov/medical-devices/digital-health-center-excellence/medical-devices-incorporate-sensor-based-digital-health-technology",
+    "https://www.fda.gov/medical-devices/software-medical-device-samd/artificial-intelligence-enabled-medical-devices"
+   ],
+   "methodology_urls": [
+    "https://www.fda.gov/",
+    "https://www.fda.gov/medical-devices",
+    "https://www.fda.gov/medical-devices/device-advice-comprehensive-regulatory-assistance/medical-device-databases",
+    "https://www.fda.gov/drugs",
+    "https://www.fda.gov/drugs/development-approval-process-drugs/drug-approvals-and-databases",
+    "https://www.fda.gov/vaccines-blood-biologics",
+    "https://www.fda.gov/medical-devices/how-study-and-market-your-device/breakthrough-devices-program",
+    "https://www.fda.gov/science-research/artificial-intelligence-and-medical-products/fda-digital-health-and-artificial-intelligence-glossary-educational-resource"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Pagina principal\n2. Información Dispositivos Médicos\n2.1. Link acceso a listado de DM aprobados por año\n2.2 Buscador base de datos aprobación previa a la comercialización Dispositivos médicos\n2.3 Bases de datos de dispositivos médicos\n3. Informacion de Medicamentos\n3.1 Listado de medicamentos aprobados\n3.2 Aprobaciones de medicamentos y bases de datos.\n4. Informacion de Vacunas, sangre y productos biologicos\n4.1 Listado de productos aprobados de terapia celular y génica\n5. Programa de dispositivos medicos innovadores\n6. Glosario de la FDA sobre salud digital e inteligencia artificial: recurso educativo.\n6.1 Listado Dispositivos médicos que incorporan tecnología de salud digital basada en sensores.\n6.2 Listado de dispositivos medicos con inteligencia artificial",
+   "access_path": "Accesos directos con link\nVerificar la aplicación de los buscadores",
+   "consult_info": "3.1 En este link se describe los medicamentos aprobados la búsqueda se da con opcion de elegir mediante pestaña mes y año y posibilidad de descarga del archivo en excel.\n4. En el link 4 se desceibe un listado de productos aprobados para terapia celular y géncia el cual cual de manera individual da enlace de acceso por producto (Indicaciones, Información del producto, Documentos de apoyo)\n6.1. Listado de DM que incorporan tencologia en salud digital basada en sensores permite descarga de archivo en excel\n6.1. Listado de DM con inteligencia artificial permite descarga de archivo en excel",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Inglés",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 30,
+   "matrix_ref": "MATRIZ FI EH fila 30",
+   "codes": [
+    "FP-RG-04",
+    "FP-RG-05"
+   ],
+   "name": "EMA – European Medicines Agency",
+   "entity_label": "Agencia regulatoria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "FVEH042025",
+   "country": "Unión Europea",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.ema.europa.eu/en/search?f%5B0%5D=ema_medicine_bundle%3Aema_medicine&f%5B1%5D=ema_search_categories%3A83",
+    "https://www.ema.europa.eu/en/medicines/medicines-human-use-under-evaluation"
+   ],
+   "methodology_urls": [
+    "https://www.ema.europa.eu/en/homepage",
+    "https://www.ema.europa.eu/en/human-regulatory-overview/medical-devices/expert-panel-support-breakthrough-medical-devices-pilot-programme"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Página principal\n2. Guia de Programa de dispositivos innovadores (PDF)\n3. Buscador Base de datos, el cual se requiere aplicación de filtros\n4. Buscador Base de datos, requiere descarga de archivo en excel por periodo de tiempo.",
+   "access_path": "3. Pide validación de Humano",
+   "consult_info": "2. En el link 2 describe la prueba piloto aplicada por la organización comparable a DT Dialogos Tempranos.",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Inglés",
+   "interface": "",
+   "restrictions": "Al ingreso pide validación por humano"
+  },
+  {
+   "excel_row": 31,
+   "matrix_ref": "MATRIZ FI EH fila 31",
+   "codes": [
+    "FP-RG-14"
+   ],
+   "name": "European Commission – Medical Devices",
+   "entity_label": "Agencia regulatoria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "UE",
+   "tech_types": [
+    "DM",
+    "IA",
+    "SD"
+   ],
+   "tech_types_raw": "DM-IA(SD)",
+   "consult_urls": [],
+   "methodology_urls": [
+    "https://health.ec.europa.eu/medical-devices-sector_en",
+    "https://health.ec.europa.eu/medical-devices-expert-panels/experts/list-opinions-provided-under-cecp_en",
+    "https://ai-watch.ec.europa.eu/publications/ai-watch-assessing-technology-readiness-levels-artificial-intelligence_en"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Informacion general Dispositivos Médicos\n2. Información de expertos por especialidad\n3. Informe Técnico \"Evaluación de los niveles de madurez tecnológica pra la inteligencia artificial\" Documento en pdf\n4. HS-p-24-64 Horizon scanning for medical devices Documento en PDF descargado",
+   "access_path": "Accesos directos con link",
+   "consult_info": "Documentos de Escaneo Horizonte y TRL",
+   "observations": "Alta aplicabilidad de proyecto EH para TRL\nNo se evidencia listado , contiene fuentes oficiales para la detección de tecnologias innovadoras y de alto riesgo.\nLa Comisión publica las opiniones emitidas por los paneles de expertos para dispositivos médicos sometidos al Clinical Evaluation Consultation Procedure\nEvaluación de los niveles de madurez tecnológica para la inteligencia artificial.\nHS-p-24-64 Horizon scanning for medical devices Documento en PDF descargado",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 32,
+   "matrix_ref": "MATRIZ FI EH fila 32",
+   "codes": [
+    "FP-RG-09"
+   ],
+   "name": "MHRA – Medicines and Healthcare products Regulatory Agency",
+   "entity_label": "Agencia regulatoria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "Reino Unido",
+   "tech_types": [
+    "MED",
+    "DM"
+   ],
+   "tech_types_raw": "MED-DM",
+   "consult_urls": [
+    "https://www.gov.uk/government/collections/marketing-authorisations-lists-of-granted-licences"
+   ],
+   "methodology_urls": [
+    "https://www.gov.uk/government/case-studies/horizon-scanning-case-study-what-is-an-actionable-horizon-scanning-signal-ahss",
+    "https://www.gov.uk/government/publications/innovation-accelerator/innovation-accelerator"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado en PDF de licencias otorgadas por periodo de tiempo\n2. Documento metodologico Horizon Scanning Case Study: What is an Actionable Horizon Scanning Signal\n3. Guia de Introducción al acelerador de la innovación",
+   "access_path": "Accesos directos con link",
+   "consult_info": "MHRA sí tiene una metodología y un proceso institucional de Horizon Scanning, pero no encontré un único “Manual metodológico de Horizon Scanning”\nLo que existe actualmente está distribuido entre:\nInnovation Accelerator\nHorizon Scanning\nActionable Horizon Scanning Signals\nHorizon Scanning Case Studies\nRegulatory Science\nInnovation Office",
+   "observations": "Alta aplicabilidad proyecto EH\nLa MHRA señala que su Horizon Scanning tiene como objetivo identificar Actionable Horizon Scanning Signals\nNo se evidencia listado de tecnologias innovadoras y de alto riesgo, se evidencian guias alertas y regulación.",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 33,
+   "matrix_ref": "MATRIZ FI EH fila 33",
+   "codes": [
+    "FP-RG-06",
+    "FP-RG-07"
+   ],
+   "name": "Health Canada",
+   "entity_label": "Agencia regulatoria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "Canadá",
+   "tech_types": [
+    "DM"
+   ],
+   "tech_types_raw": "DM",
+   "consult_urls": [],
+   "methodology_urls": [
+    "https://www.canada.ca/en/health-canada/services/drugs-health-products/medical-devices.html",
+    "https://www.canada.ca/en/health-canada/services/publications/drugs-health-products/consultation-summary-health-product-regulation.html"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Información general Dispositivos Médicos\n2. Health Canada (2019). What we heard: A summary of scanning and consultations on what’s next for health product regulation.",
+   "access_path": "canada.ca/→health → publications→ publication -drugs and health products",
+   "consult_info": "En la información del link 2 identifica escaneo cn cuatro mecanismos:\nRevisión de investigación científica, literatura publicada e informes.\nEscaneo de medios relevantes.\nConsulta directa con expertos.\nColaboración con reguladores internacionales.\nTeniendo en cuenta estos factores clave, el Departamento seleccionó las siguientes seis tecnologías emergentes para una investigación más profunda con el fin de comprender mejor cómo está evolucionando el ámbito de los productos sanitarios:\nInteligencia artificial , que incluye actividades como el aprendizaje automático, las redes neuronales, el procesamiento del lenguaje natural y la robótica.\nTerapias celulares avanzadas , como las terapias celulares individualizadas diseñadas a medida para abordar las necesidades específicas de cada paciente.\nLos macrodatos , procedentes de fuentes como sensores, información genética y redes sociales, se utilizan cada vez más para fundamentar las decisiones de pacientes y profesionales sanitarios.\nImpresión 3D de productos sanitarios (por ejemplo, implantes, prótesis, células, tejidos).\nNuevas formas de administrar fármacos que combinan diferentes líneas de productos y métodos (por ejemplo, nanotransportadores, dispositivos implantables).\nEdición genética , incluidas las terapias génicas individualizadas que pueden ayudar a prevenir y tratar ciertas enfermedades.",
+   "observations": "Alta aplicabilidad proyecto EH\nNo se evidencia un listado público exclusivo o separado para dispositivos médicos \"innovadores\" o de \"nuevas tecnologías\".En su lugar, la agencia registra y publica todos los dispositivos médicos autorizados para la venta en el país dentro de su base de datos general",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 34,
+   "matrix_ref": "MATRIZ FI EH fila 34",
+   "codes": [
+    "FP-RG-08"
+   ],
+   "name": "TGA – Therapeutic Goods Administration",
+   "entity_label": "Agencia regulatoria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "Australia",
+   "tech_types": [
+    "MED",
+    "DM",
+    "IA"
+   ],
+   "tech_types_raw": "MED-DM-IA",
+   "consult_urls": [
+    "https://www.tga.gov.au/resources/artg",
+    "https://www.tga.gov.au/products/medical-devices/software-and-artificial-intelligence-ai/manufacturing/artificial-intelligence-ai-and-medical-device-software-regulation/ai-enabled-medical-devices-artg"
+   ],
+   "methodology_urls": [
+    "https://www.tga.gov.au/resources/publication/corporate-reports/health-products-regulation-group-regulatory-science-strategy-2020-2025"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado de tecnologias recientemente incluidas en Australia (PDF)\n2. Lista de dispositivos medicos habilitados para inteligencia artificial\n3. Contiene el plan de trabajo de TGA en donde incluye el ingreso a tecnologias emergentes",
+   "access_path": "tga-gov-au→Resources and guidance →Search → Filter for product type (DM-MED-OTROS)",
+   "consult_info": "Listado de tecnologia aprobada en Australia.",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 35,
+   "matrix_ref": "MATRIZ FI EH fila 35",
+   "codes": [
+    "FP-RG-10"
+   ],
+   "name": "PMDA – Pharmaceuticals and Medical Devices Agency",
+   "entity_label": "Agencia regulatoria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "Japón",
+   "tech_types": [
+    "MED",
+    "DM",
+    "IA",
+    "SD"
+   ],
+   "tech_types_raw": "MED-DM-IA- SD SaMD",
+   "consult_urls": [
+    "https://www.pmda.go.jp/english/review-services/reviews/approved-information/devices/0001.html",
+    "https://www.pmda.go.jp/english/review-services/reviews/approved-information/drugs/0002.html"
+   ],
+   "methodology_urls": [
+    "https://www.pmda.go.jp/english/",
+    "https://www.pmda.go.jp/english/pnavi_e-06.html",
+    "https://www.pmda.go.jp/english/pnavi_e-05.html"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Página principal\n2. Información Dispositivos Médicos\n2.1 Listado de productos aprobados nuevos y mejorados (Descarga de pdf)\n3. Información medicamentos\n3.1 Listado de productos aprobados de medicamentos.",
+   "access_path": "",
+   "consult_info": "Informacion de Medicamentos, Dispositivos medicos, y en mayor descripcion SaMD, incluyendo Guia para la evaluación de SaMD, Informe sobre software basado en IA como Dispositivo Médico, Información sobre productos SaMD aprobados",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Japones- Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 36,
+   "matrix_ref": "MATRIZ FI EH fila 36",
+   "codes": [
+    "FP-RG-11"
+   ],
+   "name": "NMPA – National Medical Products Administration",
+   "entity_label": "Agencia regulatoria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "FVEH042025",
+   "country": "China",
+   "tech_types": [
+    "MED",
+    "DM"
+   ],
+   "tech_types_raw": "MED-DM",
+   "consult_urls": [],
+   "methodology_urls": [
+    "https://english.nmpa.gov.cn/index.html",
+    "https://english.nmpa.gov.cn/drugs.html",
+    "https://english.nmpa.gov.cn/medicaldevices.html",
+    "https://cisema.com/blog/china-medical-device-approval-tracker"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Página principal\n2. Información medicamentos\n3. Información dispositivos médicos\n4. Información de productos aprobados",
+   "access_path": "nmpa.gov→Drugs or Medical Devices",
+   "consult_info": "Información general de medicamentos y dispositivos médicos.Información general de dispositivos medicos.\nEl link 4 envia CISEMA el cual es el rastreador de aprobaciones de NMPA",
+   "observations": "Media aplicabilidad proyecto EH, no se evidencia listados o guias metodologicas.",
+   "priority_level": "media",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "mensual",
+   "frequency_raw": "Mensual",
+   "language": "Chino- Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 37,
+   "matrix_ref": "MATRIZ FI EH fila 37",
+   "codes": [
+    "FP-RG-12"
+   ],
+   "name": "MFDS – Ministry of Food and Drug Safety",
+   "entity_label": "Agencia regulatoria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "Corea del Sur",
+   "tech_types": [
+    "MED",
+    "DM"
+   ],
+   "tech_types_raw": "MED-DM",
+   "consult_urls": [],
+   "methodology_urls": [
+    "https://www.mfds.go.kr/eng/index.do",
+    "https://www.mfds.go.kr/eng/wpge/m_39/de011026l001.do"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Página principal\n2. Informacion de aprobación de DM",
+   "access_path": "",
+   "consult_info": "Dispositivos médicos, medicamentos, alimentos,",
+   "observations": "Baja aplicabilidad proyecto EH Criterios de aprobacion de tecnologia",
+   "priority_level": "baja",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 38,
+   "matrix_ref": "MATRIZ FI EH fila 38",
+   "codes": [
+    "FP-RG-13"
+   ],
+   "name": "Swissmedic",
+   "entity_label": "Agencia regulatoria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "Suiza",
+   "tech_types": [
+    "MED",
+    "DM"
+   ],
+   "tech_types_raw": "MED-DM",
+   "consult_urls": [
+    "https://www.swissmedic.ch/swissmedic/en/home/medical-devices/klinische-versuche/klinische-pruefungen.html"
+   ],
+   "methodology_urls": [
+    "https://www.swissmedic.ch/swissmedic/en/home.html",
+    "https://www.swissmedic.ch/swissmedic/en/home/medical-devices/medizinprodukte-datenbank.html"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Página principal\n2. Información de dispositivos médicos\n3. Invesigaciones Clinicas con dispositivos médicos\n4.",
+   "access_path": "swissmedic.chl →about us →what is horizon scanning",
+   "consult_info": "2. Informacion de Escaneo Horizonte descripcion sintetizada, amplia el concepto de los boletines informativos en los que incluyen nuevos enfoques regulatorios, avances científicos y tecnológicos, así como actividades internacionales y el marco político vigente. El contenido se presenta de forma concisa y se publica en línea y en formato PDF descargable.\n3. Investigaciones clinicas con dispositivos medicos previas a la a comercialización, se descarga un archivo en pdf.",
+   "observations": "Alta aplicabilidad proyecto EH, en el link 3 se evidencia estudios clinico previos a la comercialización.\nNo se evidencia listado de tecnologias innovadoras",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 39,
+   "matrix_ref": "MATRIZ FI EH fila 39",
+   "codes": [
+    "FP-RG-15"
+   ],
+   "name": "CDSCO Central Drugs Standard Control Organisation",
+   "entity_label": "Agencia regulatoria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "India",
+   "tech_types": [
+    "MED",
+    "DM"
+   ],
+   "tech_types_raw": "MED-DM",
+   "consult_urls": [
+    "https://www.cdsco.gov.in/opencms/opencms/en/Approval_new/Approved-New-Drugs/"
+   ],
+   "methodology_urls": [
+    "https://www.cdsco.gov.in/opencms/opencms/en/Home/"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Página principal\n2. Listado de nuevos medicamentos aprobados",
+   "access_path": "",
+   "consult_info": "",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 40,
+   "matrix_ref": "MATRIZ FI EH fila 40",
+   "codes": [
+    "FP-RG-16"
+   ],
+   "name": "AIFA Italian Medicines Agency",
+   "entity_label": "Agencia regulatoria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "Italia",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [],
+   "methodology_urls": [
+    "https://www.aifa.gov.it/en/web/guest/horizon-scanning",
+    "https://www.aifa.gov.it/en/orizzonte-farmaci"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Información Escaneo Horizonte\n2. Informes de 2019 a 2025 El informe 2025 identifica medicamentos nuevos y nuevas indicaciones que recibieron opinión positiva de EMA",
+   "access_path": "",
+   "consult_info": "Se descarga archivos en pdf *Rutas de HTA y exploración de horizontes\n*Prospectiva Análisis del entorno Panorama de los medicamentos en desarrollo Informe de 2025",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 41,
+   "matrix_ref": "MATRIZ FI EH fila 41",
+   "codes": [
+    "FP-HT-13"
+   ],
+   "name": "RedETS Red española de agencias de evaluación de tecnologias sanitarias y presatciones del sistema nacional de salud",
+   "entity_label": "ORGANISMOS DE HTA / EVALUACIÓN DE TECNOLOGÍAS",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "AGREGADA",
+   "country": "España",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://redets.sanidad.gob.es/TSNE/home.htm"
+   ],
+   "methodology_urls": [
+    "https://redets.sanidad.gob.es/TSNE/home.htm"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Listado de tecnologias sanitarias nuevas y emergentes..\nEn ese link se descarga el Plan de actuaciones en al detección temprana de tecnologias nuevas y emeregentes en la RedETS",
+   "access_path": "Acceso directo en el link",
+   "consult_info": "Plan de actuaciones en al detección temprana de tecnologias nuevas y emergentes en la RedETS descripcion de metodologia",
+   "observations": "Alta aplicabilidad proyecto Escaneo Horizonte",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Español",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 42,
+   "matrix_ref": "MATRIZ FI EH fila 42",
+   "codes": [
+    "FP-HT-04"
+   ],
+   "name": "ACE Agency for care effectivesness",
+   "entity_label": "ORGANISMOS DE HTA / EVALUACIÓN DE TECNOLOGÍAS",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "FVEH042025",
+   "country": "Singapur",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.ace-hta.gov.sg/healthcare-professionals/ace-horizon-scanning"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "1. Archivo descargado en pdf Guia metodologica proyecto Escaneo Horizonte: ESCANEO DE HORIZONTE\nMÉTODOS Y GUÍA DE PROCESOS",
+   "material_type": "1. Articulos de informes de escaneo horizonte (PDF)",
+   "access_path": "ace-hta.gov.sg→ Healthcare professionals→ ACE Horizon Scanning",
+   "consult_info": "1. Buscador de Informes publicados por ACE\nGuia metodologica proyecto Escaneo Horizonte: ESCANEO DE HORIZONTE\nMÉTODOS Y GUÍA DE PROCESOS",
+   "observations": "Alta aplicabilidad proyecto Escaneo Horizonte documento metodologico y acceso a informes publicados por ACE.",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 43,
+   "matrix_ref": "MATRIZ FI EH fila 43",
+   "codes": [
+    "FP-HT-12"
+   ],
+   "name": "AHRQ – Healthcare Horizon Scanning System",
+   "entity_label": "ORGANISMOS DE HTA / EVALUACIÓN DE TECNOLOGÍAS",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "FVEH042025",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [],
+   "methodology_urls": [
+    "https://effectivehealthcare.ahrq.gov/products/horizon-scan/overview"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Información escaneo horizonte\nSu ultima actualizacion fue de 2015",
+   "access_path": "Documentos de referencias rutas no activas",
+   "consult_info": "Guia metodologica proyecto Escaneo Horizonte",
+   "observations": "Alta aplicabilidad proyecto Escaneo Horizonte documentos a referenciar, Referente metodológico histórico toda vez que el programa ha finalizado\n*AHRQ – Horizon Scanning Protocol and Operations Manual año 2015\n*A Systematic Review of Methods for Health Care Technology Horizon Scanning – AHRQ año 2013\n*Evaluation of the AHRQ Healthcare Horizon Scanning System año 2016",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 44,
+   "matrix_ref": "MATRIZ FI EH fila 44",
+   "codes": [
+    "FP-HT-03"
+   ],
+   "name": "Canada's Drug Agency – CDA-AMC",
+   "entity_label": "ORGANISMOS DE HTA / EVALUACIÓN DE TECNOLOGÍAS",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "FVEH042025",
+   "country": "Canadá",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.cda-amc.ca/find-reports",
+    "https://www.cda-amc.ca/horizon-scan"
+   ],
+   "methodology_urls": [
+    "https://www.cda-amc.ca/horizon-scanning"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Información escaneo horizonte\nHorizon Scan de la CDA-AMC (Canada's Drug Agency) es un informe resumido de alto nivel que identifica y monitorea tecnologías de salud nuevas y emergentes antes de que se adopten de forma masiva\n2. Listado de Informes de analisis de exploración de horizontes",
+   "access_path": "cda-amc.ca→about →What we do →Programs and Services → Horizon Scan\ncda-amc.ca→about →What we do →Programs and Services → Horizon Scan →Horizon Scan Rounduo→Find reports → Select Report type",
+   "consult_info": "Documento descargado Guia Metodologica Documento de Procesos de productos y\nservicios de análisis prospectivo 2017\nLas publicaciones sobre el panorama tecnológico abarcan tecnologías sanitarias como dispositivos médicos, medicamentos, diagnóstico por imagen, pruebas de laboratorio, procedimientos quirúrgicos y otras intervenciones sanitarias.",
+   "observations": "Alta aplicabilidad proyecto EH\nla agencia CADTH y la CDA-AMC son la misma organización, ya que CADTH evolucionó y cambió oficialmente su nombre a la Agencia Canadiense de Medicamento,REVISAR MANUAL pag 18",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 45,
+   "matrix_ref": "MATRIZ FI EH fila 45",
+   "codes": [
+    "FP-HT-15",
+    "FP-HT-07"
+   ],
+   "name": "EUnetHTA / EU HTA",
+   "entity_label": "ORGANISMOS DE HTA / EVALUACIÓN DE TECNOLOGÍAS",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "FVEH042025",
+   "country": "Unión Europea- Austria",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [],
+   "methodology_urls": [
+    "https://aihta.at/page/horizon-scanning-system-hss-ein-ueberblick/en",
+    "https://health.ec.europa.eu/publications/report-emerging-health-technologies_en"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Programa de Escaneo Horizonte\n2. Informe sobre tecnologias sanitarias emergentes PDF",
+   "access_path": "",
+   "consult_info": "Para el sistema de exploracion horizontes remite a Euroscan",
+   "observations": "Media aplicabilidad para proyecto EH remite a EUROSCAN",
+   "priority_level": "media",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 46,
+   "matrix_ref": "MATRIZ FI EH fila 46",
+   "codes": [
+    "FP-HT-05"
+   ],
+   "name": "EUROSCAN",
+   "entity_label": "ORGANISMOS DE HTA / EVALUACIÓN DE TECNOLOGÍAS",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "FVEH042025",
+   "country": "Alemania- verificar",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [],
+   "methodology_urls": [
+    "https://www.euroscan.org/",
+    "https://ihts.org/",
+    "https://ihts.org/the-new-toolkit-v4-2025/"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Página principal\n2. Informacion proyecto escaneo horizonte\n3. Kit de herramientas Euroscan V 2025",
+   "access_path": "ihts.org/→I-HTS/Services and tools → Methodology→ Early Awareness Toolkit",
+   "consult_info": "Documentos metodologicos proyecto EH",
+   "observations": "Alta aplicabilidad en proyecto EH, para acceder al kit de herramientas se puede acceder como miembro IETS es consulto a ing Carlos para posibilidad de acceso a la herramienta",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 47,
+   "matrix_ref": "MATRIZ FI EH fila 47",
+   "codes": [
+    "FP-HT-06"
+   ],
+   "name": "INAHTA – International Network of Agencies for HTA",
+   "entity_label": "ORGANISMOS DE HTA / EVALUACIÓN DE TECNOLOGÍAS",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "AGREGADA",
+   "country": "Internacional",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [],
+   "methodology_urls": [
+    "https://www.inahta.org/",
+    "https://htaglossary.net/List-all-terms"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Página principal\n2. Glosario de Evaluación de Tecnologías Sanitarias (ETS) es proporcionar a la comunidad de ETS, tanto a los productores como a los usuarios de información sobre evaluación de tecnologías sanitarias, un vocabulario común para trabajar en este campo.",
+   "access_path": "inahta.org →HTA Tools 6 Resources → Early Awareness & Alert Systems",
+   "consult_info": "Informes HTA de múltiples países con tipos de publicaciones: HTA completa, Revisión rápida, Mini HTA, Otro",
+   "observations": "Revisar pertinencia de la base de datos para EH\nMaTHAS miembro de INAHTA, NO ENCUENTRO LINK ESPECIFICO PARA MaTHAS\nRemite a EUROSCAN para Sistema de alerta temprana",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 48,
+   "matrix_ref": "MATRIZ FI EH fila 48",
+   "codes": [
+    "FP-HT-10"
+   ],
+   "name": "IQWiG",
+   "entity_label": "ORGANISMOS DE HTA / EVALUACIÓN DE TECNOLOGÍAS",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "AGREGADA",
+   "country": "Alemania",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.iqwig.de/projekte/projekte-und-ergebnisse/"
+   ],
+   "methodology_urls": [
+    "https://www.iqwig.de/"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Página principal\n2. Buscador de informes evaluación de farmacos",
+   "access_path": "En el link 2 iqwig→ área→ evaluación de farmacos",
+   "consult_info": "Informes de seguimiento y evaluación de tecnologia",
+   "observations": "REVISAR PERTINENCIA",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Aleman- Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 49,
+   "matrix_ref": "MATRIZ FI EH fila 49",
+   "codes": [
+    "FP-HT-11"
+   ],
+   "name": "KCE – Belgian Health Care Knowledge Centre",
+   "entity_label": "ORGANISMOS DE HTA / EVALUACIÓN DE TECNOLOGÍAS",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "AGREGADA",
+   "country": "Bélgica",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [],
+   "methodology_urls": [
+    "https://kce.fgov.be/",
+    "https://beneluxa.org/sites/beneluxa.org/files/2017-07/Horizon%20scanning_ScientificReport_full.pdf"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Página principal\n2. Informe de escaneo horizonte productos farmaceuticos",
+   "access_path": "",
+   "consult_info": "HTA, innovaciones, procedimientos y tecnologías",
+   "observations": "REVISAR PERTINENCIA",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 50,
+   "matrix_ref": "MATRIZ FI EH fila 50",
+   "codes": [
+    "FP-HT-09"
+   ],
+   "name": "NHS National Health Service",
+   "entity_label": "ORGANISMOS DE HTA / EVALUACIÓN DE TECNOLOGÍAS",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "FVEH042025",
+   "country": "Inglaterra",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [],
+   "methodology_urls": [
+    "https://www.england.nhs.uk/aac/what-we-do/demand-signalling/"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Información programa escaneo horizonte",
+   "access_path": "england.nhs.uk → What we do → Embedding research in the NHS→Horizon scanning and demand signalling",
+   "consult_info": "Exploración de horizontes dirigida 2022-23 *Resistencia a los microbianos *Medicamentos de terapia avanzada *Inteligencia artificial.",
+   "observations": "Media aplicabilidad para proyecto EH\nDefine algunos trabajos de EH en los años 2022-23\nNHS trabaja con NIHR",
+   "priority_level": "media",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 51,
+   "matrix_ref": "MATRIZ FI EH fila 51",
+   "codes": [
+    "FP-HT-08"
+   ],
+   "name": "NICE – National Institute for Health and Care Excellence",
+   "entity_label": "ORGANISMOS DE HTA / EVALUACIÓN DE TECNOLOGÍAS",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "AGREGADA",
+   "country": "Inglaterra",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [],
+   "methodology_urls": [
+    "https://www.nice.org.uk/process/pmg36",
+    "https://www.nice.org.uk/corporate/ecd77",
+    "https://www.nice.org.uk/corporate/ecd7"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Guía de NICE sobre evaluación de tecnologías y tecnologías altamente especializadas: el manual.\n2. Marco de estándares de evidencia para tecnologías de salud digital 090822",
+   "access_path": "",
+   "consult_info": "Manual aplicado por NICE no especifico para Escaneo Horizonte",
+   "observations": "Media aplicabilidad para proyecto EH\nPrioridades estratégicas del NICE para el período 2026-2027 mecionan como plan de trabajo el análisis de horizontes para la identificación de tecnologias emergentes.\nNIHR elabora información para NICE",
+   "priority_level": "media",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 52,
+   "matrix_ref": "MATRIZ FI EH fila 52",
+   "codes": [
+    "FP-HT-02",
+    "FP-CT-04"
+   ],
+   "name": "NIHR National Insititute for Health and Care Reasearch",
+   "entity_label": "ORGANISMOS DE HTA / EVALUACIÓN DE TECNOLOGÍAS",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "FVEH042025",
+   "country": "Reino Unido",
+   "tech_types": [
+    "MT",
+    "IA",
+    "SD"
+   ],
+   "tech_types_raw": "MT-IA (SD)",
+   "consult_urls": [
+    "https://io.nihr.ac.uk/",
+    "https://io.nihr.ac.uk/resources/journal-articles/horizon-scanning-for-medical-technologies-methodological-framework-development-study-of-the-medical-innovation-scanning-techniques-mist-framework/",
+    "https://scanmedicine.com/devices",
+    "https://scanmedicine.com/clinicaltrials",
+    "https://io.nihr.ac.uk/resources/reports/a-horizon-scan-of-emerging-generative-ai-enabled-technologies-for-use-in-healthcare/",
+    "https://io.nihr.ac.uk/resources/reports/a-horizon-scan-of-algorithms-used-in-the-development-of-artificial-intelligence-ai-enabled-healthcare-technologies/",
+    "https://ioatlas.nihrio.com/",
+    "https://io.nihr.ac.uk/resources/journal-articles/reporting-horizon-scanning-studies-prototype-development-study/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Página principal\n2. Información de proyecto Esacneo Horizonte\n3. Buscador de dispositivos (Ultima publicación 2021 envia a enlace de FDA)\n4. Buscador de ensayos clinicos.\n5. Un análisis preliminar de las tecnologías emergentes de IA\ngenerativa para su uso en la atención médica. 20/05/2025.\n6. Un análisis preliminar de los algoritmos utilizados en el desarrollo de tecnologías sanitarias basadas en inteligencia artificial (IA) 13/09/2024\n7. IOAtlas, una aplicación web que presenta un glosario completo de términos de análisis prospectivo y un generador de plantillas para la extracción de datos\n8. Informe sobre estudios de exploración prospectiva: Estudio de desarrollo de prototipos 06/05/2026 (prototipo de checklist para reportar estudios de Horizon Scanning)",
+   "access_path": "",
+   "consult_info": "Exploración de horizontes para tecnologías médicas: Estudio del desarrollo del marco metodológico de las técnicas de exploración de la innovación médica (MIST)",
+   "observations": "Alta aplicabilidad para proyecto EH MedTECH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 53,
+   "matrix_ref": "MATRIZ FI EH fila 53",
+   "codes": [
+    "FP-HT-01"
+   ],
+   "name": "PCORI Patient Centered Outcomes Research Institute / ECRI",
+   "entity_label": "ORGANISMOS DE HTA / EVALUACIÓN DE TECNOLOGÍAS",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "AGREGADA",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://horizonscandb.pcori.org/",
+    "https://www.pcori.org/"
+   ],
+   "methodology_urls": [
+    "https://www.pcori.org/",
+    "https://www.pcori.org/implementation-evidence/emerging-topics-reports-and-horizon-scans/pcori-health-care-horizon-scanning-system",
+    "https://www.pcori.org/sites/default/files/PCORI-Health-Care-Horizon-Scanning-System-Protocol-Operations-Manual.pdf"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Página principal\n2. Informacion de Escaneo Horizonte\nTrabajo articulado con ECRI\n3. Manual Escaneo Horizonte\n4. Bases de datos de exploración de horizontes",
+   "access_path": "pcori.org →implementacion of evidence →Emerging topics: Reports and Horizon Scans→PCORI Health CareHorizo Scanning System\nEn link 4 https://horizonscandb.pcori.org/→*enfermedad de alzheimer y otras demencias *Cáncer * Afecciones cardiosaculares y cardiometbólicas *enfermedades infecciosas * salud mental y conductual *enfermedades raras.",
+   "consult_info": "Base de datos de exploración de horizontes\nInformes sobre innovaciones emergentes en el sector sanitario\nInformes sobre posibles disrupciones\nManual de Escaneo Horizonte",
+   "observations": "Alta aplicabilidad en proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 54,
+   "matrix_ref": "MATRIZ FI EH fila 54",
+   "codes": [
+    "FP-LI-02"
+   ],
+   "name": "WHO – World Health Organization",
+   "entity_label": "ORGANISMOS INTERNACIONALES / INVESTIGACIÓN",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "AGREGADA",
+   "country": "Internacional",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [],
+   "methodology_urls": [
+    "https://www.who.int/publications/i/item/9789240073876"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Tecnologías emergentes e innovaciones científicas: una perspectiva de salud pública global publicacion 2023",
+   "access_path": "Acceso a documento Emerging technologies and scientific ainnovstions.",
+   "consult_info": "",
+   "observations": "Alta aplicabilidad en proyecto EH\n1. Información a referenciar EH Horizonte corto plazo, medio plazo, largo plazo",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 55,
+   "matrix_ref": "MATRIZ FI EH fila 55",
+   "codes": [
+    "FP-LI-01"
+   ],
+   "name": "PubMed / NLM- NIH",
+   "entity_label": "BUSCADOR LITERATURA CIENTIFICA",
+   "source_level": "por_definir",
+   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "origin": "AGREGADA",
+   "country": "Internacional",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://pubmed.ncbi.nlm.nih.gov/"
+   ],
+   "methodology_urls": [
+    "https://pubmed.ncbi.nlm.nih.gov/40835414/"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Librería Nacional de medicina\n2. Integración de las perspectivas de los pacientes en el marco de preparación para la tecnología de salud digital: estudio Delphi",
+   "access_path": "pubmed.ncbi→Search → término o tecnología de interés (La herramienta permite filtros adicionales como tipo de articulo, disponibilidad de texto, fecha de publicación entre otros)",
+   "consult_info": "Artículos científicos, nuevas tecnologías, estudios clínicos",
+   "observations": "Alta aplicabilidad en proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 56,
+   "matrix_ref": "MATRIZ FI EH fila 56",
+   "codes": [
+    "FP-CT-01"
+   ],
+   "name": "Clinical Trials.gov / NIH National Library of Medicine",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "por_definir",
+   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "origin": "AGREGADA",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://clinicaltrials.gov/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Registro de ensayos Clinicos",
+   "access_path": "ClinicalTrials.gov → Search for Studies → Advanced Search / filtros de búsqueda → Intervention / Treatment → término o tecnología de interés → revisión y extracción de los registros identificados.",
+   "consult_info": "Protocolos de ensayos clínicos de investigaciones en curso y finalizadas. Ensayos realizados en EE. UU. y fuera de EE. UU\nSe evidencia ensayos clinicos para la busqueda en el filtro Intervention/Treatment se debe buscar con los siguientes terminos medical device, implantable device, wearable, patient monitoring, artificial intelligence, software, digital health. Y las tecnologias a priorizar.",
+   "observations": "Alta aplicabilidad en proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "diaria",
+   "frequency_raw": "Diaria de Lunes a Viernes 9:00 am",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 57,
+   "matrix_ref": "MATRIZ FI EH fila 57",
+   "codes": [
+    "FP-CT-02"
+   ],
+   "name": "WHO- Plataforma internacional de Registro de Ensayos Clinicos ICTRP",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "por_definir",
+   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "origin": "AGREGADA",
+   "country": "Internacional",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://trialsearch.who.int/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Registro de ensayos clinicos en curso y finalizados, la cual funciona como puerta de acceso internacional",
+   "access_path": "trialsearch.who.int/→ Search → o Advanced Search / filtros de búsqueda → término o tecnología de interés",
+   "consult_info": "El ICTRP integra información de diferentes registros primarios internacionales entre las que estan:\nClinicalTrials.gov.\nChinese Clinical Trial Registry.\nGerman Clinical Trials Register.\nJapan Primary Registries Network.\nKorean Clinical Research Information Service.\nIranian Registry of Clinical Trials.\nPeruvian Registry.\nBrazilian Registry.",
+   "observations": "Alta aplicabilidad en proyecto EH\nSe debe aplicar filtros para la busqueda incluyendo el nivel de fase del estudio",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "semanal",
+   "frequency_raw": "Semanalmente",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 58,
+   "matrix_ref": "MATRIZ FI EH fila 58",
+   "codes": [
+    "FP-CT-05"
+   ],
+   "name": "ISRCTN The UK\"s Clinical Study Register",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "por_definir",
+   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "origin": "AGREGADA",
+   "country": "Reino Unido",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.isrctn.com/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Registro de ensayos Clinicos",
+   "access_path": "isrctn.com → Advanced search → Text search → término o tecnología de interés",
+   "consult_info": "Acceso a estudios clinicos de forma gratuita",
+   "observations": "Alta aplicabilidad en proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 59,
+   "matrix_ref": "MATRIZ FI EH fila 59",
+   "codes": [
+    "FP-CT-06"
+   ],
+   "name": "ANZCTR Australian New Zealan Clinical Trials Registry",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "por_definir",
+   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "origin": "AGREGADA",
+   "country": "Autralia- Nueva Zelanda",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.anzctr.org.au/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Registro de ensayos Clinicos",
+   "access_path": "anzctr.org.au→ Search for trials→ término o tecnología de interés",
+   "consult_info": "Base de datos de ensayos clinicos y sus resultados de Australia, Nueva Zelanda y otro paises. El archivo permite descarga en excel.",
+   "observations": "Alta aplicabilidad en proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 60,
+   "matrix_ref": "MATRIZ FI EH fila 60",
+   "codes": [
+    "FP-CT-07"
+   ],
+   "name": "ChiCTR- Chines Clinica Trial Registry",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "por_definir",
+   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "origin": "AGREGADA",
+   "country": "China",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.chictr.org.cn/indexEN.html"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Registro de ensayos clinicos",
+   "access_path": "chictr.org.cn/→ Trial Search → término o tecnología de interés",
+   "consult_info": "Las herramientas de filtro no da opcion de tipo de tecnologia, la busqueda avanzada da otros criterios",
+   "observations": "Verificar pertinencia para proyecto EH",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Chino- Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 61,
+   "matrix_ref": "MATRIZ FI EH fila 61",
+   "codes": [
+    "FP-CT-03"
+   ],
+   "name": "CTIS",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "por_definir",
+   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "origin": "AGREGADA",
+   "country": "Union Europea",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://euclinicaltrials.eu/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Registro de ensayos Clinicos especialmente para medicamentos.",
+   "access_path": "euclinicaltrials.eu → Search clinical trials → Search results",
+   "consult_info": "Corresponde al portal en linea de Agencia Europea de Medicamentos",
+   "observations": "Verificar pertinencia desde European Commission me envia a la pagina de clinical trials. Verificar duplicidad de fuentes y pertinencia. EUDAR CT fue sustituido por CTIS desde el 31 de enero de 2023.",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 62,
+   "matrix_ref": "MATRIZ FI EH fila 62",
+   "codes": [
+    "FP-CT-08"
+   ],
+   "name": "DRKS German Clinical Trials Register",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "por_definir",
+   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "origin": "AGREGADA",
+   "country": "Alemania",
+   "tech_types": [
+    "MED",
+    "DM"
+   ],
+   "tech_types_raw": "MED-DM",
+   "consult_urls": [
+    "https://www.drks.de/search/de"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Registro de ensayos clinicos",
+   "access_path": "drks→ search term→ término o tecnología de interés",
+   "consult_info": "Base de datos de ensayos clinicos de Alemania",
+   "observations": "Alta aplicabilidad en proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Ingles-Aleman",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 63,
+   "matrix_ref": "MATRIZ FI EH fila 63",
+   "codes": [
+    "FP-CT-09"
+   ],
+   "name": "PACTR Pan African Clinical Trials Registry",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "por_definir",
+   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "origin": "AGREGADA",
+   "country": "Africa",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://pactr.samrc.ac.za/Search.aspx"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Registro de ensayos clinicos",
+   "access_path": "pactr→ search term→ término o tecnología de interés",
+   "consult_info": "Base de datos de ensayos clinicos de Africa",
+   "observations": "Alta aplicabilidad en proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Inglés",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 64,
+   "matrix_ref": "MATRIZ FI EH fila 64",
+   "codes": [
+    "FP-CT-10"
+   ],
+   "name": "ReBEC Registro Brasileiro de Ensaios Clínicos",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "por_definir",
+   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "origin": "AGREGADA",
+   "country": "Brasil",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://ensaiosclinicos.gov.br/list"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Registro de ensayos clinicos",
+   "access_path": "Link de acceso directo",
+   "consult_info": "Base de datos de ensayos clinicos de Brasil",
+   "observations": "Alta aplicabilidad en proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Portuges",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 65,
+   "matrix_ref": "MATRIZ FI EH fila 65",
+   "codes": [
+    "FP-CT-11"
+   ],
+   "name": "CTRI Clinical Trials Registry–India",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "por_definir",
+   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "origin": "AGREGADA",
+   "country": "India",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://ctri.nic.in/Clinicaltrials/advancesearchmain.php"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Registro de ensayos clinicos",
+   "access_path": "Link de acceso directo, requiere aplicacion de filtros para la busqueda",
+   "consult_info": "Base de datos de ensayos clinicos de India",
+   "observations": "Alta aplicabilidad en proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 66,
+   "matrix_ref": "MATRIZ FI EH fila 66",
+   "codes": [
+    "FP-CT-12"
+   ],
+   "name": "JPRN Japan Primary Registries Network",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "por_definir",
+   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "origin": "AGREGADA",
+   "country": "Japón",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://rctportal.mhlw.go.jp/en"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Registro de ensayos clinicos",
+   "access_path": "jprn→ search portal→ término o tecnología de interés",
+   "consult_info": "Base de datos de ensayos clinicos de Japón",
+   "observations": "Alta aplicabilidad en proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 67,
+   "matrix_ref": "MATRIZ FI EH fila 67",
+   "codes": [
+    "FP-CT-13"
+   ],
+   "name": "IRCT Iranian Registry of Clinical Trials",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "por_definir",
+   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "origin": "AGREGADA",
+   "country": "Irán",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://en.irct.ir/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Registro de ensayos clinicos",
+   "access_path": "irct→ search for trials→ término o tecnología de interés",
+   "consult_info": "Base de datos de ensayos clinicos de Iran",
+   "observations": "Alta aplicabilidad en proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 68,
+   "matrix_ref": "MATRIZ FI EH fila 68",
+   "codes": [
+    "FP-CT-14"
+   ],
+   "name": "CRiS Clinical Research Information Service",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "por_definir",
+   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "origin": "AGREGADA",
+   "country": "Corea del Sur",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://cris.nih.go.kr/cris/search/listClass.do"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Registro de ensayos clinicos",
+   "access_path": "cris→search by topics→Intervention Type→*drug*medical device* biological7vaccine*raditaion*beharovial*genetic* dietary supplement",
+   "consult_info": "Base de datos de ensayos clinicos de Corea",
+   "observations": "Alta aplicabilidad en proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Coreano- Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 69,
+   "matrix_ref": "MATRIZ FI EH fila 69",
+   "codes": [
+    "FP-LI-03"
+   ],
+   "name": "Scopus",
+   "entity_label": "BUSCADOR",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "AGREGADA",
+   "country": "Amterdam -Paises bajos",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.scopus.com/pages/home"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Registro de evidencias",
+   "access_path": "Sin acceso",
+   "consult_info": "Detección de tendencias, análisis de madurez científica y vigilancia de campos tecnológicos emergentes. Esta fuentes esta mencionada en el manual de EH de 2024 en la pág 48.",
+   "observations": "No permite acceso gratuito.",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 70,
+   "matrix_ref": "MATRIZ FI EH fila 70",
+   "codes": [
+    "FP-CT-15"
+   ],
+   "name": "Cochrane Library",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "AGREGADA",
+   "country": "Reino Unido",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.cochranelibrary.com/central"
+   ],
+   "methodology_urls": [
+    "https://www.cochranelibrary.com/"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Página principal\n2. Base de Datos Cochrane de Revisiones Sistemáticas",
+   "access_path": "cochranelibrary → Advance Search → término o tecnología de interés",
+   "consult_info": "Referencias de ensayos controlados aleatorizados también incorpora registros provenientes de fuentes como MEDLINE, Embase, ClinicalTrials.gov y WHO ICTRP",
+   "observations": "Verificar pertinencia para proyecto EH",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "mensual",
+   "frequency_raw": "Mensual",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 71,
+   "matrix_ref": "MATRIZ FI EH fila 71",
+   "codes": [
+    "FP-LI-04"
+   ],
+   "name": "IEEE Xplore (Institute of Electrical and Electronics Engineers o Instituto de Ingenieros Eléctricos y Electrónicos)",
+   "entity_label": "BUSCADOR",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "AGREGADA",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "DM"
+   ],
+   "tech_types_raw": "DM",
+   "consult_urls": [
+    "https://ieeexplore.ieee.org/Xplore/home.jsp"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Base de datos tecnologías que todavía pueden estar en una fase temprana de desarrollo.",
+   "access_path": "ieeexplore.ieee.org →Search→ término o tecnología de interés Medical Devices (Medical Imaging, Medical devices, Medical Image Analysis, Medical Data, Medical Image Segmentation, Medical Applications, Medical Datasets, Medical Systems, Medical Image Processing, Medical Knowledge)",
+   "consult_info": "Plataforma especializada en literatura científica y técnica de ingeniería, electrónica, computación, telecomunicaciones y tecnologías emergentes.\nReferenciada por NIHR-MIST",
+   "observations": "Alta aplicabilidad para proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 72,
+   "matrix_ref": "MATRIZ FI EH fila 72",
+   "codes": [
+    "FP-LI-05"
+   ],
+   "name": "EMBASE - Elsevier",
+   "entity_label": "BUSCADOR",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "AGREGADA",
+   "country": "Paises bajos- Amsterdam",
+   "tech_types": [
+    "MED",
+    "DM"
+   ],
+   "tech_types_raw": "MED-DM",
+   "consult_urls": [
+    "https://www.elsevier.com/products/embase"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Base de datos de investigación biomédica",
+   "access_path": "Acceso con suscripción",
+   "consult_info": "Información que se puede consultar:\nestudios preclínicos;\ninvestigación clínica;\nnuevas indicaciones;\nestudios de diagnóstico;\ndispositivos médicos;\nbiomarcadores;\nnuevas técnicas;\nprocedimientos;\nseguridad;\neficacia;\nestudios comparativos;\ninnovación terapéutica;\ninvestigación traslacional;\naplicaciones de tecnologías existentes.\nReferenciada por NIHR-MIST",
+   "observations": "No permite acceso gratuito.",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 73,
+   "matrix_ref": "MATRIZ FI EH fila 73",
+   "codes": [
+    "FP-LI-06"
+   ],
+   "name": "PATENTSCOPE- OMPI Organización mundial de la propiedad intelectual",
+   "entity_label": "BUSCADOR",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "AGREGADA",
+   "country": "Naciones Unidas",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.wipo.int/es/web/patentscope/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Base de datos de patentes",
+   "access_path": "patentscope → Access patentscope → Search→término o tecnología de interés",
+   "consult_info": "Base de datos de patentes gratuita proporcionada por la OMPI.Con cobertura de más de 60 colecciones de patentes, es la principal fuente de datos, y por lo tanto la más actualizada y completa, sobre las solicitudes de patentes presentadas en virtud del PCT .i . Contiene 115,7 millones de documentos de patentes.\nReferenciada por NIHR-MIST",
+   "observations": "Verificar pertinencia proyecto EH",
+   "priority_level": "revisar",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 74,
+   "matrix_ref": "MATRIZ FI EH fila 74",
+   "codes": [
+    "FP-LI-07"
+   ],
+   "name": "Medical Device Netwoork",
+   "entity_label": "BUSCADOR",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "AGREGADA",
+   "country": "Reino Unido",
+   "tech_types": [
+    "DM"
+   ],
+   "tech_types_raw": "DM",
+   "consult_urls": [
+    "https://www.medicaldevice-network.com/sector/medical-devices/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Noticias y articulos de tecnologias innovadoras",
+   "access_path": "",
+   "consult_info": "Referenciada por NIHR-MIST",
+   "observations": "Alta aplicabilidad proyecto EH\nLa información permite explorar por diferentes articulo con multiples accesos pero no es como un listado verificar pertinencia de los links de acceso",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 75,
+   "matrix_ref": "MATRIZ FI EH fila 75",
+   "codes": [
+    "FP-LI-08"
+   ],
+   "name": "Medline",
+   "entity_label": "BUSCADOR",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
+   "origin": "AGREGADA",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://medlineplus.gov/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Es una base de datos bibliográfica de la National Library of Medicine (NLM).",
+   "access_path": "1. medlineplus→*health topics *medical encycolpedia",
+   "consult_info": "Información de noticias de salud referenciada de RedETSA, MEDLINE permite hacer una búsqueda sistemática y estructurada de múltiples revistas.\nMedlinePlus es un recurso de información sanitaria en línea para pacientes, sus familiares y amigos. Es un servicio de la Biblioteca Nacional de Medicina (NLM), la biblioteca médica más grande del mundo, que forma parte de los Institutos Nacionales de Salud (NIH).",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "diaria",
+   "frequency_raw": "Diario",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 76,
+   "matrix_ref": "MATRIZ FI EH fila 76",
+   "codes": [
+    "FP-HT-14"
+   ],
+   "name": "IHSI International Horizon Sacanning Initiative",
+   "entity_label": "Iniciativa Internacional de coperación",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "Multinacional",
+   "tech_types": [
+    "DM"
+   ],
+   "tech_types_raw": "DM",
+   "consult_urls": [
+    "https://ihsi-horizonscandb.ecri.org/"
+   ],
+   "methodology_urls": [
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC11579676/",
+    "https://www.cambridge.org/core/journals/international-journal-of-technology-assessment-in-health-care/article/mapping-horizon-scanning-systems-for-medical-devices-similarities-differences-and-lessons-learned/D7F226393216196EB335D804F871968F"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Documento de identificación de iniciativa de EH /Mapeo de sistemas de exploración de horizontes para dispositivos médicos: similitudes, diferencias y lecciones aprendidas. 071123)\n2. Mapeo de sistemas de exploración de horizontes para dispositivos médicos: similitudes, diferencias y lecciones aprendidas 071123\n3. Base de datos de la Iniciativa Internacional de Exploración de Horizontes",
+   "access_path": "Accesos directos con link",
+   "consult_info": "Información importante de mapeo de iniciativas de Escaneo Horizonte DM\nEne le link 3 Para el ingreso a la base de datos se debe acceder con una creación de cuenta",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 77,
+   "matrix_ref": "MATRIZ FI EH fila 77",
+   "codes": [
+    "FP-NW-01"
+   ],
+   "name": "Medical Data",
+   "entity_label": "Revista en linea",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "No especifica",
+   "tech_types": [
+    "MED",
+    "DM"
+   ],
+   "tech_types_raw": "MED-DM",
+   "consult_urls": [
+    "http://www.newscientist.com/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Publicación de noticias de salud",
+   "access_path": "newscientist → health",
+   "consult_info": "Informacion de noticias de innovación tecnolologica\nLink rererenciado NIH \"Use of the Internet in Scanning the Horizon for New and Emerging Health Technologies: A Survey of Agencies Involved in Horizon Scanning\"",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 78,
+   "matrix_ref": "MATRIZ FI EH fila 78",
+   "codes": [
+    "FP-NW-02"
+   ],
+   "name": "Science Daily",
+   "entity_label": "Revista en linea",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "No especifica",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.sciencedaily.com/index.htm"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Publicación de noticias de salud",
+   "access_path": "sciencedaily→ health",
+   "consult_info": "Informacion de noticias de innovación tecnolologica\nLink rererenciado NIH \"Use of the Internet in Scanning the Horizon for New and Emerging Health Technologies: A Survey of Agencies Involved in Horizon Scanning\"",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 79,
+   "matrix_ref": "MATRIZ FI EH fila 79",
+   "codes": [
+    "FP-NW-03"
+   ],
+   "name": "Reuters Salud",
+   "entity_label": "Revista en linea",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "No especifica",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "http://www.reutershealth.com/frame2/eline.html"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Publicación de noticias de salud",
+   "access_path": "reuters→ business→ health care & Pharmaceuticals",
+   "consult_info": "Informacion de noticias de innovación tecnolologica\nLink rererenciado NIH \"Use of the Internet in Scanning the Horizon for New and Emerging Health Technologies: A Survey of Agencies Involved in Horizon Scanning\"",
+   "observations": "",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 80,
+   "matrix_ref": "MATRIZ FI EH fila 80",
+   "codes": [
+    "FP-NW-04"
+   ],
+   "name": "IVANHOE",
+   "entity_label": "Revista en linea",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "No especifica",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.ivanhoe.com/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Publicación de noticias de salud",
+   "access_path": "ivanhoe→ medical news→ Alzheimer, Arthritis, Asthma, Autism, Breast cancer, Cardiovascular, Dental, Diabetes, Fertility and Pregnancy, Neurological, Orthopaedics, Parkinsons , Prostate Cancer, Pulmonary, Robots and devices",
+   "consult_info": "Informacion de noticias de innovación tecnolologica\nLink rererenciado NIH \"Use of the Internet in Scanning the Horizon for New and Emerging Health Technologies: A Survey of Agencies Involved in Horizon Scanning\"",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 81,
+   "matrix_ref": "MATRIZ FI EH fila 81",
+   "codes": [
+    "FP-NW-05"
+   ],
+   "name": "Medscape",
+   "entity_label": "Revista en linea",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "No especifica",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.medscape.com/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Publicacion de noticias de salud",
+   "access_path": "medscape →news & perspective →*cardiology *diabetes & endocrinology *family medicine * hematology- oncologu * internal medicine *neurology *psychiatry",
+   "consult_info": "Informacion de noticias de innovación tecnolologica\nLink rererenciado NIH \"Use of the Internet in Scanning the Horizon for New and Emerging Health Technologies: A Survey of Agencies Involved in Horizon Scanning\"",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 82,
+   "matrix_ref": "MATRIZ FI EH fila 82",
+   "codes": [
+    "FP-NW-06"
+   ],
+   "name": "Med device online",
+   "entity_label": "Revista en linea",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "No especifica",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.meddeviceonline.com/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Publicacion de noticias de salud",
+   "access_path": "meddeviceonline → design & development",
+   "consult_info": "Información diseño y desarrollo de dispositivos médicos",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 83,
+   "matrix_ref": "MATRIZ FI EH fila 83",
+   "codes": [
+    "FP-NW-07"
+   ],
+   "name": "Doc guide (Guía del médico)",
+   "entity_label": "Portales en salud",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "No especifica",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://docguide.com/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Portal de salud",
+   "access_path": "Accesos directos con link",
+   "consult_info": "Informacion de noticias de innovación tecnolologica\nLink rererenciado NIH \"Use of the Internet in Scanning the Horizon for New and Emerging Health Technologies: A Survey of Agencies Involved in Horizon Scanning\"",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 84,
+   "matrix_ref": "MATRIZ FI EH fila 84",
+   "codes": [
+    "FP-NW-08"
+   ],
+   "name": "CNN",
+   "entity_label": "Revista en linea",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "No especifica",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://edition.cnn.com/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Publicacion de noticias de salud",
+   "access_path": "cnn→ health",
+   "consult_info": "Informacion de noticias de innovación tecnolologica\nLink rererenciado NIH \"Use of the Internet in Scanning the Horizon for New and Emerging Health Technologies: A Survey of Agencies Involved in Horizon Scanning\"",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 85,
+   "matrix_ref": "MATRIZ FI EH fila 85",
+   "codes": [
+    "FP-NW-09"
+   ],
+   "name": "The New York Times",
+   "entity_label": "Revista en linea",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "No especifica",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.nytimes.com/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Publicacion de noticias de salud",
+   "access_path": "nytimes →US →Health",
+   "consult_info": "Informacion de noticias de innovación tecnolologica\nLink rererenciado NIH \"Use of the Internet in Scanning the Horizon for New and Emerging Health Technologies: A Survey of Agencies Involved in Horizon Scanning\"",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 86,
+   "matrix_ref": "MATRIZ FI EH fila 86",
+   "codes": [
+    "FP-NW-10"
+   ],
+   "name": "Revista de la Asociación Médica Estadounidense (JAMA)",
+   "entity_label": "Revista en linea",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://jamanetwork.com/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Publicacion de noticias de salud",
+   "access_path": "jamanetwork→ search & Browse →*Artificial Intelligence * Digital Health * Oncology * Health Informatics * Ophthalmology * Pediatrics * Psychiatry and behavioral health * surgery * clincial decision support",
+   "consult_info": "Informacion de noticias de innovación tecnolologica\nLink rererenciado NIH \"Use of the Internet in Scanning the Horizon for New and Emerging Health Technologies: A Survey of Agencies Involved in Horizon Scanning\"",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 87,
+   "matrix_ref": "MATRIZ FI EH fila 87",
+   "codes": [
+    "FP-NW-11"
+   ],
+   "name": "Diario Médico",
+   "entity_label": "Revista en linea",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "España",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.diariomedico.com/medicina.html"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Publicacion de noticias de salud",
+   "access_path": "diariomedico→*por especialidades",
+   "consult_info": "Información de noticias de salud referenciada de RedETSA",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Español",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 88,
+   "matrix_ref": "MATRIZ FI EH fila 88",
+   "codes": [
+    "FP-NW-12"
+   ],
+   "name": "Noticias Médicas",
+   "entity_label": "Revista en linea",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "España",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.noticiasmedicas.es/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Publicacion de noticias de salud",
+   "access_path": "noticiasmedicas →salud",
+   "consult_info": "Información de noticias de salud referenciada de RedETSA",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Español",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 89,
+   "matrix_ref": "MATRIZ FI EH fila 89",
+   "codes": [
+    "FP-NW-13"
+   ],
+   "name": "LANCET",
+   "entity_label": "Revistas cientificas",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "No especifica",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.thelancet.com/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Literatura cientifica especializada",
+   "access_path": "thelancet→clinical→ Search → Technology / Digital Health / Artificial Intelligence / Devices / Diagnostics / Therapeutics / Clinical Trials",
+   "consult_info": "Información de noticias de salud referenciada de RedETSA",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 90,
+   "matrix_ref": "MATRIZ FI EH fila 90",
+   "codes": [
+    "FP-NW-14"
+   ],
+   "name": "New England Journal of Medicine – NEJM",
+   "entity_label": "Revistas cientificas",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MT"
+   ],
+   "tech_types_raw": "MT",
+   "consult_urls": [
+    "https://www.nejm.org/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Literatura cientifica especializada",
+   "access_path": "nejm→specialties or Topics",
+   "consult_info": "Información de noticias de salud referenciada de RedETSA",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 91,
+   "matrix_ref": "MATRIZ FI EH fila 91",
+   "codes": [
+    "FP-NW-15"
+   ],
+   "name": "BMJ",
+   "entity_label": "Revistas cientificas",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "Reino Unido",
+   "tech_types": [
+    "MT",
+    "DM",
+    "IA"
+   ],
+   "tech_types_raw": "MT DM - IA",
+   "consult_urls": [
+    "https://www.bmj.com/",
+    "https://bmjdigitalhealth.bmj.com/content/1/1/e000004",
+    "https://innovations.bmj.com/pages/collection/medical-devices"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "1. Literatura cientifica especializada (articulos, investigaciones e informes)",
+   "access_path": "1. bmj→research →research papers\n2. bmjdigitalhealth →Latest content\n3. Acceso directo",
+   "consult_info": "Información de noticias de salud referenciada de RedETSA publicar investigación y avances en digital health and artificial intelligence in healthcare, dispositivos médicos",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "No especifica",
+   "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  }
+ ],
+ "search_terms": [
+  {
+   "category": "Dispositivos implantables",
+   "tech_type": "DM",
+   "terms": [
+    "implantable device",
+    "cardiac implant",
+    "neurostimulator",
+    "implantable sensor"
+   ]
+  },
+  {
+   "category": "Dispositivos médicos",
+   "tech_type": "DM",
+   "terms": [
+    "medical devices"
+   ]
+  },
+  {
+   "category": "Equipos biomédicos",
+   "tech_type": "DM",
+   "terms": [
+    "medical equipment",
+    "diagnostic equipment",
+    "imaging device"
+   ]
+  },
+  {
+   "category": "Dispositivos de monitoreo",
+   "tech_type": "DM",
+   "terms": [
+    "patient monitoring",
+    "cardiac monitor",
+    "remote monitoring",
+    "vital signs monitor"
+   ]
+  },
+  {
+   "category": "Tecnologías intervencionistas",
+   "tech_type": "DM",
+   "terms": [
+    "interventional device",
+    "minimally invasive device",
+    "catheter",
+    "robotic surgery"
+   ]
+  },
+  {
+   "category": "IA clínica",
+   "tech_type": "IA",
+   "terms": [
+    "artificial intelligence",
+    "machine learning",
+    "clinical AI",
+    "deep learning"
+   ]
+  },
+  {
+   "category": "SaMD",
+   "tech_type": "SD",
+   "terms": [
+    "software as medical device",
+    "medical software",
+    "clinical decision support software"
+   ]
+  },
+  {
+   "category": "Telemedicina",
+   "tech_type": "SD",
+   "terms": [
+    "telemedicine",
+    "telehealth",
+    "remote consultation",
+    "virtual care"
+   ]
+  },
+  {
+   "category": "mHealth",
+   "tech_type": "SD",
+   "terms": [
+    "mobile health",
+    "mHealth",
+    "health application",
+    "mobile application"
+   ]
+  },
+  {
+   "category": "Wearables",
+   "tech_type": "SD",
+   "terms": [
+    "wearable device",
+    "wearable sensor",
+    "smartwatch",
+    "smart wearable"
+   ]
+  },
+  {
+   "category": "Medicamentos",
+   "tech_type": "MED",
+   "terms": []
+  }
+ ]
+}

@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import __version__, ai_service, audit, methodology, settings_store
+from . import __version__, ai_service, audit, methodology, prompt_store, scan_trace, settings_store, usage_meter
 from .config import settings
 from .database import (
     Base,
@@ -90,6 +90,9 @@ def load_runtime_config() -> None:
             gemini_api_key=str(cfg["gemini_api_key"]) or None,
             gemini_model=str(cfg["gemini_model"]) or None,
         )
+        prompt_store.load_from_db(db)
+        usage_meter.load_from_db(db)
+        scan_trace.load_from_db(db)
     finally:
         db.close()
 

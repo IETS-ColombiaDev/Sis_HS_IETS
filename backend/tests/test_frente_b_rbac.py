@@ -69,6 +69,8 @@ def test_clinical_evaluator_manages_sources(api):
 def test_configuration_requires_config_manage(api):
     for role in ("evaluador_tecnico", "evaluador_clinico", "tomador_decisiones", "revisor_pares"):
         assert api.get("/api/config", role=role).status_code == 403
+        assert api.get("/api/config/prompts", role=role).status_code == 403
+        assert api.get("/api/config/scan-traces", role=role).status_code == 403
         assert api.put("/api/config/schedule", role=role, json={"scan_interval_hours": 4}).status_code == 403
     assert api.get("/api/config", role="superadmin").status_code == 200
 

@@ -38,10 +38,21 @@ def enqueue(
     triggered_by: str,
     origin: str = "manual",
 ) -> list[IngestJob]:
-    """Crea un job por fuente. No ejecuta nada: eso lo hace `tick` o `run_job`."""
+    """Crea un job por fuente. No ejecuta nada: eso lo hace `tick` o `run_job`.
+
+    Los jobs se crean en orden de prioridad de la matriz EH (alta primero) y,
+    como `tick` atiende por fecha e id, las fuentes prioritarias corren antes.
+    """
+    from . import source_profile
+
+    options = source_profile.load_options(db)
+    ordered = sorted(
+        sources,
+        key=lambda s: (source_profile.priority_rank(getattr(s, "priority_level", "") or "", options), s.title or ""),
+    )
     jobs: list[IngestJob] = []
     now = datetime.now(timezone.utc)
-    for source in sources:
+    for source in ordered:
         if getattr(source, "retired", False) or source.catalog_active is False:
             continue
         pending = (

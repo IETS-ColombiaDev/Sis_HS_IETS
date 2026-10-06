@@ -200,7 +200,7 @@ export default function Scan() {
         step="identificacion"
         title="Vigilancia de fuentes"
         titleHint={GLOSSARY.vigilancia}
-        purpose="Fase 1 · Identificación: rastreo sistemático de referentes internacionales para capturar señales de tecnologías sanitarias emergentes."
+        purpose="Fase 1 · Identificación: el rastreador entra a cada fuente, sigue hasta las fichas internas y, si MiniMax está activo, extrae las señales."
         actions={
           <div className="fb-toolbar">
             <Button variant="secondary" onClick={() => navigate("/fuentes")}>

@@ -137,6 +137,20 @@ class SourceBase(BaseModel):
     catalog_note: str = ""
     is_contrast: bool = False
     catalog_active: bool = True
+    # Matriz EH y flujo de escaneo por fuente.
+    source_level: str = ""
+    priority_level: str = ""
+    tech_types: list | None = None
+    matrix_ref: str = ""
+    matrix_origin: str = ""
+    entry_urls: list | None = None
+    reference_urls: list | None = None
+    material_type: str = ""
+    access_path: str = ""
+    consult_info: str = ""
+    observations: str = ""
+    usage_restrictions: str = ""
+    scan_profile: dict | None = None
 
 
 class SourceCreate(SourceBase):
@@ -185,6 +199,19 @@ class SourceUpdate(BaseModel):
     is_contrast: bool | None = None
     catalog_active: bool | None = None
     scrape_enabled: bool | None = None
+    source_level: str | None = None
+    priority_level: str | None = None
+    tech_types: list | None = None
+    matrix_ref: str | None = None
+    matrix_origin: str | None = None
+    entry_urls: list | None = None
+    reference_urls: list | None = None
+    material_type: str | None = None
+    access_path: str | None = None
+    consult_info: str | None = None
+    observations: str | None = None
+    usage_restrictions: str | None = None
+    scan_profile: dict | None = None
 
 
 class SourceOut(SourceBase):
@@ -374,6 +401,7 @@ class LinkPreviewOut(BaseModel):
     main_text: str = ""
     candidates: list[PreviewCandidate] = []
     candidates_count: int = 0
+    pages_visited: int = 0
     message: str = ""
 
 
@@ -533,6 +561,20 @@ class ConfigOut(BaseModel):
     minimax_active_model: str = ""
     minimax_available_models: list[str] = []
     minimax_vision_model: str = ""
+    scan_max_tokens: int = 2048
+    scan_max_pages: int = 8
+    scan_fetch_timeout: int = 25
+    scan_child_timeout: int = 15
+    scan_ai_timeout: int = 60
+    scan_retries: int = 3
+    scan_pause_ms: int = 350
+    ai_usage_prompt_tokens: int = 0
+    ai_usage_completion_tokens: int = 0
+    ai_usage_total_tokens: int = 0
+    ai_usage_calls: int = 0
+    ai_usage_last_at: str = ""
+    ai_usage_last_model: str = ""
+    minimax_plan_summary: str = ""
 
 
 class ConfigUpdate(BaseModel):
@@ -546,6 +588,59 @@ class ConfigUpdate(BaseModel):
     ai_provider: str | None = None
     ai_ocr_enabled: bool | None = None
     ai_web_enabled: bool | None = None
+    scan_max_tokens: int | None = None
+    scan_max_pages: int | None = None
+    scan_fetch_timeout: int | None = None
+    scan_child_timeout: int | None = None
+    scan_ai_timeout: int | None = None
+    scan_retries: int | None = None
+    scan_pause_ms: int | None = None
+
+
+class ScanTraceStepOut(BaseModel):
+    action: str = ""
+    url: str = ""
+    status: str = ""
+    ms: int = 0
+    detail: str = ""
+
+
+class ScanTraceOut(BaseModel):
+    at: str = ""
+    kind: str = "scan"
+    source: str = ""
+    url: str = ""
+    ok: bool = False
+    status: str = ""
+    elapsed_ms: int = 0
+    pages_visited: int = 0
+    items_found: int = 0
+    items_new: int = 0
+    ai: bool = False
+    ocr: bool = False
+    web_search: bool = False
+    priority: str = ""
+    source_level: str = ""
+    message: str = ""
+    steps: list[ScanTraceStepOut] = []
+
+
+class ScanPromptOut(BaseModel):
+    system: str
+    user: str
+    max_tokens: int
+    max_pages: int
+    max_chars: int
+    placeholders: list[str] = []
+    defaults: dict = {}
+
+
+class ScanPromptUpdate(BaseModel):
+    system: str | None = None
+    user: str | None = None
+    max_tokens: int | None = None
+    max_pages: int | None = None
+    max_chars: int | None = None
 
 
 class GeminiTestIn(BaseModel):

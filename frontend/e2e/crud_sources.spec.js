@@ -31,7 +31,10 @@ test.describe("fuentes · superadministrador", () => {
     let card = await openSourceCard(page, name);
     await card.getByRole("button", { name: "Editar" }).click();
     await page.locator("#source-connector").selectOption("fixture");
-    await page.locator("#source-level").selectOption("C");
+    await page.locator("#source-access").selectOption("C");
+    await page.locator("#source-priority").selectOption("alta");
+    await page.locator("#source-tier").selectOption("primaria");
+    await page.getByTestId("flow-ocr").uncheck();
     await page.locator("#source-frequency").selectOption("semanal");
     await page.locator("#source-url").fill(selfUrl(baseURL, `/api/health?e2e=${encodeURIComponent(name)}`));
     await page.locator("#source-config").fill("{ esto no es json");
@@ -42,7 +45,10 @@ test.describe("fuentes · superadministrador", () => {
     await page.getByRole("button", { name: "Guardar cambios" }).click();
     await expectToast(page, "Fuente actualizada");
     card = await openSourceCard(page, name);
-    await expect(card).toContainText("Nivel C");
+    await expect(card).toContainText("Acceso C");
+    await expect(card).toContainText("Prioridad Alta");
+    await expect(card).toContainText("Primaria");
+    await expect(card.locator(".flow-chip.off")).toHaveText(["OCR"]);
     await expect(card).toContainText("fixture");
 
     // Ingesta de la fuente: el fixture deja una senal nueva.
