@@ -245,6 +245,21 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(Exception)
+async def unhandled_error(request: Request, exc: Exception):
+    """Un 500 deja traza completa en el log con una referencia que el usuario puede citar.
+
+    Fuera de produccion la respuesta incluye la causa, para diagnosticar despliegues
+    de prueba sin acceso a la consola del servidor.
+    """
+    ref = os.urandom(4).hex()
+    log.exception("Error no controlado [ref %s] en %s %s", ref, request.method, request.url.path)
+    detail = f"Error interno del servidor (ref {ref})."
+    if not settings.is_production:
+        detail += f" {type(exc).__name__}: {str(exc)[:300]}"
+    return JSONResponse(status_code=500, content={"detail": detail})
+
+
 @app.middleware("http")
 async def audit_context_middleware(request: Request, call_next):
     """Abre el contexto de la bitacora: IP, ruta e identificador de peticion.
