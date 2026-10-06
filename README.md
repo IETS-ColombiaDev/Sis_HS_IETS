@@ -23,6 +23,15 @@ corporativa definida en [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md).
 > perfil y tablero de gobernanza con grafo consultable (chat por nodo y vistas
 > guardadas). Cada flujo está cubierto por pruebas unitarias, de API y de navegador.
 > Despliegue: [`DEPLOY.md`](DEPLOY.md) · Cumplimiento: [`BACKLOG.md`](BACKLOG.md).
+>
+> **Octubre 2026 — Matriz EH de fuentes.** El inventario se alinea con la matriz
+> «Fuentes de información proactiva EH»: **95 fuentes** en seis bloques (nuevo bloque de
+> revistas y portales de noticias), nivel de fuente, prioridad, tipos de tecnología,
+> ruta de acceso y URLs de entrada editables con listas desplegables. Cada fuente tiene
+> su **flujo de escaneo** (recorrido, enlaces, OCR, IA y búsqueda web) y la IA lanza
+> **búsquedas `site:` en buscadores** para encontrar documentos que el menú del sitio no
+> muestra. Todo se parametriza en *Configuración › Parámetros de fuentes*. Ver
+> [Inventario de fuentes y matriz EH](#inventario-de-fuentes-y-matriz-eh).
 
 ---
 
@@ -37,6 +46,7 @@ corporativa definida en [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md).
 - [Acceso, cuentas y seguridad](#acceso-cuentas-y-seguridad)
 - [Bitácora de auditoría](#bitácora-de-auditoría)
 - [Catálogos y parámetros metodológicos](#catálogos-y-parámetros-metodológicos)
+- [Inventario de fuentes y matriz EH](#inventario-de-fuentes-y-matriz-eh)
 - [Arquitectura](#arquitectura)
 - [Estructura del proyecto](#estructura-del-proyecto)
 - [Modelo de datos](#modelo-de-datos)
@@ -72,7 +82,7 @@ Cuatro conceptos ordenan todo el sistema. Entenderlos evita la mayor parte de la
 | **1. Identificación** | Vigilancia | `/vigilancia` | Conectores API (ClinicalTrials, FDA, EMA, PubMed) y HTML de último recurso, en cola |
 | **Canal reactivo** | Postulación pública | `/postular` | Formulario externo con conflicto de interés; entra a moderación, no al catálogo |
 | **Canal reactivo** | Postulaciones | `/postulaciones` | Cola de aceptación o rechazo; lo aceptado llega a la bandeja como reactivo |
-| **1. Identificación** | Inventario | `/fuentes` | Catálogo verificado D-06: 53 fuentes, sonda de salud y panel de cobertura |
+| **1. Identificación** | Inventario | `/fuentes` | Catálogo D-06 + matriz EH: 95 fuentes con prioridad, nivel de fuente, tipos de tecnología y flujo de escaneo; sonda de salud y cobertura |
 | **1. Identificación** | **Bandeja de entrada** | `/bandeja-entrada` | Staging: clasificar señales capturadas y asignarlas por lotes al ciclo |
 | **Transversal** | **Ciclos** | `/ciclos` | Crear, transicionar y cerrar ciclos; embudo de conversión |
 | **Filtrado** | **Filtrado y depuración** | `/filtrado` | Duplicados difusos, verificación de novedad, cruce INVIMA y Listado Único |
@@ -89,7 +99,7 @@ Cuatro conceptos ordenan todo el sistema. Entenderlos evita la mayor parte de la
 | **Análisis** | Asistente IA | `/chat` | Chat con contexto del sistema; las consultas por nodo del grafo se guardan aparte |
 | **Gobierno** | **Auditoría** | `/auditoria` | Bitácora inmutable con filtros y vida completa de cada entidad |
 | **Admin** | Usuarios y perfiles | `/usuarios` | Alta, edición, perfil, contraseña temporal, desbloqueo, activación y baja de cuentas; matriz de permisos |
-| **Admin** | Configuración | `/configuracion` | IA, llaves de fuentes, tareas programadas, catálogos y parámetros metodológicos |
+| **Admin** | Configuración | `/configuracion` | IA, prompts, llaves de fuentes, parámetros de fuentes (listas de la matriz, búsqueda web, carga del Excel), tareas programadas, catálogos y parámetros metodológicos |
 
 **Rutas heredadas** (redirección automática): `/escaneo → /vigilancia`, `/hallazgos → /senales`, `/recomendaciones → /diseminacion`, `/caracterizacion → /evaluacion`.
 
@@ -352,6 +362,55 @@ Todo cambio de parámetro queda en la bitácora, con autor, momento y valor ante
 
 ---
 
+## Inventario de fuentes y matriz EH
+
+El inventario de `/fuentes` combina el catálogo verificado D-06 (URL, adaptador, nivel de acceso A–E) con la matriz **«FUENTES DE INFORMACION PROACTIVA EH»** (hoja *MATRIZ FI EH*, 89 filas, y hoja *Criterios de búsqueda*, 11 categorías). Las 89 filas quedan mapeadas a códigos del catálogo: 47 coinciden con fuentes existentes y 42 son nuevas.
+
+| Bloque | Fuentes |
+|---|:---:|
+| Registros de ensayos clínicos | 15 |
+| Agencias regulatorias | 16 |
+| Agencias de HTA y redes de EH | 15 |
+| Literatura y organismos internacionales | 8 |
+| Fabricantes de I+D | 26 |
+| Revistas y portales de noticias (nuevo) | 15 |
+| **Total** | **95** |
+
+### Campos de la matriz por fuente
+
+| Campo | Origen en la matriz | Uso |
+|---|---|---|
+| Nivel de fuente | Primaria · secundaria · terciaria · por definir | Filtro e insignia; contexto para la IA |
+| Nivel de priorización | Observaciones: alta/media/baja aplicabilidad; «revisar pertinencia» | **Orden de la cola** (alta primero), filtro, insignia y peso en el prompt |
+| Tipos de tecnología | MED · DM · BIOM · IA · SD (SaMD) · MT | Elige los términos de búsqueda web por categoría |
+| URLs de entrada | Link de consulta (o link general) | El recorrido las visita; son **respaldo** si la URL principal falla |
+| Ruta de acceso | «medscape → News & Perspective → Cardiology» | Se derivan palabras guía: los enlaces que las contienen se siguen primero |
+| Qué consultar, tipo de material, observaciones, restricciones, origen | Columnas homónimas | Ficha de la fuente y contexto `{source_context}` del prompt |
+
+Las listas desplegables (niveles, prioridades con rango, tipos de tecnología, orígenes) se editan en **Configuración › Parámetros de fuentes**; la API valida contra ellas. Recargar el catálogo restituye URL, adaptador y nivel de acceso, pero **conserva** la priorización, la ruta y el flujo editados en el panel.
+
+### Flujo de escaneo por fuente
+
+Cada fuente tiene casillas propias en *Editar*: **recorrido del sitio**, **seguir enlaces internos**, **OCR**, **lectura con IA** y **búsqueda web**, más páginas a seguir (0 = valor global), palabras guía, términos propios y dominio de búsqueda. Los interruptores globales de IA y OCR siguen mandando. El orden de una corrida es:
+
+1. Descarga de la URL principal; si falla, prueba las URLs de entrada (paso `respaldo` en la bitácora).
+2. **Búsqueda web**: la IA redacta hasta N consultas `site:dominio` con el contexto de la matriz (sin IA, reglas que rotan los términos por día) y las lanza en cascada en Yahoo → DuckDuckGo → DuckDuckGo Lite → Bing, o Brave Search API / SearXNG si se configuran. Un motor que bloquea queda en pausa unos minutos. Solo se conservan resultados del dominio y, opcionalmente, los documentos (PDF, informes) primero.
+3. Recorrido: página principal → URLs de entrada → resultados de búsqueda → fichas internas mejor puntuadas por la ruta de acceso.
+4. OCR e IA según las casillas, con el bloque de contexto de la matriz; luego huella y bandeja.
+
+*Probar búsqueda web* (en *Editar*) ejecuta el paso 2 sin capturar señales. La bitácora de *Configuración › IA* muestra cada paso, la prioridad y si hubo búsqueda web.
+
+### Actualizar la matriz
+
+En *Configuración › Parámetros de fuentes*, **Importar Excel** lee el archivo (máx. 10 MB), actualiza las fuentes mapeadas, crea las filas sin código como fuentes HTML de nivel D (la recarga del catálogo no las retira) y guarda la matriz en `backend/app/data/matriz_fuentes_eh.json` (con copia `.prev.json`). Sin marcar *Sobrescribir*, solo completa campos vacíos. *Reaplicar matriz cargada* vuelve a aplicar el JSON empaquetado. Por consola:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m app.source_matrix "..\FUENTES DE INFORMACION PROACTIVA EH (1).xlsx"
+```
+
+---
+
 ## Arquitectura
 
 ```mermaid
@@ -428,7 +487,11 @@ Sis_HS_IETS/
 │   │   ├── dedup.py                # Motor difuso RapidFuzz
 │   │   ├── normalization.py        # ATC, CIE-10, MeSH, GMDN/EMDN
 │   │   ├── invima.py               # Índice local: Socrata y carga plana
-│   │   ├── scraper.py              # Pipeline de vigilancia
+│   │   ├── scraper.py              # Pipeline de vigilancia (recorrido guiado por la matriz)
+│   │   ├── source_matrix.py        # Lector del Excel de la matriz EH y mapeo a códigos
+│   │   ├── source_profile.py       # Listas de la matriz, flujo por fuente y config. de búsqueda
+│   │   ├── web_search.py           # Búsqueda web en cascada y consultas redactadas por la IA
+│   │   ├── data/matriz_fuentes_eh.json  # Matriz EH empaquetada (89 filas, 11 criterios)
 │   │   ├── minimax_service.py      # IA principal
 │   │   ├── gemini_service.py       # IA de respaldo
 │   │   ├── firestore_directory.py  # Nombres y apellidos por correo (RRHH)
@@ -442,7 +505,7 @@ Sis_HS_IETS/
 │   │   ├── mailer.py               # Correo de invitaciones y alertas (SMTP)
 │   │   └── routers/                # auth, users, cycles, technologies, priority,
 │   │                               # screening, invima, catalogs, audit, …
-│   ├── alembic/                    # Migraciones versionadas (baseline 0001)
+│   ├── alembic/                    # Migraciones versionadas (0001 baseline, 0002 matriz EH)
 │   ├── tests/                      # Pruebas unitarias e integración (pytest)
 │   ├── smoke_test.py               # Suite de regresión E2E de la API
 │   ├── requirements.txt
@@ -509,7 +572,7 @@ Sis_HS_IETS/
 | Entidad | Descripción |
 |---|---|
 | `User` | Cuenta institucional; `first_name` / `last_name` se rellenan desde Firestore si el correo coincide |
-| `Source` | Referente del inventario |
+| `Source` | Referente del inventario. Desde la migración 0002: `source_level`, `priority_level`, `tech_types`, `matrix_ref`, `matrix_origin`, `entry_urls`, `reference_urls`, `material_type`, `access_path`, `consult_info`, `observations`, `usage_restrictions` y `scan_profile` (flujo por fuente) |
 | `Finding` | Señal capturada; conserva `screening_score` y `content_hash` |
 | `Recommendation` | Informe de adopción vinculado a una señal |
 | `ScrapeLog` | Registro de cada ejecución de vigilancia |
@@ -569,6 +632,19 @@ Documentación interactiva: **`http://127.0.0.1:8000/docs`**
 | `POST /api/ingest/reprocess` | Reproceso del crudo con el mapeo vigente (simulación por defecto) |
 | `DELETE /api/clusters/{id}` · `/api/tech-types/{id}` · `GET /api/findings/stats` · `GET /api/audit/entities` | Complementos de los CRUD existentes |
 
+### Matriz EH de fuentes (octubre 2026)
+
+| Método y ruta | Propósito |
+|---|---|
+| `GET /api/sources?source_level=&priority_level=&tech_type=` | Filtros nuevos del listado (`priority_level=sin_asignar` para las vacías) |
+| `GET /api/sources/options` | Listas desplegables, bloques y estado de la búsqueda web (cualquier perfil) |
+| `POST /api/sources/{id}/web-search` | Prueba la búsqueda web de una fuente sin capturar (`scan:run`) |
+| `POST /api/sources/matrix/import` | Importa el Excel (multipart `file`, `overwrite`) o reaplica la matriz empaquetada (`source:write`) |
+| `GET` · `PUT /api/config/source-options` · `POST /reset` | Listas de la matriz (`config:manage`) |
+| `GET` · `PUT /api/config/web-search` · `POST /reset` · `/cooldowns/clear` · `/test` | Motores, límites, términos por categoría, llave Brave (enmascarada) y URL SearXNG |
+
+El CSV de `/api/sources/export` incluye nivel de fuente, prioridad, tipos de tecnología, referencia de la matriz, URLs de entrada, ruta de acceso, qué consultar, restricciones y flujo.
+
 ### Operación heredada
 
 | Prefijo | Endpoints principales |
@@ -622,7 +698,7 @@ Al iniciar, el backend ejecuta en orden:
 2. Migraciones ligeras de esquema, incluida la de `priority_score` a `screening_score`
 3. Endurecimiento de la bitácora (triggers o `REVOKE` según el motor)
 4. Instalación de los listeners de auditoría
-5. Sincronización del catálogo verificado D-06 (53 fuentes; retira el inventario anterior sin borrar senales)
+5. Sincronización del catálogo verificado D-06 con la matriz EH (95 fuentes; retira el inventario anterior sin borrar señales y conserva lo editado en el panel)
 6. Siembra de clústeres, tipologías, criterios P1–P6 y parámetros metodológicos
 7. Recálculo de `screening_score` en las señales existentes
 8. Migración de señales a tecnologías y creación del Ciclo 0 - Histórico
@@ -756,7 +832,9 @@ Copie [`backend/.env.example`](backend/.env.example) como `.env`.
 
 **Sin `GOOGLE_CLIENT_ID`:** use el acceso rápido de la pantalla de login o `POST /api/auth/dev-login` con un correo `@iets.org.co`.
 
-La configuración de MiniMax y Gemini también puede guardarse desde `/configuracion` y tiene prioridad sobre el `.env`.
+La configuración de MiniMax y Gemini también puede guardarse desde `/configuracion` y tiene prioridad sobre el `.env`. Lo mismo vale para la búsqueda web (motores, llave de Brave Search API, URL de SearXNG), que solo se configura desde *Parámetros de fuentes*.
+
+**Errores 500:** toda excepción no controlada queda en el log del servidor con su traza y una referencia (`ref a1b2c3d4`) que también ve el usuario. Fuera de producción el mensaje incluye además el tipo y la causa del error, útil para diagnosticar un despliegue de prueba sin acceso a la consola.
 
 ---
 
@@ -793,13 +871,17 @@ El último punto es el único que cambia la operación de un ciclo en curso. Si 
 
 **Primer arranque de la v3:** vaya a `/filtrado`, pestaña *Novedad*, y sincronice el índice de INVIMA. Sin él, el cruce regulatorio no devuelve nada y la pantalla lo advierte.
 
+### Matriz EH (octubre 2026)
+
+La migración Alembic `0002_source_matrix_profile` agrega los campos de la matriz a `sources` (idempotente; no toca datos existentes). Al arrancar, la sincronización del catálogo crea las 42 fuentes nuevas y completa los campos de la matriz solo donde estén vacíos. El prompt de extracción incorpora `{source_context}`; si guardó un prompt propio sin ese marcador, el contexto se antepone al contenido igualmente (o restaure el prompt por defecto en *Prompts de vigilancia*).
+
 ---
 
 ## Flujo de uso sugerido
 
 1. **Iniciar sesión** — con el correo y la contraseña que asignó el superadministrador (en el primer ingreso se reemplaza la temporal). La bandeja de trabajo muestra de inmediato los pendientes de su perfil, cada uno con enlace directo a la tecnología.
 2. **Abrir un ciclo** en `/ciclos`: código, apertura, corte de datos y fecha de boletín. El sistema valida la ventana y la cuota anual.
-3. **Vigilancia** — ejecutar el rastreo masivo o por referente.
+3. **Vigilancia** — ejecutar el rastreo masivo o por referente. Las fuentes de prioridad alta de la matriz EH se atienden primero; ajuste el flujo de cada fuente en `/fuentes › Editar`.
 4. **Bandeja de entrada** — clasificar las señales capturadas (clúster, tipología, condición, fechas regulatorias) apoyándose en la sugerencia asistida, y asignarlas por lotes al ciclo. Sin clúster ni tipología, el sistema no permite asignar.
 5. **Filtrado** — pasar el ciclo a *En filtrado* e ir a `/filtrado`: correr el barrido de duplicados y resolver las propuestas, declarar la novedad de cada tecnología con su cruce contra INVIMA, y revisar el Listado Único que resulta. Lo que no supere la compuerta de novedad no llega a la matriz.
 6. **Priorización** — pasar a *En priorización*. Cada perfil ve en `/priorizacion` solo lo que le corresponde calificar. Al completarse los seis criterios, el sistema calcula el `%P` y clasifica.
