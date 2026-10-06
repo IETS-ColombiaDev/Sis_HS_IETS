@@ -2849,6 +2849,95 @@ h4 {
   font-size: 13px;
   color: #92400e;
 }
+.source-section-title {
+  margin: 18px 0 10px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 14px;
+  color: #0f172a;
+}
+.source-section-note {
+  font-size: 12.5px;
+  color: #64748b;
+  margin: -4px 0 10px;
+}
+.source-tech-checks,
+.source-flow-switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.source-tech-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  width: 100%;
+}
+.source-flow-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.flow-chip {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 9999px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+.flow-chip.off {
+  background: #f8fafc;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+  text-decoration: line-through;
+}
+.source-matrix-fiche {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.source-matrix-fiche p { margin: 4px 0; }
+.source-matrix-fiche ul { margin: 4px 0 4px 18px; padding: 0; }
+.web-search-result {
+  margin-top: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  background: #f8fafc;
+}
+.web-search-queries,
+.web-search-steps {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.web-search-results { margin: 8px 0 0 18px; padding: 0; display: grid; gap: 6px; }
+.web-search-results p { margin: 2px 0 0; color: #64748b; font-size: 12.5px; }
+.option-list-row {
+  display: grid;
+  grid-template-columns: 150px 1fr 1.4fr 70px auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.option-list-row input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.muted { color: #94a3b8; font-size: 12.5px; }
 .health-counts {
   display: flex;
   gap: 10px;

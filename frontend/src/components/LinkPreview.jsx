@@ -12,9 +12,14 @@ export default function LinkPreview({ data }) {
       {data.message && <p style={{ margin: "4px 0" }}>{data.message}</p>}
       {data.title && <p style={{ margin: "4px 0" }}><strong>Título:</strong> {data.title}</p>}
       {data.description && <p style={{ margin: "4px 0" }}>{data.description}</p>}
-      {data.ok && (
+          {data.ok && (
         <>
-          <p style={{ margin: "6px 0 0" }}><strong>{data.candidates_count || 0}</strong> posible(s) señal(es) detectadas en la página.</p>
+          {data.pages_visited > 1 && (
+            <p style={{ margin: "6px 0 0" }}>
+              El rastreador entró a <strong>{data.pages_visited}</strong> páginas internas (listado y fichas).
+            </p>
+          )}
+          <p style={{ margin: "6px 0 0" }}><strong>{data.candidates_count || 0}</strong> posible(s) señal(es) detectadas.</p>
           {(data.candidates || []).length > 0 && (
             <ul>
               {data.candidates.slice(0, 6).map((c, i) => (

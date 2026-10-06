@@ -11,13 +11,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from .. import __version__, ai_service, gemini_service, minimax_service, scheduler_service, settings_store
+from .. import __version__, ai_service, gemini_service, minimax_service, prompt_store, scan_trace, scheduler_service, settings_store, usage_meter
 from ..config import settings
 from ..database import get_db
 from ..deps import get_current_user, require_permission
 from ..models import Finding, Source, User
 from ..rbac import P_CONFIG_MANAGE, has_permission, role_label
-from ..schemas import ConfigOut, ConfigUpdate, GeminiTestIn, GeminiTestOut
+from ..schemas import ConfigOut, ConfigUpdate, GeminiTestIn, GeminiTestOut, ScanPromptOut, ScanPromptUpdate, ScanTraceOut
 
 # Valores del .env al importar el modulo (antes de que el arranque los pise con
 # los de la BD). Permiten que "eliminar la llave guardada" vuelva al .env en vez
@@ -56,6 +56,9 @@ def _apply_ai_runtime(db: Session) -> None:
         gemini_api_key=str(cfg["gemini_api_key"]),
         gemini_model=str(cfg["gemini_model"]),
     )
+    prompt_store.load_from_db(db)
+    usage_meter.load_from_db(db)
+    scan_trace.load_from_db(db)
 
 
 def _build_config_out(db: Session) -> ConfigOut:
@@ -67,6 +70,9 @@ def _build_config_out(db: Session) -> ConfigOut:
     enabled = ai_service.is_enabled()
     gemini_on = gemini_service.is_enabled()
     minimax_on = minimax_service.is_enabled()
+    prompts = prompt_store.current()
+    usage = usage_meter.snapshot()
+    plan = minimax_service.coding_plan_cached()
     return ConfigOut(
         gemini_enabled=enabled,
         gemini_has_key=gemini_service.has_key(),
@@ -95,6 +101,20 @@ def _build_config_out(db: Session) -> ConfigOut:
         minimax_active_model=minimax_service.current_model() if minimax_on else "",
         minimax_available_models=minimax_service.list_available_models() if minimax_on else minimax_service.list_catalog_models(),
         minimax_vision_model=minimax_service.vision_model() if minimax_on else "MiniMax-M3",
+        scan_max_tokens=int(prompts["max_tokens"]),
+        scan_max_pages=int(prompts["max_pages"]),
+        scan_fetch_timeout=int(prompts.get("fetch_timeout") or 25),
+        scan_child_timeout=int(prompts.get("child_timeout") or 15),
+        scan_ai_timeout=int(prompts.get("ai_timeout") or 60),
+        scan_retries=int(prompts.get("retries") or 3),
+        scan_pause_ms=int(prompts.get("pause_ms") or 350),
+        ai_usage_prompt_tokens=int(usage.get("prompt_tokens") or 0),
+        ai_usage_completion_tokens=int(usage.get("completion_tokens") or 0),
+        ai_usage_total_tokens=int(usage.get("total_tokens") or 0),
+        ai_usage_calls=int(usage.get("calls") or 0),
+        ai_usage_last_at=str(usage.get("last_at") or ""),
+        ai_usage_last_model=str(usage.get("last_model") or ""),
+        minimax_plan_summary=str(plan.get("summary") or ""),
     )
 
 
@@ -129,6 +149,17 @@ def update_config(
         settings_store.set_value(db, settings_store.NCBI_API_KEY, payload.ncbi_api_key.strip())
     if payload.ncbi_email is not None:
         settings_store.set_value(db, settings_store.NCBI_EMAIL, payload.ncbi_email.strip())
+    if payload.scan_max_tokens is not None or payload.scan_max_pages is not None or payload.scan_fetch_timeout is not None or payload.scan_child_timeout is not None or payload.scan_ai_timeout is not None or payload.scan_retries is not None or payload.scan_pause_ms is not None:
+        prompt_store.save_to_db(
+            db,
+            max_tokens=payload.scan_max_tokens,
+            max_pages=payload.scan_max_pages,
+            fetch_timeout=payload.scan_fetch_timeout,
+            child_timeout=payload.scan_child_timeout,
+            ai_timeout=payload.scan_ai_timeout,
+            retries=payload.scan_retries,
+            pause_ms=payload.scan_pause_ms,
+        )
 
     _apply_ai_runtime(db)
     _apply_ingest_keys(db)
@@ -174,6 +205,167 @@ def detect_models(
         available_models=result.get("available_models", []),
         provider="minimax",
     )
+
+
+def _prompt_out() -> ScanPromptOut:
+    data = prompt_store.current()
+    return ScanPromptOut(
+        system=str(data["system"]),
+        user=str(data["user"]),
+        max_tokens=int(data["max_tokens"]),
+        max_pages=int(data["max_pages"]),
+        max_chars=int(data["max_chars"]),
+        placeholders=["source_title", "source_url", "pages_visited", "source_context", "content", "ocr_note", "max_items"],
+        defaults=prompt_store.defaults(),
+    )
+
+
+@router.get("/prompts", response_model=ScanPromptOut)
+def get_prompts(db: Session = Depends(get_db), user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    prompt_store.load_from_db(db)
+    return _prompt_out()
+
+
+@router.put("/prompts", response_model=ScanPromptOut)
+def update_prompts(
+    payload: ScanPromptUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CONFIG_MANAGE)),
+):
+    prompt_store.save_to_db(
+        db,
+        system=payload.system,
+        user=payload.user,
+        max_tokens=payload.max_tokens,
+        max_pages=payload.max_pages,
+        max_chars=payload.max_chars,
+    )
+    return _prompt_out()
+
+
+@router.post("/prompts/reset", response_model=ScanPromptOut)
+def reset_prompts(db: Session = Depends(get_db), user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    prompt_store.reset_to_defaults(db)
+    return _prompt_out()
+
+
+def _search_out(cfg: dict, db: Session) -> dict:
+    from .. import source_profile, web_search
+
+    out = dict(cfg)
+    out["brave_api_key_masked"] = _mask(source_profile.brave_api_key(db))
+    out["cooldown"] = web_search.cooldown_status()
+    out["engine_labels"] = source_profile.ENGINE_LABELS
+    out["limits"] = {k: list(v) for k, v in source_profile.SEARCH_LIMITS.items()}
+    return out
+
+
+@router.get("/source-options")
+def get_source_options(db: Session = Depends(get_db), user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    from .. import source_profile
+
+    return source_profile.load_options(db)
+
+
+@router.put("/source-options")
+def update_source_options(
+    payload: dict,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CONFIG_MANAGE)),
+):
+    from .. import source_profile
+
+    try:
+        return source_profile.save_options(db, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/source-options/reset")
+def reset_source_options(db: Session = Depends(get_db), user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    from .. import source_profile
+
+    return source_profile.reset_options(db)
+
+
+@router.get("/web-search")
+def get_web_search(db: Session = Depends(get_db), user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    from .. import source_profile
+
+    return _search_out(source_profile.load_search(db), db)
+
+
+@router.put("/web-search")
+def update_web_search(
+    payload: dict,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CONFIG_MANAGE)),
+):
+    from .. import source_profile
+
+    try:
+        cfg = source_profile.save_search(db, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _search_out(cfg, db)
+
+
+@router.post("/web-search/reset")
+def reset_web_search(db: Session = Depends(get_db), user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    from .. import source_profile, web_search
+
+    web_search.reset_cooldowns()
+    return _search_out(source_profile.reset_search(db), db)
+
+
+@router.post("/web-search/cooldowns/clear")
+def clear_search_cooldowns(db: Session = Depends(get_db), user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    from .. import source_profile, web_search
+
+    web_search.reset_cooldowns()
+    return _search_out(source_profile.load_search(db), db)
+
+
+@router.post("/web-search/test")
+def test_web_search(
+    payload: dict,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CONFIG_MANAGE)),
+):
+    """Ejecuta una consulta libre con la cascada de motores (diagnostico)."""
+    from .. import source_profile, web_search
+
+    query = str(payload.get("query") or "").strip()[:300]
+    if not query:
+        raise HTTPException(status_code=422, detail="Escriba una consulta.")
+    cfg = source_profile.load_search(db)
+    return web_search.search(query, cfg=cfg, brave_key=source_profile.brave_api_key(db))
+
+
+@router.post("/usage/reset", response_model=ConfigOut)
+def reset_usage(db: Session = Depends(get_db), user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    usage_meter.reset(db)
+    return _build_config_out(db)
+
+
+@router.get("/scan-traces", response_model=list[ScanTraceOut])
+def list_scan_traces(db: Session = Depends(get_db), user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    scan_trace.load_from_db(db)
+    return [ScanTraceOut(**row) for row in scan_trace.list_traces()]
+
+
+@router.post("/scan-traces/clear")
+def clear_scan_traces(db: Session = Depends(get_db), user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    scan_trace.clear(db)
+    return {"ok": True, "cleared": True}
+
+
+@router.get("/usage", response_model=ConfigOut)
+def refresh_usage(db: Session = Depends(get_db), user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    """Relee el saldo MiniMax (red) y el contador local de tokens."""
+    if minimax_service.has_key():
+        minimax_service.coding_plan_remains(cache_seconds=0)
+    return _build_config_out(db)
 
 
 # --------------------------------------------------------------------------- #

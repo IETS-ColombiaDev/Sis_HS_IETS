@@ -271,6 +271,7 @@ def generate(
     model: str | None = None,
     images: list[dict] | None = None,
     api_key: str | None = None,
+    timeout: float | None = None,
 ) -> tuple[str, str]:
     """Genera texto. `images` es lista de {mime, data} en base64 o {url}."""
     key = (api_key or _runtime_api_key or "").strip()
@@ -306,7 +307,7 @@ def generate(
 
     try:
         payload = _completion_body(model_name, messages, temperature, max_tokens)
-        with _client(timeout=60.0) as client:
+        with _client(timeout=float(timeout or 60.0)) as client:
             resp = client.post(
                 f"{BASE_URL}/chat/completions",
                 headers=_headers(key),
@@ -314,7 +315,9 @@ def generate(
             )
         if resp.status_code >= 400:
             return (f"[Error MiniMax HTTP {resp.status_code}: {resp.text[:240]}]", model_name)
-        text = _extract_text(resp.json())
+        payload_out = resp.json()
+        text = _extract_text(payload_out)
+        _record_usage(payload_out, model_name)
         return (text, model_name)
     except Exception as exc:  # noqa: BLE001
         return (f"[Error al consultar MiniMax: {exc}]", model_name)
@@ -358,12 +361,49 @@ def test_connection(api_key: str | None = None) -> dict:
         return {"ok": False, "message": f"Error de conexión con MiniMax: {exc}", "model": ""}
 
 
-def coding_plan_remains(api_key: str | None = None) -> dict:
+def _record_usage(payload: dict, model_name: str) -> None:
+    usage = payload.get("usage") if isinstance(payload, dict) else None
+    if not isinstance(usage, dict):
+        return
+    try:
+        from . import usage_meter
+
+        usage_meter.record(
+            prompt_tokens=int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0),
+            completion_tokens=int(usage.get("completion_tokens") or usage.get("output_tokens") or 0),
+            total_tokens=int(usage.get("total_tokens") or 0),
+            model=model_name,
+        )
+    except Exception:  # noqa: BLE001
+        return
+
+
+_plan_cache: dict = {"key": "", "at": 0.0, "data": {}}
+
+
+def coding_plan_cached() -> dict:
+    data = _plan_cache.get("data")
+    if isinstance(data, dict) and data:
+        return dict(data)
+    return {"ok": False, "summary": ""}
+
+
+def coding_plan_remains(api_key: str | None = None, *, cache_seconds: float = 90.0) -> dict:
+    import time
+
     key = (api_key or _runtime_api_key or "").strip()
     if not key:
         return {"ok": False}
+    now = time.monotonic()
+    if (
+        cache_seconds
+        and _plan_cache.get("key") == key
+        and now - float(_plan_cache.get("at") or 0) < cache_seconds
+        and _plan_cache.get("data")
+    ):
+        return dict(_plan_cache["data"])
     try:
-        with _client(timeout=15.0) as client:
+        with _client(timeout=6.0) as client:
             resp = client.get(CODING_PLAN_REMAINS, headers=_headers(key))
         if resp.status_code >= 400:
             return {"ok": False, "status": resp.status_code}
@@ -378,6 +418,8 @@ def coding_plan_remains(api_key: str | None = None) -> dict:
             leftover = data.get("remain") or data.get("remaining") or data.get("data")
             if leftover is not None:
                 summary = f"Saldo Coding Plan: {leftover}."
-        return {"ok": True, "data": data, "summary": summary}
+        out = {"ok": True, "data": data, "summary": summary}
+        _plan_cache.update(key=key, at=now, data=out)
+        return dict(out)
     except Exception:  # noqa: BLE001
         return {"ok": False}

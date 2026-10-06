@@ -121,6 +121,23 @@ class Source(Base):
     last_probe_detail: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
     next_review_due: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Matriz institucional EH (FUENTES DE INFORMACION PROACTIVA EH). Las listas
+    # de valores son parametros de Configuracion > Parametros de fuentes.
+    source_level: Mapped[str] = mapped_column(String(20), default="", index=True)
+    priority_level: Mapped[str] = mapped_column(String(20), default="", index=True)
+    tech_types: Mapped[list | None] = mapped_column(JSONType, default=list)
+    matrix_ref: Mapped[str] = mapped_column(String(60), default="")
+    matrix_origin: Mapped[str] = mapped_column(String(40), default="")
+    entry_urls: Mapped[list | None] = mapped_column(JSONType, default=list)
+    reference_urls: Mapped[list | None] = mapped_column(JSONType, default=list)
+    material_type: Mapped[str] = mapped_column(Text, default="")
+    access_path: Mapped[str] = mapped_column(Text, default="")
+    consult_info: Mapped[str] = mapped_column(Text, default="")
+    observations: Mapped[str] = mapped_column(Text, default="")
+    usage_restrictions: Mapped[str] = mapped_column(Text, default="")
+    # Flujo del escaneo de esta fuente (ver source_profile.DEFAULT_SCAN_PROFILE).
+    scan_profile: Mapped[dict | None] = mapped_column(JSONType, default=dict)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

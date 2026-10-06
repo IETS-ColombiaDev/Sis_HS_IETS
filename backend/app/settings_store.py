@@ -29,13 +29,22 @@ def get_value(db: Session, key: str, default: str = "") -> str:
 
 
 def set_value(db: Session, key: str, value: str) -> None:
+    _upsert(db, key, value)
+    db.commit()
+
+
+def set_values(db: Session, mapping: dict[str, str]) -> None:
+    for key, value in mapping.items():
+        _upsert(db, key, value)
+    db.commit()
+
+
+def _upsert(db: Session, key: str, value: str) -> None:
     row = db.get(AppMeta, key)
     if row is None:
-        row = AppMeta(key=key, value=value or "")
-        db.add(row)
+        db.add(AppMeta(key=key, value=value or ""))
     else:
         row.value = value or ""
-    db.commit()
 
 
 def load_gemini_config(db: Session) -> tuple[str, str]:

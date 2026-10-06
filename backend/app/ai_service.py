@@ -133,16 +133,22 @@ def generate(
     system: str | None = None,
     temperature: float = 0.5,
     images: list[dict] | None = None,
+    max_tokens: int | None = None,
+    timeout: float | None = None,
 ) -> tuple[str, str]:
     """Genera texto con el proveedor activo. Devuelve (texto, modelo)."""
     who = active_provider()
     if who == "minimax":
-        text, model = minimax_service.generate(
-            prompt,
-            system=system,
-            temperature=max(0.1, min(2.0, temperature if temperature else 0.7)),
-            images=images,
-        )
+        kwargs = {
+            "system": system,
+            "temperature": max(0.1, min(2.0, temperature if temperature else 0.7)),
+            "images": images,
+        }
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        text, model = minimax_service.generate(prompt, **kwargs)
         if text and not text.startswith("[Error"):
             return text, model
         if gemini_service.is_enabled() and not images:

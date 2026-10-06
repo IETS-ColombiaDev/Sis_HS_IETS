@@ -18,6 +18,8 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Con el Content-Type JSON por defecto, axios convierte un FormData en JSON y el archivo no llega.
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) config.headers.setContentType("multipart/form-data");
   return config;
 });
 

@@ -33,15 +33,82 @@ def db():
     session.close()
 
 
-def test_catalog_has_fifty_three_unique_codes():
+def test_catalog_has_ninety_five_unique_codes():
     rows = catalog.CATALOG_SOURCES
     codes = [r["catalog_code"] for r in rows]
-    assert len(rows) == 53
-    assert len(set(codes)) == 53
+    assert len(rows) == 95
+    assert len(set(codes)) == 95
+    urls = [catalog_service.normalize_url(r["url"]) for r in rows]
+    assert len(set(urls)) == len(urls)
     stats = catalog.catalog_stats()
     assert stats["governors"] == stats["by_level"]["A"] + stats["by_level"]["B"]
     assert stats["by_level"]["A"] >= 5
-    assert stats["by_block"][catalog.CAT_FABRICANTE] == 24
+    assert stats["by_block"][catalog.CAT_FABRICANTE] == 26
+    assert stats["by_block"][catalog.CAT_NOTICIAS] == 15
+    assert stats["from_matrix"] == 95
+
+
+def test_every_matrix_row_maps_to_a_catalog_source():
+    from app import source_matrix
+
+    matrix = source_matrix.load_matrix()
+    assert len(matrix["rows"]) == 89
+    codes = {r["catalog_code"] for r in catalog.CATALOG_SOURCES}
+    for row in matrix["rows"]:
+        assert row["codes"], row["name"]
+        assert set(row["codes"]) <= codes, row["name"]
+    pcori = next(r for r in catalog.CATALOG_SOURCES if r["catalog_code"] == "FP-HT-01")
+    assert pcori["priority_level"] in {"alta", "media", "baja", "revisar", ""}
+    assert pcori["source_level"] in {"primaria", "secundaria", "terciaria", "por_definir"}
+    assert pcori["matrix_ref"].startswith("MATRIZ FI EH fila")
+
+
+def test_sync_keeps_admin_edits_of_matrix_fields(db):
+    catalog_service.sync_catalog(db, triggered_by="test")
+    src = db.query(Source).filter(Source.catalog_code == "FP-HT-01").one()
+    src.priority_level = "baja"
+    src.access_path = "ruta editada"
+    db.commit()
+    catalog_service.sync_catalog(db, triggered_by="test")
+    db.refresh(src)
+    assert src.priority_level == "baja"
+    assert src.access_path == "ruta editada"
+
+
+def test_import_matrix_overwrite_and_create(db):
+    from app import source_matrix
+
+    catalog_service.sync_catalog(db, triggered_by="test")
+    src = db.query(Source).filter(Source.catalog_code == "FP-HT-01").one()
+    src.priority_level = "baja"
+    db.commit()
+    parsed = {
+        "sheet": "MATRIZ FI EH",
+        "rows": [
+            {**next(r for r in source_matrix.load_matrix()["rows"] if "FP-HT-01" in r["codes"]), "priority_level": "alta"},
+            {
+                "excel_row": 999, "matrix_ref": "MATRIZ FI EH fila 999", "codes": [], "name": "Portal nuevo de prueba",
+                "entity_label": "Revista / portal de noticias", "source_level": "secundaria", "priority_level": "media",
+                "tech_types": ["DM"], "consult_urls": ["https://portal-prueba.example.org/salud"], "methodology_urls": [],
+                "origin": "", "country": "", "frequency": "semanal", "language": "Ingles",
+            },
+        ],
+        "search_terms": [],
+    }
+    keep = catalog_service.import_matrix(db, parsed, overwrite=False, persist=False)
+    db.refresh(src)
+    assert src.priority_level == "baja"
+    assert keep["created"] == 1
+    summary = catalog_service.import_matrix(db, parsed, overwrite=True, persist=False)
+    db.refresh(src)
+    assert src.priority_level == "alta"
+    assert summary["created"] == 0 and summary["updated"] == 2
+    new = db.query(Source).filter(Source.title == "Portal nuevo de prueba").one()
+    assert new.category == catalog.CAT_NOTICIAS
+    assert new.verification_status == catalog_service.MATRIX_IMPORT_MARK
+    catalog_service.sync_catalog(db, triggered_by="test")
+    db.refresh(new)
+    assert new.retired is False
 
 
 def test_cadth_is_alias_of_cda_amc_and_ahrq_is_inactive():
@@ -65,7 +132,7 @@ def test_import_is_idempotent_and_retires_legacy(db):
     db.add(Source(title="Sitio principal del IETS", url="https://iets.org.co/", scrape_enabled=True))
     db.commit()
     first = catalog_service.sync_catalog(db, triggered_by="test")
-    assert first["created"] >= 53
+    assert first["created"] >= 95
     second = catalog_service.sync_catalog(db, triggered_by="test")
     assert second["created"] == 0
     assert db.query(Source).filter(Source.catalog_code == "FP-CT-01").count() == 1

@@ -23,6 +23,14 @@ import { Input, Textarea, Select } from "../components/Field";
 import { LoadingBlock } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
 import LinkPreview from "../components/LinkPreview";
+import SourceMatrixEditor, {
+  FALLBACK_OPTIONS,
+  MatrixBadges,
+  WebSearchResult,
+  matrixFormFrom,
+  matrixPayload,
+  optionLabel,
+} from "../components/SourceMatrixEditor";
 
 const BLOCKS = [
   "Registros de ensayos clinicos",
@@ -30,7 +38,9 @@ const BLOCKS = [
   "Agencias de HTA y redes de EH",
   "Literatura y organismos internacionales",
   "Fabricantes de I+D",
+  "Revistas y portales de noticias",
 ];
+const FLOW_SHORT = { crawl: "Recorrido", ocr: "OCR", ai: "IA", web_search: "Búsqueda web" };
 // El bloque se guarda tal cual en la base (catalogo D-06 sembrado); solo la etiqueta visible lleva tilde.
 const BLOCK_LABELS = { "Registros de ensayos clinicos": "Registros de ensayos clínicos" };
 const blockLabel = (c) => BLOCK_LABELS[c] || c;
@@ -62,6 +72,7 @@ const EMPTY = {
   sync_frequency: "mensual",
   country: "",
   connectorConfigText: "{}",
+  ...matrixFormFrom(null),
 };
 const QUICK_EMPTY = { title: "", url: "", category: "Agencias de HTA y redes de EH" };
 
@@ -106,6 +117,12 @@ export default function Sources() {
   const [blockFilter, setBlockFilter] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
   const [healthFilter, setHealthFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
+  const [tierFilter, setTierFilter] = useState("");
+  const [techFilter, setTechFilter] = useState("");
+  const [meta, setMeta] = useState({ options: FALLBACK_OPTIONS, web_search: { enabled: true } });
+  const [webSearch, setWebSearch] = useState(null);
+  const [searchingWeb, setSearchingWeb] = useState(false);
   const [viewMode, setViewMode] = useState("registry");
   const [showRetired, setShowRetired] = useState(false);
 
@@ -146,6 +163,12 @@ export default function Sources() {
     } finally {
       setLoading(false);
     }
+    try {
+      const { data } = await api.get("/sources/options");
+      setMeta(data);
+    } catch {
+      // Sin las listas del servidor se usan las de respaldo.
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -154,6 +177,11 @@ export default function Sources() {
   }, [load, version]);
 
   const connectorByCode = useMemo(() => Object.fromEntries(connectors.map((c) => [c.code, c])), [connectors]);
+  const options = meta.options || FALLBACK_OPTIONS;
+  const priorityRank = useMemo(() => {
+    const map = Object.fromEntries((options.priority_level || []).map((o) => [o.value, o.rank ?? 50]));
+    return (p) => (p ? map[p] ?? 50 : 3);
+  }, [options]);
   const active = useMemo(() => sources.filter((s) => !s.retired && s.catalog_active !== false), [sources]);
   const retired = useMemo(() => sources.filter((s) => s.retired), [sources]);
 
@@ -164,15 +192,28 @@ export default function Sources() {
       const okBlock = !blockFilter || s.category === blockFilter;
       const okLevel = !levelFilter || s.access_level === levelFilter;
       const okHealth = !healthFilter || (s.health_status || "sin_sonda") === healthFilter;
+      const okPriority = !priorityFilter || (priorityFilter === "sin_asignar" ? !s.priority_level : s.priority_level === priorityFilter);
+      const okTier = !tierFilter || (s.source_level || "por_definir") === tierFilter;
+      const okTech = !techFilter || (s.tech_types || []).includes(techFilter);
       const okSearch =
         !q ||
-        [s.title, s.url, s.catalog_code, s.connector, s.description, ...(s.aliases || [])]
+        [s.title, s.url, s.catalog_code, s.connector, s.description, s.access_path, s.consult_info, ...(s.aliases || [])]
           .join(" ")
           .toLowerCase()
           .includes(q);
-      return okBlock && okLevel && okHealth && okSearch;
-    });
-  }, [sources, active, showRetired, search, blockFilter, levelFilter, healthFilter]);
+      return okBlock && okLevel && okHealth && okPriority && okTier && okTech && okSearch;
+    }).sort((a, b) => priorityRank(a.priority_level) - priorityRank(b.priority_level) || (a.title || "").localeCompare(b.title || ""));
+  }, [sources, active, showRetired, search, blockFilter, levelFilter, healthFilter, priorityFilter, tierFilter, techFilter, priorityRank]);
+  const anyFilter = search || blockFilter || levelFilter || healthFilter || priorityFilter || tierFilter || techFilter;
+  const clearFilters = () => {
+    setSearch("");
+    setBlockFilter("");
+    setLevelFilter("");
+    setHealthFilter("");
+    setPriorityFilter("");
+    setTierFilter("");
+    setTechFilter("");
+  };
 
   const grouped = useMemo(() => {
     const map = new Map();
@@ -191,6 +232,9 @@ export default function Sources() {
       vigiladas: active.filter((s) => s.scrape_enabled).length,
       contrast: active.filter((s) => s.is_contrast).length,
       governors: active.filter((s) => s.access_level === "A" || s.access_level === "B").length,
+      alta: active.filter((s) => s.priority_level === "alta").length,
+      primarias: active.filter((s) => s.source_level === "primaria").length,
+      buscables: active.filter((s) => s.scrape_enabled && s.scan_profile?.web_search !== false).length,
     }),
     [active]
   );
@@ -198,12 +242,28 @@ export default function Sources() {
   const openAdvanced = (s = null) => {
     setEditing(s);
     setFormError("");
+    setWebSearch(null);
     setForm(
       s
-        ? { ...EMPTY, ...s, connectorConfigText: JSON.stringify(s.connector_config || {}, null, 2) }
+        ? { ...EMPTY, ...s, connectorConfigText: JSON.stringify(s.connector_config || {}, null, 2), ...matrixFormFrom(s) }
         : EMPTY
     );
     setModalOpen(true);
+  };
+
+  const testWebSearch = async (s) => {
+    setSearchingWeb(true);
+    setWebSearch(null);
+    try {
+      const { data } = await api.post(`/sources/${s.id}/web-search`);
+      setWebSearch(data);
+      if ((data.results || []).length) toast.success(`Búsqueda web: ${data.results.length} resultado(s) en ${data.domain}`);
+      else toast.warning("Búsqueda web sin resultados en el dominio");
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo probar la búsqueda web"));
+    } finally {
+      setSearchingWeb(false);
+    }
   };
 
   const save = async () => {
@@ -229,6 +289,11 @@ export default function Sources() {
       setFormError("La configuración del conector debe ser un objeto JSON válido, por ejemplo {}.");
       return;
     }
+    const matrix = matrixPayload(form);
+    if (matrix.error) {
+      setFormError(matrix.error);
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -243,6 +308,7 @@ export default function Sources() {
         sync_frequency: form.sync_frequency,
         country: form.country,
         connector_config: connectorConfig,
+        ...matrix.payload,
       };
       if (editing) await api.put(`/sources/${editing.id}`, payload);
       else await api.post("/sources", payload);
@@ -473,7 +539,16 @@ export default function Sources() {
         </button>
       ),
     },
-    { key: "level", width: 70, label: "Nivel", tip: <InfoTip text={GLOSSARY.fb_nivel} label="Qué es el nivel" />, render: (s) => <Badge tone={s.access_level}>{s.access_level || "—"}</Badge> },
+    { key: "level", width: 80, label: "Acceso", tip: <InfoTip text={GLOSSARY.fb_nivel} label="Qué es el nivel de acceso" />, render: (s) => <Badge tone={s.access_level}>{s.access_level || "—"}</Badge> },
+    {
+      key: "priority",
+      width: 110,
+      label: "Prioridad",
+      tip: <InfoTip text={GLOSSARY.fb_prioridad_fuente} label="Qué es la prioridad" />,
+      render: (s) => (s.priority_level ? <MatrixBadges source={{ priority_level: s.priority_level }} options={options} /> : <span className="muted">Sin asignar</span>),
+    },
+    { key: "tier", width: 100, label: "Nivel de fuente", tip: <InfoTip text={GLOSSARY.fb_nivel_fuente} label="Qué es el nivel de fuente" />, render: (s) => optionLabel(options, "source_level", s.source_level || "por_definir") },
+    { key: "tech", width: 110, label: "Tecnologías", render: (s) => (s.tech_types || []).join(", ") || "—" },
     { key: "connector", width: 120, label: "Adaptador", tip: <InfoTip text={GLOSSARY.fb_adaptador} label="Qué es el adaptador" />, render: (s) => s.connector || "html" },
     { key: "health", width: 100, label: "Salud", tip: <InfoTip text={GLOSSARY.fb_salud} label="Qué es la salud" />, render: (s) => <Badge tone={healthTone(s.health_status)}>{HEALTH_LABELS[s.health_status || "sin_sonda"] || s.health_status}</Badge> },
     {
@@ -544,6 +619,8 @@ export default function Sources() {
           { label: "Contrato A/B", value: stats.governors, sub: "Sostienen el pipeline", hint: GLOSSARY.fb_nivel },
           { label: "Ingesta activa", value: stats.vigiladas, hint: GLOSSARY.fb_ingesta },
           { label: "Fuentes de contraste", value: stats.contrast, sub: "Control de cobertura", hint: GLOSSARY.fb_contraste },
+          { label: "Prioridad alta", value: stats.alta, sub: `${stats.primarias} fuentes primarias`, hint: GLOSSARY.fb_prioridad_fuente },
+          { label: "Con búsqueda web", value: stats.buscables, sub: meta.web_search?.enabled === false ? "Apagada en Parámetros de fuentes" : "IA + motores en el dominio", hint: GLOSSARY.fb_flujo_busqueda },
         ]}
       />
 
@@ -576,10 +653,29 @@ export default function Sources() {
                   <option key={c} value={c}>{blockLabel(c)}</option>
                 ))}
               </select>
-              <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} className="filter-select" aria-label="Filtrar por nivel">
-                <option value="">Todos los niveles</option>
+              <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} className="filter-select" aria-label="Filtrar por nivel de acceso">
+                <option value="">Todo nivel de acceso</option>
                 {LEVELS.map((l) => (
-                  <option key={l.value} value={l.value}>Nivel {l.value}</option>
+                  <option key={l.value} value={l.value}>Acceso {l.value}</option>
+                ))}
+              </select>
+              <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="filter-select" aria-label="Filtrar por prioridad">
+                <option value="">Toda prioridad</option>
+                {(options.priority_level || []).map((o) => (
+                  <option key={o.value} value={o.value}>Prioridad {o.label}</option>
+                ))}
+                <option value="sin_asignar">Sin prioridad asignada</option>
+              </select>
+              <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)} className="filter-select" aria-label="Filtrar por nivel de fuente">
+                <option value="">Primaria, secundaria...</option>
+                {(options.source_level || []).map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <select value={techFilter} onChange={(e) => setTechFilter(e.target.value)} className="filter-select" aria-label="Filtrar por tipo de tecnología">
+                <option value="">Toda tecnología</option>
+                {(options.tech_type || []).map((o) => (
+                  <option key={o.value} value={o.value}>{o.value} · {o.label}</option>
                 ))}
               </select>
               <select value={healthFilter} onChange={(e) => setHealthFilter(e.target.value)} className="filter-select" aria-label="Filtrar por salud">
@@ -611,8 +707,8 @@ export default function Sources() {
                     : "Ajuste la búsqueda o los filtros, o marque 'Incluir retiradas'."
                 }
                 action={
-                  search || blockFilter || levelFilter || healthFilter ? (
-                    <Button variant="secondary" onClick={() => { setSearch(""); setBlockFilter(""); setLevelFilter(""); setHealthFilter(""); }}>
+                  anyFilter ? (
+                    <Button variant="secondary" onClick={clearFilters}>
                       Limpiar filtros
                     </Button>
                   ) : null
@@ -632,7 +728,8 @@ export default function Sources() {
                       <Card key={s.id} padding={16} className={`registry-card catalog-card catalog-card--${s.access_level || "D"}`}>
                         <div className="registry-card-top" data-testid={`source-card-${s.id}`}>
                           <span className="catalog-code">{s.catalog_code || "sin código"}</span>
-                          <span title={GLOSSARY.fb_nivel}><Badge tone={s.access_level}>Nivel {s.access_level || "—"}</Badge></span>
+                          <span title={GLOSSARY.fb_nivel}><Badge tone={s.access_level}>Acceso {s.access_level || "—"}</Badge></span>
+                          <MatrixBadges source={s} options={options} />
                           <span title={GLOSSARY.fb_salud}><Badge tone={healthTone(s.health_status)}>{HEALTH_LABELS[s.health_status || "sin_sonda"] || s.health_status}</Badge></span>
                           {s.is_contrast && <span title={GLOSSARY.fb_contraste}><Badge tone="info">Contraste</Badge></span>}
                           {s.retired && <span title={GLOSSARY.fb_retirada}><Badge tone="viewer">Retirada</Badge></span>}
@@ -650,8 +747,16 @@ export default function Sources() {
                           <span title={GLOSSARY.fb_frecuencia}>{s.sync_frequency || "—"}</span>
                           <span>{s.country || s.language}</span>
                           <span>{s.findings_count || 0} señales</span>
+                          {(s.tech_types || []).length > 0 && <span title={GLOSSARY.fb_tipos_tecnologia}>{s.tech_types.join(" · ")}</span>}
                           {s.requires_api_key && <span title="Funciona sin llave, pero con un cupo bajo. Configúrela en Configuración > Llaves de fuentes.">requiere llave</span>}
                         </div>
+                        {s.scrape_enabled && !s.retired && (
+                          <div className="source-flow-chips" title={GLOSSARY.fb_flujo_fuente}>
+                            {Object.entries(FLOW_SHORT).map(([k, label]) => (
+                              <span key={k} className={`flow-chip${s.scan_profile?.[k] === false ? " off" : ""}`}>{label}</span>
+                            ))}
+                          </div>
+                        )}
                         <div className="registry-card-actions">
                           <SourceActions s={s} />
                         </div>
@@ -685,7 +790,7 @@ export default function Sources() {
             columns={[
               { key: "code", width: 100, label: "Código", render: (s) => s.catalog_code || "—" },
               { key: "title", label: "Fuente", render: (s) => s.title },
-              { key: "level", width: 70, label: "Nivel", tip: <InfoTip text={GLOSSARY.fb_nivel} />, render: (s) => <Badge tone={s.access_level}>{s.access_level}</Badge> },
+              { key: "level", width: 80, label: "Acceso", tip: <InfoTip text={GLOSSARY.fb_nivel} />, render: (s) => <Badge tone={s.access_level}>{s.access_level}</Badge> },
               { key: "status", width: 100, label: "Estado", render: (s) => <Badge tone={healthTone(s.health_status)}>{HEALTH_LABELS[s.health_status || "sin_sonda"] || s.health_status}</Badge> },
               { key: "msg", label: "Detalle", render: (s) => s.message || "—" },
               {
@@ -781,7 +886,7 @@ export default function Sources() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editing ? "Editar fuente" : "Agregar fuente"}
-        width={720}
+        width={820}
         footer={
           <>
             <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={saving}>Cancelar</Button>
@@ -792,7 +897,8 @@ export default function Sources() {
         {formError && <p className="public-submit-error" role="alert">{formError}</p>}
         {editing?.catalog_code && (
           <p style={{ fontSize: 12.5, color: "#92400E", background: "#FFFBEB", padding: "8px 10px", borderRadius: 8, marginTop: 0 }}>
-            Fuente del catálogo D-06 ({editing.catalog_code}). Recargar el catálogo restituye sus datos oficiales.
+            Fuente del catálogo D-06 ({editing.catalog_code}). Recargar el catálogo restituye sus datos oficiales; la
+            priorización, la ruta de acceso y el flujo que edite aquí se conservan.
           </p>
         )}
         <Input id="source-title" label="Nombre" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
@@ -801,7 +907,7 @@ export default function Sources() {
           <Select id="source-block" label="Bloque" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
             {[...new Set([...BLOCKS, form.category].filter(Boolean))].map((c) => <option key={c} value={c}>{blockLabel(c)}</option>)}
           </Select>
-          <Select id="source-level" label="Nivel de fuente" hint={GLOSSARY.fb_nivel} value={form.access_level} onChange={(e) => setForm({ ...form, access_level: e.target.value })}>
+          <Select id="source-access" label="Nivel de acceso (contrato de datos)" hint={GLOSSARY.fb_nivel} value={form.access_level} onChange={(e) => setForm({ ...form, access_level: e.target.value })}>
             {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
           </Select>
           <Select id="source-connector" label="Adaptador" hint={GLOSSARY.fb_adaptador} value={form.connector} onChange={(e) => setForm({ ...form, connector: e.target.value })}>
@@ -832,6 +938,15 @@ export default function Sources() {
           <input type="checkbox" checked={form.scrape_enabled} onChange={(e) => setForm({ ...form, scrape_enabled: e.target.checked })} style={{ width: 18, height: 18 }} />
           <TermLabel tip={GLOSSARY.fb_ingesta}>Ingesta activa (vigilancia masiva y programada)</TermLabel>
         </label>
+        <SourceMatrixEditor form={form} setForm={setForm} options={options} webSearchOn={meta.web_search?.enabled !== false} />
+        {editing && canScan && (
+          <div style={{ marginTop: 4 }}>
+            <HintButton variant="outline" size="sm" hint={GLOSSARY.fb_probar_busqueda} loading={searchingWeb} onClick={() => testWebSearch(editing)}>
+              <Icon name="radar" size={14} /> Probar búsqueda web
+            </HintButton>
+            <WebSearchResult data={webSearch} />
+          </div>
+        )}
       </Modal>
 
       <Modal open={!!detailSource} onClose={() => setDetailSource(null)} title={detailSource?.title || "Fuente"} width={720}>
@@ -839,7 +954,8 @@ export default function Sources() {
           <div className="source-fiche">
             <div className="registry-card-top" style={{ marginBottom: 12 }}>
               <span className="catalog-code">{detailSource.catalog_code || "sin código"}</span>
-              <Badge tone={detailSource.access_level}>Nivel {detailSource.access_level || "—"}</Badge>
+              <Badge tone={detailSource.access_level}>Acceso {detailSource.access_level || "—"}</Badge>
+              <MatrixBadges source={detailSource} options={options} />
               <Badge tone={healthTone(detailSource.health_status)}>{HEALTH_LABELS[detailSource.health_status || "sin_sonda"] || detailSource.health_status}</Badge>
               {detailSource.verification_status && <Badge tone={detailSource.verification_status}>{detailSource.verification_status}</Badge>}
             </div>
@@ -854,7 +970,43 @@ export default function Sources() {
               <div><dt>Alias</dt><dd>{(detailSource.aliases || []).join(", ") || "—"}</dd></div>
               <div><dt>Términos</dt><dd>{detailSource.terms_accepted_at ? `Aceptados ${new Date(detailSource.terms_accepted_at).toLocaleDateString()}` : (detailSource.terms_url || "No aplican")}</dd></div>
               {detailSource.last_error && <div><dt>Último error</dt><dd>{detailSource.last_error.slice(0, 300)}</dd></div>}
+              <div><dt><TermLabel tip={GLOSSARY.fb_nivel_fuente}>Nivel de fuente</TermLabel></dt><dd>{optionLabel(options, "source_level", detailSource.source_level || "por_definir")}</dd></div>
+              <div><dt><TermLabel tip={GLOSSARY.fb_prioridad_fuente}>Prioridad</TermLabel></dt><dd>{detailSource.priority_level ? optionLabel(options, "priority_level", detailSource.priority_level) : "Sin asignar"}</dd></div>
+              <div><dt><TermLabel tip={GLOSSARY.fb_tipos_tecnologia}>Tipos de tecnología</TermLabel></dt><dd>{(detailSource.tech_types || []).map((t) => optionLabel(options, "tech_type", t)).join(", ") || "—"}</dd></div>
+              <div><dt>Origen en la matriz</dt><dd>{[detailSource.matrix_ref, detailSource.matrix_origin].filter(Boolean).join(" · ") || "—"}</dd></div>
+              <div>
+                <dt><TermLabel tip={GLOSSARY.fb_flujo_fuente}>Flujo</TermLabel></dt>
+                <dd>
+                  {Object.entries(FLOW_SHORT)
+                    .filter(([k]) => detailSource.scan_profile?.[k] !== false)
+                    .map(([, label]) => label)
+                    .join(" · ") || "Todo apagado"}
+                  {detailSource.scan_profile?.max_pages ? ` · ${detailSource.scan_profile.max_pages} páginas` : ""}
+                </dd>
+              </div>
+              {detailSource.material_type && <div><dt>Tipo de material</dt><dd>{detailSource.material_type}</dd></div>}
             </dl>
+            {(detailSource.access_path || detailSource.consult_info || (detailSource.entry_urls || []).length > 0) && (
+              <div className="source-matrix-fiche">
+                {detailSource.access_path && <p><strong>Ruta de acceso:</strong> {detailSource.access_path}</p>}
+                {detailSource.consult_info && <p><strong>Qué consultar:</strong> {detailSource.consult_info}</p>}
+                {(detailSource.entry_urls || []).length > 0 && (
+                  <div>
+                    <strong>URLs de entrada:</strong>
+                    <ul>
+                      {detailSource.entry_urls.map((u) => (
+                        <li key={u}><a href={u} target="_blank" rel="noreferrer">{u.replace(/^https?:\/\//, "").slice(0, 90)}</a></li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {(detailSource.reference_urls || []).length > 0 && (
+                  <p><strong>Referencias:</strong> {detailSource.reference_urls.map((u) => <a key={u} href={u} target="_blank" rel="noreferrer" style={{ marginRight: 8 }}>{u.replace(/^https?:\/\//, "").slice(0, 60)}</a>)}</p>
+                )}
+                {detailSource.observations && <p><strong>Observaciones:</strong> {detailSource.observations}</p>}
+                {detailSource.usage_restrictions && <p><strong>Restricciones:</strong> {detailSource.usage_restrictions}</p>}
+              </div>
+            )}
             {detailSource.catalog_note && <p className="catalog-note">{detailSource.catalog_note}</p>}
             <div className="fb-toolbar" style={{ marginBottom: 8 }}>
               {detailSource.url && (
@@ -889,7 +1041,7 @@ export default function Sources() {
         onConfirm={importCatalog}
         loading={importing}
         title="Recargar catálogo D-06"
-        message="Se actualizarán las fuentes oficiales con los datos del catálogo verificado y se retirarán las que ya no estén en el. Las señales nunca se borran. Las ediciones locales a fuentes oficiales se sobrescriben."
+        message="Se actualizarán las fuentes oficiales con los datos del catálogo verificado y se retirarán las que ya no estén en el. Las señales nunca se borran. Los datos oficiales (URL, adaptador, nivel de acceso) se restituyen; la priorización, la ruta de acceso y el flujo editados en el panel se conservan."
         confirmLabel="Recargar"
         confirmVariant="primary"
       />

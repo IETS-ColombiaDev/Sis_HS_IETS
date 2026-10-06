@@ -60,7 +60,41 @@ SOURCE_FIELDS = (
     "is_contrast",
     "catalog_active",
     "retired",
+) + (
+    "source_level",
+    "priority_level",
+    "tech_types",
+    "matrix_ref",
+    "matrix_origin",
+    "entry_urls",
+    "reference_urls",
+    "material_type",
+    "access_path",
+    "consult_info",
+    "observations",
+    "usage_restrictions",
+    "scan_profile",
 )
+
+# Campos que el equipo ajusta desde el panel (listas desplegables y casillas del
+# flujo). La recarga del catalogo solo los completa si estan vacios; para pisarlos
+# con la matriz hay que reimportarla de forma explicita (import_matrix).
+ADMIN_FIELDS = (
+    "source_level",
+    "priority_level",
+    "tech_types",
+    "matrix_ref",
+    "matrix_origin",
+    "entry_urls",
+    "reference_urls",
+    "material_type",
+    "access_path",
+    "consult_info",
+    "observations",
+    "usage_restrictions",
+    "scan_profile",
+)
+MATRIX_IMPORT_MARK = "matriz_importada"
 
 
 def normalize_url(url: str) -> str:
@@ -80,7 +114,7 @@ def normalize_url(url: str) -> str:
 
 
 def sync_catalog(db: Session, *, triggered_by: str = "sistema") -> dict:
-    """Upsert de las 53 fuentes y retiro de las que ya no estan en el catalogo."""
+    """Upsert del catalogo D-06 + matriz EH y retiro de lo que ya no esta."""
     created = 0
     updated = 0
     retired = 0
@@ -107,7 +141,7 @@ def sync_catalog(db: Session, *, triggered_by: str = "sistema") -> dict:
             continue
         # Las fuentes que el equipo registro a mano no pertenecen al inventario
         # anterior: retirarlas en cada arranque las borraba de la vigilancia.
-        if (source.verification_status or "").strip() == LOCAL_SOURCE_MARK:
+        if (source.verification_status or "").strip() in {LOCAL_SOURCE_MARK, MATRIX_IMPORT_MARK}:
             continue
         source.retired = True
         source.scrape_enabled = False
@@ -145,6 +179,122 @@ def sync_catalog(db: Session, *, triggered_by: str = "sistema") -> dict:
     }
 
 
+def _category_for(entity_label: str) -> tuple[str, str]:
+    from . import catalog
+    from .source_matrix import fold
+
+    text = fold(entity_label)
+    if "fabricante" in text:
+        return catalog.CAT_FABRICANTE, "fabricante"
+    if "regulator" in text:
+        return catalog.CAT_REGULATORIA, "agencia_regulatoria"
+    if "ensayo" in text:
+        return catalog.CAT_ENSAYOS, "registro_ensayos"
+    if any(k in text for k in ("hta", "evaluacion", "iniciativa", "organismo")):
+        return catalog.CAT_HTA, "organismo_hta"
+    if any(k in text for k in ("revista", "portal", "noticia")):
+        return catalog.CAT_NOTICIAS, "revista_noticias"
+    return catalog.CAT_LITERATURA, "literatura"
+
+
+def import_matrix(
+    db: Session,
+    parsed: dict,
+    *,
+    overwrite: bool = True,
+    persist: bool = True,
+    triggered_by: str = "sistema",
+) -> dict:
+    """Aplica una matriz EH (Excel ya leido) al inventario.
+
+    - Filas con codigo: actualiza nivel, prioridad, tipos, URLs de entrada, ruta
+      de acceso, que consultar y restricciones. Con `overwrite=False` solo
+      completa lo vacio (respeta lo editado en el panel).
+    - Filas sin codigo: crea la fuente (rastreo HTML, nivel D) marcada como
+      importada de la matriz, para que la recarga del catalogo no la retire.
+    - `persist`: guarda la matriz como la empaquetada (la usa el catalogo en el
+      proximo arranque y los terminos de busqueda por defecto).
+    """
+    from . import source_matrix
+    from .catalog import FREQ_HOURS
+
+    rows = parsed.get("rows") or []
+    updated = created = 0
+    touched: list[str] = []
+    unmatched: list[str] = []
+    for row in rows:
+        codes = row.get("codes") or []
+        if codes:
+            for idx, code in enumerate(codes):
+                source = db.query(Source).filter(Source.catalog_code == code).first()
+                if source is None:
+                    continue
+                fields = source_matrix.profile_fields(row, primary=idx == 0)
+                _apply_catalog_fields(source, fields, overwrite_admin=overwrite)
+                updated += 1
+                touched.append(code)
+            continue
+        urls = source_matrix.entry_urls_for(row)
+        main = urls[0] if urls else ""
+        norm = normalize_url(main)
+        existing = None
+        for source in db.query(Source).all():
+            if (norm and normalize_url(source.url) == norm) or (source.title or "").strip() == row["name"]:
+                existing = source
+                break
+        fields = source_matrix.profile_fields(row, primary=True)
+        if existing is not None:
+            _apply_catalog_fields(existing, fields, overwrite_admin=overwrite)
+            updated += 1
+            continue
+        if not main:
+            unmatched.append(row["name"])
+            continue
+        category, entity_type = _category_for(row.get("entity_label") or "")
+        freq = row.get("frequency") or "semanal"
+        db.add(
+            Source(
+                title=row["name"][:590],
+                url=norm[:1020],
+                category=category,
+                entity_type=entity_type,
+                description=(row.get("consult_info") or row["name"])[:1000],
+                relation_iets=f"Matriz EH ({row.get('matrix_ref', '')})"[:300],
+                language=(row.get("language") or "Ingles")[:60],
+                connector="html",
+                access_level="D",
+                sync_frequency=freq,
+                scan_interval_hours=FREQ_HOURS.get(freq, 168),
+                scrape_enabled=True,
+                link_status="Activo",
+                country=(row.get("country") or "")[:80],
+                verification_status=MATRIX_IMPORT_MARK,
+                catalog_note="Creada al importar la matriz EH: asigne bloque, nivel y adaptador si hace falta.",
+                tags="matriz EH",
+                **fields,
+            )
+        )
+        created += 1
+    if persist:
+        prev = source_matrix.DATA_FILE.with_suffix(".prev.json")
+        if source_matrix.DATA_FILE.exists():
+            prev.write_text(source_matrix.DATA_FILE.read_text(encoding="utf-8"), encoding="utf-8")
+        source_matrix.write_data_file(parsed)
+    summary = {
+        "rows": len(rows),
+        "updated": updated,
+        "created": created,
+        "unmatched": unmatched,
+        "search_terms": len(parsed.get("search_terms") or []),
+        "overwrite": overwrite,
+        "persisted": persist,
+        "sheet": parsed.get("sheet", ""),
+    }
+    record_action(db, entity_type="sources", entity_id="matrix", action="matrix_import", new_value=summary)
+    db.commit()
+    return summary
+
+
 def accept_terms(db: Session, source: Source) -> Source:
     source.terms_accepted_at = datetime.now(timezone.utc)
     db.commit()
@@ -172,8 +322,15 @@ def _find_match(db: Session, payload: dict) -> Source | None:
     return None
 
 
-def _apply_catalog_fields(source: Source, payload: dict) -> None:
-    """Actualiza metadatos del catalogo sin pisar el estado operativo de salud."""
+def _is_empty(value) -> bool:
+    return value is None or value == "" or value == [] or value == {}
+
+
+def _apply_catalog_fields(source: Source, payload: dict, *, overwrite_admin: bool = False) -> None:
+    """Actualiza metadatos del catalogo sin pisar el estado operativo de salud.
+
+    Los ADMIN_FIELDS solo se completan si estan vacios, salvo `overwrite_admin`.
+    """
     preserve = {
         "health_status",
         "last_ok_at",
@@ -190,6 +347,8 @@ def _apply_catalog_fields(source: Source, payload: dict) -> None:
     }
     for key, value in payload.items():
         if key in preserve:
+            continue
+        if key in ADMIN_FIELDS and not overwrite_admin and not _is_empty(getattr(source, key, None)):
             continue
         if key == "connector_config":
             current = source.connector_config if isinstance(source.connector_config, dict) else {}

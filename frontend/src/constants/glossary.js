@@ -75,6 +75,12 @@ export const GLOSSARY = {
     "OCR: la IA lee texto dentro de imágenes o PDFs de sitios web cuando la página no entrega datos estructurados.",
   minimax:
     "MiniMax: modelo de inteligencia artificial usado para resumir, extraer datos de sitios y apoyar la redacción. No reemplaza el juicio del analista.",
+  prompt_vigilancia:
+    "Instrucciones que MiniMax sigue al extraer fichas. No debe inventar NCT ni tecnologías ausentes del texto. Variables: {source_title}, {source_url}, {pages_visited}, {content}, {ocr_note} y {max_items}.",
+  token_ia:
+    "La llave de MiniMax se guarda en el servidor. El panel muestra el saldo del plan y los tokens que esta aplicación ya consumió en llamadas reales.",
+  flujo_ingesta:
+    "Orden fijo: cola → descarga HTTP → PDF/HTML → heurística → fichas internas → OCR (opcional) → MiniMax (opcional) → huella y bandeja. Un sitio que falle no tumba las demás fuentes.",
   cluster:
     "Clúster: grupo de enfermedades o problemas de salud (cáncer, huérfanas, alto costo, etc.) para organizar las tecnologías.",
   tipologia:
@@ -231,7 +237,49 @@ export const GLOSSARY = {
   fb_frecuencia:
     "Cada cuánto se vuelve a consultar esta fuente. La vigilancia programada solo la encola cuando su frecuencia ya venció, para no saturar a la fuente.",
   fb_nivel:
-    "Nivel de la fuente según su contrato de datos: A = API estable, B = feed o descarga oficial, C = página estructurada, D = página que solo confirma, E = curaduría humana. Una fuente D o E nunca sobreescribe un dato que ya trajo una A o B.",
+    "Nivel de acceso según el contrato de datos de la fuente: A = API estable, B = feed o descarga oficial, C = página estructurada, D = página que solo confirma, E = curaduría humana. Una fuente D o E nunca sobreescribe un dato que ya trajo una A o B.",
+  fb_matriz_eh:
+    "Datos de la matriz 'Fuentes de información proactiva EH' (hoja MATRIZ FI EH): priorización, nivel de fuente, tipos de tecnología, ruta de acceso y qué consultar. Guían a la IA y al recorrido. Las listas se editan en Configuración › Parámetros de fuentes.",
+  fb_nivel_fuente:
+    "Primaria: produce la evidencia o el dato original (registro de ensayos, fabricante, agencia que aprueba). Secundaria: resume o evalúa fuentes primarias (agencias HTA, revistas). Terciaria: compila o difunde (portales, redes de EH).",
+  fb_prioridad_fuente:
+    "Aplicabilidad de la fuente para el escaneo de horizonte según la matriz EH. Las de prioridad alta se encolan y escanean primero, y la IA da más peso a lo que encuentra en ellas.",
+  fb_origen_matriz:
+    "Cómo llegó la fuente a la matriz (por ejemplo DOC_TEC = documento técnico, PROP = propuesta del equipo). La lista se edita en Parámetros de fuentes.",
+  fb_tipos_tecnologia:
+    "Tecnologías que cubre la fuente: MED medicamentos, DM dispositivos, BIOM biomarcadores, IA inteligencia artificial, SD software como dispositivo, MT múltiples. Definen los términos de la búsqueda web.",
+  fb_urls_entrada:
+    "Páginas internas que el recorrido visita además de la URL principal (columna 'Link de consulta' de la matriz). Si la URL principal falla, se usan como respaldo.",
+  fb_ruta_acceso:
+    "Pasos de navegación para llegar a la información (por ejemplo 'Medscape → News & Perspective → Cardiology'). El sistema extrae palabras guía y sigue primero los enlaces que las contienen.",
+  fb_flujo_fuente:
+    "Casillas del flujo de esta fuente: qué hace el escaneo al consultarla. Apagar una casilla solo afecta a esta fuente; los interruptores globales de IA y OCR siguen mandando.",
+  fb_flujo_recorrido:
+    "Entra a las URLs de entrada de la matriz y a las fichas internas. Apagado: solo se lee la página principal.",
+  fb_flujo_enlaces:
+    "Sigue los enlaces internos mejor puntuados (los que coinciden con la ruta de acceso suben). Requiere el recorrido encendido.",
+  fb_flujo_ocr:
+    "Lee el texto de PDF escaneados e imágenes con el modelo de visión. Útil en agencias que publican informes como imagen.",
+  fb_flujo_ia:
+    "La IA lee lo recorrido y extrae tecnologías, fases y NCT verificables, con el contexto de la matriz (prioridad, qué consultar).",
+  fb_flujo_busqueda:
+    "Antes de recorrer, la IA redacta consultas 'site:dominio' y las lanza en buscadores (Yahoo, DuckDuckGo, Bing, Brave o SearXNG) para encontrar documentos de la fuente que el menú no muestra.",
+  fb_flujo_paginas:
+    "Fichas internas a seguir en esta fuente. 0 usa el valor global de Configuración › Prompt de IA. Máximo 20.",
+  fb_dominio_busqueda:
+    "Dominio donde se buscan resultados (por ejemplo 'fda.gov'). Vacío usa el de la URL principal. Los resultados de otros dominios se descartan.",
+  fb_palabras_guia:
+    "Palabras que, si aparecen en un enlace, hacen que el recorrido lo siga primero. Se suman a las que salen de la ruta de acceso.",
+  fb_terminos_fuente:
+    "Términos propios para la búsqueda web de esta fuente. Vacío usa los de 'Criterios de búsqueda' según sus tipos de tecnología.",
+  fb_probar_busqueda:
+    "Ejecuta la búsqueda web de esta fuente con lo guardado (sin capturar señales) y muestra consultas, motores y resultados.",
+  fb_parametros_fuentes:
+    "Listas desplegables de la matriz EH, configuración de la búsqueda web y carga del Excel de la matriz.",
+  fb_motores_busqueda:
+    "Motores en cascada: si uno bloquea o no trae resultados se prueba el siguiente; el que bloquea queda en pausa unos minutos. Brave (llave) y SearXNG (URL propia) son los más estables.",
+  fb_importar_matriz:
+    "Lee el Excel 'Fuentes de información proactiva EH' (hojas MATRIZ FI EH y Criterios de búsqueda), actualiza las fuentes del catálogo y crea las que falten. Sin archivo, reaplica la matriz ya cargada.",
   fb_salud:
     "Resultado de la última sonda. Verde: responde y el formato coincide. Ámbar: responde pero cambió el formato o vino vacía (la ingesta se suspende). Rojo: no responde. Sin sonda: aún no se ha probado.",
   fb_ingesta:
@@ -259,7 +307,7 @@ export const GLOSSARY = {
   fb_cola:
     "Trabajos de ingesta: uno por fuente. Pendiente = en espera; ejecutando = en curso; ok = terminó; parcial = trajo parte; error = falló (se reintenta hasta 3 veces con espera creciente).",
   fb_vista_previa:
-    "Muestra que información extraería el sistema de un enlace, sin guardar nada. Útil antes de registrar una fuente nueva.",
+    "Muestra qué información extraería el sistema de un enlace, sin guardar nada. Entra al listado y sigue hasta las fichas internas. Útil antes de registrar una fuente nueva.",
   fb_programada:
     "Vigilancia programada: cada cierto número de horas el sistema revisa qué fuentes vencieron según su frecuencia y las encola solo, sin que nadie oprima un botón.",
   fb_intervalo_vigilancia:
