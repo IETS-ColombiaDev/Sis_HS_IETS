@@ -896,6 +896,7 @@ La migración Alembic `0002_source_matrix_profile` agrega los campos de la matri
 
 | Documento | Contenido |
 |---|---|
+| [`GUIA_USUARIO.md`](GUIA_USUARIO.md) | Guía de usuario: todos los módulos, paso a paso, perfiles y preguntas frecuentes |
 | [`Plan_Fases_Actualizacion_Plataforma_EH_IETS.md`](Plan_Fases_Actualizacion_Plataforma_EH_IETS.md) | Plan de fases 0 a 7 y matriz de trazabilidad de los 20 RF |
 | [`BACKLOG.md`](BACKLOG.md) | Estado de cumplimiento por RF, diagramas, roadmap, riesgos y decisiones abiertas |
 | [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) | Inventario definitivo RF01 / D-06 y contrato de cada conector |
