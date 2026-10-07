@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from .config import settings
+from .config import EMBEDDED_MINIMAX_API_KEY, settings
 
 BASE_URL = "https://api.minimax.io/v1"
 CODING_PLAN_REMAINS = f"{BASE_URL}/api/openplatform/coding_plan/remains"
@@ -40,11 +40,16 @@ _resolved_model: str | None = None
 _cached_available: list[str] | None = None
 
 
+def _default_key() -> str:
+    return (settings.minimax_api_key or "").strip() or EMBEDDED_MINIMAX_API_KEY
+
+
 def configure_runtime(api_key: str | None = None, model: str | None = None) -> None:
     global _runtime_api_key, _runtime_model, _resolved_model, _cached_available
     with _lock:
         if api_key is not None:
-            _runtime_api_key = (api_key or "").strip()
+            # Vacio en panel/.env: se vuelve a la llave embebida (siempre disponible).
+            _runtime_api_key = (api_key or "").strip() or _default_key()
         if model is not None:
             _runtime_model = (model or "").strip()
         _resolved_model = None
@@ -52,15 +57,15 @@ def configure_runtime(api_key: str | None = None, model: str | None = None) -> N
 
 
 def get_api_key() -> str:
-    return _runtime_api_key
+    return _runtime_api_key or _default_key()
 
 
 def has_key() -> bool:
-    return bool(_runtime_api_key)
+    return bool(get_api_key())
 
 
 def is_enabled() -> bool:
-    return bool(_runtime_api_key)
+    return bool(get_api_key())
 
 
 def _headers(key: str | None = None) -> dict[str, str]:

@@ -63,7 +63,14 @@ def load_ai_config(db: Session) -> dict[str, str | bool]:
     """Config de MiniMax / proveedor / OCR. La BD pisa al .env si hay valor."""
     from .config import settings
 
-    minimax_key = get_value(db, MINIMAX_API_KEY, "") or (settings.minimax_api_key or "")
+    from .config import EMBEDDED_MINIMAX_API_KEY
+
+    # BD → .env / Settings → constante embebida (siempre hay llave operativa).
+    minimax_key = (
+        get_value(db, MINIMAX_API_KEY, "")
+        or (settings.minimax_api_key or "")
+        or EMBEDDED_MINIMAX_API_KEY
+    )
     minimax_model = get_value(db, MINIMAX_MODEL, "") or (settings.minimax_model or "")
     provider = get_value(db, AI_PROVIDER, "") or (settings.ai_provider or "auto")
     return {
