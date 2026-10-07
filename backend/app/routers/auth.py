@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from .. import audit, rbac
 from ..config import settings
-from ..database import get_db
+from ..database import get_db, run_with_db_retry
 from ..deps import get_current_user
 from ..firestore_directory import resolve_name
 from ..models import User
@@ -223,21 +223,32 @@ def login_password(payload: PasswordLoginIn, request: Request, db: Session = Dep
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario desactivado. Contacte al administrador.")
 
-    user.failed_logins = 0
-    user.locked_until = None
-    user.last_login = now
-    canonical = rbac.canonical_role(user.role)
-    if user.role != canonical:
-        user.role = canonical
-    audit.record_action(
-        db,
-        entity_type="users",
-        entity_id=str(user.id),
-        action="auth:login",
-        new_value={"email": user.email, "method": "password"},
-    )
-    db.commit()
-    db.refresh(user)
+    def _complete() -> User:
+        u = db.query(User).filter(User.email == email).first()
+        if u is None or not u.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuario desactivado. Contacte al administrador.",
+            )
+        u.failed_logins = 0
+        u.locked_until = None
+        u.last_login = now
+        canonical = rbac.canonical_role(u.role)
+        if u.role != canonical:
+            u.role = canonical
+        audit.set_user_context(u)
+        audit.record_action(
+            db,
+            entity_type="users",
+            entity_id=str(u.id),
+            action="auth:login",
+            new_value={"email": u.email, "method": "password"},
+        )
+        db.commit()
+        db.refresh(u)
+        return u
+
+    user = run_with_db_retry(db, _complete)
     return TokenOut(access_token=create_session_token(user), user=user_out(user))
 
 
@@ -303,7 +314,10 @@ def login_google(payload: GoogleLoginIn, db: Session = Depends(get_db)):
     incoming = " ".join(
         part for part in (info.get("given_name") or "", info.get("family_name") or "") if part
     ) or info.get("name", "")
-    user = _get_or_create_user(db, email, incoming, info.get("picture", ""))
+    user = run_with_db_retry(
+        db,
+        lambda: _get_or_create_user(db, email, incoming, info.get("picture", "")),
+    )
     return TokenOut(access_token=create_session_token(user), user=user_out(user))
 
 
@@ -322,7 +336,11 @@ def dev_login(payload: DevLoginIn, db: Session = Depends(get_db)):
         )
         db.commit()
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Login de desarrollo deshabilitado")
-    user = _get_or_create_user(db, payload.email, payload.name, "", dev=True)
+
+    def _do() -> User:
+        return _get_or_create_user(db, payload.email, payload.name, "", dev=True)
+
+    user = run_with_db_retry(db, _do)
     return TokenOut(access_token=create_session_token(user), user=user_out(user))
 
 

@@ -183,25 +183,45 @@ def assert_safe_configuration() -> None:
         log.warning("ALLOW_DEV_LOGIN=true se ignora en produccion: el acceso de desarrollo queda apagado.")
 
 
+def _truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     assert_safe_configuration()
     ensure_pg_extensions()
-    # Esquema versionado (P0-1): crea una base vacia con Alembic o marca en el
-    # baseline una base anterior. create_all y las migraciones ligeras siguen
-    # despues como red de seguridad idempotente.
-    from .migrations import upgrade_database
+    # Tras `python -m app.migrations --bootstrap` el entrypoint marca
+    # APP_BOOTSTRAPPED=1: los workers solo cargan runtime (evita N siembras
+    # paralelas sobre SQLite → "database is locked" en el login).
+    light = _truthy_env("APP_BOOTSTRAPPED")
+    if light:
+        log.info("Arranque ligero (APP_BOOTSTRAPPED=1): sin reseembra ni migraciones.")
+        Base.metadata.create_all(bind=engine)
+        harden_audit_log()
+        audit.install_listeners()
+        load_runtime_config()
+    else:
+        # Esquema versionado (P0-1): crea una base vacia con Alembic o marca en el
+        # baseline una base anterior. create_all y las migraciones ligeras siguen
+        # despues como red de seguridad idempotente.
+        from .migrations import upgrade_database
 
-    upgrade_database()
-    Base.metadata.create_all(bind=engine)
-    run_schema_migrations()
-    harden_audit_log()
-    # La bitacora se instala antes de cualquier siembra o migracion, de modo que
-    # ninguna escritura quede fuera de la trazabilidad (principio 3 del plan).
-    audit.install_listeners()
-    seed_sources_if_empty()
-    seed_methodology()
-    load_runtime_config()
+        upgrade_database()
+        Base.metadata.create_all(bind=engine)
+        run_schema_migrations()
+        harden_audit_log()
+        # La bitacora se instala antes de cualquier siembra o migracion, de modo que
+        # ninguna escritura quede fuera de la trazabilidad (principio 3 del plan).
+        audit.install_listeners()
+        seed_sources_if_empty()
+        seed_methodology()
+        load_runtime_config()
+        backfill_screening_scores()
+        migrate_to_technologies()
+        seed_official_cycles()
+        seed_api_sources()
+
     from .settings_store import load_ingest_keys
 
     db = SessionLocal()
@@ -215,10 +235,6 @@ async def lifespan(app: FastAPI):
             settings.ncbi_email = keys["ncbi_email"]
     finally:
         db.close()
-    backfill_screening_scores()
-    migrate_to_technologies()
-    seed_official_cycles()
-    seed_api_sources()
     from .worker import start_worker, stop_worker
 
     start_worker()

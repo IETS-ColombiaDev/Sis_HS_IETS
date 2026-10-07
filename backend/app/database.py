@@ -19,13 +19,31 @@ log = logging.getLogger(__name__)
 IS_SQLITE = settings.database_url.startswith("sqlite")
 IS_POSTGRES = settings.database_url.startswith("postgres")
 
-connect_args = {"check_same_thread": False} if IS_SQLITE else {}
+# SQLite en un contenedor con varios workers (o worker + API) se bloquea en
+# INSERT concurrentes (login, bitacora, catalogo). WAL + busy_timeout hacen que
+# espere en lugar de fallar con "database is locked".
+_connect_args: dict = {}
+_engine_kwargs: dict = {"pool_pre_ping": True}
+if IS_SQLITE:
+    _connect_args = {
+        "check_same_thread": False,
+        "timeout": 60,
+    }
+    _engine_kwargs["connect_args"] = _connect_args
 
-engine = create_engine(
-    settings.database_url,
-    connect_args=connect_args,
-    pool_pre_ping=True,
-)
+engine = create_engine(settings.database_url, **_engine_kwargs)
+
+if IS_SQLITE:
+    from sqlalchemy import event
+
+    @event.listens_for(engine, "connect")
+    def _sqlite_on_connect(dbapi_conn, _connection_record) -> None:  # noqa: ANN001
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=60000")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -40,6 +58,34 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def is_lock_error(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    return "locked" in msg or "database is busy" in msg or "database is locked" in msg
+
+
+def run_with_db_retry(db: Session, fn, *, attempts: int = 8, pause_s: float = 0.2):
+    """Reejecuta `fn()` si SQLite responde occupied/locked (tras rollback)."""
+    import time
+
+    from sqlalchemy.exc import OperationalError, PendingRollbackError
+
+    last: Exception | None = None
+    for i in range(max(1, attempts)):
+        try:
+            return fn()
+        except (OperationalError, PendingRollbackError) as exc:
+            last = exc
+            if not is_lock_error(exc) and not isinstance(exc, PendingRollbackError):
+                raise
+            try:
+                db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(pause_s * (i + 1))
+    assert last is not None
+    raise last
 
 
 # --------------------------------------------------------------------------- #
