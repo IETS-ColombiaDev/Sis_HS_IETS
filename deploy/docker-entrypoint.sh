@@ -22,6 +22,17 @@ PORT="${PORT:-8000}"
 WEB_CONCURRENCY="${WEB_CONCURRENCY:-2}"
 RUN_MIGRATIONS="${RUN_MIGRATIONS:-true}"
 
+# SQLite no admite varios escritores concurrentes: con 2+ workers de uvicorn el
+# login falla con "database is locked". Un solo proceso basta (o use PostgreSQL).
+case "$(printf '%s' "${DATABASE_URL:-}" | tr '[:upper:]' '[:lower:]')" in
+  sqlite:*)
+    if [ "$WEB_CONCURRENCY" != "1" ]; then
+      echo "==> SQLite detectado: WEB_CONCURRENCY=$WEB_CONCURRENCY → 1 (evita database is locked)"
+      WEB_CONCURRENCY=1
+    fi
+    ;;
+esac
+
 # El worker de ingesta es un hilo dentro de cada proceso de uvicorn y la cola
 # (ingest_jobs) no reclama trabajos de forma atomica: con INGEST_WORKER_ENABLED
 # en un servicio de varios procesos, cada job se ejecutaria varias veces.
@@ -47,6 +58,8 @@ case "$(printf '%s' "$RUN_MIGRATIONS" | tr '[:upper:]' '[:lower:]')" in
   1|true|yes|on)
     echo "==> Migraciones y arranque inicial"
     python -m app.migrations --bootstrap
+    # Los workers de uvicorn no vuelven a sembrar catalogos/ciclos: ya se hizo aqui.
+    export APP_BOOTSTRAPPED=1
     ;;
 esac
 
