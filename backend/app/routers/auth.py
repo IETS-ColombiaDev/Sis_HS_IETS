@@ -166,15 +166,26 @@ def login_password(payload: PasswordLoginIn, request: Request, db: Session = Dep
 
     if user is None or not user.password_hash:
         burn_verify_time(payload.password)
-        audit.set_user_context(user or _AnonymousAttempt(email))
-        audit.record_action(
-            db,
-            entity_type="auth",
-            entity_id=email or "desconocido",
-            action="auth:login_failed",
-            new_value={"email": email, "reason": "sin_cuenta_o_sin_contrasena"},
-        )
-        db.commit()
+
+        def _fail_unknown() -> None:
+            audit.set_user_context(user or _AnonymousAttempt(email))
+            audit.record_action(
+                db,
+                entity_type="auth",
+                entity_id=email or "desconocido",
+                action="auth:login_failed",
+                new_value={"email": email, "reason": "sin_cuenta_o_sin_contrasena"},
+            )
+            db.commit()
+
+        try:
+            run_with_db_retry(db, _fail_unknown)
+        except Exception:  # noqa: BLE001
+            # No convertir un bloqueo de bitácora en 500: el acceso sigue denegado.
+            try:
+                db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=GENERIC_LOGIN_ERROR)
 
     audit.set_user_context(user)
@@ -190,34 +201,51 @@ def login_password(payload: PasswordLoginIn, request: Request, db: Session = Dep
         )
 
     if not verify_password(payload.password, user.password_hash):
-        user.failed_logins = int(user.failed_logins or 0) + 1
         detail = GENERIC_LOGIN_ERROR
-        if user.failed_logins >= settings.login_max_attempts:
-            user.locked_until = now + timedelta(minutes=settings.login_lockout_minutes)
-            user.failed_logins = 0
+        user_id = user.id
+        user_email = user.email
+
+        def _fail_password() -> str:
+            u = db.query(User).filter(User.email == email).first()
+            if u is None:
+                return GENERIC_LOGIN_ERROR
+            u.failed_logins = int(u.failed_logins or 0) + 1
+            msg = GENERIC_LOGIN_ERROR
+            if u.failed_logins >= settings.login_max_attempts:
+                u.locked_until = now + timedelta(minutes=settings.login_lockout_minutes)
+                u.failed_logins = 0
+                audit.record_action(
+                    db,
+                    entity_type="users",
+                    entity_id=str(user_id),
+                    action="auth:locked",
+                    new_value={"email": user_email, "minutes": settings.login_lockout_minutes},
+                )
+                msg = (
+                    f"Cuenta bloqueada por {settings.login_lockout_minutes} minutos tras "
+                    f"{settings.login_max_attempts} intentos fallidos."
+                )
+            else:
+                remaining = settings.login_max_attempts - u.failed_logins
+                if remaining <= 2:
+                    msg = f"{GENERIC_LOGIN_ERROR} Le quedan {remaining} intento(s) antes del bloqueo."
             audit.record_action(
                 db,
                 entity_type="users",
-                entity_id=str(user.id),
-                action="auth:locked",
-                new_value={"email": user.email, "minutes": settings.login_lockout_minutes},
+                entity_id=str(user_id),
+                action="auth:login_failed",
+                new_value={"email": user_email, "reason": "contrasena"},
             )
-            detail = (
-                f"Cuenta bloqueada por {settings.login_lockout_minutes} minutos tras "
-                f"{settings.login_max_attempts} intentos fallidos."
-            )
-        else:
-            remaining = settings.login_max_attempts - user.failed_logins
-            if remaining <= 2:
-                detail = f"{GENERIC_LOGIN_ERROR} Le quedan {remaining} intento(s) antes del bloqueo."
-        audit.record_action(
-            db,
-            entity_type="users",
-            entity_id=str(user.id),
-            action="auth:login_failed",
-            new_value={"email": user.email, "reason": "contrasena"},
-        )
-        db.commit()
+            db.commit()
+            return msg
+
+        try:
+            detail = run_with_db_retry(db, _fail_password)
+        except Exception:  # noqa: BLE001
+            try:
+                db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
 
     if not user.is_active:

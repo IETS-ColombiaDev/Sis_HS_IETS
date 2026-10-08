@@ -19,17 +19,22 @@ if [ "$#" -gt 0 ]; then
 fi
 
 PORT="${PORT:-8000}"
-WEB_CONCURRENCY="${WEB_CONCURRENCY:-2}"
+WEB_CONCURRENCY="${WEB_CONCURRENCY:-1}"
 RUN_MIGRATIONS="${RUN_MIGRATIONS:-true}"
 
-# SQLite no admite varios escritores concurrentes: con 2+ workers de uvicorn el
-# login falla con "database is locked". Un solo proceso basta (o use PostgreSQL).
-case "$(printf '%s' "${DATABASE_URL:-}" | tr '[:upper:]' '[:lower:]')" in
-  sqlite:*)
+# Solo PostgreSQL tolera varios escritores. Cualquier otra URL (SQLite, vacia,
+# relativa) fuerza un unico proceso: en Render con SQLite, 2+ workers rompen el
+# login con "database is locked".
+DB_URL_LC="$(printf '%s' "${DATABASE_URL:-sqlite}" | tr '[:upper:]' '[:lower:]')"
+case "$DB_URL_LC" in
+  postgres://*|postgresql://*|postgresql+*)
+    ;;
+  *)
     if [ "$WEB_CONCURRENCY" != "1" ]; then
-      echo "==> SQLite detectado: WEB_CONCURRENCY=$WEB_CONCURRENCY → 1 (evita database is locked)"
+      echo "==> Motor no-Postgres (${DB_URL_LC%%:*}): WEB_CONCURRENCY=$WEB_CONCURRENCY → 1"
       WEB_CONCURRENCY=1
     fi
+    mkdir -p /app/data 2>/dev/null || true
     ;;
 esac
 
@@ -63,11 +68,23 @@ case "$(printf '%s' "$RUN_MIGRATIONS" | tr '[:upper:]' '[:lower:]')" in
     ;;
 esac
 
+# Opcional: crea/actualiza el superadmin al arrancar (Render/production sin Google).
+if [ -n "${BOOTSTRAP_ADMIN_EMAIL:-}" ] && [ -n "${BOOTSTRAP_ADMIN_PASSWORD:-}" ]; then
+  echo "==> Bootstrap admin ${BOOTSTRAP_ADMIN_EMAIL}"
+  python -m app.cli create-admin \
+    --email "$BOOTSTRAP_ADMIN_EMAIL" \
+    --name "${BOOTSTRAP_ADMIN_NAME:-Administrador IETS}" \
+    --password "$BOOTSTRAP_ADMIN_PASSWORD" || true
+fi
+
+# Tras el proxy de Render/Caddy, confiar en X-Forwarded-* de cualquier hop.
+FORWARDED_ALLOW_IPS="${FORWARDED_ALLOW_IPS:-*}"
+
 echo "==> uvicorn en 0.0.0.0:${PORT} con ${WEB_CONCURRENCY} proceso(s); ingesta: ${INGEST_WORKER_ENABLED:-false}"
 exec uvicorn app.main:app \
   --host 0.0.0.0 \
   --port "$PORT" \
   --workers "$WEB_CONCURRENCY" \
   --proxy-headers \
-  --forwarded-allow-ips "${FORWARDED_ALLOW_IPS:-127.0.0.1}" \
+  --forwarded-allow-ips "$FORWARDED_ALLOW_IPS" \
   --timeout-graceful-shutdown 30
