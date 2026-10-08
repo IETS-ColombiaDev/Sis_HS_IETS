@@ -17,8 +17,10 @@ services:
     envVars:
       - key: WEB_CONCURRENCY
         value: "1"
+      # false en el arranque web evita pelear el SQLite con el login; active
+      # vigilancia luego o use un servicio worker aparte.
       - key: INGEST_WORKER_ENABLED
-        value: "true"
+        value: "false"
       - key: RUN_MIGRATIONS
         value: "true"
       - key: DATABASE_URL
