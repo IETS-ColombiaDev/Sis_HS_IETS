@@ -15,8 +15,10 @@ from __future__ import annotations
 import logging
 import threading
 
+import os
+
 from .config import settings
-from .database import SessionLocal
+from .database import IS_SQLITE, SessionLocal
 
 log = logging.getLogger(__name__)
 
@@ -28,10 +30,22 @@ _kick_lock = threading.Lock()
 KICK_MAX_ROUNDS = 25
 
 
+def _force_worker_on_sqlite() -> bool:
+    return os.environ.get("INGEST_WORKER_FORCE", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def start_worker() -> None:
     global _thread
     if not settings.ingest_worker_enabled:
         log.info("Worker de ingesta deshabilitado por configuracion.")
+        return
+    # Con SQLite el worker en hilo pelea escrituras con el login y la UI se queda
+    # en "El servidor tardó demasiado". Use Postgres o INGEST_WORKER_FORCE=1.
+    if IS_SQLITE and not _force_worker_on_sqlite():
+        log.warning(
+            "Worker de ingesta apagado con SQLite (protege el login). "
+            "Defina INGEST_WORKER_FORCE=1 para forzarlo o use PostgreSQL."
+        )
         return
     if _thread and _thread.is_alive():
         return

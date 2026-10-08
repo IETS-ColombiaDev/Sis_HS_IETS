@@ -64,28 +64,39 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
+  const postAuth = useCallback(async (url, body) => {
+    // Un reintento rapido: en Render/SQLite el primer intento a veces choca
+    // con un arranque frio; el segundo suele entrar al instante.
+    let lastErr;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const { data } = await api.post(url, body, { timeout: 12000 });
+        return acceptSession(data);
+      } catch (err) {
+        lastErr = err;
+        const retriable =
+          err?.code === "ECONNABORTED" ||
+          !err?.response ||
+          (err?.response?.status >= 500 && err?.response?.status < 600);
+        if (!retriable || attempt === 1) throw err;
+      }
+    }
+    throw lastErr;
+  }, [acceptSession]);
+
   const loginWithPassword = useCallback(
-    async (email, password) => {
-      const { data } = await api.post("/auth/login", { email, password });
-      return acceptSession(data);
-    },
-    [acceptSession]
+    (email, password) => postAuth("/auth/login", { email, password }),
+    [postAuth]
   );
 
   const loginWithGoogle = useCallback(
-    async (credential) => {
-      const { data } = await api.post("/auth/google", { credential });
-      return acceptSession(data);
-    },
-    [acceptSession]
+    (credential) => postAuth("/auth/google", { credential }),
+    [postAuth]
   );
 
   const loginDev = useCallback(
-    async (email, name) => {
-      const { data } = await api.post("/auth/dev-login", { email, name });
-      return acceptSession(data);
-    },
-    [acceptSession]
+    (email, name) => postAuth("/auth/dev-login", { email, name }),
+    [postAuth]
   );
 
   const changePassword = useCallback(

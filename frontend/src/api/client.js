@@ -13,8 +13,8 @@ export function setToken(token) {
 const api = axios.create({
   baseURL: "/api",
   headers: { "Content-Type": "application/json" },
-  // Login debe fallar rapido y mostrar error; no dejar el spinner 45s+.
-  timeout: 20000,
+  // Por defecto corto; el login usa timeout propio + reintento en AuthContext.
+  timeout: 15000,
 });
 
 api.interceptors.request.use((config) => {

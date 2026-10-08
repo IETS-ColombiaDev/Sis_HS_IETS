@@ -112,54 +112,30 @@ def _get_or_create_user(
         )
     user = db.query(User).filter(User.email == email).first()
     now = datetime.now(timezone.utc)
-    if user is None:
-        full, first, last = _login_display_name(email, "", name)
-        user = User(
-            email=email,
-            name=full,
-            first_name=first,
-            last_name=last,
-            picture=picture or "",
-            role=_resolve_role(db, email, dev=dev),
-            is_active=True,
-            last_login=now,
-        )
-        db.add(user)
-    else:
+
+    # Camino caliente: solo SELECT + JWT. Sin UPDATE/INSERT en el request.
+    # Así el "Acceso rápido" no espera a SQLite aunque haya otra escritura.
+    if user is not None:
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario desactivado")
-        # Camino rapido: no reescribir perfil ni tocar Firestore en cada ingreso.
-        user.last_login = now
-        canonical = rbac.canonical_role(user.role)
-        if user.role != canonical:
-            user.role = canonical
-        if email in settings.admin_emails_list and user.role != rbac.SUPERADMIN:
-            user.role = rbac.SUPERADMIN
-        if picture and picture != (user.picture or ""):
-            user.picture = picture
-        if name and not (user.name or "").strip():
-            full, first, last = _login_display_name(email, user.name or "", name)
-            user.name = full
-            user.first_name = first
-            user.last_name = last
-    if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario desactivado")
-    audit.set_user_context(user)
-    try:
-        db.commit()
-        db.refresh(user)
-    except Exception as exc:
-        from ..database import is_lock_error
-
-        # Usuario ya existente: no bloquear el ingreso si SQLite esta ocupado.
-        db.rollback()
-        if user.id is None or not is_lock_error(exc):
-            raise
-        db.expire_all()
-        user = db.query(User).filter(User.email == email).first()
-        if user is None or not user.is_active:
-            raise
         audit.set_user_context(user)
+        return user
+
+    full, first, last = _login_display_name(email, "", name)
+    user = User(
+        email=email,
+        name=full,
+        first_name=first,
+        last_name=last,
+        picture=picture or "",
+        role=_resolve_role(db, email, dev=dev),
+        is_active=True,
+        last_login=now,
+    )
+    db.add(user)
+    audit.set_user_context(user)
+    db.commit()
+    db.refresh(user)
     return user
 
 
@@ -282,6 +258,8 @@ def login_password(payload: PasswordLoginIn, request: Request, db: Session = Dep
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario desactivado. Contacte al administrador.")
 
+    # Exito: el token se emite aunque el commit de last_login/bitacora falle
+    # por SQLite ocupado (el usuario ya esta autenticado).
     def _complete() -> User:
         u = db.query(User).filter(User.email == email).first()
         if u is None or not u.is_active:
@@ -307,7 +285,14 @@ def login_password(payload: PasswordLoginIn, request: Request, db: Session = Dep
         db.refresh(u)
         return u
 
-    user = run_with_db_retry(db, _complete)
+    try:
+        user = run_with_db_retry(db, _complete, attempts=3, pause_s=0.15)
+    except Exception:  # noqa: BLE001
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        audit.set_user_context(user)
     return TokenOut(access_token=create_session_token(user), user=user_out(user, use_directory=False))
 
 
