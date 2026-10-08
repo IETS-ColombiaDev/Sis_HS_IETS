@@ -59,9 +59,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     ALLOW_DEV_LOGIN=false \
     PORT=8000 \
     WEB_CONCURRENCY=1 \
-    INGEST_WORKER_ENABLED=false \
+    INGEST_WORKER_ENABLED=true \
     RUN_MIGRATIONS=true \
-    FORWARDED_ALLOW_IPS=127.0.0.1 \
+    FORWARDED_ALLOW_IPS=* \
     FRONTEND_DIST=/app/frontend/dist \
     DATABASE_URL=sqlite:////app/data/iets_horizonte.db
 

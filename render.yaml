@@ -1,0 +1,33 @@
+# Blueprint Render — Sis_HS_IETS
+# https://sis-hs-iets.onrender.com
+#
+# Un solo proceso + SQLite (el entrypoint fuerza WEB_CONCURRENCY=1 si no hay
+# Postgres). Defina BOOTSTRAP_ADMIN_* en el panel para el primer ingreso con
+# contraseña; o deje ENVIRONMENT=development si usa acceso de desarrollo.
+services:
+  - type: web
+    name: sis-hs-iets
+    runtime: docker
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    envVars:
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: INGEST_WORKER_ENABLED
+        value: "true"
+      - key: RUN_MIGRATIONS
+        value: "true"
+      - key: DATABASE_URL
+        value: sqlite:////app/data/iets_horizonte.db
+      - key: CORS_ORIGINS
+        value: https://sis-hs-iets.onrender.com
+      - key: PUBLIC_BASE_URL
+        value: https://sis-hs-iets.onrender.com
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
+      - key: SECRET_KEY
+        generateValue: true
