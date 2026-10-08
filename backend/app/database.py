@@ -22,15 +22,13 @@ log = logging.getLogger(__name__)
 IS_SQLITE = settings.database_url.startswith("sqlite")
 IS_POSTGRES = settings.database_url.startswith("postgres")
 
-# Un solo candado por proceso: con WEB_CONCURRENCY=1 los hilos (API + worker)
-# no pelean el fichero SQLite entre si. Con varios procesos no alcanza: use
-# PostgreSQL o deje un unico worker de uvicorn.
+# Candado opcional para tramos cortos (p. ej. reintentos de login). NO envolver
+# Session.commit() solo: si un hilo hace INSERT y otro tiene el candado en
+# commit, SQLite + el candado se bloquean mutuamente y el login "se queda".
 _sqlite_write_lock = threading.RLock()
 
-# SQLite en un contenedor con varios workers (o worker + API) se bloquea en
-# INSERT concurrentes (login, bitacora, catalogo). WAL + busy_timeout hacen que
-# espere en lugar de fallar con "database is locked". NullPool evita que el
-# pool de SQLAlchemy retenga conexiones escritoras entre peticiones/hilos.
+# SQLite: WAL + busy_timeout + NullPool. Un solo proceso uvicorn (entrypoint).
+# timeout de conexion corto: mejor fallar/reintentar que colgar el spinner 60s+.
 _connect_args: dict = {}
 _engine_kwargs: dict = {"pool_pre_ping": True}
 if IS_SQLITE:
@@ -40,11 +38,10 @@ if IS_SQLITE:
 
     _connect_args = {
         "check_same_thread": False,
-        "timeout": 60,
+        "timeout": 15,
     }
     _engine_kwargs["connect_args"] = _connect_args
     _engine_kwargs["poolclass"] = NullPool
-    # Asegura el directorio del fichero (p. ej. /app/data en Docker/Render).
     raw = settings.database_url.split("///", 1)[-1]
     if raw and not raw.startswith(":memory:"):
         Path(raw).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
@@ -58,32 +55,14 @@ if IS_SQLITE:
     def _sqlite_on_connect(dbapi_conn, _connection_record) -> None:  # noqa: ANN001
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA busy_timeout=60000")
+        cursor.execute("PRAGMA busy_timeout=15000")
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA temp_store=MEMORY")
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
 
 
-class _Session(Session):
-    """Session que serializa commit/rollback en SQLite dentro del proceso."""
-
-    def commit(self) -> None:
-        if not IS_SQLITE:
-            super().commit()
-            return
-        with _sqlite_write_lock:
-            super().commit()
-
-    def rollback(self) -> None:
-        if not IS_SQLITE:
-            super().rollback()
-            return
-        with _sqlite_write_lock:
-            super().rollback()
-
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=_Session)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 class Base(DeclarativeBase):
@@ -113,8 +92,12 @@ def is_lock_error(exc: BaseException) -> bool:
     return "locked" in msg or "database is busy" in msg or "database is locked" in msg
 
 
-def run_with_db_retry(db: Session, fn, *, attempts: int = 8, pause_s: float = 0.2):
-    """Reejecuta `fn()` si SQLite responde occupied/locked (tras rollback)."""
+def run_with_db_retry(db: Session, fn, *, attempts: int = 5, pause_s: float = 0.25):
+    """Reejecuta `fn()` si SQLite responde occupied/locked (tras rollback).
+
+    Intentos acotados: el cliente HTTP corta a ~45s; no tiene sentido reintentar
+    hasta llenar ese presupuesto y dejar el spinner girando.
+    """
     from sqlalchemy.exc import OperationalError, PendingRollbackError
 
     last: Exception | None = None
