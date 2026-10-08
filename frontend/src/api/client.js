@@ -13,8 +13,8 @@ export function setToken(token) {
 const api = axios.create({
   baseURL: "/api",
   headers: { "Content-Type": "application/json" },
-  // Sin esto el spinner de login puede girar minutos si SQLite/Render se traba.
-  timeout: 45000,
+  // Login debe fallar rapido y mostrar error; no dejar el spinner 45s+.
+  timeout: 20000,
 });
 
 api.interceptors.request.use((config) => {

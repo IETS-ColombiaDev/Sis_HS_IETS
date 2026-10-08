@@ -38,7 +38,7 @@ if IS_SQLITE:
 
     _connect_args = {
         "check_same_thread": False,
-        "timeout": 15,
+        "timeout": 5,
     }
     _engine_kwargs["connect_args"] = _connect_args
     _engine_kwargs["poolclass"] = NullPool
@@ -55,7 +55,7 @@ if IS_SQLITE:
     def _sqlite_on_connect(dbapi_conn, _connection_record) -> None:  # noqa: ANN001
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA busy_timeout=15000")
+        cursor.execute("PRAGMA busy_timeout=5000")
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA temp_store=MEMORY")
         cursor.execute("PRAGMA foreign_keys=ON")

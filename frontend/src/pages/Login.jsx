@@ -82,7 +82,7 @@ export default function Login() {
       setLoading(true);
       await loginWithPassword(email.trim(), password);
     } catch (err) {
-      setError(apiError(err, "No se pudo iniciar sesión"));
+      setError(apiError(err, "No se pudo iniciar sesión. Si el servidor está ocupado, espere unos segundos e intente de nuevo."));
       setPassword("");
     } finally {
       setLoading(false);
@@ -95,7 +95,7 @@ export default function Login() {
       setError("");
       await loginDev(targetEmail, targetName);
     } catch (err) {
-      setError(apiError(err, "No se pudo iniciar sesión"));
+      setError(apiError(err, "No se pudo iniciar sesión. Espere un momento e intente de nuevo."));
     } finally {
       setLoading(false);
     }

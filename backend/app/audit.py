@@ -90,6 +90,11 @@ EXCLUDED_FIELDS = {
     # Credenciales: el hash de la contrasena nunca viaja a la bitacora. Los
     # eventos de acceso se registran aparte con `record_action` (auth:*).
     "password_hash",
+    # Metadatos de sesion: cambiarlos en cada login no debe disparar un
+    # INSERT extra en audit_log (en SQLite eso frena el ingreso).
+    "last_login",
+    "failed_logins",
+    "locked_until",
 }
 
 # Los dos contextos guardan un diccionario *mutable* y se reasignan lo menos

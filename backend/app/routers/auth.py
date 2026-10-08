@@ -48,9 +48,18 @@ def _as_utc(value: datetime | None) -> datetime | None:
     return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
 
-def user_out(user: User) -> UserOut:
-    """Serializa el usuario con su matriz de permisos resuelta."""
-    full, first, last = resolve_name(email=user.email, leftover=user.name, incoming="")
+def user_out(user: User, *, use_directory: bool = True) -> UserOut:
+    """Serializa el usuario con su matriz de permisos resuelta.
+
+    `use_directory=False` en el login: evita una ida a Firestore que puede
+    tardar varios segundos y hacer que la UI muestre error/timeout.
+    """
+    if use_directory:
+        full, first, last = resolve_name(email=user.email, leftover=user.name, incoming="")
+    else:
+        full = user.name or ""
+        first = getattr(user, "first_name", "") or ""
+        last = getattr(user, "last_name", "") or ""
     out = UserOut.model_validate(user)
     out.name = full or user.name
     out.first_name = first or getattr(user, "first_name", "") or ""
@@ -80,6 +89,17 @@ def _resolve_role(db: Session, email: str, *, dev: bool = False) -> str:
     return rbac.TOMADOR_DECISIONES
 
 
+def _login_display_name(email: str, leftover: str, incoming: str) -> tuple[str, str, str]:
+    """Nombre para el alta/login sin consultar Firestore (evita 5–15 s de espera)."""
+    from ..firestore_directory import is_placeholder_name
+
+    for candidate in (incoming, leftover):
+        if candidate and not is_placeholder_name(candidate, email):
+            return candidate.strip(), "", ""
+    local = email.split("@")[0].replace(".", " ").strip()
+    return local, "", ""
+
+
 def _get_or_create_user(
     db: Session, email: str, name: str, picture: str, *, dev: bool = False
 ) -> User:
@@ -90,12 +110,10 @@ def _get_or_create_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Solo se permiten cuentas institucionales @{settings.allowed_email_domain}",
         )
-    leftover = ""
     user = db.query(User).filter(User.email == email).first()
-    if user is not None:
-        leftover = user.name or ""
-    full, first, last = resolve_name(email=email, leftover=leftover, incoming=name)
+    now = datetime.now(timezone.utc)
     if user is None:
+        full, first, last = _login_display_name(email, "", name)
         user = User(
             email=email,
             name=full,
@@ -104,31 +122,44 @@ def _get_or_create_user(
             picture=picture or "",
             role=_resolve_role(db, email, dev=dev),
             is_active=True,
+            last_login=now,
         )
         db.add(user)
     else:
-        user.name = full
-        user.first_name = first
-        user.last_name = last
-        if picture:
-            user.picture = picture
-        # Normaliza roles heredados y reafirma el superadministrador declarado.
-        # El perfil asignado por el administrador jamas se modifica al ingresar:
-        # promoverlo aqui seria una escalada de privilegios silenciosa.
+        if not user.is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario desactivado")
+        # Camino rapido: no reescribir perfil ni tocar Firestore en cada ingreso.
+        user.last_login = now
         canonical = rbac.canonical_role(user.role)
         if user.role != canonical:
             user.role = canonical
         if email in settings.admin_emails_list and user.role != rbac.SUPERADMIN:
             user.role = rbac.SUPERADMIN
+        if picture and picture != (user.picture or ""):
+            user.picture = picture
+        if name and not (user.name or "").strip():
+            full, first, last = _login_display_name(email, user.name or "", name)
+            user.name = full
+            user.first_name = first
+            user.last_name = last
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario desactivado")
-    user.last_login = datetime.now(timezone.utc)
-    # El alta y la actualizacion del perfil ocurren antes de que exista un
-    # principal autenticado. Sin esto, el inicio de sesion quedaria atribuido al
-    # sistema y la bitacora no diria quien entro.
     audit.set_user_context(user)
-    db.commit()
-    db.refresh(user)
+    try:
+        db.commit()
+        db.refresh(user)
+    except Exception as exc:
+        from ..database import is_lock_error
+
+        # Usuario ya existente: no bloquear el ingreso si SQLite esta ocupado.
+        db.rollback()
+        if user.id is None or not is_lock_error(exc):
+            raise
+        db.expire_all()
+        user = db.query(User).filter(User.email == email).first()
+        if user is None or not user.is_active:
+            raise
+        audit.set_user_context(user)
     return user
 
 
@@ -277,7 +308,7 @@ def login_password(payload: PasswordLoginIn, request: Request, db: Session = Dep
         return u
 
     user = run_with_db_retry(db, _complete)
-    return TokenOut(access_token=create_session_token(user), user=user_out(user))
+    return TokenOut(access_token=create_session_token(user), user=user_out(user, use_directory=False))
 
 
 @router.post("/change-password", response_model=TokenOut)
@@ -346,7 +377,7 @@ def login_google(payload: GoogleLoginIn, db: Session = Depends(get_db)):
         db,
         lambda: _get_or_create_user(db, email, incoming, info.get("picture", "")),
     )
-    return TokenOut(access_token=create_session_token(user), user=user_out(user))
+    return TokenOut(access_token=create_session_token(user), user=user_out(user, use_directory=False))
 
 
 @router.post("/dev-login", response_model=TokenOut)
@@ -369,9 +400,10 @@ def dev_login(payload: DevLoginIn, db: Session = Depends(get_db)):
         return _get_or_create_user(db, payload.email, payload.name, "", dev=True)
 
     user = run_with_db_retry(db, _do)
-    return TokenOut(access_token=create_session_token(user), user=user_out(user))
+    return TokenOut(access_token=create_session_token(user), user=user_out(user, use_directory=False))
 
 
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)):
-    return user_out(user)
+    # Sin Firestore: /me se llama al cargar la app y no debe retrasar la entrada.
+    return user_out(user, use_directory=False)
