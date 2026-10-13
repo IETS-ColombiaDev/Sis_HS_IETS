@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { apiError } from "../api/client";
+import { apiError, getLastEmail } from "../api/client";
 import Button from "../components/Button";
 import { Input } from "../components/Field";
 import PasswordField from "../components/PasswordField";
@@ -15,12 +15,12 @@ const FEATURES = [
 export default function Login() {
   const { status, sessionNotice, loginWithPassword, loginWithGoogle, loginDev } = useAuth();
   const googleBtn = useRef(null);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => getLastEmail());
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleReady, setGoogleReady] = useState(false);
-  const [devEmail, setDevEmail] = useState("");
+  const [devEmail, setDevEmail] = useState(() => getLastEmail());
   const [devName, setDevName] = useState("");
   const [devOpen, setDevOpen] = useState(false);
   const domain = status?.allowed_domain || "iets.org.co";

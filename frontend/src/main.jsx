@@ -5,6 +5,7 @@ import App from "./App";
 import { AuthProvider } from "./auth/AuthContext";
 import { RealtimeProvider } from "./realtime/RealtimeContext";
 import { ToastProvider } from "./components/Toast";
+import { BackupProvider } from "./backup/BackupContext";
 import "./styles/globals.css";
 import "./styles/shell.css";
 
@@ -14,7 +15,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <ToastProvider>
         <AuthProvider>
           <RealtimeProvider>
-            <App />
+            <BackupProvider>
+              <App />
+            </BackupProvider>
           </RealtimeProvider>
         </AuthProvider>
       </ToastProvider>

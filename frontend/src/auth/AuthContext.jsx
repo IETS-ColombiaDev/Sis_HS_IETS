@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
-import api, { setToken, getToken, setUnauthorizedHandler } from "../api/client";
+import api, { setToken, getToken, setUnauthorizedHandler, setLastEmail } from "../api/client";
 
 const AuthContext = createContext(null);
 
@@ -60,6 +60,7 @@ export function AuthProvider({ children }) {
   const acceptSession = useCallback((data) => {
     setToken(data.access_token);
     setAccount(data.user);
+    setLastEmail(data.user?.email);
     setSessionNotice("");
     return data.user;
   }, []);

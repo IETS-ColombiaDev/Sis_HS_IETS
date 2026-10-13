@@ -278,9 +278,14 @@ def restore_snapshot(data: bytes, *, force: bool = False) -> dict:
             dst = sqlite3.connect(str(path), timeout=60)
             try:
                 src.backup(dst)
+                dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                dst.commit()
             finally:
                 dst.close()
                 src.close()
+        from .database import engine
+
+        engine.dispose()
         _after_restore(snap)
         return {
             "restored": True,

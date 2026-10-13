@@ -33,6 +33,7 @@ def test_minimax_strips_thinking_tags():
 
 
 def test_ocr_off_without_key():
+    # Llave vacia del panel no apaga MiniMax: hay llave embebida de respaldo.
     ai_service.configure_runtime(
         provider="minimax",
         ocr_enabled=True,
@@ -40,9 +41,12 @@ def test_ocr_off_without_key():
         minimax_api_key="",
         minimax_model="",
     )
+    assert ai_service.is_enabled() is True
+    assert ai_service.ocr_enabled() is True
+    assert ai_service.web_assist_enabled() is True
+    ai_service.configure_runtime(ocr_enabled=False, web_enabled=False)
     assert ai_service.ocr_enabled() is False
     assert ai_service.web_assist_enabled() is False
-    assert ai_service.is_enabled() is False
 
 
 def test_web_assist_on_with_key():
