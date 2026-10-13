@@ -1,6 +1,7 @@
 import axios from "axios";
 
 const TOKEN_KEY = "iets_hs_token";
+const LAST_EMAIL_KEY = "iets_hs_last_email";
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -8,6 +9,23 @@ export function getToken() {
 export function setToken(token) {
   if (token) localStorage.setItem(TOKEN_KEY, token);
   else localStorage.removeItem(TOKEN_KEY);
+}
+
+export function getLastEmail() {
+  try {
+    return localStorage.getItem(LAST_EMAIL_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function setLastEmail(email) {
+  try {
+    const value = (email || "").trim().toLowerCase();
+    if (value) localStorage.setItem(LAST_EMAIL_KEY, value);
+  } catch {
+    /* modo privado */
+  }
 }
 
 const api = axios.create({
@@ -22,6 +40,7 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   // Con el Content-Type JSON por defecto, axios convierte un FormData en JSON y el archivo no llega.
   if (typeof FormData !== "undefined" && config.data instanceof FormData) config.headers.setContentType("multipart/form-data");
+  if (typeof Blob !== "undefined" && config.data instanceof Blob) config.headers.setContentType("application/octet-stream");
   return config;
 });
 

@@ -13,6 +13,7 @@ import SafeAvatar from "./SafeAvatar";
 import Modal from "./Modal";
 import ChangePasswordForm from "./ChangePasswordForm";
 import { useToast } from "./Toast";
+import { useBackup } from "../backup/BackupContext";
 
 const NAV = [
   { section: "Operación diaria" },
@@ -388,6 +389,40 @@ const TITLES = {
   "/configuracion": "Configuración",
 };
 
+function BackupStatusPill() {
+  const backup = useBackup();
+  if (!backup?.enabled || backup.supported === false) return null;
+  const restoring = backup.status === "restoring";
+  const saving = backup.status === "saving";
+  const err = backup.status === "error";
+  const has = Boolean(backup.current?.takenAt);
+  const label = restoring ? "Restaurando…" : saving ? "Guardando…" : err ? "Copia con error" : has ? "Guardado aquí" : "Sin copia local";
+  const tip = restoring
+    ? "Se está devolviendo al servidor la copia guardada en este navegador."
+    : saving
+      ? "Se está actualizando la copia de la base en este navegador."
+      : err
+        ? backup.message || "No se pudo guardar o restaurar la copia local."
+        : has
+          ? `Copia del ${new Date(backup.current.takenAt).toLocaleString("es-CO")}. Si Render borra el disco, se restaura sola al ingresar.`
+          : "Aún no hay copia en este navegador. Se guardará sola tras el primer cambio.";
+  return (
+    <Tooltip text={tip}>
+      <NavLink
+        to="/configuracion?tab=copia_local"
+        className="header-status"
+        style={{ textDecoration: "none", color: "inherit" }}
+      >
+        <span
+          className="header-status-dot"
+          style={{ background: err ? "#DC2626" : restoring || saving ? "#D97706" : has ? "#059669" : "#94A3B8" }}
+        />
+        <span className="header-status-label">{label}</span>
+      </NavLink>
+    </Tooltip>
+  );
+}
+
 function EnvironmentBanner() {
   const { status } = useAuth();
   const env = status?.environment;
@@ -471,6 +506,7 @@ function Header({ onToggle }) {
             <span className="header-status-label">En vivo</span>
           </div>
         </Tooltip>
+        <BackupStatusPill />
 
         {status && (
           <GeminiPill status={status} isAdmin={isAdmin} />

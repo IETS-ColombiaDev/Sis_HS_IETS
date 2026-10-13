@@ -16,6 +16,7 @@ mimetypes.add_type("image/svg+xml", ".svg")
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -32,6 +33,7 @@ from .database import (
 from .routers import (
     audit as audit_router,
     auth,
+    backup,
     catalogs,
     chat,
     config as config_router,
@@ -222,6 +224,10 @@ async def lifespan(app: FastAPI):
         seed_official_cycles()
         seed_api_sources()
 
+    from .browser_backup import ensure_epoch
+
+    ensure_epoch()
+
     from .settings_store import load_ingest_keys
 
     db = SessionLocal()
@@ -259,6 +265,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Listados como /api/sources pesan ~230 KB en JSON; comprimidos bajan a ~10 %.
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
 
 
 @app.exception_handler(Exception)
@@ -336,10 +344,16 @@ def _apply_security_headers(request: Request, response) -> None:
     if path.startswith("/api/"):
         # Respuestas con datos del expediente: que ningun intermediario las guarde.
         headers.setdefault("Cache-Control", "no-store")
+    elif path.startswith("/assets/"):
+        # Vite pone un hash en el nombre: el archivo nunca cambia bajo la misma URL.
+        headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
+    elif headers.get("content-type", "").startswith("text/html"):
+        headers.setdefault("Cache-Control", "no-cache")
 
 
 ROUTERS = (
     auth,
+    backup,
     system,
     config_router,
     sources,
