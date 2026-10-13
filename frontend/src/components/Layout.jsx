@@ -12,6 +12,7 @@ import InfoTip from "./InfoTip";
 import SafeAvatar from "./SafeAvatar";
 import Modal from "./Modal";
 import ChangePasswordForm from "./ChangePasswordForm";
+import OnboardingGuide, { ONBOARDING_KEY } from "./OnboardingGuide";
 import { useToast } from "./Toast";
 import { useBackup } from "../backup/BackupContext";
 
@@ -438,7 +439,7 @@ function EnvironmentBanner() {
   );
 }
 
-function Header({ onToggle }) {
+function Header({ onToggle, onOpenGuide }) {
   const { user, logout, status, isAdmin } = useAuth();
   const { updatedAt } = useRealtime();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -498,6 +499,17 @@ function Header({ onToggle }) {
       </div>
 
       <div className="app-header-right" style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+        <Tooltip text="Cómo funciona el sistema, en cinco pantallas.">
+          <button
+            type="button"
+            className="header-guide-btn"
+            aria-label="Abrir guía rápida"
+            onClick={onOpenGuide}
+          >
+            <Icon name="compass" size={16} />
+            <span className="header-guide-label">Guía</span>
+          </button>
+        </Tooltip>
         <CycleSelector />
 
         <Tooltip text={`Sincronización en tiempo real.${updatedAt ? ` Última: ${new Date(updatedAt).toLocaleTimeString()}.` : ""}`}>
@@ -565,6 +577,17 @@ function Header({ onToggle }) {
                   className="user-menu-item"
                   onClick={() => {
                     setMenuOpen(false);
+                    onOpenGuide?.();
+                  }}
+                >
+                  <Icon name="compass" size={17} />
+                  Guía rápida
+                </button>
+                <button
+                  role="menuitem"
+                  className="user-menu-item"
+                  onClick={() => {
+                    setMenuOpen(false);
                     setPwdOpen(true);
                   }}
                 >
@@ -611,18 +634,33 @@ function Header({ onToggle }) {
 }
 
 export default function Layout({ children }) {
+  const { user, justLoggedIn, clearJustLoggedIn } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+
+  useEffect(() => {
+    if (!user || !justLoggedIn) return;
+    clearJustLoggedIn();
+    if (localStorage.getItem(ONBOARDING_KEY) !== "1") setGuideOpen(true);
+  }, [user, justLoggedIn, clearJustLoggedIn]);
+
+  const closeGuide = (persist) => {
+    setGuideOpen(false);
+    if (persist) localStorage.setItem(ONBOARDING_KEY, "1");
+  };
+
   return (
     <div>
       <a href="#contenido" className="skip-link">Saltar al contenido</a>
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="content-shell" style={{ marginLeft: 280, minHeight: "100vh" }}>
         <EnvironmentBanner />
-        <Header onToggle={() => setSidebarOpen((v) => !v)} />
+        <Header onToggle={() => setSidebarOpen((v) => !v)} onOpenGuide={() => setGuideOpen(true)} />
         <main id="contenido" tabIndex={-1} style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }} className="fade-in">
           {children}
         </main>
       </div>
+      {guideOpen ? <OnboardingGuide open onClose={closeGuide} /> : null}
     </div>
   );
 }

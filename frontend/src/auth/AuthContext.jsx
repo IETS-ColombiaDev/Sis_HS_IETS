@@ -16,10 +16,12 @@ export function AuthProvider({ children }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sessionNotice, setSessionNotice] = useState("");
+  const [justLoggedIn, setJustLoggedIn] = useState(false);
 
   const logout = useCallback((notice = "") => {
     setToken(null);
     setAccount(null);
+    setJustLoggedIn(false);
     setSessionNotice(typeof notice === "string" ? notice : "");
   }, []);
 
@@ -62,8 +64,11 @@ export function AuthProvider({ children }) {
     setAccount(data.user);
     setLastEmail(data.user?.email);
     setSessionNotice("");
+    setJustLoggedIn(true);
     return data.user;
   }, []);
+
+  const clearJustLoggedIn = useCallback(() => setJustLoggedIn(false), []);
 
   const postAuth = useCallback(async (url, body) => {
     // Un reintento rapido: en Render/SQLite el primer intento a veces choca
@@ -127,6 +132,8 @@ export function AuthProvider({ children }) {
     loginDev,
     changePassword,
     logout,
+    justLoggedIn,
+    clearJustLoggedIn,
     refreshStatus: loadStatus,
     can,
     permissions,
