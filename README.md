@@ -11,7 +11,7 @@ Inspirado en el modelo operativo del
 [NIHR Innovation Observatory](https://io.nihr.ac.uk/) y construido sobre la línea gráfica
 corporativa definida en [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md).
 
-**Versión:** 7.0.0 · **Stack:** FastAPI + React 18 · PostgreSQL 15 en producción (SQLite en desarrollo) · Alembic · Docker
+**Versión:** 7.0.0 · **Stack:** FastAPI + React 18 · SQLite (Render actual) o PostgreSQL 15 · Alembic · Docker
 
 > **v7.0 — Producto de producción.** Sobre las fases 0 a 6 del
 > [plan de actualización](Plan_Fases_Actualizacion_Plataforma_EH_IETS.md), esta versión
@@ -32,6 +32,15 @@ corporativa definida en [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md).
 > **búsquedas `site:` en buscadores** para encontrar documentos que el menú del sitio no
 > muestra. Todo se parametriza en *Configuración › Parámetros de fuentes*. Ver
 > [Inventario de fuentes y matriz EH](#inventario-de-fuentes-y-matriz-eh).
+>
+> **Octubre 2026 — Operación en Render y copia local.** MiniMax queda disponible con
+> llave embebida (el panel puede sustituirla). El login ya no espera a Firestore ni
+> escribe en SQLite si el usuario existe. Con SQLite el worker de vigilancia programada
+> se apaga para no bloquear el ingreso; el escaneo **manual** sigue. El disco de Render
+> (plan free) es efímero: el administrador guarda una **copia comprimida de la base en
+> IndexedDB** (*Configuración › Copia en el navegador*; indicador *Guardado aquí*). Si
+> el servidor arranca vacío, esa copia se restaura sola. Cumplimiento RF/RNF:
+> [`Comparacion_Requerimientos_Validacion_SI_Escaneo_Horizonte.md`](Comparacion_Requerimientos_Validacion_SI_Escaneo_Horizonte.md).
 
 ---
 
@@ -57,6 +66,7 @@ corporativa definida en [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md).
 - [Migración desde versiones anteriores](#migración-desde-versiones-anteriores)
 - [Flujo de uso sugerido](#flujo-de-uso-sugerido)
 - [Documentación relacionada](#documentación-relacionada)
+- [Comparación con la matriz de validación de requerimientos](Comparacion_Requerimientos_Validacion_SI_Escaneo_Horizonte.md)
 
 ---
 
@@ -99,7 +109,7 @@ Cuatro conceptos ordenan todo el sistema. Entenderlos evita la mayor parte de la
 | **Análisis** | Asistente IA | `/chat` | Chat con contexto del sistema; las consultas por nodo del grafo se guardan aparte |
 | **Gobierno** | **Auditoría** | `/auditoria` | Bitácora inmutable con filtros y vida completa de cada entidad |
 | **Admin** | Usuarios y perfiles | `/usuarios` | Alta, edición, perfil, contraseña temporal, desbloqueo, activación y baja de cuentas; matriz de permisos |
-| **Admin** | Configuración | `/configuracion` | IA, prompts, llaves de fuentes, parámetros de fuentes (listas de la matriz, búsqueda web, carga del Excel), tareas programadas, catálogos y parámetros metodológicos |
+| **Admin** | Configuración | `/configuracion` | IA, prompts, llaves de fuentes, parámetros de fuentes (listas de la matriz, búsqueda web, carga del Excel), tareas programadas, catálogos, parámetros metodológicos y **copia de la base en este navegador** |
 
 **Rutas heredadas** (redirección automática): `/escaneo → /vigilancia`, `/hallazgos → /senales`, `/recomendaciones → /diseminacion`, `/caracterizacion → /evaluacion`.
 
@@ -426,7 +436,7 @@ flowchart LR
     DOM["cycle_service · priority_engine<br/>technology_service · classification<br/>screening_service · dedup · normalization"]
     SVC["scraper · invima · minimax_service · gemini_service · events"]
     DIR["firestore_directory"]
-    DB[("SQLite dev · PostgreSQL prod")]
+    DB[("SQLite o PostgreSQL")]
     API --> GUARD --> DOM --> DB
     API --> SVC --> DB
     API --> DIR
@@ -451,10 +461,10 @@ flowchart LR
 | Capa | Tecnología |
 |---|---|
 | Backend | FastAPI 0.115 · SQLAlchemy 2 · Pydantic 2 |
-| Datos | SQLite en desarrollo · PostgreSQL 15 en producción (`pg_trgm`, `unaccent`, JSONB) |
+| Datos | SQLite (Render actual y desarrollo) · PostgreSQL 15 cuando `DATABASE_URL` lo indica (`pg_trgm`, `unaccent`, JSONB) |
 | Scraping | httpx · trafilatura · BeautifulSoup (lxml) · pypdf |
 | Similitud difusa | RapidFuzz (Levenshtein, Jaro-Winkler, token sort) |
-| IA | MiniMax (principal) · Gemini (respaldo); `AI_PROVIDER=auto` elige el disponible |
+| IA | MiniMax (principal, llave embebida de respaldo) · Gemini (opcional); `AI_PROVIDER=auto` |
 | Directorio | Firestore (colección `usuarios` del sistema de permisos IETS), emparejado por correo |
 | Auth | Correo y contraseña (scrypt + JWT) · Google Identity Services opcional |
 | Frontend | React 18 · Vite 5 · React Router 6 · Recharts · axios |
@@ -645,6 +655,16 @@ Documentación interactiva: **`http://127.0.0.1:8000/docs`**
 
 El CSV de `/api/sources/export` incluye nivel de fuente, prioridad, tipos de tecnología, referencia de la matriz, URLs de entrada, ruta de acceso, qué consultar, restricciones y flujo.
 
+### Copia en el navegador (octubre 2026)
+
+| Método y ruta | Propósito |
+|---|---|
+| `GET /api/backup/info` | Época, huella y tamaño de la base SQLite (`config:manage`) |
+| `GET /api/backup/export` | Instantánea gzip de la base; cabeceras `X-Backup-Epoch`, `X-Backup-Fingerprint`, `X-Backup-Taken-At` |
+| `POST /api/backup/restore?force=` | Restaura la instantánea; `force=true` pisa una base con trabajo. Devuelve un JWT nuevo si la cuenta sobrevive |
+
+Con PostgreSQL estos endpoints responden 400: la copia en el navegador solo aplica a SQLite.
+
 ### Operación heredada
 
 | Prefijo | Endpoints principales |
@@ -730,7 +750,11 @@ npm run build      # genera frontend/dist
 
 Con `frontend/dist` presente, **solo hace falta el backend**: sirve la SPA en `/` y la API en `/api/*`.
 
-Para un servidor de producción siga [`DEPLOY.md`](DEPLOY.md): Docker Compose con PostgreSQL 15 y HTTPS, o `start-prod.ps1` en Windows sin contenedores. Resumen:
+Para un servidor de producción siga [`DEPLOY.md`](DEPLOY.md): Docker Compose con PostgreSQL 15 y HTTPS, o `start-prod.ps1` en Windows sin contenedores.
+
+**Render (plan gratuito, estado actual).** Corre SQLite en disco efímero, un solo proceso y worker de vigilancia apagado. El login de usuarios existentes no escribe. MiniMax funciona con la llave embebida. Los datos de trabajo no sobreviven a un apagado del servicio: use *Copia en el navegador* o pase a PostgreSQL. Hoy `ENVIRONMENT` sigue en `development` en ese hosting (el acceso rápido sigue visible); hay que ponerlo en `production` cuando exista `SECRET_KEY` propia.
+
+Resumen para un despliegue institucional:
 
 1. Defina `ENVIRONMENT=production` y una `SECRET_KEY` propia (`python -m app.cli check-config` lo valida).
 2. Cree el primer superadministrador: `python -m app.cli create-admin --email persona@iets.org.co --name "Nombre"`.
@@ -819,20 +843,26 @@ Copie [`backend/.env.example`](backend/.env.example) como `.env`.
 | `PUBLIC_SUBMISSIONS_PER_WINDOW` · `PUBLIC_SUBMISSIONS_WINDOW_SECONDS` | Tope de postulaciones públicas por IP |
 | `FRONTEND_DIST` | Carpeta del frontend compilado que sirve el backend (defecto `frontend/dist`) |
 | `SEED_OFFICIAL_CYCLES` | Siembra de los ciclos oficiales 2026 al arrancar. Por defecto activa en desarrollo y **apagada en producción** (allí los ciclos los gobierna la coordinación); `true` la fuerza |
-| `MINIMAX_API_KEY` · `MINIMAX_MODEL` | IA principal. Vacío el modelo se detecta solo |
+| `MINIMAX_API_KEY` · `MINIMAX_MODEL` | IA principal. Si la llave va vacía, se usa la embebida en `config.py`. El modelo vacío se detecta solo |
 | `AI_PROVIDER` | `auto` · `minimax` · `gemini` |
 | `AI_WEB_ENABLED` · `AI_OCR_ENABLED` | La IA entra a sitios y, si se activa, lee PDF o imágenes escaneados |
 | `GEMINI_API_KEY` · `GEMINI_MODEL` | Respaldo de [Google AI Studio](https://aistudio.google.com/app/apikey); modelo vacío = autodetección |
 | `FIREBASE_PROJECT_ID` | Proyecto Firestore del directorio RRHH (defecto `sistema-permisos-iets`) |
 | `FIREBASE_SERVICE_ACCOUNT_KEY` · `FIREBASE_SERVICE_ACCOUNT_FILE` | Credencial de servicio. Si ambas van vacías, se intenta el `.env.local` del sistema RRHH hermano |
 | `CORS_ORIGINS` | Orígenes del frontend, separados por coma |
-| `DATABASE_URL` | Defecto `sqlite:///./iets_horizonte.db`; acepta `postgresql+psycopg://…` |
+| `DATABASE_URL` | Defecto `sqlite:///./iets_horizonte.db`; acepta `postgresql+psycopg://…`. Con SQLite el entrypoint fuerza `WEB_CONCURRENCY=1` y apaga el worker de ingesta salvo `INGEST_WORKER_FORCE=1` |
+| `WEB_CONCURRENCY` | Procesos de uvicorn. Debe ser `1` con SQLite |
+| `INGEST_WORKER_ENABLED` | Worker en hilo. En SQLite se ignora (salvo `INGEST_WORKER_FORCE`) para no bloquear el login |
+| `INGEST_WORKER_FORCE` | `1` fuerza el worker aunque la base sea SQLite (no usar en Render free) |
+| `BOOTSTRAP_ADMIN_EMAIL` · `BOOTSTRAP_ADMIN_PASSWORD` | Crea o actualiza el superadministrador al arrancar el contenedor |
 
 **Login con Google:** cree credenciales OAuth 2.0 de tipo "Aplicación web" en Google Cloud Console y agregue el origen del frontend a "Orígenes autorizados de JavaScript".
 
 **Sin `GOOGLE_CLIENT_ID`:** use el acceso rápido de la pantalla de login o `POST /api/auth/dev-login` con un correo `@iets.org.co`.
 
-La configuración de MiniMax y Gemini también puede guardarse desde `/configuracion` y tiene prioridad sobre el `.env`. Lo mismo vale para la búsqueda web (motores, llave de Brave Search API, URL de SearXNG), que solo se configura desde *Parámetros de fuentes*.
+La configuración de MiniMax y Gemini también puede guardarse desde `/configuracion` y tiene prioridad sobre el `.env`. Vaciar la llave en el panel **no apaga** MiniMax: vuelve la embebida. La búsqueda web (motores, Brave, SearXNG) solo se configura desde *Parámetros de fuentes*.
+
+**Copia en el navegador (SQLite / Render free).** El superadministrador guarda en IndexedDB una copia `.db.gz` de toda la base (`GET/POST /api/backup/*`). Se actualiza sola al trabajar. Si el servidor arranca con una base nueva y vacía de trabajo, al ingresar se restaura. Nunca pisa una copia de otra época con un servidor vacío. Indicador *Guardado aquí* en la cabecera; panel en `/configuracion?tab=copia_local`.
 
 **Errores 500:** toda excepción no controlada queda en el log del servidor con su traza y una referencia (`ref a1b2c3d4`) que también ve el usuario. Fuera de producción el mensaje incluye además el tipo y la causa del error, útil para diagnosticar un despliegue de prueba sin acceso a la consola.
 
@@ -879,7 +909,7 @@ La migración Alembic `0002_source_matrix_profile` agrega los campos de la matri
 
 ## Flujo de uso sugerido
 
-1. **Iniciar sesión** — con el correo y la contraseña que asignó el superadministrador (en el primer ingreso se reemplaza la temporal). La bandeja de trabajo muestra de inmediato los pendientes de su perfil, cada uno con enlace directo a la tecnología.
+1. **Iniciar sesión** — con el correo y la contraseña que asignó el superadministrador (en el primer ingreso se reemplaza la temporal). En Render, si el servidor arrancó vacío, la copia del navegador se restaura sola; confirme *Guardado aquí* en la cabecera. La bandeja de trabajo muestra de inmediato los pendientes de su perfil, cada uno con enlace directo a la tecnología.
 2. **Abrir un ciclo** en `/ciclos`: código, apertura, corte de datos y fecha de boletín. El sistema valida la ventana y la cuota anual.
 3. **Vigilancia** — ejecutar el rastreo masivo o por referente. Las fuentes de prioridad alta de la matriz EH se atienden primero; ajuste el flujo de cada fuente en `/fuentes › Editar`.
 4. **Bandeja de entrada** — clasificar las señales capturadas (clúster, tipología, condición, fechas regulatorias) apoyándose en la sugerencia asistida, y asignarlas por lotes al ciclo. Sin clúster ni tipología, el sistema no permite asignar.
@@ -896,6 +926,8 @@ La migración Alembic `0002_source_matrix_profile` agrega los campos de la matri
 
 | Documento | Contenido |
 |---|---|
+| [`Comparacion_Requerimientos_Validacion_SI_Escaneo_Horizonte.md`](Comparacion_Requerimientos_Validacion_SI_Escaneo_Horizonte.md) | RF01–RF20, P1–P6, %P y RNF01–RNF12 frente a la matriz de validación, uno a uno |
+| [`Validacion_Requerimientos_SI_Escaneo_Horizonte.xlsx`](Validacion_Requerimientos_SI_Escaneo_Horizonte.xlsx) | Matriz de concepto IETS (viable / replantear / inviable) |
 | [`GUIA_USUARIO.md`](GUIA_USUARIO.md) | Guía de usuario: todos los módulos, paso a paso, perfiles y preguntas frecuentes |
 | [`Plan_Fases_Actualizacion_Plataforma_EH_IETS.md`](Plan_Fases_Actualizacion_Plataforma_EH_IETS.md) | Plan de fases 0 a 7 y matriz de trazabilidad de los 20 RF |
 | [`BACKLOG.md`](BACKLOG.md) | Estado de cumplimiento por RF, diagramas, roadmap, riesgos y decisiones abiertas |

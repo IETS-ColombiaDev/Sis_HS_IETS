@@ -2,6 +2,7 @@
 import { expect } from "@playwright/test";
 
 export const TOKEN_KEY = "iets_hs_token";
+export const ONBOARDING_KEY = "iets_hs_onboarding_v1";
 export const ADMIN_EMAIL = "admin@iets.org.co";
 
 export const ROLES = [
@@ -52,12 +53,13 @@ export async function loginAs(page, role = "superadmin", path = "/") {
   const token = await tokenForRole(page.request, role);
   // Se inyecta una sola vez por pestana: asi un cierre de sesion posterior en la
   // prueba no queda deshecho por la siguiente navegacion.
-  await page.addInitScript(([k, t]) => {
+  await page.addInitScript(([k, t, g]) => {
     if (!window.sessionStorage.getItem("e2e_token_injected")) {
       window.localStorage.setItem(k, t);
       window.sessionStorage.setItem("e2e_token_injected", "1");
     }
-  }, [TOKEN_KEY, token]);
+    window.localStorage.setItem(g, "1");
+  }, [TOKEN_KEY, token, ONBOARDING_KEY]);
   await page.goto(path);
   return token;
 }
