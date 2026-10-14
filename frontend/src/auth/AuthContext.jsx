@@ -76,7 +76,7 @@ export function AuthProvider({ children }) {
     let lastErr;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const { data } = await api.post(url, body, { timeout: 12000 });
+        const { data } = await api.post(url, body, { timeout: 20000 });
         return acceptSession(data);
       } catch (err) {
         lastErr = err;

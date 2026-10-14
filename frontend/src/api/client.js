@@ -31,8 +31,9 @@ export function setLastEmail(email) {
 const api = axios.create({
   baseURL: "/api",
   headers: { "Content-Type": "application/json" },
-  // Por defecto corto; el login usa timeout propio + reintento en AuthContext.
-  timeout: 15000,
+  // Mayor que el busy_timeout de SQLite (15 s): si Firebase está copiando la
+  // base, la UI espera en lugar de cortar y mostrar "tardó demasiado".
+  timeout: 45000,
 });
 
 api.interceptors.request.use((config) => {
@@ -51,9 +52,23 @@ export function setUnauthorizedHandler(fn) {
 
 api.interceptors.response.use(
   (r) => r,
-  (error) => {
+  async (error) => {
+    const config = error.config;
     if (error.response && error.response.status === 401) {
       if (onUnauthorized) onUnauthorized();
+      return Promise.reject(error);
+    }
+    const method = String(config?.method || "get").toLowerCase();
+    const retriable =
+      config &&
+      !config.__retried &&
+      method === "get" &&
+      (error.code === "ECONNABORTED" ||
+        !error.response ||
+        [502, 503, 504].includes(error.response.status));
+    if (retriable) {
+      config.__retried = true;
+      return api.request(config);
     }
     return Promise.reject(error);
   }
