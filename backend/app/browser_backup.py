@@ -47,6 +47,7 @@ MAX_DB_BYTES = 1024 * 1024 * 1024
 REQUIRED_TABLES = {"users", "app_meta", "sources"}
 
 _restore_lock = threading.Lock()
+_export_lock = threading.Lock()
 
 
 class RestoreRejected(Exception):
@@ -176,12 +177,14 @@ def export_snapshot() -> tuple[bytes, dict]:
         raise RestoreRejected("La copia en el navegador solo aplica a SQLite.", status=400)
     meta = info()
     taken_at = _now_iso()
-    with tempfile.TemporaryDirectory() as tmp:
+    with _export_lock, tempfile.TemporaryDirectory() as tmp:
         copy = Path(tmp) / "snapshot.db"
         src = sqlite3.connect(str(path), timeout=30)
         dst = sqlite3.connect(str(copy))
         try:
-            src.backup(dst)
+            # Por lotes para que un INSERT (vigilancia) no se quede 5 s en
+            # "database is locked" mientras se copia toda la base.
+            src.backup(dst, pages=64, sleep=0.02)
             dst.execute(
                 "INSERT OR REPLACE INTO app_meta(key, value, updated_at) VALUES (?, ?, ?)",
                 (TAKEN_AT_KEY, taken_at, taken_at),

@@ -134,7 +134,7 @@ export default function Scan() {
   const runScan = async (ids) => {
     setRunning(true);
     try {
-      const { data } = await api.post("/ingest/run", { source_ids: ids?.length ? ids : [], process_now: false });
+      const { data } = await api.post("/ingest/run", { source_ids: ids?.length ? ids : [], process_now: false }, { timeout: 60000 });
       toast.success(`Vigilancia encolada: ${data.queued} fuente(s). El worker las atiende sin bloquear esta pantalla.`);
       setSelected(new Set());
       load();
@@ -148,7 +148,7 @@ export default function Scan() {
   const runScheduledNow = async () => {
     setRunningScheduled(true);
     try {
-      const { data } = await api.post("/config/schedule/vigilancia/run");
+      const { data } = await api.post("/config/schedule/vigilancia/run", null, { timeout: 60000 });
       if (data.status === "sin_trabajo") toast.info(data.message);
       else toast.success(data.message || "Vigilancia programada ejecutada");
       load();

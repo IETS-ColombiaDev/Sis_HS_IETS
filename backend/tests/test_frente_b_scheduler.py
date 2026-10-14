@@ -62,6 +62,27 @@ def test_interval_is_validated(db):
     assert cfg["scan_interval_hours"] == 12 and cfg["dedup_enabled"] is False
 
 
+def test_manual_scan_retries_when_sqlite_is_locked(db, monkeypatch):
+    _source(db)
+    from sqlalchemy.exc import OperationalError
+
+    real_commit = db.commit
+    hits = {"n": 0}
+
+    def flaky():
+        hits["n"] += 1
+        if hits["n"] == 1:
+            raise OperationalError("INSERT", {}, Exception("database is locked"))
+        return real_commit()
+
+    monkeypatch.setattr(db, "commit", flaky)
+    run = scheduler_service.run_scan(db, origin="manual", triggered_by="admin@iets.org.co")
+    assert hits["n"] >= 2
+    assert run.origin == "manual"
+    assert run.status in {"en_curso", "sin_trabajo"}
+    assert db.query(ScheduledRun).filter(ScheduledRun.id == run.id).one().task == "vigilancia"
+
+
 def test_scheduled_scan_enqueues_runs_and_reports_to_the_inbox(db):
     source = _source(db)
     settings_store.save_schedule(db, dedup_enabled=False)
