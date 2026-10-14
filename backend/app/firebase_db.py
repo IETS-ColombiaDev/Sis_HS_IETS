@@ -324,12 +324,18 @@ def _fetch_payload(meta: dict) -> bytes:
 
 
 def push_now(*, force: bool = False) -> dict:
-    global _last_sha, _status
+    global _last_sha, _status, _busy
     if not enabled():
         return {"ok": False, "reason": "disabled"}
     if not firebase_auth.configured():
         return {"ok": False, "reason": "sin_credenciales"}
-    payload, snap = browser_backup.export_snapshot()
+    if _busy:
+        return {"ok": False, "reason": "busy"}
+    _busy = True
+    try:
+        payload, snap = browser_backup.export_snapshot()
+    finally:
+        _busy = False
     digest = hashlib.sha256(payload).hexdigest()
     if digest == _last_sha and not force:
         _status = {**_status, "synced": True, "skipped": True, "taken_at": snap.get("taken_at")}

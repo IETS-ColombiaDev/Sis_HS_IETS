@@ -19,11 +19,14 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy.exc import OperationalError, PendingRollbackError
 from sqlalchemy.orm import Session
 
 from . import rbac, settings_store
+from .database import is_lock_error
 from .audit import record_action
 from .events import bump_state_version
 from .models import AlertEvent, IngestJob, ScheduledRun, User
@@ -57,6 +60,36 @@ _lock = threading.Lock()
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _commit(db: Session, *keep) -> None:
+    """COMMIT con reintento: la copia Firebase/navegador puede ocupar SQLite."""
+    from sqlalchemy.orm.session import make_transient
+
+    last: Exception | None = None
+    for i in range(8):
+        try:
+            for obj in keep:
+                db.add(obj)
+            db.commit()
+            return
+        except (OperationalError, PendingRollbackError) as exc:
+            last = exc
+            if not is_lock_error(exc) and not isinstance(exc, PendingRollbackError):
+                raise
+            try:
+                db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            for obj in keep:
+                if getattr(obj, "id", None) is None:
+                    try:
+                        make_transient(obj)
+                    except Exception:  # noqa: BLE001
+                        pass
+            time.sleep(0.25 * (i + 1))
+    assert last is not None
+    raise last
 
 
 def _aware(value: datetime | None) -> datetime | None:
@@ -157,8 +190,7 @@ def run_scan(db: Session, *, origin: str = "programado", triggered_by: str = "pr
     from .ingest_service import enqueue_due
 
     run = ScheduledRun(task=TASK_SCAN, origin=origin, triggered_by=triggered_by, status="en_curso")
-    db.add(run)
-    db.commit()
+    _commit(db, run)
     try:
         jobs = enqueue_due(db, triggered_by=triggered_by if origin == "manual" else "programador")
     except Exception as exc:  # noqa: BLE001
@@ -167,7 +199,7 @@ def run_scan(db: Session, *, origin: str = "programado", triggered_by: str = "pr
         run.status = "error"
         run.message = f"No se pudo encolar la vigilancia: {type(exc).__name__}: {exc}"[:2000]
         run.finished_at = _now()
-        db.commit()
+        _commit(db, run)
         return run
 
     job_ids = [j.id for j in jobs]
@@ -185,7 +217,7 @@ def run_scan(db: Session, *, origin: str = "programado", triggered_by: str = "pr
         action="schedule:scan",
         new_value={"origin": origin, "jobs": len(job_ids), "actor": triggered_by},
     )
-    db.commit()
+    _commit(db, run)
     db.refresh(run)
     bump_state_version(db)
     return run
@@ -204,8 +236,7 @@ def run_dedup(db: Session, *, origin: str = "programado", triggered_by: str = "p
         status="en_curso",
         detail={"cycle_id": cycle.id if cycle else None, "cycle_code": cycle.code if cycle else ""},
     )
-    db.add(run)
-    db.commit()
+    _commit(db, run)
     try:
         result = screening_service.scan_duplicates(
             db, cycle_id=cycle.id if cycle else None, actor=triggered_by
@@ -216,7 +247,7 @@ def run_dedup(db: Session, *, origin: str = "programado", triggered_by: str = "p
         run.status = "error"
         run.message = f"El barrido falló: {type(exc).__name__}: {exc}"[:2000]
         run.finished_at = _now()
-        db.commit()
+        _commit(db, run)
         return run
 
     created = int(result.get("created") or 0)
@@ -235,7 +266,7 @@ def run_dedup(db: Session, *, origin: str = "programado", triggered_by: str = "p
         f"{created} propuesta(s) nueva(s), {result.get('pending', 0)} pendiente(s) de revisión."
     )
     run.detail = {**(run.detail or {}), **{k: result.get(k) for k in ("refreshed", "pending", "threshold")}}
-    db.commit()
+    _commit(db, run)
     if created:
         notify(
             db,
