@@ -6,11 +6,10 @@ import { useToast } from "../components/Toast";
 import { listArchives, loadByKey, loadCurrent, readMeta, saveCurrent } from "./browserStore";
 
 /**
- * Copia de la base en IndexedDB del administrador.
+ * Copia extra de la base en IndexedDB del administrador.
  *
- * Render (plan free) borra el disco al dormir o redesplegar. Al ingresar, si el
- * servidor arranco vacio, la copia de ESTE navegador se sube. Nunca se pisa una
- * copia local de otra base con el servidor vacio (eso perdia el trabajo).
+ * El origen durable es Firestore (`hs_iets_db`). Esta copia del navegador es un
+ * respaldo. Nunca se pisa una copia local de otra epoca con un servidor vacio.
  */
 const BackupContext = createContext(null);
 
@@ -44,6 +43,7 @@ export function BackupProvider({ children }) {
     archives: [],
     supported: true,
     message: "",
+    firebase: null,
   });
   const busy = useRef(false);
   const lastExport = useRef(0);
@@ -98,9 +98,10 @@ export function BackupProvider({ children }) {
     try {
       const { data: info } = await api.get("/backup/info");
       if (!info.supported) {
-        setState((s) => ({ ...s, supported: false, status: "idle" }));
+        setState((s) => ({ ...s, supported: false, status: "idle", firebase: info.firebase || null }));
         return;
       }
+      setState((s) => ({ ...s, firebase: info.firebase || null }));
       const snap = await loadCurrent();
       if (!triedRestore.current) {
         let candidate = shouldRestore(info, snap) ? snap : null;
@@ -219,7 +220,16 @@ export function BackupProvider({ children }) {
     }
   }, [restoreBlob]);
 
-  const value = { enabled, ...state, saveNow, download, restoreFrom };
+  const refreshFirebase = useCallback(async () => {
+    const { data: info } = await api.get("/backup/info");
+    setState((s) => ({
+      ...s,
+      firebase: info.firebase || null,
+      supported: info.supported !== false,
+    }));
+  }, []);
+
+  const value = { enabled, ...state, saveNow, download, restoreFrom, refreshFirebase };
   return <BackupContext.Provider value={value}>{children}</BackupContext.Provider>;
 }
 

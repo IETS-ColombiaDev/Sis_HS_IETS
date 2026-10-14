@@ -23,7 +23,7 @@ const TABS = [
   { id: "programacion", label: "Tareas programadas", icon: "clock" },
   { id: "fuentes", label: "Llaves de fuentes", icon: "globe" },
   { id: "parametros_fuentes", label: "Parámetros de fuentes", icon: "layers" },
-  { id: "copia_local", label: "Copia en el navegador", icon: "save" },
+  { id: "copia_local", label: "Persistencia (Firebase)", icon: "save" },
 ];
 
 export default function Settings() {

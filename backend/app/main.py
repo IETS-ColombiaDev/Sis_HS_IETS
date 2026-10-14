@@ -23,6 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__, ai_service, audit, methodology, prompt_store, scan_trace, settings_store, usage_meter
 from .config import settings
 from .database import (
+    IS_SQLITE,
     Base,
     SessionLocal,
     engine,
@@ -202,7 +203,6 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
         harden_audit_log()
         audit.install_listeners()
-        load_runtime_config()
     else:
         # Esquema versionado (P0-1): crea una base vacia con Alembic o marca en el
         # baseline una base anterior. create_all y las migraciones ligeras siguen
@@ -216,17 +216,38 @@ async def lifespan(app: FastAPI):
         # La bitacora se instala antes de cualquier siembra o migracion, de modo que
         # ninguna escritura quede fuera de la trazabilidad (principio 3 del plan).
         audit.install_listeners()
+
+    from .browser_backup import ensure_epoch
+    from . import firebase_auth, firebase_db
+
+    ensure_epoch()
+    if IS_SQLITE and getattr(settings, "firebase_db_enabled", True) and not firebase_auth.configured():
+        log.warning(
+            "FIREBASE_SERVICE_ACCOUNT_KEY ausente: la base SQLite no se persistira en Firestore."
+        )
+    try:
+        provisioned = firebase_db.ensure_database()
+        if provisioned.get("ok"):
+            log.info(
+                "Base Firestore lista: %s/%s (creada=%s).",
+                provisioned.get("project_id"),
+                provisioned.get("database"),
+                provisioned.get("created"),
+            )
+        elif provisioned.get("reason") not in {"pytest", "sin_credenciales"}:
+            log.warning("No se pudo preparar Firestore hs-iets: %s", provisioned)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("No se pudo crear/verificar la base Firestore hs-iets: %s", exc)
+    firebase_db.pull_if_needed()
+
+    if not light:
         seed_sources_if_empty()
         seed_methodology()
-        load_runtime_config()
         backfill_screening_scores()
         migrate_to_technologies()
         seed_official_cycles()
         seed_api_sources()
-
-    from .browser_backup import ensure_epoch
-
-    ensure_epoch()
+    load_runtime_config()
 
     from .settings_store import load_ingest_keys
 
@@ -243,8 +264,14 @@ async def lifespan(app: FastAPI):
         db.close()
     from .worker import start_worker, stop_worker
 
+    firebase_db.enable_autosync()
+    try:
+        firebase_db.push_now()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("No se pudo publicar la base en Firestore al arrancar: %s", exc)
     start_worker()
     yield
+    firebase_db.flush_on_shutdown()
     stop_worker()
 
 

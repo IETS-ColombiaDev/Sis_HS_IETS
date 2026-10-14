@@ -66,7 +66,7 @@ Las mediciones de Render se tomaron con el servicio ya despierto. El arranque en
 
 **Verificado 13 oct:** el modelo opera; el lago en Render estaba **vacío** (0 hallazgos) porque el disco SQLite se borra al dormir el servicio.
 
-**Dictamen: cumple** en software. La persistencia en el hosting actual no está garantizada hasta publicar la copia en el navegador o pasar a PostgreSQL.
+**Dictamen: cumple** en software. En Render la persistencia es la instantánea Firestore (`hs_iets_db`); exige `FIREBASE_SERVICE_ACCOUNT_KEY`.
 
 ---
 
@@ -613,7 +613,7 @@ Dictamen de **software + despliegue actual** (esta nota):
 | Cumple con brecha | RF01, RF02, RF08, P4, RF14, RF16, RF18, RF20, RNF05 (si el servicio está caliente), RNF08, RNF11 |
 | Parcial | RF11, RF19, RNF03, RNF07 |
 | No cumple (ambiente) | RNF04, RNF06, RNF12 en Render |
-| Pendiente de publicar | Copia de la base en el navegador (`/api/backup`, IndexedDB) — commit `6e28f1c` no está en `origin/main` |
+| Pendiente de publicar | Base Firestore propia `hs-iets` + `FIREBASE_SERVICE_ACCOUNT_KEY` en Render |
 
 Los **nueve “Replantear”** de la matriz (RF08, RF11, P1–P6, RF19) no significan “no construido”. En P1–P6 y RF08 el código cubre el enunciado original; lo abierto es si la IA debe **decidir** o solo **sugerir**, y si el OCR debe ir siempre encendido. RF11 y RF19 siguen incompletos de alcance.
 
@@ -624,7 +624,7 @@ Los **nueve “Replantear”** de la matriz (RF08, RF11, P1–P6, RF19) no signi
 Estos ítems no son filas de la Excel; sí determinan si el sistema “funciona al 100 %” en Render:
 
 1. **Disco efímero.** SQLite en el plan gratuito se borra al dormir o redesplegar. El 13 oct el inventario de trabajo estaba en **0 hallazgos**. El 8 oct se habían cargado decenas vía ClinicalTrials.gov.
-2. **Copia en el navegador.** Diseñada precisamente para (1). Código listo; **no está en Render** hasta el `git push`.
+2. **Base en Firebase.** Instantánea gzip en Firestore (`hs_iets_db`). Código listo; en Render hace falta `FIREBASE_SERVICE_ACCOUNT_KEY` y publicar.
 3. **Login vs worker.** Varios workers o el hilo de ingesta sobre SQLite producían `database is locked` y el spinner de ingreso. Mitigado: un proceso, login de usuarios existentes **sin escritura**, worker apagado con SQLite.
 4. **MiniMax.** Llave embebida + panel. Prueba real 13 oct: **OK, MiniMax-M3, 2,3 s**.
 5. **Acceso de desarrollo público.** Contradice RNF12 mientras `ENVIRONMENT=development`.
@@ -635,8 +635,8 @@ Estos ítems no son filas de la Excel; sí determinan si el sistema “funciona 
 
 Orden práctico, no de prioridad de la Excel:
 
-1. Publicar `6e28f1c` (`git push origin main`) para activar la copia en el navegador.
-2. Entrar una vez como administrador y confirmar **Guardado aquí** en la cabecera.
+1. Publicar a `origin/main` y definir `FIREBASE_SERVICE_ACCOUNT_KEY` en Render.
+2. Entrar como administrador y confirmar **Firebase** en la cabecera (*Configuración › Persistencia*).
 3. Poner `ENVIRONMENT=production` y `SECRET_KEY` propia; crear la cuenta con `BOOTSTRAP_ADMIN_*` o `/usuarios`.
 4. Sustituir SQLite por PostgreSQL (addon Render, Neon o el `docker-compose` de `DEPLOY.md`) y `INGEST_WORKER_ENABLED=true`.
 5. Sincronizar INVIMA y no perder el índice.

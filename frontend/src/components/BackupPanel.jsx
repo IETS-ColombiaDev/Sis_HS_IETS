@@ -1,4 +1,6 @@
 import { useState } from "react";
+import api from "../api/client";
+import { useAuth } from "../auth/AuthContext";
 import { useBackup } from "../backup/BackupContext";
 import { useToast } from "./Toast";
 import { Card, SectionTitle } from "./Card";
@@ -25,22 +27,12 @@ const STATUS = {
 
 export default function BackupPanel() {
   const backup = useBackup();
+  const { refreshStatus } = useAuth();
   const toast = useToast();
   const [working, setWorking] = useState(false);
 
   if (!backup.enabled) return null;
-  if (!backup.supported) {
-    return (
-      <Card>
-        <SectionTitle>Copia en este navegador</SectionTitle>
-        <p style={{ color: "#64748B", fontSize: 13.5 }}>
-          El servidor usa una base PostgreSQL persistente: no hace falta guardar copia en el navegador.
-        </p>
-      </Card>
-    );
-  }
 
-  const st = STATUS[backup.status] || STATUS.idle;
   const run = async (fn, okMsg) => {
     setWorking(true);
     try {
@@ -53,6 +45,92 @@ export default function BackupPanel() {
     }
   };
 
+  const fb = backup.firebase;
+  const pushFirebase = () =>
+    run(async () => {
+      const { data } = await api.post("/backup/firebase/push");
+      if (!data?.ok) throw new Error(data?.reason || "Firestore no aceptó la copia");
+      await backup.refreshFirebase?.();
+      await refreshStatus?.();
+    }, "Base publicada en Firebase.");
+
+  const pullFirebase = () => {
+    const ok = window.confirm(
+      "Se reemplazará toda la base del servidor por la copia publicada en Firebase. " +
+        "Lo registrado aquí después de esa publicación se perderá. ¿Continuar?"
+    );
+    if (!ok) return;
+    run(async () => {
+      const { data } = await api.post("/backup/firebase/pull");
+      if (!data?.ok) throw new Error(data?.reason || "No se pudo leer Firestore");
+      if (data.restored) {
+        window.location.reload();
+        return;
+      }
+      await backup.refreshFirebase?.();
+      toast.success(data.kept_local ? "El servidor ya tenía el trabajo más reciente." : "Firebase no tiene copia todavía.");
+    });
+  };
+
+  const firebaseCard = (
+    <Card data-testid="firebase-db-panel">
+      <SectionTitle>Base en Firebase</SectionTitle>
+      <p style={{ color: "#475569", fontSize: 13.5, lineHeight: 1.6, marginBottom: 12 }}>
+        Este proyecto tiene su propio espacio en Firestore: colección <strong>hs_iets_db</strong>,
+        aparte del directorio RRHH. SQLite solo es el motor local; al arrancar se restaura y
+        cada cambio se publica. El disco de Render puede borrarse sin perder el trabajo.
+      </p>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+        <Badge tone={fb?.enabled ? (fb?.synced ? "ok" : fb?.error ? "error" : "warning") : "default"}>
+          {fb?.enabled ? (fb?.synced ? "Sincronizada" : fb?.error ? "Con error" : "Pendiente") : "Sin credencial"}
+        </Badge>
+        <span style={{ fontSize: 13.5 }}>
+          Última publicación: <strong>{fmtDate(fb?.taken_at)}</strong>
+        </span>
+        <span style={{ fontSize: 13.5, color: "#64748B" }}>
+          {fb?.collection || "hs_iets_db"}
+          {fb?.database ? ` · ${fb.database}` : ""}
+          {fb?.gzip_size ? ` · ${fmtSize(fb.gzip_size)}` : ""}
+          {fb?.project_id ? ` · ${fb.project_id}` : ""}
+        </span>
+      </div>
+      {fb?.error ? (
+        <div role="alert" className="login-notice login-notice-error" style={{ marginBottom: 12 }}>
+          {fb.error}
+        </div>
+      ) : null}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Button onClick={pushFirebase} loading={working} disabled={working || !fb?.configured}>
+          <Icon name="save" size={16} /> Publicar ahora en Firebase
+        </Button>
+        <Button variant="outline" onClick={pullFirebase} disabled={working || !fb?.configured}>
+          <Icon name="refresh" size={16} /> Restaurar desde Firebase
+        </Button>
+      </div>
+      {!fb?.configured ? (
+        <p style={{ fontSize: 13, color: "#92400E", marginTop: 10 }}>
+          Defina <code>FIREBASE_SERVICE_ACCOUNT_KEY</code> en el servidor. La persistencia usa la base
+          nombrada <code>hs-iets</code>, no la base <code>(default)</code> del directorio RRHH.
+        </p>
+      ) : null}
+    </Card>
+  );
+
+  if (!backup.supported) {
+    return (
+      <>
+        {firebaseCard}
+        <Card>
+          <SectionTitle>Copia en este navegador</SectionTitle>
+          <p style={{ color: "#64748B", fontSize: 13.5 }}>
+            El servidor usa una base PostgreSQL persistente: no hace falta guardar copia en el navegador.
+          </p>
+        </Card>
+      </>
+    );
+  }
+
+  const st = STATUS[backup.status] || STATUS.idle;
   const confirmRestore = (key, takenAt) => {
     const ok = window.confirm(
       `Se reemplazará toda la base del servidor por la copia del ${fmtDate(takenAt)}. ` +
@@ -62,12 +140,13 @@ export default function BackupPanel() {
   };
 
   return (
+    <>
+    {firebaseCard}
     <Card data-testid="browser-backup-panel">
-      <SectionTitle>Copia en este navegador</SectionTitle>
+      <SectionTitle>Copia de respaldo en este navegador</SectionTitle>
       <p style={{ color: "#475569", fontSize: 13.5, lineHeight: 1.6, marginBottom: 12 }}>
-        Este navegador guarda una copia comprimida de toda la base (fuentes, hallazgos, ciclos, usuarios y
-        configuración) y la actualiza al trabajar. Si Render borra el disco, al volver a ingresar se restaura
-        sola. Una copia de otra base nunca se pisa con un servidor vacío.
+        Copia extra en este navegador. La fuente de verdad es Firebase; esto sirve si hay que
+        recuperar un momento anterior sin tocar Firestore.
       </p>
 
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
@@ -112,5 +191,6 @@ export default function BackupPanel() {
         </div>
       )}
     </Card>
+    </>
   );
 }

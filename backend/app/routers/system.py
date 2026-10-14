@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from .. import __version__, ai_service
+from .. import __version__, ai_service, firebase_db
 from ..config import settings
 from ..database import get_db
 from ..deps import get_current_user
@@ -37,6 +37,9 @@ def system_status():
         ai_model=model,
         ai_ocr_enabled=ai_service.ocr_enabled(),
         ai_web_enabled=ai_service.web_assist_enabled(),
+        firebase_db_enabled=firebase_db.enabled(),
+        firebase_db_synced=bool(firebase_db.status().get("synced")),
+        firebase_db_name=str(firebase_db.status().get("database") or ""),
     )
 
 

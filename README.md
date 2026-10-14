@@ -36,10 +36,10 @@ corporativa definida en [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md).
 > **Octubre 2026 — Operación en Render y copia local.** MiniMax queda disponible con
 > llave embebida (el panel puede sustituirla). El login ya no espera a Firestore ni
 > escribe en SQLite si el usuario existe. Con SQLite el worker de vigilancia programada
-> se apaga para no bloquear el ingreso; el escaneo **manual** sigue. El disco de Render
-> (plan free) es efímero: el administrador guarda una **copia comprimida de la base en
-> IndexedDB** (*Configuración › Copia en el navegador*; indicador *Guardado aquí*). Si
-> el servidor arranca vacío, esa copia se restaura sola. Cumplimiento RF/RNF:
+> se apaga para no bloquear el ingreso; el escaneo **manual** sigue. **La base vive en
+> Firebase** (colección `hs_iets_db` del mismo proyecto RRHH): al arrancar se restaura
+> y cada escritura se publica. SQLite solo es el motor local. Hace falta
+> `FIREBASE_SERVICE_ACCOUNT_KEY` en Render. Cumplimiento RF/RNF:
 > [`Comparacion_Requerimientos_Validacion_SI_Escaneo_Horizonte.md`](Comparacion_Requerimientos_Validacion_SI_Escaneo_Horizonte.md).
 
 ---
@@ -436,17 +436,19 @@ flowchart LR
     DOM["cycle_service · priority_engine<br/>technology_service · classification<br/>screening_service · dedup · normalization"]
     SVC["scraper · invima · minimax_service · gemini_service · events"]
     DIR["firestore_directory"]
-    DB[("SQLite o PostgreSQL")]
+    DB[("SQLite motor / PostgreSQL")]
+    FB["firebase_db"]
     API --> GUARD --> DOM --> DB
     API --> SVC --> DB
     API --> DIR
+    API --> FB
   end
   subgraph Externos
     WEB["Referentes web"]
     SOC["datos.gov.co · Socrata"]
     MM["MiniMax"]
     GEM["Gemini (respaldo)"]
-    FS["Firestore RRHH"]
+    FS["Firestore RRHH + hs_iets_db"]
     GGL["Google OAuth"]
   end
   CTX -->|HTTPS| API
@@ -455,13 +457,14 @@ flowchart LR
   SVC --> MM
   SVC --> GEM
   DIR --> FS
+  FB --> FS
   API --> GGL
 ```
 
 | Capa | Tecnología |
 |---|---|
 | Backend | FastAPI 0.115 · SQLAlchemy 2 · Pydantic 2 |
-| Datos | SQLite (Render actual y desarrollo) · PostgreSQL 15 cuando `DATABASE_URL` lo indica (`pg_trgm`, `unaccent`, JSONB) |
+| Datos | SQLite como motor local (Render y desarrollo) persistido en Firestore (`hs_iets_db`) · PostgreSQL 15 cuando `DATABASE_URL` lo indica |
 | Scraping | httpx · trafilatura · BeautifulSoup (lxml) · pypdf |
 | Similitud difusa | RapidFuzz (Levenshtein, Jaro-Winkler, token sort) |
 | IA | MiniMax (principal, llave embebida de respaldo) · Gemini (opcional); `AI_PROVIDER=auto` |
@@ -655,15 +658,18 @@ Documentación interactiva: **`http://127.0.0.1:8000/docs`**
 
 El CSV de `/api/sources/export` incluye nivel de fuente, prioridad, tipos de tecnología, referencia de la matriz, URLs de entrada, ruta de acceso, qué consultar, restricciones y flujo.
 
-### Copia en el navegador (octubre 2026)
+### Persistencia Firebase y copia en el navegador (octubre 2026)
 
 | Método y ruta | Propósito |
 |---|---|
-| `GET /api/backup/info` | Época, huella y tamaño de la base SQLite (`config:manage`) |
+| `GET /api/backup/info` | Época, huella, tamaño y estado de Firestore (`config:manage`) |
+| `GET /api/backup/firebase` | Estado de la instantánea en `hs_iets_db` |
+| `POST /api/backup/firebase/push` | Publica ahora la base en Firestore |
+| `POST /api/backup/firebase/pull` | Restaura desde Firestore si el disco está vacío o atrasado |
 | `GET /api/backup/export` | Instantánea gzip de la base; cabeceras `X-Backup-Epoch`, `X-Backup-Fingerprint`, `X-Backup-Taken-At` |
-| `POST /api/backup/restore?force=` | Restaura la instantánea; `force=true` pisa una base con trabajo. Devuelve un JWT nuevo si la cuenta sobrevive |
+| `POST /api/backup/restore?force=` | Restaura la instantánea local; `force=true` pisa una base con trabajo. Luego publica en Firebase |
 
-Con PostgreSQL estos endpoints responden 400: la copia en el navegador solo aplica a SQLite.
+Con PostgreSQL el origen durable es el propio Postgres; Firebase y la copia del navegador no aplican.
 
 ### Operación heredada
 
@@ -752,7 +758,7 @@ Con `frontend/dist` presente, **solo hace falta el backend**: sirve la SPA en `/
 
 Para un servidor de producción siga [`DEPLOY.md`](DEPLOY.md): Docker Compose con PostgreSQL 15 y HTTPS, o `start-prod.ps1` en Windows sin contenedores.
 
-**Render (plan gratuito, estado actual).** Corre SQLite en disco efímero, un solo proceso y worker de vigilancia apagado. El login de usuarios existentes no escribe. MiniMax funciona con la llave embebida. Los datos de trabajo no sobreviven a un apagado del servicio: use *Copia en el navegador* o pase a PostgreSQL. Hoy `ENVIRONMENT` sigue en `development` en ese hosting (el acceso rápido sigue visible); hay que ponerlo en `production` cuando exista `SECRET_KEY` propia.
+**Render (plan gratuito, estado actual).** Corre SQLite en disco efímero, un solo proceso y worker de vigilancia apagado. El login de usuarios existentes no escribe. MiniMax funciona con la llave embebida. **La base se restaura y se publica en Firestore** (`hs_iets_db`); hay que definir `FIREBASE_SERVICE_ACCOUNT_KEY` en el panel. Hoy `ENVIRONMENT` sigue en `development` en ese hosting (el acceso rápido sigue visible); hay que ponerlo en `production` cuando exista `SECRET_KEY` propia.
 
 Resumen para un despliegue institucional:
 
@@ -847,8 +853,12 @@ Copie [`backend/.env.example`](backend/.env.example) como `.env`.
 | `AI_PROVIDER` | `auto` · `minimax` · `gemini` |
 | `AI_WEB_ENABLED` · `AI_OCR_ENABLED` | La IA entra a sitios y, si se activa, lee PDF o imágenes escaneados |
 | `GEMINI_API_KEY` · `GEMINI_MODEL` | Respaldo de [Google AI Studio](https://aistudio.google.com/app/apikey); modelo vacío = autodetección |
-| `FIREBASE_PROJECT_ID` | Proyecto Firestore del directorio RRHH (defecto `sistema-permisos-iets`) |
-| `FIREBASE_SERVICE_ACCOUNT_KEY` · `FIREBASE_SERVICE_ACCOUNT_FILE` | Credencial de servicio. Si ambas van vacías, se intenta el `.env.local` del sistema RRHH hermano |
+| `FIREBASE_PROJECT_ID` | Proyecto GCP (directorio RRHH en `(default)` y base Horizonte en `hs-iets`) |
+| `FIREBASE_SERVICE_ACCOUNT_KEY` · `FIREBASE_SERVICE_ACCOUNT_FILE` | Credencial de servicio. Sin ella no hay directorio ni persistencia. Si ambas van vacías, se intenta el `.env.local` del sistema RRHH hermano |
+| `FIREBASE_DB_ENABLED` | `true` por defecto. Publica y restaura la SQLite en la base Firestore `hs-iets` |
+| `FIREBASE_DB_DATABASE` | Base Firestore propia (defecto `hs-iets`). No puede ser `(default)` |
+| `FIREBASE_DB_COLLECTION` | Colección de la instantánea (defecto `hs_iets_db`) |
+| `FIREBASE_DB_LOCATION` | Región al crear la base (defecto `nam5`) |
 | `CORS_ORIGINS` | Orígenes del frontend, separados por coma |
 | `DATABASE_URL` | Defecto `sqlite:///./iets_horizonte.db`; acepta `postgresql+psycopg://…`. Con SQLite el entrypoint fuerza `WEB_CONCURRENCY=1` y apaga el worker de ingesta salvo `INGEST_WORKER_FORCE=1` |
 | `WEB_CONCURRENCY` | Procesos de uvicorn. Debe ser `1` con SQLite |
@@ -862,7 +872,7 @@ Copie [`backend/.env.example`](backend/.env.example) como `.env`.
 
 La configuración de MiniMax y Gemini también puede guardarse desde `/configuracion` y tiene prioridad sobre el `.env`. Vaciar la llave en el panel **no apaga** MiniMax: vuelve la embebida. La búsqueda web (motores, Brave, SearXNG) solo se configura desde *Parámetros de fuentes*.
 
-**Copia en el navegador (SQLite / Render free).** El superadministrador guarda en IndexedDB una copia `.db.gz` de toda la base (`GET/POST /api/backup/*`). Se actualiza sola al trabajar. Si el servidor arranca con una base nueva y vacía de trabajo, al ingresar se restaura. Nunca pisa una copia de otra época con un servidor vacío. Indicador *Guardado aquí* en la cabecera; panel en `/configuracion?tab=copia_local`.
+**Base en Firebase.** Instantánea gzip en la colección exclusiva **`hs_iets_db`** (nunca `usuarios` de RRHH). Si el proyecto permite bases nombradas, se usa `hs-iets`; si no, esa colección en `(default)`. `python -m app.cli ensure-firebase-db --probe` verifica el espacio.
 
 **Errores 500:** toda excepción no controlada queda en el log del servidor con su traza y una referencia (`ref a1b2c3d4`) que también ve el usuario. Fuera de producción el mensaje incluye además el tipo y la causa del error, útil para diagnosticar un despliegue de prueba sin acceso a la consola.
 
@@ -909,7 +919,7 @@ La migración Alembic `0002_source_matrix_profile` agrega los campos de la matri
 
 ## Flujo de uso sugerido
 
-1. **Iniciar sesión** — con el correo y la contraseña que asignó el superadministrador (en el primer ingreso se reemplaza la temporal). En Render, si el servidor arrancó vacío, la copia del navegador se restaura sola; confirme *Guardado aquí* en la cabecera. La bandeja de trabajo muestra de inmediato los pendientes de su perfil, cada uno con enlace directo a la tecnología.
+1. **Iniciar sesión** — con el correo y la contraseña que asignó el superadministrador (en el primer ingreso se reemplaza la temporal). En Render la base se restaura desde Firebase al arrancar; confirme el indicador *Firebase* en la cabecera. La bandeja de trabajo muestra de inmediato los pendientes de su perfil, cada uno con enlace directo a la tecnología.
 2. **Abrir un ciclo** en `/ciclos`: código, apertura, corte de datos y fecha de boletín. El sistema valida la ventana y la cuota anual.
 3. **Vigilancia** — ejecutar el rastreo masivo o por referente. Las fuentes de prioridad alta de la matriz EH se atienden primero; ajuste el flujo de cada fuente en `/fuentes › Editar`.
 4. **Bandeja de entrada** — clasificar las señales capturadas (clúster, tipología, condición, fechas regulatorias) apoyándose en la sugerencia asistida, y asignarlas por lotes al ciclo. Sin clúster ni tipología, el sistema no permite asignar.
