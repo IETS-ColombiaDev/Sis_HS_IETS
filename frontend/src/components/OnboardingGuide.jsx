@@ -106,7 +106,7 @@ function stepsFor(user) {
       lead: "Confirme el ciclo en la cabecera y entre por cualquiera de estas puertas. Puede reabrir esta guía con el botón Guía.",
       pipe: "all",
       actions,
-      note: "En equipos compartidos cierre sesión al terminar. Si el servidor está en Render (disco temporal), el administrador debe ver «Guardado aquí» en la cabecera.",
+      note: "En equipos compartidos cierre sesión al terminar. Si el servidor está en Render (disco temporal), la base vive en Firebase; confirme el indicador Firebase en la cabecera.",
     },
   ];
 }

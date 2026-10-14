@@ -46,15 +46,14 @@ def test_firestore_name_beats_leftover_database(monkeypatch, db):
     db.commit()
 
     user = _get_or_create_user(db, "andrea.gomez@iets.org.co", "Administrador IETS", "", dev=True)
-    assert user.name == "Andrea Gomez Diaz"
-    assert user.first_name == "Andrea"
-    assert user.last_name == "Gomez Diaz"
-    assert "Administrador" not in user.name
+    # El login no reescribe la fila (camino caliente). El directorio se aplica al serializar.
+    assert user.name == "Administrador IETS"
 
     shown = user_out(user)
     assert shown.name == "Andrea Gomez Diaz"
     assert shown.first_name == "Andrea"
     assert shown.last_name == "Gomez Diaz"
+    assert "Administrador" not in shown.name
 
 
 def test_placeholder_is_not_kept_when_directory_missing(monkeypatch, db):

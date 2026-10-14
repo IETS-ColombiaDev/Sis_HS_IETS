@@ -33,3 +33,15 @@ services:
         value: "*"
       - key: SECRET_KEY
         generateValue: true
+      - key: FIREBASE_PROJECT_ID
+        value: sistema-permisos-iets
+      - key: FIREBASE_DB_ENABLED
+        value: "true"
+      - key: FIREBASE_DB_DATABASE
+        value: hs-iets
+      - key: FIREBASE_DB_COLLECTION
+        value: hs_iets_db
+      - key: FIREBASE_DB_LOCATION
+        value: nam5
+      - key: FIREBASE_SERVICE_ACCOUNT_KEY
+        sync: false

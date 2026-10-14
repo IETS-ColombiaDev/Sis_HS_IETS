@@ -1,21 +1,17 @@
 """Directorio institucional de personas (Firestore RRHH), emparejado por correo."""
 from __future__ import annotations
 
-import json
 import logging
 import time
 from dataclasses import dataclass
-from pathlib import Path
 
 import requests
-from google.auth.transport.requests import Request
-from google.oauth2 import service_account
 
+from . import firebase_auth
 from .config import settings
 
 log = logging.getLogger(__name__)
 
-_SCOPES = ("https://www.googleapis.com/auth/datastore",)
 _CACHE_TTL = 120
 _PLACEHOLDERS = {
     "admin",
@@ -27,7 +23,6 @@ _PLACEHOLDERS = {
 }
 
 _cache: dict = {"at": 0.0, "by_email": {}}
-_creds = None
 
 
 @dataclass(frozen=True)
@@ -53,48 +48,20 @@ def is_placeholder_name(name: str, email: str = "") -> bool:
     return text in _PLACEHOLDERS
 
 
-def _sibling_rrhh_env() -> Path:
-    explicit = (getattr(settings, "firebase_rrhh_env_file", "") or "").strip()
-    if explicit:
-        return Path(explicit)
-    return Path(__file__).resolve().parents[3] / "RRHH" / "frontend" / ".env.local"
-
-
-def _load_service_account() -> dict | None:
-    raw = (settings.firebase_service_account_key or "").strip()
-    if raw:
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            log.warning("FIREBASE_SERVICE_ACCOUNT_KEY no es un JSON valido")
-    path = (settings.firebase_service_account_file or "").strip()
-    if path and Path(path).is_file():
-        return json.loads(Path(path).read_text(encoding="utf-8"))
-    env_path = _sibling_rrhh_env()
-    if env_path.is_file():
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            if line.startswith("FIREBASE_SERVICE_ACCOUNT_KEY="):
-                payload = line.split("=", 1)[1].strip()
-                if payload:
-                    return json.loads(payload)
-    return None
-
-
 def configured() -> bool:
-    return bool((settings.firebase_project_id or "").strip() or _load_service_account())
+    return firebase_auth.configured() or bool((settings.firebase_project_id or "").strip())
 
 
-def _project_id(info: dict | None) -> str:
-    return (settings.firebase_project_id or "").strip() or (info or {}).get("project_id") or ""
+def _load_service_account():
+    return firebase_auth.load_service_account()
 
 
-def _access_token(info: dict) -> str:
-    global _creds
-    if _creds is None:
-        _creds = service_account.Credentials.from_service_account_info(info, scopes=_SCOPES)
-    if not _creds.valid:
-        _creds.refresh(Request())
-    return _creds.token
+def _project_id(info):
+    return firebase_auth.project_id(info)
+
+
+def _access_token(info):
+    return firebase_auth.access_token(info)
 
 
 def _field_text(fields: dict, *keys: str) -> str:

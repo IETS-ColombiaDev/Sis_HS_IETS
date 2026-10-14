@@ -528,6 +528,9 @@ class SystemStatus(BaseModel):
     password_login_enabled: bool = True
     environment: str = "development"
     password_min_length: int = 10
+    firebase_db_enabled: bool = False
+    firebase_db_synced: bool = False
+    firebase_db_name: str = ""
 
 
 # --------------------------------------------------------------------------- #

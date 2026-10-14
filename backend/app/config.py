@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     firebase_service_account_key: str = ""
     firebase_service_account_file: str = ""
     firebase_rrhh_env_file: str = ""
+    # Base Firestore propia de Horizonte (NO la (default) de RRHH).
+    firebase_db_enabled: bool = True
+    firebase_db_database: str = "hs-iets"
+    firebase_db_collection: str = "hs_iets_db"
+    firebase_db_location: str = "nam5"
 
     @property
     def is_production(self) -> bool:

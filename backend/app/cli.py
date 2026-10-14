@@ -134,6 +134,7 @@ def cmd_check_config(args) -> int:
     env = "production" if settings.is_production else settings.environment
     print(f"Entorno: {env}")
     print(f"Base de datos: {settings.database_url.split('@')[-1]}")
+    print(f"Firestore Horizonte: {settings.firebase_db_database} / {settings.firebase_db_collection}")
     print(f"Acceso de desarrollo: {'habilitado' if settings.dev_login_enabled else 'deshabilitado'}")
     print(f"Google: {'configurado' if settings.google_client_id else 'no configurado'}")
     problems = settings.production_problems()
@@ -142,6 +143,36 @@ def cmd_check_config(args) -> int:
     if settings.is_production and not problems:
         print("Configuración de producción válida.")
     return 1 if problems else 0
+
+
+def cmd_ensure_firebase_db(args) -> int:
+    from . import firebase_db
+
+    try:
+        result = firebase_db.ensure_database()
+    except Exception as exc:  # noqa: BLE001
+        print(f"ERROR al preparar hs-iets: {exc}", file=sys.stderr)
+        return 1
+    print(
+        f"Firestore {result.get('project_id')}/{result.get('database')}: "
+        f"{'creada' if result.get('created') else result.get('reason') or 'lista'}"
+    )
+    if not result.get("ok"):
+        return 1
+    if args.probe:
+        try:
+            probe = firebase_db.probe()
+        except Exception as exc:  # noqa: BLE001
+            print(f"ERROR sonda: {exc}", file=sys.stderr)
+            return 1
+        print(f"Sonda ok en {probe.get('database')}.")
+    if args.push:
+        pushed = firebase_db.push_now(force=True)
+        if not pushed.get("ok"):
+            print(f"ERROR al publicar: {pushed.get('reason')}", file=sys.stderr)
+            return 1
+        print(f"Publicada ({pushed.get('gzip_size') or 0} bytes gzip).")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -165,6 +196,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("check-config", help="Valida la configuración del entorno")
     p.set_defaults(func=cmd_check_config)
+
+    p = sub.add_parser("ensure-firebase-db", help="Crea o verifica la base Firestore hs-iets")
+    p.add_argument("--probe", action="store_true", help="Escribe y borra un documento de prueba")
+    p.add_argument("--push", action="store_true", help="Publica la SQLite local en hs-iets")
+    p.set_defaults(func=cmd_ensure_firebase_db)
 
     args = parser.parse_args(argv)
     return args.func(args)

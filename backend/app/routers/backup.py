@@ -1,23 +1,49 @@
 """Copia de la base en el navegador del administrador (ver `browser_backup`)."""
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 
-from .. import browser_backup
+from .. import browser_backup, firebase_db
 from ..database import SessionLocal
 from ..deps import require_permission
 from ..models import User
 from ..rbac import P_CONFIG_MANAGE
 from ..security import create_session_token
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/backup", tags=["backup"])
 
 
 @router.get("/info")
 def backup_info(user: User = Depends(require_permission(P_CONFIG_MANAGE))):
-    return browser_backup.info()
+    data = browser_backup.info()
+    data["firebase"] = firebase_db.status()
+    return data
+
+
+@router.get("/firebase")
+def firebase_info(user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    return firebase_db.status()
+
+
+@router.post("/firebase/push")
+def firebase_push(user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    try:
+        return firebase_db.push_now(force=True)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=str(exc)[:300]) from exc
+
+
+@router.post("/firebase/pull")
+def firebase_pull(user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    try:
+        return firebase_db.pull_if_needed()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=str(exc)[:300]) from exc
 
 
 @router.get("/export")
@@ -61,4 +87,8 @@ async def backup_restore(
     finally:
         db.close()
     result["access_token"] = token
+    try:
+        firebase_db.push_now(force=True)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("No se pudo publicar en Firebase tras restaurar: %s", exc)
     return result

@@ -391,7 +391,24 @@ const TITLES = {
 };
 
 function BackupStatusPill() {
+  const { status } = useAuth();
   const backup = useBackup();
+  const fbOn = Boolean(status?.firebase_db_enabled);
+  const fbOk = Boolean(status?.firebase_db_synced);
+  if (fbOn) {
+    return (
+      <Tooltip text={fbOk ? `Base Firestore ${status?.firebase_db_name || "hs_iets_db"} publicada. Sobrevive al disco de Render.` : "El espacio Firestore de Horizonte está activo; la primera publicación ocurre al guardar."}>
+        <NavLink
+          to="/configuracion?tab=copia_local"
+          className="header-status"
+          style={{ textDecoration: "none", color: "inherit" }}
+        >
+          <span className="header-status-dot" style={{ background: fbOk ? "#059669" : "#D97706" }} />
+          <span className="header-status-label">{fbOk ? "Firebase" : "Firebase…"}</span>
+        </NavLink>
+      </Tooltip>
+    );
+  }
   if (!backup?.enabled || backup.supported === false) return null;
   const restoring = backup.status === "restoring";
   const saving = backup.status === "saving";
