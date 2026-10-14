@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import mimetypes
 import os
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -265,10 +266,14 @@ async def lifespan(app: FastAPI):
     from .worker import start_worker, stop_worker
 
     firebase_db.enable_autosync()
-    try:
-        firebase_db.push_now()
-    except Exception as exc:  # noqa: BLE001
-        log.warning("No se pudo publicar la base en Firestore al arrancar: %s", exc)
+
+    def _boot_push() -> None:
+        try:
+            firebase_db.push_now()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("No se pudo publicar la base en Firestore al arrancar: %s", exc)
+
+    threading.Thread(target=_boot_push, name="firebase-boot-push", daemon=True).start()
     start_worker()
     yield
     firebase_db.flush_on_shutdown()

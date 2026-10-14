@@ -102,6 +102,10 @@ export function BackupProvider({ children }) {
         return;
       }
       setState((s) => ({ ...s, firebase: info.firebase || null }));
+      if (info.firebase?.enabled && !manual) {
+        await refreshLocal({ status: "idle", message: "" });
+        return;
+      }
       const snap = await loadCurrent();
       if (!triedRestore.current) {
         let candidate = shouldRestore(info, snap) ? snap : null;
