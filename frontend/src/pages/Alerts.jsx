@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api, { apiError } from "../api/client";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { useToast } from "../components/Toast";
@@ -31,6 +31,7 @@ export default function Alerts() {
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
+  const firstLoad = useRef(true);
 
   const load = useCallback(async () => {
     try {
@@ -41,8 +42,9 @@ export default function Alerts() {
       setItems(a.data);
       setSubs(s.data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar las alertas"));
+      if (firstLoad.current) toast.error(apiError(e, "No se pudieron cargar las alertas"));
     } finally {
+      firstLoad.current = false;
       setLoading(false);
     }
   }, [toast, onlyUnread]);

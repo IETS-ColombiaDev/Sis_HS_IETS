@@ -235,7 +235,7 @@ def _try_named_database(dbid: str) -> dict:
     return {"ok": False, "reason": f"HTTP {create.status_code}"}
 
 
-def ensure_database() -> dict:
+def ensure_database(*, probe_write: bool = True) -> dict:
     """Prepara el espacio de Horizonte. Prefiere la base nombrada; si el
     proyecto no permite crearlas, usa la coleccion exclusiva `hs_iets_db`
     (nunca `usuarios`)."""
@@ -265,7 +265,9 @@ def ensure_database() -> dict:
             _resolved_db = "(default)"
     else:
         _resolved_db = "(default)"
-    probe_result = probe()
+    probed = False
+    if probe_write:
+        probed = bool(probe().get("ok"))
     return {
         "ok": True,
         "created": created,
@@ -273,7 +275,7 @@ def ensure_database() -> dict:
         "database": _active_database(),
         "collection": _collection(),
         "project_id": firebase_auth.project_id(),
-        "probed": probe_result.get("ok"),
+        "probed": probed,
     }
 
 

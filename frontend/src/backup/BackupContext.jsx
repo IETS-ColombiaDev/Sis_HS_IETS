@@ -48,6 +48,7 @@ export function BackupProvider({ children }) {
   const busy = useRef(false);
   const lastExport = useRef(0);
   const triedRestore = useRef(false);
+  const firebaseOn = useRef(false);
   const toastRef = useRef(toast);
   toastRef.current = toast;
 
@@ -101,6 +102,7 @@ export function BackupProvider({ children }) {
         setState((s) => ({ ...s, supported: false, status: "idle", firebase: info.firebase || null }));
         return;
       }
+      firebaseOn.current = Boolean(info.firebase?.enabled);
       setState((s) => ({ ...s, firebase: info.firebase || null }));
       if (info.firebase?.enabled && !manual) {
         await refreshLocal({ status: "idle", message: "" });
@@ -194,6 +196,7 @@ export function BackupProvider({ children }) {
       firstVersion.current = false;
       return undefined;
     }
+    if (firebaseOn.current) return undefined;
     const t = setTimeout(() => sync(), CHANGE_DEBOUNCE_MS);
     return () => clearTimeout(t);
   }, [enabled, version, sync]);
@@ -226,6 +229,7 @@ export function BackupProvider({ children }) {
 
   const refreshFirebase = useCallback(async () => {
     const { data: info } = await api.get("/backup/info");
+    firebaseOn.current = Boolean(info.firebase?.enabled);
     setState((s) => ({
       ...s,
       firebase: info.firebase || null,

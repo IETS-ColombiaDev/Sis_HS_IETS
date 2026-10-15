@@ -20,6 +20,7 @@ def system_status():
     enabled = ai_service.is_enabled()
     model = ai_service.current_model() if enabled else ""
     provider = ai_service.active_provider()
+    fb = firebase_db.status()
     return SystemStatus(
         gemini_enabled=enabled,
         gemini_model=model,
@@ -37,9 +38,9 @@ def system_status():
         ai_model=model,
         ai_ocr_enabled=ai_service.ocr_enabled(),
         ai_web_enabled=ai_service.web_assist_enabled(),
-        firebase_db_enabled=firebase_db.enabled(),
-        firebase_db_synced=bool(firebase_db.status().get("synced")),
-        firebase_db_name=str(firebase_db.status().get("database") or ""),
+        firebase_db_enabled=bool(fb.get("enabled")),
+        firebase_db_synced=bool(fb.get("synced")),
+        firebase_db_name=str(fb.get("database") or ""),
     )
 
 

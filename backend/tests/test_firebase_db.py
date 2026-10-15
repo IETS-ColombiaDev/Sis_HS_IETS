@@ -151,6 +151,14 @@ def test_ensure_database_creates_named_db(store):
     assert again["created"] is False
 
 
+def test_ensure_database_can_skip_probe(store, monkeypatch):
+    firebase_db.reset_resolved()
+    monkeypatch.setattr(firebase_db, "probe", lambda: (_ for _ in ()).throw(AssertionError("probe")))
+    out = firebase_db.ensure_database(probe_write=False)
+    assert out["ok"] is True
+    assert out["probed"] is False
+
+
 def test_ensure_falls_back_to_exclusive_collection(store):
     store["create_status"]["code"] = 403
     out = firebase_db.ensure_database()

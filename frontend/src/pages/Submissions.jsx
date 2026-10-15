@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -28,6 +28,7 @@ const TABS = [
 export default function Submissions() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const firstLoad = useRef(true);
   const [filter, setFilter] = useState("recibida");
   const [current, setCurrent] = useState(null);
   const [note, setNote] = useState("");
@@ -46,8 +47,9 @@ export default function Submissions() {
       const { data } = await api.get("/submissions", { params: { status: filter || undefined } });
       setRows(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar las postulaciones"));
+      if (firstLoad.current) toast.error(apiError(e, "No se pudieron cargar las postulaciones"));
     } finally {
+      firstLoad.current = false;
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

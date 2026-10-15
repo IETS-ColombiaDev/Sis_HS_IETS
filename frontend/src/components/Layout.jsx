@@ -393,11 +393,12 @@ const TITLES = {
 function BackupStatusPill() {
   const { status } = useAuth();
   const backup = useBackup();
-  const fbOn = Boolean(status?.firebase_db_enabled);
-  const fbOk = Boolean(status?.firebase_db_synced);
+  const fbOn = Boolean(status?.firebase_db_enabled || backup?.firebase?.enabled);
+  const fbOk = Boolean(status?.firebase_db_synced || backup?.firebase?.synced);
+  const fbName = status?.firebase_db_name || backup?.firebase?.collection || "hs_iets_db";
   if (fbOn) {
     return (
-      <Tooltip text={fbOk ? `Base Firestore ${status?.firebase_db_name || "hs_iets_db"} publicada. Sobrevive al disco de Render.` : "El espacio Firestore de Horizonte está activo; la primera publicación ocurre al guardar."}>
+      <Tooltip text={fbOk ? `Base Firestore ${fbName} publicada. Sobrevive al disco de Render.` : "El espacio Firestore de Horizonte está activo; la primera publicación ocurre al guardar."}>
         <NavLink
           to="/configuracion?tab=copia_local"
           className="header-status"

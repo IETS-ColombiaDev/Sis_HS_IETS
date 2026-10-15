@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -74,6 +74,7 @@ export default function Scan() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [preview, setPreview] = useState(null);
   const [previewing, setPreviewing] = useState(false);
+  const firstLoad = useRef(true);
 
   const load = useCallback(async () => {
     try {
@@ -88,8 +89,9 @@ export default function Scan() {
       setJobs(j.data);
       setSchedule(sc.data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar la vigilancia"));
+      if (firstLoad.current) toast.error(apiError(e, "No se pudo cargar la vigilancia"));
     } finally {
+      firstLoad.current = false;
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

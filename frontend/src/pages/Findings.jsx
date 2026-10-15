@@ -42,6 +42,7 @@ export default function Findings() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const firstLoad = useRef(true);
   const [view, setView] = useState("kanban");
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [query, setQuery] = useState(EMPTY_FILTERS);
@@ -76,8 +77,9 @@ export default function Findings() {
       setFindings(list.data);
       setStats(st.data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar las señales"));
+      if (firstLoad.current) toast.error(apiError(e, "No se pudieron cargar las señales"));
     } finally {
+      firstLoad.current = false;
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

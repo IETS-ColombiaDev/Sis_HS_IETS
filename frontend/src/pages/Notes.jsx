@@ -42,6 +42,7 @@ export default function Notes() {
 
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const firstLoad = useRef(true);
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -73,8 +74,9 @@ export default function Notes() {
       setNotes(data);
       setDetail((d) => (d ? data.find((n) => n.id === d.id) || null : d));
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar las notas"));
+      if (firstLoad.current) toast.error(apiError(e, "No se pudieron cargar las notas"));
     } finally {
+      firstLoad.current = false;
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
