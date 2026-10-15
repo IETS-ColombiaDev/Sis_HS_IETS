@@ -46,6 +46,7 @@ export default function Staging() {
   const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const firstLoad = useRef(true);
   const [selected, setSelected] = useState(() => new Set());
   const [filters, setFilters] = useState({ q: "", source_id: "", channel: "" });
   const [query, setQuery] = useState({ q: "", source_id: "", channel: "" });
@@ -96,8 +97,9 @@ export default function Staging() {
       setTotal(Number(list.headers?.["x-total-count"] ?? list.data.length));
       setStats(st.data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar la bandeja de entrada"));
+      if (firstLoad.current) toast.error(apiError(e, "No se pudo cargar la bandeja de entrada"));
     } finally {
+      firstLoad.current = false;
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

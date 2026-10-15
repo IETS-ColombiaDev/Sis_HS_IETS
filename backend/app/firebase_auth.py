@@ -17,6 +17,8 @@ _SCOPES = (
     "https://www.googleapis.com/auth/cloud-platform",
 )
 _creds = None
+_sa_info = None
+_sa_loaded = False
 
 
 def sibling_rrhh_env() -> Path:
@@ -27,22 +29,33 @@ def sibling_rrhh_env() -> Path:
 
 
 def load_service_account() -> dict | None:
+    global _sa_info, _sa_loaded
+    if _sa_loaded:
+        return _sa_info
     raw = (settings.firebase_service_account_key or "").strip()
     if raw:
         try:
-            return json.loads(raw)
+            _sa_info = json.loads(raw)
         except json.JSONDecodeError:
             log.warning("FIREBASE_SERVICE_ACCOUNT_KEY no es un JSON valido")
+            _sa_info = None
+        _sa_loaded = True
+        return _sa_info
     path = (settings.firebase_service_account_file or "").strip()
     if path and Path(path).is_file():
-        return json.loads(Path(path).read_text(encoding="utf-8"))
+        _sa_info = json.loads(Path(path).read_text(encoding="utf-8"))
+        _sa_loaded = True
+        return _sa_info
     env_path = sibling_rrhh_env()
     if env_path.is_file():
         for line in env_path.read_text(encoding="utf-8").splitlines():
             if line.startswith("FIREBASE_SERVICE_ACCOUNT_KEY="):
                 payload = line.split("=", 1)[1].strip()
                 if payload:
-                    return json.loads(payload)
+                    _sa_info = json.loads(payload)
+                    _sa_loaded = True
+                    return _sa_info
+    _sa_loaded = True
     return None
 
 

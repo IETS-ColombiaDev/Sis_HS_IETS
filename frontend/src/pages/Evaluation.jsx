@@ -218,6 +218,7 @@ export default function Evaluation() {
   const [queue, setQueue] = useState([]);
   const [labels, setLabels] = useState(DEFAULT_LABELS);
   const [loading, setLoading] = useState(true);
+  const firstLoad = useRef(true);
   const [activeId, setActiveId] = useState(null);
   const [doc, setDoc] = useState(null);
   const [docLoading, setDocLoading] = useState(false);
@@ -250,8 +251,9 @@ export default function Evaluation() {
           : data[0]?.technology_id || null
       );
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar la cola de evaluación"));
+      if (firstLoad.current) toast.error(apiError(e, "No se pudo cargar la cola de evaluación"));
     } finally {
+      firstLoad.current = false;
       setLoading(false);
     }
   }, [cycleId, toast]);

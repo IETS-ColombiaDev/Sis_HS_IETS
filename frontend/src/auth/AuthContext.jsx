@@ -65,8 +65,9 @@ export function AuthProvider({ children }) {
     setLastEmail(data.user?.email);
     setSessionNotice("");
     setJustLoggedIn(true);
+    loadStatus();
     return data.user;
-  }, []);
+  }, [loadStatus]);
 
   const clearJustLoggedIn = useCallback(() => setJustLoggedIn(false), []);
 

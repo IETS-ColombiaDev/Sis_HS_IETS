@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api, { apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -98,8 +98,8 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const toast = useToast();
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const [a, b] = await Promise.allSettled([
         api.get("/dashboard/workbench"),
@@ -108,7 +108,7 @@ export default function Dashboard() {
       if (a.status === "fulfilled") setWb(a.value.data);
       if (b.status === "fulfilled") {
         setWork(b.value.data);
-      } else {
+      } else if (!silent) {
         setWork({
           role: "",
           role_label: "",
@@ -123,6 +123,7 @@ export default function Dashboard() {
           active_cycle_status_label: "",
         });
       }
+      if (silent) return;
       if (a.status === "rejected" && b.status === "rejected") {
         toast.error(apiError(a.reason, "No se pudo cargar la bandeja de trabajo"));
       } else if (a.status === "rejected") {
@@ -131,15 +132,23 @@ export default function Dashboard() {
         toast.error(apiError(b.reason, "No se pudieron cargar los pendientes del perfil"));
       }
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar la bandeja de trabajo"));
+      if (!silent) toast.error(apiError(e, "No se pudo cargar la bandeja de trabajo"));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const firstVersion = useRef(true);
   useEffect(() => {
     load();
+  }, [load]);
+  useEffect(() => {
+    if (firstVersion.current) {
+      firstVersion.current = false;
+      return;
+    }
+    load({ silent: true });
   }, [load, version]);
 
   if (loading) return <LoadingBlock label="Cargando bandeja de trabajo..." />;

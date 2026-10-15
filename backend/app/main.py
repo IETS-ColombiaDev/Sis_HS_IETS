@@ -227,7 +227,7 @@ async def lifespan(app: FastAPI):
             "FIREBASE_SERVICE_ACCOUNT_KEY ausente: la base SQLite no se persistira en Firestore."
         )
     try:
-        provisioned = firebase_db.ensure_database()
+        provisioned = firebase_db.ensure_database(probe_write=False)
         if provisioned.get("ok"):
             log.info(
                 "Base Firestore lista: %s/%s (creada=%s).",

@@ -61,6 +61,7 @@ export default function Prioritization() {
   const [stats, setStats] = useState(null);
   const [clusters, setClusters] = useState([]);
   const [loading, setLoading] = useState(true);
+  const firstLoad = useRef(true);
   const [activeId, setActiveId] = useState(null);
   const [onlyMine, setOnlyMine] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -154,8 +155,9 @@ export default function Prioritization() {
         return q.data[0]?.technology_id || null;
       });
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar la cola de priorización"));
+      if (firstLoad.current) toast.error(apiError(e, "No se pudo cargar la cola de priorización"));
     } finally {
+      firstLoad.current = false;
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

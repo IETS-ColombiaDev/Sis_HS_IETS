@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import api, { apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
@@ -58,6 +58,7 @@ export default function SchedulePanel() {
   const [draft, setDraft] = useState({});
   const [saving, setSaving] = useState(false);
   const [runningTask, setRunningTask] = useState("");
+  const firstLoad = useRef(true);
 
   const load = useCallback(async () => {
     try {
@@ -71,7 +72,9 @@ export default function SchedulePanel() {
         dedup_interval_hours: String(s.data.dedup_interval_hours),
       });
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar la programación"));
+      if (firstLoad.current) toast.error(apiError(e, "No se pudo cargar la programación"));
+    } finally {
+      firstLoad.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

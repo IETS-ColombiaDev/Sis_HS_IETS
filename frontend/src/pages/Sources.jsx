@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -141,6 +141,7 @@ export default function Sources() {
   const [detailSource, setDetailSource] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [confirmImport, setConfirmImport] = useState(false);
+  const firstLoad = useRef(true);
   const [deleting, setDeleting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [probingAll, setProbingAll] = useState(false);
@@ -159,8 +160,9 @@ export default function Sources() {
       setCoverage(c.data);
       setConnectors(k.data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar las fuentes"));
+      if (firstLoad.current) toast.error(apiError(e, "No se pudieron cargar las fuentes"));
     } finally {
+      firstLoad.current = false;
       setLoading(false);
     }
     try {
