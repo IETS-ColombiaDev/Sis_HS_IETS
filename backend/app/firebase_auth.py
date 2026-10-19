@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 
 from google.auth.transport.requests import Request
@@ -21,10 +22,14 @@ _sa_info = None
 _sa_loaded = False
 
 
-def sibling_rrhh_env() -> Path:
+def sibling_rrhh_env() -> Path | None:
     explicit = (getattr(settings, "firebase_rrhh_env_file", "") or "").strip()
     if explicit:
         return Path(explicit)
+    # FIREBASE_RRHH_ENV_FILE="" (definida y vacia) apaga la busqueda: asi las
+    # pruebas aisladas no toman en silencio la cuenta de servicio de RRHH.
+    if "FIREBASE_RRHH_ENV_FILE" in os.environ:
+        return None
     return Path(__file__).resolve().parents[3] / "RRHH" / "frontend" / ".env.local"
 
 
@@ -47,7 +52,7 @@ def load_service_account() -> dict | None:
         _sa_loaded = True
         return _sa_info
     env_path = sibling_rrhh_env()
-    if env_path.is_file():
+    if env_path is not None and env_path.is_file():
         for line in env_path.read_text(encoding="utf-8").splitlines():
             if line.startswith("FIREBASE_SERVICE_ACCOUNT_KEY="):
                 payload = line.split("=", 1)[1].strip()

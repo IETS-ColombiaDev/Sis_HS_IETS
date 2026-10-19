@@ -1,6 +1,6 @@
 // Acceso con contrasena y modulo de administracion de usuarios, por la interfaz.
 import { test, expect } from "@playwright/test";
-import { loginAs, watchErrors, expectClean, settle, apiToken, auth } from "./helpers";
+import { loginAs, watchErrors, expectClean, settle, apiToken, auth, ONBOARDING_KEY } from "./helpers";
 
 const STRONG = "Horizonte2026seguro";
 
@@ -176,6 +176,8 @@ test("cambio voluntario de contrasena desde el menu del usuario", async ({ page,
     data: { current_password: STRONG, new_password: "Segunda2026clave" },
   });
 
+  // La guia de bienvenida sale en el primer ingreso y tapa el menu del usuario.
+  await page.addInitScript((k) => window.localStorage.setItem(k, "1"), ONBOARDING_KEY);
   await page.goto("/login");
   await loginUi(page, email, "Segunda2026clave");
   await expect(page.locator(".user-meta")).toContainText("Tomador de decisiones");

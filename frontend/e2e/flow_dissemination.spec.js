@@ -46,6 +46,13 @@ test.describe("boletines del ciclo", () => {
     await popup.waitForLoadState();
     await expect(popup.locator("body")).toContainText(cycle.code);
     await popup.close();
+
+    // PDF nativo (RF19): descarga A4 lista para distribuir.
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByTestId(`bulletin-pdf-${bulletin.id}`).click(),
+    ]);
+    expect(download.suggestedFilename()).toBe(`boletin-${bulletin.id}.pdf`);
     expectClean(errors);
   });
 

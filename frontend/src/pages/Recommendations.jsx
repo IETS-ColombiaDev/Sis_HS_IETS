@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import api, { apiError } from "../api/client";
+import api, { AI_TIMEOUT, apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useCycle } from "../cycle/CycleContext";
 import { useRealtime } from "../realtime/RealtimeContext";
@@ -164,7 +164,7 @@ export default function Recommendations() {
     try {
       let data;
       if (createMode === "ia") {
-        ({ data } = await api.post("/recommendations/generate", { finding_id: Number(draft.finding_id) }));
+        ({ data } = await api.post("/recommendations/generate", { finding_id: Number(draft.finding_id) }, { timeout: AI_TIMEOUT }));
         if (/sin IA|fallback/i.test(data.model_used || "")) toast.warning("IA no configurada: se creó un informe preliminar para completar a mano.");
         else toast.success(`Informe generado con ${data.model_used}`);
       } else {

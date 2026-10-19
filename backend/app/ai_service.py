@@ -1,6 +1,6 @@
 """Fachada de IA: MiniMax (principal) con Gemini como respaldo opcional.
 
-El proveedor `auto` usa MiniMax si hay llave; si no, Gemini.
+El proveedor `auto` usa MiniMax si hay llave; si no, Gemini. `off` la apaga.
 El OCR de paginas e imagenes solo corre cuando `ai_ocr_enabled` esta activo
 y MiniMax-M3 (vision) esta disponible.
 """
@@ -39,7 +39,7 @@ def configure_runtime(
     with _lock:
         if provider is not None:
             value = (provider or "auto").strip().lower()
-            _runtime_provider = value if value in {"auto", "minimax", "gemini"} else "auto"
+            _runtime_provider = value if value in {"auto", "minimax", "gemini", "off"} else "auto"
         if ocr_enabled is not None:
             _runtime_ocr = bool(ocr_enabled)
         if web_enabled is not None:
@@ -56,6 +56,9 @@ def provider() -> str:
 
 def active_provider() -> str:
     pref = provider()
+    if pref == "off":
+        # Apagada a proposito (panel o AI_PROVIDER=off): la llave embebida no la enciende.
+        return ""
     if pref == "minimax" and minimax_service.is_enabled():
         return "minimax"
     if pref == "gemini" and gemini_service.is_enabled():
@@ -90,7 +93,7 @@ def current_model() -> str:
 
 
 def ocr_enabled() -> bool:
-    return _runtime_ocr and minimax_service.is_enabled()
+    return _runtime_ocr and provider() != "off" and minimax_service.is_enabled()
 
 
 def web_assist_enabled() -> bool:

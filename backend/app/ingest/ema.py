@@ -1,8 +1,9 @@
-"""Conector de EMA: descarga oficial de tablas, RSS como contingencia.
+"""Conector de EMA: reporte oficial de medicamentos, RSS como contingencia.
 
-La EMA no expone REST. El sitio publica tablas descargables que actualiza
-cada noche (nivel B). El RSS se conserva solo si la descarga no esta
-disponible o no se puede interpretar.
+La EMA no expone REST. Publica cada noche el reporte "Medicines output" en
+JSON (y XLSX) con todos los medicamentos de uso humano y veterinario (nivel B).
+Se toman los de uso humano con movimiento mas reciente (opinion CHMP,
+autorizacion, inicio de evaluacion). El RSS de noticias queda de contingencia.
 """
 from __future__ import annotations
 
@@ -17,12 +18,24 @@ from .base import (
     parse_compact_date,
     register,
     request_bytes,
+    request_json,
     request_text,
     schema_signature,
 )
 
-DEFAULT_FEED = "https://www.ema.europa.eu/en/rss.xml"
+DEFAULT_FEED = "https://www.ema.europa.eu/en/news.xml"
 DOWNLOAD_PAGE = "https://www.ema.europa.eu/en/medicines/download-medicine-data"
+DEFAULT_JSON_REPORT = "https://www.ema.europa.eu/en/documents/report/medicines-output-medicines_json-report_en.json"
+# Solo hitos de novedad: la fecha de decision de la Comision cambia con cada
+# variacion administrativa y haria subir productos de hace 20 anos.
+# Estados que no aportan a un escaneo de horizonte (producto fuera del mercado).
+_STALE_STATUS = ("withdrawn", "lapsed", "expired", "revoked")
+_DATE_FIELDS = (
+    "opinion_adopted_date",
+    "marketing_authorisation_date",
+    "start_of_evaluation_date",
+    "start_of_rolling_review_date",
+)
 
 
 class EmaConnector(Connector):
@@ -33,7 +46,7 @@ class EmaConnector(Connector):
         "contingencia cuando el archivo no está disponible."
     )
     min_interval = 0.5
-    adapter_version = "2"
+    adapter_version = "3"
 
     def fetch(self, *, config: dict, url: str = "") -> ConnectorResult:
         config = config or {}
@@ -53,7 +66,45 @@ class EmaConnector(Connector):
             downloaded = self._try_download(config, page_size)
             if downloaded is not None:
                 return downloaded
+            report = self._try_json_report(config, page_size)
+            if report is not None:
+                return report
         return self._from_rss(config, url, page_size)
+
+    def _try_json_report(self, config: dict, page_size: int) -> ConnectorResult | None:
+        report_url = clean_text(config.get("json_url") or DEFAULT_JSON_REPORT)
+        try:
+            payload = request_json(
+                report_url,
+                connector_code=self.code,
+                min_interval=self.min_interval,
+                timeout=90.0,
+            )
+        except Exception:
+            return None
+        rows = payload.get("data") if isinstance(payload, dict) else payload
+        if not isinstance(rows, list):
+            return None
+        include_generics = bool(config.get("include_generics"))
+        rows = [
+            r
+            for r in rows
+            if isinstance(r, dict)
+            and _is_current_human(r)
+            and (include_generics or str(r.get("generic") or "").strip().lower() != "yes")
+        ]
+        rows.sort(key=_latest_movement, reverse=True)
+        records = [self._from_table_row(row) for row in rows[: max(1, min(page_size, 200))]]
+        records = [r for r in records if r]
+        if not records:
+            return None
+        return ConnectorResult(
+            records=records,
+            message=f"{len(records)} medicamentos de uso humano del reporte oficial de la EMA (de {len(rows)} vigentes).",
+            schema_signature=schema_signature(rows[:3]),
+            adapter_version=self.adapter_version,
+            endpoint=report_url,
+        )
 
     def _try_download(self, config: dict, page_size: int) -> ConnectorResult | None:
         file_url = clean_text(config.get("download_url") or "")
@@ -104,7 +155,8 @@ class EmaConnector(Connector):
 
     def _from_table_row(self, row: dict) -> CanonicalRecord | None:
         name = clean_text(
-            row.get("Medicine name")
+            row.get("name_of_medicine")
+            or row.get("Medicine name")
             or row.get("Name of medicine")
             or row.get("medicine_name")
             or row.get("name")
@@ -112,7 +164,8 @@ class EmaConnector(Connector):
             590,
         )
         inn = clean_text(
-            row.get("International non-proprietary name")
+            row.get("international_non_proprietary_name_common_name")
+            or row.get("International non-proprietary name")
             or row.get("INN")
             or row.get("inn_name")
             or row.get("Active substance"),
@@ -121,31 +174,67 @@ class EmaConnector(Connector):
         if not name and not inn:
             return None
         maker = clean_text(
-            row.get("Marketing authorisation holder")
+            row.get("marketing_authorisation_developer_applicant_holder")
+            or row.get("Marketing authorisation holder")
             or row.get("Company")
             or row.get("manufacturer"),
             300,
         )
         approval = clean_text(
-            row.get("Marketing authorisation date")
+            row.get("marketing_authorisation_date")
+            or row.get("Marketing authorisation date")
             or row.get("Date of authorisation")
             or row.get("authorisation_date")
         )
-        ident = clean_text(row.get("EMA product number") or row.get("Product number") or name or inn)
+        ident = clean_text(
+            row.get("ema_product_number") or row.get("EMA product number") or row.get("Product number") or name or inn
+        )
+        status = clean_text(row.get("medicine_status"))
+        indication = clean_text(row.get("therapeutic_indication"), 2000)
+        area = clean_text(row.get("therapeutic_area_mesh"), 300)
+        opinion = clean_text(row.get("opinion_adopted_date"))
+        flags = [
+            label
+            for key, label in (
+                ("orphan_medicine", "huerfano"),
+                ("advanced_therapy", "terapia avanzada"),
+                ("prime_priority_medicine", "PRIME"),
+                ("conditional_approval", "aprobacion condicional"),
+                ("biosimilar", "biosimilar"),
+                ("generic", "generico"),
+            )
+            if str(row.get(key) or "").strip().lower() == "yes"
+        ]
+        if approval:
+            phase = regulatory = "Autorizado EMA"
+        elif opinion or status.lower().startswith("opinion"):
+            phase = regulatory = "Opinion CHMP"
+        elif status:
+            phase = regulatory = f"EMA: {status}"
+        else:
+            phase, regulatory = "Registro EMA", "Publicacion EMA"
+        parts = [name or inn, f"DCI: {inn}" if inn else "", f"Titular: {maker or 'n/d'}"]
+        if status:
+            parts.append(f"Estado EMA: {status}")
+        if flags:
+            parts.append("Marcadores: " + ", ".join(flags))
+        if indication:
+            parts.append(indication)
         return CanonicalRecord(
             external_id=ident[:180],
             title=name or inn,
-            url=DOWNLOAD_PAGE,
-            summary=clean_text(f"{name or inn}. {inn}. Titular: {maker or 'n/d'}.", 1500),
+            url=clean_text(row.get("medicine_url"), 1000) or DOWNLOAD_PAGE,
+            summary=clean_text(". ".join(p for p in parts if p), 1500),
             commercial_name=(name or inn)[:400],
             inn_name=inn,
             manufacturer=maker,
+            indication=indication or area,
             technology_type="medicamento",
-            development_phase="Autorizado EMA" if approval else "Registro EMA",
-            horizon="inminente" if approval else "transicional",
-            ema_approval_date=parse_compact_date(approval),
-            regulatory_status="Autorizado EMA" if approval else "Publicacion EMA",
-            published_date=approval or "",
+            development_phase=phase,
+            horizon="inminente" if (approval or opinion) else "transicional",
+            ema_approval_date=parse_compact_date(approval or opinion),
+            regulatory_status=regulatory,
+            published_date=approval or opinion or "",
             raw=row,
         )
 
@@ -173,6 +262,23 @@ class EmaConnector(Connector):
             published_date=published,
             raw=item,
         )
+
+
+def _is_current_human(row: dict) -> bool:
+    if str(row.get("category") or "Human").strip().lower() != "human":
+        return False
+    status = str(row.get("medicine_status") or "").strip().lower()
+    return not status.startswith(_STALE_STATUS)
+
+
+def _latest_movement(row: dict) -> str:
+    """Fecha ISO del ultimo hito regulatorio (dd/mm/aaaa en el reporte)."""
+    best = ""
+    for field in _DATE_FIELDS:
+        value = parse_compact_date(str(row.get(field) or ""))
+        if value and value.isoformat() > best:
+            best = value.isoformat()
+    return best
 
 
 def _parse_rss(xml_text: str) -> list[dict]:

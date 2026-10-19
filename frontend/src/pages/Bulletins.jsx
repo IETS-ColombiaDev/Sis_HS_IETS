@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { apiError } from "../api/client";
+import { downloadFromApi } from "../utils/download";
 import { useAuth } from "../auth/AuthContext";
 import { useCycle } from "../cycle/CycleContext";
 import { useRealtime } from "../realtime/RealtimeContext";
@@ -107,6 +108,14 @@ export default function Bulletins() {
       if (!win) toast.info("Si no se abrió una pestaña nueva, permita las ventanas emergentes para este sitio.");
     } catch (e) {
       toast.error(apiError(e, "No se pudo abrir el boletín"));
+    }
+  };
+
+  const exportPdf = async (b) => {
+    try {
+      await downloadFromApi(api, `/bulletins/${b.id}/export?format=pdf`, `boletin-${b.id}.pdf`);
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo generar el PDF del boletín"));
     }
   };
 
@@ -223,10 +232,18 @@ export default function Bulletins() {
               <HintButton
                 variant="outline"
                 onClick={() => exportHtml(b)}
-                hint="Abre la versión ejecutiva imprimible. Use Imprimir > Guardar como PDF para distribuirla."
+                hint="Abre la versión ejecutiva en una pestaña nueva."
                 data-testid={`bulletin-export-${b.id}`}
               >
                 Ver HTML ejecutivo
+              </HintButton>
+              <HintButton
+                variant="outline"
+                onClick={() => exportPdf(b)}
+                hint="Descarga el boletín en PDF (A4) listo para distribuir."
+                data-testid={`bulletin-pdf-${b.id}`}
+              >
+                Descargar PDF
               </HintButton>
             </div>
           </Card>

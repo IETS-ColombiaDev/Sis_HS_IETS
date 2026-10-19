@@ -101,9 +101,15 @@ export default function PublicFiche() {
           <div className="eval-actions">
             <Button
               variant="secondary"
-              onClick={() => window.open(`/api/public/technologies/${id}/export`, "_blank", "noopener")}
+              onClick={() => window.open(`/api/public/technologies/${id}/export?format=pdf`, "_blank", "noopener")}
             >
               Descargar ficha técnica
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => window.open(`/api/public/technologies/${id}/export`, "_blank", "noopener")}
+            >
+              Ver versión web
             </Button>
             <Link to="/expedientes">Volver al buscador</Link>
           </div>

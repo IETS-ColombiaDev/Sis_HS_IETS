@@ -417,6 +417,7 @@ def add_internal_comment(
 @router.get("/{doc_id}/export")
 def export_html(
     doc_id: int,
+    format: str = "html",
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -431,6 +432,10 @@ def export_html(
     cycle = db.get(Cycle, doc.cycle_id)
     html = evaluation_service.render_institutional_html(doc, tech, cycle_code=cycle.code if cycle else "")
     filename = f"iets-evaluacion-{doc.id}-v{doc.version_major}.{doc.version_minor}.html"
+    if format == "pdf":
+        from ..pdf_export import pdf_response
+
+        return pdf_response(html, filename[:-5] + ".pdf", doc.title or "Informe de evaluación")
     return Response(
         content=html,
         media_type="text/html; charset=utf-8",

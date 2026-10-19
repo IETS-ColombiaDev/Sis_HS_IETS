@@ -32,6 +32,56 @@ def test_minimax_strips_thinking_tags():
     assert text == "OK"
 
 
+def test_minimax_new_variants_do_not_take_m3_place():
+    # M3.1-Flash exige razonamiento adaptativo: no hereda la posicion ni la vision de M3.
+    chosen = minimax_service._pick_model(["MiniMax-M3.1-Flash", "MiniMax-M2.7", "MiniMax-M3"])
+    assert chosen == "MiniMax-M3"
+    assert not minimax_service.supports_vision("MiniMax-M3.1-Flash")
+    assert "thinking" not in minimax_service._completion_body("MiniMax-M3.1-Flash", [], 0.5, 64)
+    assert minimax_service._completion_body("MiniMax-M3", [], 0.5, 64)["thinking"] == {"type": "disabled"}
+
+
+def test_minimax_retries_without_thinking_when_model_rejects_it(monkeypatch):
+    calls = []
+
+    class FakeResp:
+        def __init__(self, code, text):
+            self.status_code, self.text = code, text
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def post(self, url, headers=None, json=None):
+            calls.append(dict(json))
+            if "thinking" in json:
+                return FakeResp(400, 'model requires adaptive thinking; thinking.type="disabled"')
+            return FakeResp(200, "{}")
+
+    monkeypatch.setattr(minimax_service, "_client", lambda timeout=45.0: FakeClient())
+    resp = minimax_service._post_completion("k", {"model": "X", "thinking": {"type": "disabled"}}, timeout=5)
+    assert resp.status_code == 200
+    assert len(calls) == 2 and "thinking" not in calls[1]
+
+
+def test_provider_off_disables_ai_despite_the_embedded_key():
+    ai_service.configure_runtime(provider="off", ocr_enabled=True, web_enabled=True, minimax_api_key="")
+    try:
+        assert ai_service.active_provider() == ""
+        assert not ai_service.is_enabled() and not ai_service.ocr_enabled() and not ai_service.web_assist_enabled()
+        assert ai_service.generate("hola") == ("", "")
+    finally:
+        ai_service.configure_runtime(provider="auto", ocr_enabled=False)
+
+
+def test_minimax_strips_unclosed_thinking():
+    text = minimax_service._extract_text({"choices": [{"message": {"content": "<think>razonamiento cortado"}}]})
+    assert text == ""
+
+
 def test_ocr_off_without_key():
     # Llave vacia del panel no apaga MiniMax: hay llave embebida de respaldo.
     ai_service.configure_runtime(
@@ -91,6 +141,58 @@ def test_parse_items_accepts_trailing_comma_and_findings_wrapper():
     items = ai_web._parse_items(text, "https://fuente.test", "Fuente")
     assert len(items) == 1
     assert "CAR-T" in items[0]["title"]
+
+
+def test_parse_items_salvages_every_item_of_a_truncated_answer():
+    # max_tokens corta el arreglo: se rescatan todos los objetos completos, no solo el primero.
+    text = """```json
+    [
+      {"title": "Paradise Ultrasound Renal Denervation", "summary": "Aprobado", "meta": {"pma": "P220023"}},
+      {"title": "Symplicity Spyral Renal Denervation", "summary": "Aprobado"},
+      {"title": "TriClip Transcatheter Tricuspid Valve", "summary": "Aprob"""
+    items = ai_web._parse_items(text, "https://fuente.test", "FDA")
+    assert [i["title"][:8] for i in items] == ["Paradise", "Symplici"]
+
+
+def test_extract_from_page_reports_an_empty_verdict(monkeypatch):
+    ai_service.configure_runtime(provider="minimax", web_enabled=True, ocr_enabled=False, minimax_api_key="sk-test-not-real")
+    monkeypatch.setattr(ai_service, "generate", lambda *a, **k: ("[]", "MiniMax-M3"))
+    report: dict = {}
+    html = "<html><body><main><p>Programa de dispositivos: requisitos y preguntas frecuentes.</p></main></body></html>"
+    items = ai_web.extract_from_page("FDA", "https://fuente.test", html=html, crawl={"combined": "texto"}, report=report)
+    assert items == [] and report["answered"] is True
+    monkeypatch.setattr(ai_service, "generate", lambda *a, **k: ("[Error MiniMax HTTP 500]", "MiniMax-M3"))
+    report = {}
+    ai_web.extract_from_page("FDA", "https://fuente.test", html=html, crawl={"combined": "texto"}, report=report)
+    assert "answered" not in report
+    ai_service.configure_runtime(minimax_api_key="")
+
+
+def test_ai_verdict_replaces_heuristic_links_only_on_generic_pages(monkeypatch):
+    from app import scraper
+
+    ai_service.configure_runtime(provider="minimax", web_enabled=True, ocr_enabled=False, minimax_api_key="sk-test-not-real")
+    signal = {"title": "Lecanemab en Alzheimer temprano", "url": "https://fuente.test"}
+
+    def fake_extract(**kw):
+        kw["report"]["answered"] = True
+        return [signal]
+
+    monkeypatch.setattr(ai_web, "extract_from_page", fake_extract)
+    nav = [{"title": "How to Study and Market Your Device", "url": "https://fuente.test/a"}]
+    kept = scraper._enrich_with_ai(list(nav), source_title="FDA", source_url="https://fuente.test", ai_decides=True)
+    assert kept == [signal]
+    merged = scraper._enrich_with_ai(list(nav), source_title="FDA", source_url="https://fuente.test")
+    assert len(merged) == 2
+    # Pipeline: con veredicto de la IA se conservan las filas reconocibles y caen los enlaces.
+    row = {"title": "DWH213 del-brax Facioscapulohumeral muscular dystrophy Neuroscience Phase 3 2028 siRNA DUX4 knockdown Lead Indication", "url": "https://fuente.test"}
+    link = {"title": "Download Roche Group Pharmaceuticals pipeline", "url": "https://fuente.test/pdf"}
+    kept = scraper._enrich_with_ai(
+        [row, link], source_title="Pipeline", source_url="https://fuente.test",
+        ai_decides=True, keep_heuristic=scraper._is_pipeline_row,
+    )
+    assert row in kept and link not in kept and signal in kept
+    ai_service.configure_runtime(minimax_api_key="")
 
 
 def test_parse_items_drops_nav_and_invented_nct():

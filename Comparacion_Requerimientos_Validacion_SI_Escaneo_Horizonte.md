@@ -32,6 +32,8 @@ Las mediciones de Render se tomaron con el servicio ya despierto. El arranque en
 
 **Hoy.** Catálogo D-06 + matriz EH: **95 fuentes** en seis bloques. Conectores API (`clinicaltrials`, `fda`, `ema`, `pubmed`, `who_ictrp`, `ctis`, Health Canada, etc.) y HTML de último recurso. Cada fuente tiene flujo (recorrido, OCR, IA, búsqueda web `site:`). Alta y edición manual en `/fuentes` y señales en `/bandeja-entrada`. Cola `ingest_jobs` con `POST /api/scan/run`.
 
+**Verificado 19 oct (ingesta real, una corrida por conector):** ClinicalTrials.gov 100 estudios, openFDA 120, PubMed 20, EMA 40 (reporte oficial JSON; el RSS antiguo daba 404), CTIS 40 (el portal ahora exige POST; antes 403), PCORI 40 fichas activas (API del buscador; el servidor omite el certificado intermedio y se completa por AIA), Health Canada 50 dispositivos clase III–IV y 50 medicamentos nuevos (sin genéricos ni productos de consumo). WHO ICTRP y TGA siguen por lote.
+
 **Brecha de despliegue.** En Render con SQLite el worker de vigilancia **está apagado** para no bloquear el login. El escaneo **manual** sí corre (ClinicalTrials.gov: 100 estudios en < 5 s el 8 oct). WHO ICTRP sigue por lote. EuroScan i-HTS no tiene conector API propio: entra como HTML.
 
 **Dictamen: cumple con brecha** (vigilancia programada y CAPTCHA; carga manual sí existe).
@@ -378,13 +380,13 @@ Las mediciones de Render se tomaron con el servicio ya despierto. El arranque en
 |---|---|
 | Prioridad | Deseable |
 | Concepto IETS | Viable |
-| Prototipo | Expedientes no confidenciales, sin montos; HTML institucional (no PDF nativo) |
+| Prototipo | Expedientes no confidenciales, sin montos; HTML institucional y PDF nativo |
 
-**Hoy.** `/expedientes` sin login. Exportación HTML imprimible (Imprimir → PDF), no PDF binario.
+**Hoy.** `/expedientes` sin login. «Descargar ficha técnica» entrega PDF A4 nativo (`/api/public/technologies/{id}/export?format=pdf`); la versión web HTML se conserva.
 
 **Verificado 13 oct:** `GET /api/public/technologies` y `/api/public/strategy/stats` → 200.
 
-**Dictamen: cumple con brecha** (PDF nativo).
+**Dictamen: cumple.**
 
 ---
 
@@ -394,13 +396,13 @@ Las mediciones de Render se tomaron con el servicio ya despierto. El arranque en
 |---|---|
 | Prioridad en matriz | Fuera de alcance |
 | Concepto IETS | **Replantear** (sin texto de propuesta en la celda) |
-| Prototipo | Compila al cerrar; aprobación del líder; PDF nativo pendiente |
+| Prototipo | Compila al cerrar; aprobación del líder; HTML ejecutivo y PDF nativo |
 
-**Hoy.** `/boletines`: compilación al cierre, maquetación HTML ejecutiva, aprobación. No hay PDF nativo ni envío automático a alta dirección.
+**Hoy.** `/boletines`: compilación al cierre, maquetación HTML ejecutiva, aprobación y «Descargar PDF» (A4, `?format=pdf`). Los informes de evaluación (RF14) también descargan PDF. No hay envío automático a alta dirección.
 
 **Verificado 13 oct:** `GET /api/bulletins?cycle_id=3` → 200.
 
-**Dictamen: parcial** (el generador existe; el entregable PDF/distribución institucional no).
+**Dictamen: cumple con brecha** (el PDF existe; falta la distribución automática a alta dirección, que depende de SMTP).
 
 ---
 
@@ -609,9 +611,9 @@ Dictamen de **software + despliegue actual** (esta nota):
 
 | Dictamen | IDs |
 |---|---|
-| Cumple | RF03, RF04, RF05, RF06, RF07, RF09, RF10, RF12, P1–P3, P5, P6, %P (regla de puntos), RF13, RF15, RF17, RNF01, RNF02, RNF09, RNF10 |
-| Cumple con brecha | RF01, RF02, RF08, P4, RF14, RF16, RF18, RF20, RNF05 (si el servicio está caliente), RNF08, RNF11 |
-| Parcial | RF11, RF19, RNF03, RNF07 |
+| Cumple | RF03, RF04, RF05, RF06, RF07, RF09, RF10, RF12, P1–P3, P5, P6, %P (regla de puntos), RF13, RF15, RF17, RF18, RNF01, RNF02, RNF09, RNF10 |
+| Cumple con brecha | RF01, RF02, RF08, P4, RF14, RF16, RF19, RF20, RNF05 (si el servicio está caliente), RNF08, RNF11 |
+| Parcial | RF11, RNF03, RNF07 |
 | No cumple (ambiente) | RNF04, RNF06, RNF12 en Render |
 | Pendiente de publicar | Base Firestore propia `hs-iets` + `FIREBASE_SERVICE_ACCOUNT_KEY` en Render |
 
@@ -624,9 +626,9 @@ Los **nueve “Replantear”** de la matriz (RF08, RF11, P1–P6, RF19) no signi
 Estos ítems no son filas de la Excel; sí determinan si el sistema “funciona al 100 %” en Render:
 
 1. **Disco efímero.** SQLite en el plan gratuito se borra al dormir o redesplegar. El 13 oct el inventario de trabajo estaba en **0 hallazgos**. El 8 oct se habían cargado decenas vía ClinicalTrials.gov.
-2. **Base en Firebase.** Instantánea gzip en Firestore (`hs_iets_db`). Código listo; en Render hace falta `FIREBASE_SERVICE_ACCOUNT_KEY` y publicar.
+2. **Base en Firebase.** Firestore es el almacén: instantánea gzip en `(default)/hs_iets_db`, publicada ~5 s después de cada cambio y al apagar; el servidor se restaura desde allí al arrancar. **Verificado 19 oct** contra Firestore real: tres generaciones de servidor con disco borrado entre cada una conservan todos los cambios. Corregido ese día: publicaciones concurrentes podían dejar una copia vieja en la nube; en Windows la restauración fallaba por el archivo temporal; y los entornos de desarrollo y pruebas escribían en la colección de producción (ahora usan `hs_iets_db_dev`; el servidor de Render, que corre con `ENVIRONMENT=development`, sigue en `hs_iets_db` porque define `RENDER=true`). En Render falta solo `FIREBASE_SERVICE_ACCOUNT_KEY`.
 3. **Login vs worker.** Varios workers o el hilo de ingesta sobre SQLite producían `database is locked` y el spinner de ingreso. Mitigado: un proceso, login de usuarios existentes **sin escritura**, worker apagado con SQLite.
-4. **MiniMax.** Llave embebida + panel. Prueba real 13 oct: **OK, MiniMax-M3, 2,3 s**.
+4. **MiniMax.** Llave embebida + panel. Prueba real 19 oct: **OK, MiniMax-M3**. La cuenta expone ahora `MiniMax-M3.1-Flash`, que rechaza `thinking: disabled`; la detección lo elegía y todas las llamadas fallaban hasta la corrección del 19 oct. `AI_PROVIDER=off` (o «Apagada» en Configuración) desactiva la IA aunque exista la llave embebida.
 5. **Acceso de desarrollo público.** Contradice RNF12 mientras `ENVIRONMENT=development`.
 
 ---

@@ -23,11 +23,56 @@ def normalize(text: str) -> str:
     return "".join(c for c in decomposed if not unicodedata.combining(c))
 
 
+def _keyword_pattern(kw: str) -> re.Pattern | None:
+    """Coincidencia por palabra, no por subcadena.
+
+    Las palabras clave son raices ("oncolog", "diabet"): deben empezar palabra.
+    Las cortas o escritas entre espacios (" ia ", "app", "pcr") deben ser la
+    palabra completa; antes "ia" coincidia dentro de "diabetes" y "app" dentro de
+    "approved". "mab" es sufijo de anticuerpos (pembrolizumab): termina palabra.
+    """
+    raw = normalize(kw)
+    needle = raw.strip()
+    if not needle:
+        return None
+    word = re.escape(needle)
+    if needle == "mab":
+        return re.compile(rf"{word}(?![a-z0-9])")
+    if len(needle) <= 3 or raw != needle:
+        return re.compile(rf"(?<![a-z0-9]){word}(?![a-z0-9])")
+    return re.compile(rf"(?<![a-z0-9]){word}")
+
+
+# Equivalentes en ingles, incorporados al codigo: las fuentes internacionales
+# (EMA, FDA, Health Canada, CTIS, PCORI) publican en ingles y las palabras clave
+# del catalogo estan en espanol. Se suman a las del catalogo, que el
+# administrador sigue editando en Configuracion.
+BUILTIN_EN_KEYWORDS: dict[str, list[str]] = {
+    "cancer": ["neoplasm", "tumour", "leukemia", "leukaemia", "lymphoma", "myeloma", "oncology", "malignan", "glioma", "glioblastoma"],
+    "alto_costo": ["renal disease", "kidney disease", "dialysis", "transplant", "hiv", "haemophilia", "hemophilia", "rheumatoid arthritis", "multiple sclerosis", "hepatitis c"],
+    "huerfanas": [" rare ", "orphan", "spinal muscular atrophy", "cystic fibrosis", "amyloidosis", "lysosomal", "niemann-pick", "angelman", "sickle cell", "thalassemia", "thalassaemia"],
+    "infecciosas_emergentes": ["infection", "infectious", "vaccine", "virus", "viral", "bacterial", "antibiotic", "antiviral", "hepatitis b", "rsv", "respiratory syncytial"],
+    "prevalentes": ["diabetes", "hypertension", "obesity", "heart failure", "cardiovascular", "copd", "asthma", "depression", "anxiety", "schizophrenia", "alzheimer", "dementia", "stroke", "dyslipidemia", "hypercholesterolemia", "chronic kidney"],
+    "otras_prioritarias": ["maternal", "neonatal", "pediatric", "paediatric", "pregnancy", "contracepti", "palliative", "rehabilitation", "nutrition"],
+    "medicamento": ["tablet", "capsule", "injection", "infusion", "solution for", "pharmaceutical", "monoclonal antibody", "antibody", "inhibitor", "agonist", "antagonist", "small molecule", "dci", "principio activo"],
+    "terapia_avanzada": ["cell therapy", "gene editing", "viral vector", "aav", "antisense", "oligonucleotide", "sirna", "rna interference"],
+    "dispositivo": ["implant", "catheter", "valve", "pump", "prosthesis", "orthosis", "pacemaker", "defibrillator", "neurostimulat", "medical device"],
+    "diagnostico_ivd": ["assay", "test kit", "reagent", "companion diagnostic", "ngs", "sequencing", "biomarker", "imaging agent", "tracer", "pet/ct"],
+    "procedimiento": ["procedure", "surgical", "minimally invasive", "transcatheter", "denervation"],
+    "salud_digital": ["mobile health", "mhealth", "telehealth", "remote monitoring", "digital therapeutic", "smartphone"],
+    "ia": ["agentic", "large language model", "computer vision", "neural network"],
+}
+
+
+def _keywords_for(row) -> list[str]:
+    return list(row.keywords or []) + BUILTIN_EN_KEYWORDS.get(getattr(row, "code", ""), [])
+
+
 def _score_keywords(blob: str, keywords: list[str] | None) -> tuple[int, list[str]]:
     hits: list[str] = []
     for kw in keywords or []:
-        needle = normalize(kw).strip()
-        if needle and needle in blob:
+        pattern = _keyword_pattern(kw)
+        if pattern and pattern.search(blob):
             hits.append(kw.strip())
     return len(hits), hits
 
@@ -61,7 +106,7 @@ def suggest_cluster(
     best_reason = ""
 
     for cluster in db.query(Cluster).filter(Cluster.is_active == True).order_by(Cluster.sort_order):  # noqa: E712
-        score, hits = _score_keywords(blob, cluster.keywords)
+        score, hits = _score_keywords(blob, _keywords_for(cluster))
         icd_score, icd_hits = _score_icd10(icd10_codes, cluster.icd10_prefixes)
         mesh_score, mesh_hits = _score_keywords(mesh_blob, cluster.mesh_terms)
         total = score + icd_score + mesh_score * 2
@@ -94,7 +139,7 @@ def suggest_tech_type(
     best_score = 0
     best_reason = ""
     for tt in types:
-        score, hits = _score_keywords(blob, tt.keywords)
+        score, hits = _score_keywords(blob, _keywords_for(tt))
         if score:
             weight = score * (2 if tt.code in ("terapia_avanzada", "ia", "diagnostico_ivd") else 1)
             if weight > best_score:

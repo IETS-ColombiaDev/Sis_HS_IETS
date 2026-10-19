@@ -11,6 +11,37 @@ from app.models import User
 from app.routers import backup as backup_router
 
 
+@pytest.fixture(autouse=True)
+def _production_collection(monkeypatch):
+    """Las reglas de aislamiento se prueban sobre la coleccion de produccion."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "environment", "production")
+
+
+def test_non_production_never_uses_the_production_collection(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "environment", "development")
+    monkeypatch.delenv("RENDER", raising=False)
+    assert firebase_db._collection() == "hs_iets_db_dev"
+    # Render corre hoy con ENVIRONMENT=development: sigue usando la coleccion real.
+    monkeypatch.setenv("RENDER", "true")
+    assert firebase_db._collection() == "hs_iets_db"
+    monkeypatch.delenv("RENDER")
+    monkeypatch.setattr(settings, "firebase_db_share_with_production", True)
+    assert firebase_db._collection() == "hs_iets_db"
+
+
+def test_empty_rrhh_env_override_disables_the_sibling_lookup(monkeypatch):
+    from app import firebase_auth
+
+    monkeypatch.setenv("FIREBASE_RRHH_ENV_FILE", "")
+    assert firebase_auth.sibling_rrhh_env() is None
+    monkeypatch.delenv("FIREBASE_RRHH_ENV_FILE")
+    assert firebase_auth.sibling_rrhh_env().name == ".env.local"
+
+
 def test_disabled_during_pytest():
     assert firebase_db.enabled() is False
     assert firebase_db.push_now(force=True)["reason"] == "disabled"
@@ -205,6 +236,50 @@ def test_push_splits_and_roundtrip(store, monkeypatch):
 
     skipped = firebase_db.push_now()
     assert skipped["skipped"] is True
+
+
+def test_concurrent_pushes_never_leave_an_older_snapshot_in_the_cloud(store, monkeypatch):
+    """La copia de arranque (lenta) no puede pisar a una mas nueva que termino antes."""
+    import threading
+    import time
+
+    state = {"version": 0}
+    first_upload_started = threading.Event()
+
+    def export():
+        state["version"] += 1
+        payload = f"GZIP-v{state['version']}".encode()
+        return payload, {"epoch": "e", "fingerprint": "f", "taken_at": f"v{state['version']}", "raw_size": 1}
+
+    original_put = firebase_db._put_doc
+
+    def slow_put(doc_id, fields):
+        if not first_upload_started.is_set():
+            first_upload_started.set()
+            time.sleep(0.3)  # la primera subida tarda: antes, la segunda la adelantaba
+        original_put(doc_id, fields)
+
+    monkeypatch.setattr(firebase_db.browser_backup, "export_snapshot", export)
+    monkeypatch.setattr(firebase_db, "_put_doc", slow_put)
+    boot = threading.Thread(target=firebase_db.push_now, kwargs={"force": True})
+    boot.start()
+    first_upload_started.wait(2)
+    state["version"] = 10  # llegan cambios mientras sube la copia de arranque
+    firebase_db.push_now(force=True)
+    boot.join(5)
+
+    meta = firebase_db.fetch_meta()
+    assert firebase_db._fetch_payload(meta) == b"GZIP-v11"
+
+
+def test_a_commit_during_a_push_is_still_scheduled(store, monkeypatch):
+    monkeypatch.setattr(firebase_db, "_autosync", True)
+    monkeypatch.setattr(firebase_db, "_busy", True)
+    firebase_db.schedule_push()
+    try:
+        assert firebase_db._timer is not None and firebase_db._timer.is_alive()
+    finally:
+        firebase_db.disable_autosync()
 
 
 def test_fetch_rejects_corrupt_sha(store):

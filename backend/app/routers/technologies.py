@@ -21,6 +21,7 @@ from ..models import (
     Cluster,
     Cycle,
     CycleTechnology,
+    Finding,
     PriorityScore,
     Source,
     TechType,
@@ -426,8 +427,11 @@ def suggest_classification(
         icd10_codes=tech.icd10_codes,
         mesh_terms=tech.mesh_terms,
     )
+    finding = db.get(Finding, tech.finding_id) if tech.finding_id else None
     type_id, type_reason = suggest_tech_type(
         db,
+        # El tipo que declaro el conector (EMA = medicamento, MDALL = dispositivo).
+        legacy_type=finding.technology_type if finding else "",
         title=tech.commercial_name,
         summary=tech.summary,
         technology=tech.inn_name,

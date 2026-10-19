@@ -67,13 +67,17 @@ def get_fiche(technology_id: int, request: Request, db: Session = Depends(get_db
 
 
 @router.get("/technologies/{technology_id}/export")
-def export_fiche(technology_id: int, request: Request, db: Session = Depends(get_db)):
+def export_fiche(technology_id: int, request: Request, format: str = "html", db: Session = Depends(get_db)):
     _rate_limit(request)
     try:
         data = strategy_service.public_fiche(db, technology_id)
     except StrategyRuleError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     html = strategy_service.render_public_fiche_html(data)
+    if format == "pdf":
+        from ..pdf_export import pdf_response
+
+        return pdf_response(html, f"ficha-publica-{technology_id}.pdf", data.get("title") or "Ficha pública")
     return Response(
         content=html,
         media_type="text/html; charset=utf-8",

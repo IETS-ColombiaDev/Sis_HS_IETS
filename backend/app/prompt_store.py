@@ -78,12 +78,12 @@ No copie el esquema de ejemplo. No invente identificadores NCT ni tecnologias qu
 Si dos menciones son la misma tecnologia, unifique en un item.
 Si no hay senales reales, []."""
 
-DEFAULT_MAX_TOKENS = 2048
+DEFAULT_MAX_TOKENS = 4096
 DEFAULT_MAX_PAGES = 8
 DEFAULT_MAX_CHARS = 28000
 DEFAULT_FETCH_TIMEOUT = 25
 DEFAULT_CHILD_TIMEOUT = 15
-DEFAULT_AI_TIMEOUT = 60
+DEFAULT_AI_TIMEOUT = 120
 DEFAULT_RETRIES = 3
 DEFAULT_PAUSE_MS = 350
 MAX_TOKENS_MIN, MAX_TOKENS_MAX = 256, 8192

@@ -207,13 +207,19 @@ def _normalize_item(item: dict, source_url: str, source_title: str, source_text:
     return _drop_invented_nct(out, source_text)
 
 
-def _loads_payload(text: str) -> list:
+def _decode_payload(text: str) -> list | None:
+    """Lista de items del modelo; None si no hay JSON legible.
+
+    Si la respuesta se corto por max_tokens (arreglo sin cerrar), rescata todos
+    los objetos completos de primer nivel en lugar de solo el primero.
+    """
     blob = _FENCE.sub("", text).replace("```", "")
     decoder = json.JSONDecoder()
     arrays: list = []
     objects: list = []
+    covered_until = -1
     for i, ch in enumerate(blob):
-        if ch not in "[{":
+        if ch not in "[{" or i < covered_until:
             continue
         piece = blob[i:]
         variants = [piece]
@@ -221,9 +227,10 @@ def _loads_payload(text: str) -> list:
         if stripped != piece:
             variants.append(stripped)
         decoded = None
+        end = 0
         for candidate in variants:
             try:
-                decoded, _end = decoder.raw_decode(candidate)
+                decoded, end = decoder.raw_decode(candidate)
                 break
             except json.JSONDecodeError:
                 continue
@@ -233,6 +240,9 @@ def _loads_payload(text: str) -> list:
                 break
         elif isinstance(decoded, dict):
             objects.append(decoded)
+            if candidate is piece:
+                # Los objetos anidados de este item ya quedaron dentro de el.
+                covered_until = i + end
     for data in arrays:
         if data:
             return data
@@ -243,8 +253,12 @@ def _loads_payload(text: str) -> list:
         if isinstance(rows, list):
             return rows
     if objects:
-        return [objects[0]]
-    return []
+        return objects
+    return None
+
+
+def _loads_payload(text: str) -> list:
+    return _decode_payload(text) or []
 
 
 def _parse_items(text: str, source_url: str, source_title: str, source_text: str = "") -> list[dict]:
@@ -275,8 +289,12 @@ def extract_from_page(
     allow_ai: bool = True,
     allow_ocr: bool = True,
     source_context: str = "",
+    report: dict | None = None,
 ) -> list[dict]:
     """Pide a la IA que entre al contenido real del sitio (listado + fichas).
+
+    Si se pasa `report`, queda report["answered"] = True cuando el modelo
+    devolvio JSON legible (aunque sea []): su veredicto sobre la pagina.
 
     `allow_ai` / `allow_ocr` son las casillas del flujo de la fuente: se suman
     a los interruptores globales, nunca los encienden.
@@ -353,6 +371,8 @@ def extract_from_page(
         )
     except Exception:  # noqa: BLE001
         return []
+    if report is not None and text and not text.startswith("[Error"):
+        report["answered"] = _decode_payload(text) is not None
     return _parse_items(text, source_url, source_title, source_text=main_text)
 
 

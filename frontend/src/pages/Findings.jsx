@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import api, { apiError } from "../api/client";
+import api, { AI_TIMEOUT, apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { useToast } from "../components/Toast";
@@ -150,7 +150,7 @@ export default function Findings() {
   const generateRec = async (f) => {
     setGenId(f.id);
     try {
-      const { data } = await api.post("/recommendations/generate", { finding_id: f.id });
+      const { data } = await api.post("/recommendations/generate", { finding_id: f.id }, { timeout: AI_TIMEOUT });
       const preliminary = /sin IA|fallback/i.test(data.model_used || "");
       if (preliminary) toast.warning("IA no configurada: se creó un informe preliminar para completar en Diseminación.");
       else toast.success(`Informe generado (${data.model_used})`);
@@ -165,7 +165,7 @@ export default function Findings() {
   const enhanceFinding = async (f) => {
     setEnhancingId(f.id);
     try {
-      const { data } = await api.post(`/findings/${f.id}/enhance-ai`);
+      const { data } = await api.post(`/findings/${f.id}/enhance-ai`, null, { timeout: AI_TIMEOUT });
       toast.success("Ficha enriquecida con IA. Revise el resultado.");
       setDetail(data);
       load();

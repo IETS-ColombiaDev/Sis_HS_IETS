@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import api, { apiError } from "../api/client";
+import api, { AI_TIMEOUT, apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
 import Button from "../components/Button";
@@ -87,7 +87,7 @@ export default function Chat() {
     setMessages((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", content: message }]);
     setSending(true);
     try {
-      const { data } = await api.post("/chat/send", { session_id: activeId, message });
+      const { data } = await api.post("/chat/send", { session_id: activeId, message }, { timeout: AI_TIMEOUT });
       setActiveId(data.session.id);
       setMessages((m) => [...m, data.answer]);
       loadSessions();

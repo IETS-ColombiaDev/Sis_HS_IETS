@@ -28,7 +28,7 @@ LOCATION = "nam5"
 META_ID = "meta"
 CHUNK_PREFIX = "c"
 CHUNK_BYTES = 600_000
-PUSH_DEBOUNCE_S = 20.0
+PUSH_DEBOUNCE_S = 5.0
 _RESERVED_DEFAULT = {"(default)", "default"}
 _RRHH_COLLECTIONS = {"usuarios", "users"}
 _resolved_db: str | None = None
@@ -37,6 +37,11 @@ _autosync = False
 _busy = False
 _timer: threading.Timer | None = None
 _lock = threading.Lock()
+# Serializa exportar + subir (y restaurar): sin esto, la copia de arranque, la del
+# temporizador y la del apagado corrian a la vez y una foto vieja que terminaba de
+# subir despues pisaba a la nueva en Firestore.
+_sync_lock = threading.RLock()
+SYNC_WAIT_S = 180.0
 _last_sha = ""
 _status: dict = {"configured": False, "synced": False}
 
@@ -79,9 +84,24 @@ def _location() -> str:
     return name or LOCATION
 
 
+DEV_SUFFIX = "_dev"
+
+
 def _collection() -> str:
-    name = (getattr(settings, "firebase_db_collection", "") or COLLECTION).strip()
-    return name or COLLECTION
+    """Coleccion de la copia. Fuera de produccion siempre lleva el sufijo `_dev`.
+
+    El desarrollo local y las pruebas de navegador comparten la cuenta de servicio
+    con Render: sin esta separacion, un servidor de pruebas restauraba la base de
+    produccion al arrancar y la sobrescribia con usuarios y ciclos de prueba.
+    El servidor desplegado usa la coleccion real aunque corra con
+    ENVIRONMENT=development (Render define RENDER=true).
+    FIREBASE_DB_SHARE_WITH_PRODUCTION=true lo permite a proposito (soporte).
+    """
+    name = (getattr(settings, "firebase_db_collection", "") or COLLECTION).strip() or COLLECTION
+    deployed = settings.is_production or os.environ.get("RENDER", "").strip().lower() == "true"
+    if deployed or getattr(settings, "firebase_db_share_with_production", False):
+        return name
+    return name if name.endswith(DEV_SUFFIX) else f"{name}{DEV_SUFFIX}"
 
 
 def reset_resolved() -> None:
@@ -326,13 +346,20 @@ def _fetch_payload(meta: dict) -> bytes:
 
 
 def push_now(*, force: bool = False) -> dict:
-    global _last_sha, _status, _busy
     if not enabled():
         return {"ok": False, "reason": "disabled"}
     if not firebase_auth.configured():
         return {"ok": False, "reason": "sin_credenciales"}
-    if _busy:
+    if not _sync_lock.acquire(timeout=SYNC_WAIT_S):
         return {"ok": False, "reason": "busy"}
+    try:
+        return _push_locked(force=force)
+    finally:
+        _sync_lock.release()
+
+
+def _push_locked(*, force: bool) -> dict:
+    global _last_sha, _status, _busy
     _busy = True
     try:
         payload, snap = browser_backup.export_snapshot()
@@ -397,6 +424,11 @@ def _cloud_should_win(cloud: dict, local: dict) -> bool:
 
 def pull_if_needed() -> dict:
     """Restaura desde Firestore si el disco local esta vacio o atrasado."""
+    with _sync_lock:
+        return _pull_locked()
+
+
+def _pull_locked() -> dict:
     global _last_sha, _status, _busy
     if not enabled():
         _status = {"configured": firebase_auth.configured(), "enabled": False}
@@ -446,7 +478,9 @@ def pull_if_needed() -> dict:
 
 def schedule_push() -> None:
     global _timer
-    if not _autosync or _busy or not enabled():
+    # No se descarta aunque haya una copia en curso: el temporizador espera el
+    # candado y sube el estado mas reciente.
+    if not _autosync or not enabled():
         return
     with _lock:
         if _timer is not None:
@@ -457,7 +491,7 @@ def schedule_push() -> None:
 
 
 def _flush() -> None:
-    if _busy or not enabled():
+    if not enabled():
         return
     try:
         push_now()

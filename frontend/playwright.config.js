@@ -54,6 +54,8 @@ export default defineConfig({
           // Aislado del backend/.env del equipo: las pruebas asumen IA apagada, sin
           // reCAPTCHA, sin correo saliente y sin directorio institucional (como en CI).
           MINIMAX_API_KEY: "",
+          // Hay una llave MiniMax embebida de respaldo: solo "off" apaga la IA.
+          AI_PROVIDER: "off",
           GEMINI_API_KEY: "",
           RECAPTCHA_SECRET: "",
           RECAPTCHA_SITE_KEY: "",
@@ -61,6 +63,8 @@ export default defineConfig({
           FIREBASE_SERVICE_ACCOUNT_KEY: "",
           FIREBASE_SERVICE_ACCOUNT_FILE: "",
           FIREBASE_RRHH_ENV_FILE: "",
+          // Nunca tocar la copia de produccion en Firestore desde las pruebas.
+          FIREBASE_DB_ENABLED: "false",
         },
       },
 });

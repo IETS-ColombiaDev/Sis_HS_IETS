@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import api, { apiError } from "../api/client";
+import api, { AI_TIMEOUT, apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
 import { PageHeader, Card, SectionTitle } from "../components/Card";
@@ -50,11 +50,11 @@ export default function Settings() {
   const [provider, setProvider] = useState("auto");
   const [ocrEnabled, setOcrEnabled] = useState(false);
   const [webEnabled, setWebEnabled] = useState(true);
-  const [scanMaxTokens, setScanMaxTokens] = useState(2048);
+  const [scanMaxTokens, setScanMaxTokens] = useState(4096);
   const [scanMaxPages, setScanMaxPages] = useState(8);
   const [fetchTimeout, setFetchTimeout] = useState(25);
   const [childTimeout, setChildTimeout] = useState(15);
-  const [aiTimeout, setAiTimeout] = useState(60);
+  const [aiTimeout, setAiTimeout] = useState(120);
   const [retries, setRetries] = useState(3);
   const [pauseMs, setPauseMs] = useState(350);
   const [traces, setTraces] = useState([]);
@@ -71,11 +71,11 @@ export default function Settings() {
     setProvider(data.ai_provider || "auto");
     setOcrEnabled(Boolean(data.ai_ocr_enabled));
     setWebEnabled(data.ai_web_enabled !== false);
-    setScanMaxTokens(data.scan_max_tokens || 2048);
+    setScanMaxTokens(data.scan_max_tokens || 4096);
     setScanMaxPages(data.scan_max_pages || 8);
     setFetchTimeout(data.scan_fetch_timeout || 25);
     setChildTimeout(data.scan_child_timeout || 15);
-    setAiTimeout(data.scan_ai_timeout || 60);
+    setAiTimeout(data.scan_ai_timeout || 120);
     setRetries(data.scan_retries ?? 3);
     setPauseMs(data.scan_pause_ms ?? 350);
     setNcbiEmail(data.ncbi_email || "");
@@ -154,7 +154,7 @@ export default function Settings() {
       const payload = { provider: who };
       if (who === "minimax" && minimaxToken.trim()) payload.minimax_api_key = minimaxToken.trim();
       if (who === "gemini" && token.trim()) payload.gemini_api_key = token.trim();
-      const { data } = await api.post("/config/test", payload);
+      const { data } = await api.post("/config/test", payload, { timeout: AI_TIMEOUT });
       setBanner({ type: data.ok ? "ok" : "error", message: data.message });
       if (data.ok) {
         toast.success(`Conexión ${who === "gemini" ? "Gemini" : "MiniMax"} verificada`);
@@ -175,7 +175,7 @@ export default function Settings() {
     setDetecting(true);
     setBanner(null);
     try {
-      const { data } = await api.post("/config/detect-models");
+      const { data } = await api.post("/config/detect-models", null, { timeout: AI_TIMEOUT });
       setBanner({ type: data.ok ? "ok" : "error", message: data.message });
       if (data.ok) {
         setMinimaxModel("");
@@ -203,11 +203,11 @@ export default function Settings() {
         ai_provider: provider,
         ai_ocr_enabled: ocrEnabled,
         ai_web_enabled: webEnabled,
-        scan_max_tokens: Number(scanMaxTokens) || 2048,
+        scan_max_tokens: Number(scanMaxTokens) || 4096,
         scan_max_pages: Number(scanMaxPages) || 8,
         scan_fetch_timeout: Number(fetchTimeout) || 25,
         scan_child_timeout: Number(childTimeout) || 15,
-        scan_ai_timeout: Number(aiTimeout) || 60,
+        scan_ai_timeout: Number(aiTimeout) || 120,
         scan_retries: Number(retries) || 0,
         scan_pause_ms: Number(pauseMs) || 0,
       };
@@ -402,6 +402,7 @@ export default function Settings() {
             <option value="auto">Automático (MiniMax si hay llave; si no, Gemini)</option>
             <option value="minimax">Solo MiniMax</option>
             <option value="gemini">Solo Gemini</option>
+            <option value="off">Apagada (sin IA; se usan los modos de respaldo)</option>
           </Select>
 
           <Select label="Modelo MiniMax" hint="Automático elige el mejor modelo que responda con su llave. Use Detectar mejor modelo para probarlo." value={minimaxModel} onChange={(e) => setMinimaxModel(e.target.value)}>
@@ -754,7 +755,7 @@ function PromptsPanel({ prompts, setPrompts, toast, saving, setSaving }) {
       const { data } = await api.put("/config/prompts", {
         system: prompts.system,
         user: prompts.user,
-        max_tokens: Number(prompts.max_tokens) || 2048,
+        max_tokens: Number(prompts.max_tokens) || 4096,
         max_pages: Number(prompts.max_pages) || 8,
         max_chars: Number(prompts.max_chars) || 28000,
       });

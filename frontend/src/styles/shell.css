@@ -50,6 +50,19 @@
   .header-title {
     font-size: 15px !important;
     max-width: 30vw;
+    /* El titulo cede espacio: sin esto el avatar quedaba 14 px fuera a 390 px. */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .app-header-left {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .app-header-right {
+    /* Sus piezas (guia, ciclo, avatar) no se encogen: todo el ajuste lo absorbe el titulo. */
+    flex: 0 0 auto;
   }
   .app-header .header-status,
   .app-header .cycle-switcher > .info-tip,

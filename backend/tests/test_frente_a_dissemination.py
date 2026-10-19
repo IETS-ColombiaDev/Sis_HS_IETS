@@ -47,6 +47,30 @@ def test_publishing_follows_approval_and_is_final(h):
     assert export.status_code == 200 and "text/html" in export.headers["content-type"]
 
 
+def test_bulletin_exports_a_native_pdf(h):
+    cycle = h.cycle(status="en_evaluacion")
+    bid = h.client.post(f"/api/bulletins/compile/{cycle.id}").json()["id"]
+
+    pdf = h.client.get(f"/api/bulletins/{bid}/export?format=pdf")
+
+    assert pdf.status_code == 200
+    assert pdf.headers["content-type"] == "application/pdf"
+    assert pdf.content.startswith(b"%PDF") and f"boletin-{bid}.pdf" in pdf.headers["content-disposition"]
+
+
+def test_pdf_export_survives_markup_and_glyphs_outside_the_font():
+    from app.pdf_export import html_to_pdf
+
+    html = (
+        "<html><body><div class='sheet'><header><div class='kicker'>R&amp;D · IETS</div>"
+        "<h1>Anti-β-amiloide &lt;nuevo&gt;</h1></header><article class='block'><h3>Población</h3>"
+        "<p>Adultos ≥ 50 años — «IETS»</p></article><table><tr><th>A</th></tr><tr><td>1</td></tr></table>"
+        "<ul><li><a href='https://clinicaltrials.gov/study/NCT1'>NCT1</a></li></ul></div></body></html>"
+    )
+
+    assert html_to_pdf(html).startswith(b"%PDF")
+
+
 def test_bulletin_actions_require_cycle_write(h):
     cycle = h.cycle(status="en_evaluacion")
 

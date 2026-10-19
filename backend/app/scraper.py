@@ -832,6 +832,12 @@ def _summarize(text: str, limit: int = 600) -> str:
     return cut + "..."
 
 
+def _is_pipeline_row(item: dict) -> bool:
+    from .ingest.pipeline_rows import parse_row
+
+    return parse_row(item.get("title") or "") is not None
+
+
 def _enrich_with_ai(
     findings_data: list[dict],
     *,
@@ -844,8 +850,16 @@ def _enrich_with_ai(
     allow_ai: bool = True,
     allow_ocr: bool = True,
     source_context: str = "",
+    ai_decides: bool = False,
+    keep_heuristic=None,
 ) -> list[dict]:
-    """Si la IA web/OCR esta activa (global y en el flujo de la fuente), complementa hallazgos."""
+    """Si la IA web/OCR esta activa (global y en el flujo de la fuente), complementa hallazgos.
+
+    Con `ai_decides` (paginas HTML genericas) y una respuesta legible de la IA,
+    sus senales reemplazan a los candidatos heuristicos, que en esas paginas son
+    sobre todo enlaces de navegacion. `keep_heuristic(item)` conserva los que
+    si son datos estructurados (filas de pipeline). Si la IA falla, quedan todos.
+    """
     try:
         from . import ai_service, ai_web
 
@@ -858,6 +872,7 @@ def _enrich_with_ai(
                 )
             return findings_data
         t0 = time.perf_counter()
+        report: dict = {}
         extra = ai_web.extract_from_page(
             source_title=source_title,
             source_url=source_url,
@@ -868,16 +883,23 @@ def _enrich_with_ai(
             allow_ai=allow_ai,
             allow_ocr=allow_ocr,
             source_context=source_context,
+            report=report,
         )
+        replaced = ai_decides and report.get("answered") and web_on
+        kept = [d for d in findings_data if keep_heuristic and keep_heuristic(d)] if replaced else findings_data
+        dropped = len(findings_data) - len(kept)
         if isinstance(crawl, dict):
             crawl.setdefault("steps", []).append(
                 {
                     "action": "ia",
                     "status": "ok" if extra else "sin_senales",
                     "ms": int((time.perf_counter() - t0) * 1000),
-                    "detail": f"{len(extra)} senales estructuradas" if extra else "sin senales nuevas",
+                    "detail": (f"{len(extra)} senales estructuradas" if extra else "sin senales nuevas")
+                    + (f"; {dropped} enlace(s) heuristico(s) descartados" if dropped else ""),
                 }
             )
+        if replaced:
+            return ai_web.merge_findings(kept, extra) if extra else kept
         if extra:
             return ai_web.merge_findings(findings_data, extra)
     except Exception:  # noqa: BLE001
@@ -1060,6 +1082,8 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                 allow_ai=profile["ai"],
                 allow_ocr=profile["ocr"],
                 source_context=context,
+                ai_decides=True,
+                keep_heuristic=_is_pipeline_row if is_pipeline_source(source) else None,
             )
 
         new_count = 0
@@ -1248,7 +1272,17 @@ def preview_url(url: str) -> dict:
         cands = extract_candidates(src, text)
         crawl = crawl_site(url, html=text)
         cands = apply_crawled_text(cands, crawl)
-        cands = _enrich_with_ai(cands, source_title=title or url, source_url=url, html=text, crawl=crawl)
+        from .ingest.pipeline_rows import is_pipeline_source
+
+        cands = _enrich_with_ai(
+            cands,
+            source_title=title or url,
+            source_url=url,
+            html=text,
+            crawl=crawl,
+            ai_decides=True,
+            keep_heuristic=_is_pipeline_row if is_pipeline_source(src) else None,
+        )
         sample = [
             {
                 "title": c["title"],
