@@ -47,6 +47,23 @@ def _http_client(url: str, timeout: float, headers: dict) -> httpx.Client:
     return httpx.Client(timeout=timeout, follow_redirects=True, headers=headers, verify=verify)
 
 
+def tls_get(url: str, *, timeout, headers: dict, params: dict | None = None) -> httpx.Response:
+    """GET de una sola vez que completa la cadena TLS por AIA si hace falta.
+
+    Lo usan la sonda de fuentes y el escaner HTML, que no pasan por los
+    reintentos de `request_*` pero sufren los mismos servidores mal configurados.
+    """
+    extra = {"params": params} if params else {}
+    try:
+        with _http_client(url, timeout, headers) as client:
+            return client.get(url, **extra)
+    except httpx.TransportError as exc:
+        if not _learn_missing_intermediate(url, exc):
+            raise
+        with _http_client(url, timeout, headers) as client:
+            return client.get(url, **extra)
+
+
 def _learn_missing_intermediate(url: str, exc: Exception) -> bool:
     """True si se aprendio el intermedio del host y conviene reintentar ya."""
     host = _host(url)

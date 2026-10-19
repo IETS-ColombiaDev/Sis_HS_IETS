@@ -17,10 +17,13 @@ services:
     envVars:
       - key: WEB_CONCURRENCY
         value: "1"
-      # false en el arranque web evita pelear el SQLite con el login; active
-      # vigilancia luego o use un servicio worker aparte.
+      # Vigilancia programada y cola de ingesta en el mismo proceso. Desde el
+      # 19 oct 2026 el escaneo ya no deja escrituras abiertas durante la red, y
+      # una prueba de 5 min con vigilancia + 6 usuarios dio 0 bloqueos de SQLite.
       - key: INGEST_WORKER_ENABLED
-        value: "false"
+        value: "true"
+      - key: INGEST_WORKER_FORCE
+        value: "true"
       - key: RUN_MIGRATIONS
         value: "true"
       - key: DATABASE_URL

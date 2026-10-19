@@ -327,6 +327,64 @@ def test_the_index_finds_the_registry_by_active_principle(db):
     assert hits[0]["valid_registry"] is True
 
 
+def test_live_lookup_fills_the_index_when_the_local_copy_misses(db, monkeypatch):
+    """Con 5 000 de ~2 millones de filas, pembrolizumab daba 'sin registro'."""
+    import importlib
+
+    real = importlib.import_module("app.invima")
+    # Esta prueba si usa la consulta en vivo (con la red simulada abajo).
+    monkeypatch.setattr(real, "live_lookup", real._original_live_lookup)
+    calls = []
+
+    class FakeResp:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._rows
+
+    class FakeClient:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def get(self, url, params=None):
+            calls.append((url, params["$where"]))
+            if "i7cb-raxc" in url:
+                return FakeResp([{
+                    "expediente": "20085509", "producto": "KEYTRUDA 100 MG", "titular": "MSD",
+                    "registrosanitario": "INVIMA 2017MBT-0017599", "estadoregistro": "Vigente",
+                    "fechaexpedicion": "02/20/2017", "fechavencimiento": "01/01/3000",
+                    "principioactivo": "PEMBROLIZUMAB",
+                }])
+            return FakeResp([])
+
+    monkeypatch.setattr(real.httpx, "Client", FakeClient)
+    real._LIVE_MISSES.clear()
+    hits = real.search(db, "pembrolizumab")
+
+    assert hits and hits[0]["valid_registry"] is True
+    assert hits[0]["record"].fecha_expedicion == dt.date(2017, 2, 20)  # mes/dia de Socrata
+    assert any("PEMBROLIZ" in where for _url, where in calls)
+    # Segunda busqueda: ya esta en el indice, no vuelve a la red.
+    calls.clear()
+    assert real.search(db, "pembrolizumab") and not calls
+
+
+def test_english_inn_finds_the_spanish_registry(db):
+    seed_invima(db, principio_activo="SEMAGLUTIDA", producto="OZEMPIC")
+    hits = invima.search(db, "semaglutide")
+    assert hits and hits[0]["score"] >= 80
+
+
 def test_an_expired_registry_does_not_count_as_valid(db):
     seed_invima(db, fecha_vencimiento=dt.date.today() - dt.timedelta(days=10))
 

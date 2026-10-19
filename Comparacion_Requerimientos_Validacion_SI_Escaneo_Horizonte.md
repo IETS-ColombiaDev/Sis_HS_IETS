@@ -34,7 +34,7 @@ Las mediciones de Render se tomaron con el servicio ya despierto. El arranque en
 
 **Verificado 19 oct (ingesta real, una corrida por conector):** ClinicalTrials.gov 100 estudios, openFDA 120, PubMed 20, EMA 40 (reporte oficial JSON; el RSS antiguo daba 404), CTIS 40 (el portal ahora exige POST; antes 403), PCORI 40 fichas activas (API del buscador; el servidor omite el certificado intermedio y se completa por AIA), Health Canada 50 dispositivos clase III–IV y 50 medicamentos nuevos (sin genéricos ni productos de consumo). WHO ICTRP y TGA siguen por lote.
 
-**Brecha de despliegue.** En Render con SQLite el worker de vigilancia **está apagado** para no bloquear el login. El escaneo **manual** sí corre (ClinicalTrials.gov: 100 estudios en < 5 s el 8 oct). WHO ICTRP sigue por lote. EuroScan i-HTS no tiene conector API propio: entra como HTML.
+**Despliegue.** Desde el 19 oct el worker de vigilancia queda **encendido** en Render (`render.yaml`): el escaneo ya no retiene escrituras durante la red y una prueba de 5 min con vigilancia y 6 usuarios simultáneos dio 0 bloqueos de SQLite (antes, picos de 17 s y errores `database is locked`). Las revistas que bloquean robots (JAMA, BMJ, NYT) se leen por su RSS oficial; 14 sitios con protección anti-robot (Lancet, NEJM, Cochrane, pipelines de AbbVie/Bayer/Lilly/Pfizer, entre otros) requieren carga manual, y la sonda lo indica. El escaneo **manual** sí corre (ClinicalTrials.gov: 100 estudios en < 5 s el 8 oct). WHO ICTRP sigue por lote. EuroScan i-HTS no tiene conector API propio: entra como HTML.
 
 **Dictamen: cumple con brecha** (vigilancia programada y CAPTCHA; carga manual sí existe).
 
@@ -181,11 +181,11 @@ Las mediciones de Render se tomaron con el servicio ya despierto. El arranque en
 | Concepto IETS | **Replantear.** Ampliar el requerimiento |
 | Prototipo | Índice local; Socrata + archivo plano; cruce por principio activo degradado |
 
-**Hoy.** Índice local (`invima_records`), sync datos.gov.co y carga por archivo plano, umbral de coincidencia parametrizable. El cruce por principio activo sigue siendo coincidencia aproximada, no un servicio oficial INVIMA.
+**Hoy.** Índice local (`invima_records`), sync datos.gov.co y carga por archivo plano, umbral de coincidencia parametrizable. Desde el 19 oct, si el índice no alcanza el umbral, la búsqueda consulta **en vivo** los tres conjuntos de datos.gov.co (CUM con principio activo, dispositivos y registros) y guarda lo encontrado; acepta DCI en inglés (semaglutide ↔ SEMAGLUTIDA) y lee bien las fechas mes/día del CUM. Verificado en vivo: pembrolizumab, semaglutida, tirzepatida, nivolumab y dupilumab vigentes; lecanemab sin registro.
 
 **Verificado 13 oct:** `GET /api/invima/status` → 200, `total_records: 0`, `stale: true` (el índice no sobrevive al disco efímero de Render).
 
-**Dictamen: parcial.** Hay módulo; no hay convenio de dato oficial ni índice persistente en el hosting actual.
+**Dictamen: cumple con brecha.** La verificación funciona contra el dato abierto oficial sin depender de la sincronización completa; falta un convenio de dato estructurado con el INVIMA (la consulta es por coincidencia aproximada de nombres).
 
 ---
 
@@ -612,8 +612,8 @@ Dictamen de **software + despliegue actual** (esta nota):
 | Dictamen | IDs |
 |---|---|
 | Cumple | RF03, RF04, RF05, RF06, RF07, RF09, RF10, RF12, P1–P3, P5, P6, %P (regla de puntos), RF13, RF15, RF17, RF18, RNF01, RNF02, RNF09, RNF10 |
-| Cumple con brecha | RF01, RF02, RF08, P4, RF14, RF16, RF19, RF20, RNF05 (si el servicio está caliente), RNF08, RNF11 |
-| Parcial | RF11, RNF03, RNF07 |
+| Cumple con brecha | RF01, RF02, RF08, P4, RF11, RF14, RF16, RF19, RF20, RNF05 (si el servicio está caliente), RNF08, RNF11 |
+| Parcial | RNF03, RNF07 |
 | No cumple (ambiente) | RNF04, RNF06, RNF12 en Render |
 | Pendiente de publicar | Base Firestore propia `hs-iets` + `FIREBASE_SERVICE_ACCOUNT_KEY` en Render |
 
@@ -627,7 +627,7 @@ Estos ítems no son filas de la Excel; sí determinan si el sistema “funciona 
 
 1. **Disco efímero.** SQLite en el plan gratuito se borra al dormir o redesplegar. El 13 oct el inventario de trabajo estaba en **0 hallazgos**. El 8 oct se habían cargado decenas vía ClinicalTrials.gov.
 2. **Base en Firebase.** Firestore es el almacén: instantánea gzip en `(default)/hs_iets_db`, publicada ~5 s después de cada cambio y al apagar; el servidor se restaura desde allí al arrancar. **Verificado 19 oct** contra Firestore real: tres generaciones de servidor con disco borrado entre cada una conservan todos los cambios. Corregido ese día: publicaciones concurrentes podían dejar una copia vieja en la nube; en Windows la restauración fallaba por el archivo temporal; y los entornos de desarrollo y pruebas escribían en la colección de producción (ahora usan `hs_iets_db_dev`; el servidor de Render, que corre con `ENVIRONMENT=development`, sigue en `hs_iets_db` porque define `RENDER=true`). En Render falta solo `FIREBASE_SERVICE_ACCOUNT_KEY`.
-3. **Login vs worker.** Varios workers o el hilo de ingesta sobre SQLite producían `database is locked` y el spinner de ingreso. Mitigado: un proceso, login de usuarios existentes **sin escritura**, worker apagado con SQLite.
+3. **Login vs worker.** Varios workers o el hilo de ingesta sobre SQLite producían `database is locked` y el spinner de ingreso. Causa encontrada el 19 oct: el escaneo abría la escritura antes de descargar y la traza se guardaba en otra sesión que esperaba ese candado ~15 s. Corregido; el worker vuelve a estar activo en un solo proceso.
 4. **MiniMax.** Llave embebida + panel. Prueba real 19 oct: **OK, MiniMax-M3**. La cuenta expone ahora `MiniMax-M3.1-Flash`, que rechaza `thinking: disabled`; la detección lo elegía y todas las llamadas fallaban hasta la corrección del 19 oct. `AI_PROVIDER=off` (o «Apagada» en Configuración) desactiva la IA aunque exista la llave embebida.
 5. **Acceso de desarrollo público.** Contradice RNF12 mientras `ENVIRONMENT=development`.
 

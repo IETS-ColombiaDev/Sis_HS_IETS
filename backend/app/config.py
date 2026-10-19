@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     ai_ocr_enabled: bool = False
     ai_web_enabled: bool = True
 
+    # Verificacion INVIMA (RF11): si el indice local no tiene la tecnologia, se
+    # consulta en vivo datos.gov.co. false = solo el indice local (pruebas aisladas).
+    invima_live_lookup: bool = True
+
     # General
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:8000,http://localhost:8000"
     database_url: str = "sqlite:///./iets_horizonte.db"

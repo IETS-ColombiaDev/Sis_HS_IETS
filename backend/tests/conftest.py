@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import firebase_db, firestore_directory  # noqa: E402
+from app import firebase_db, firestore_directory, invima  # noqa: E402
 from app.ratelimit import login_limiter  # noqa: E402
 
 
@@ -39,3 +39,11 @@ def _fresh_login_limiter():
     login_limiter.reset()
     yield
     login_limiter.reset()
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_invima(monkeypatch):
+    """La busqueda INVIMA no consulta datos.gov.co en vivo durante las pruebas."""
+    monkeypatch.setattr(invima, "_original_live_lookup", invima.live_lookup, raising=False)
+    monkeypatch.setattr(invima, "live_lookup", lambda db, term, **kw: 0)
+    yield

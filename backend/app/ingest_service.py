@@ -417,6 +417,10 @@ def _run_html(db: Session, source: Source, triggered_by: str) -> tuple[int, int,
     from .scraper import scrape_source
 
     scrape_log = scrape_source(db, source, triggered_by=triggered_by)
+    if scrape_log.status == "error":
+        # Un 403 o una caida de la fuente no es un job "ok": cuenta para el
+        # reintento y el cortacircuitos como cualquier conector.
+        raise ConnectorError(scrape_log.message or "El escaneo HTML fallo.")
     return (
         scrape_log.items_found or 0,
         scrape_log.items_new or 0,

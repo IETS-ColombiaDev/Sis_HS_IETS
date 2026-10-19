@@ -9,13 +9,15 @@ from __future__ import annotations
 
 import hashlib
 import io
+import html as html_lib
 import re
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse, urlunparse
 import time
+import warnings
 
 import httpx
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 from sqlalchemy.orm import Session
 
 from .models import Finding, ScrapeLog, Source
@@ -133,6 +135,9 @@ _DATE_RE = re.compile(
     re.I,
 )
 
+# Los canales RSS se recorren tambien con el analizador HTML (enlaces, texto): es intencional.
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+
 
 def _classify_horizon(text: str) -> str:
     if _HORIZON_INMINENTE.search(text):
@@ -224,8 +229,9 @@ def fetch_url(url: str, timeout: float | None = None) -> tuple[int, str, str, by
     for attempt in range(attempts):
         try:
             cfg = httpx.Timeout(timeout, connect=min(10.0, timeout), read=timeout, write=min(15.0, timeout))
-            with httpx.Client(follow_redirects=True, timeout=cfg, headers=BROWSER_HEADERS) as client:
-                resp = client.get(url)
+            from .ingest.base import tls_get
+
+            resp = tls_get(url, timeout=cfg, headers=BROWSER_HEADERS)
             raw = resp.content or b""
             if len(raw) > MAX_BODY_BYTES:
                 raw = raw[:MAX_BODY_BYTES]
@@ -640,9 +646,86 @@ def apply_crawled_text(findings: list[dict], crawl: dict | None) -> list[dict]:
 # --------------------------------------------------------------------------- #
 #  Extraccion
 # --------------------------------------------------------------------------- #
+# Canales oficiales de sitios que bloquean robots en su portada (403) pero
+# publican RSS abierto. Se usan como respaldo despues de las rutas de la matriz.
+FEED_FALLBACKS: dict[str, tuple[str, ...]] = {
+    "jamanetwork.com": ("https://jamanetwork.com/rss/site_3/onlineFirst_67.xml", "https://jamanetwork.com/rss/site_3/67.xml"),
+    "bmj.com": ("https://www.bmj.com/rss/recent.xml",),
+    "nytimes.com": ("https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",),
+}
+
+
+def fallback_urls(source: Source, entry_urls: list[str] | None = None) -> list[str]:
+    """Rutas de respaldo: las de la matriz EH y, si existe, el canal RSS del dominio."""
+    main = _normalize_url(source.url or "")
+    out = [u for u in (entry_urls or []) if _normalize_url(u) != main][:3]
+    host = (urlparse(source.url or "").hostname or "").lower().removeprefix("www.")
+    for domain, feeds in FEED_FALLBACKS.items():
+        if host == domain or host.endswith("." + domain):
+            out.extend(feeds)
+    return out
+
+
+def is_feed(text: str) -> bool:
+    """Canal RSS o Atom (revistas cuyo sitio bloquea robots pero publican feed)."""
+    head = (text or "").lstrip()[:600].lower()
+    return "<rss" in head or "<feed" in head or "<rdf:rdf" in head
+
+
+def feed_items(xml: str) -> list[dict]:
+    """Items de un canal RSS 2.0 / RDF / Atom: titulo, enlace, resumen y fecha."""
+    try:
+        soup = BeautifulSoup(xml, "xml")
+    except Exception:  # noqa: BLE001
+        soup = BeautifulSoup(xml, "lxml")
+    items = []
+    for node in soup.find_all(["item", "entry"]):
+        title = _clean(html_lib.unescape(node.title.get_text(" ", strip=True))) if node.title else ""
+        link = ""
+        link_tag = node.find("link")
+        if link_tag is not None:
+            link = (link_tag.get("href") or link_tag.get_text(strip=True) or "").strip()
+        body = node.find(["description", "summary", "content", "encoded"])
+        summary = _clean(html_lib.unescape(BeautifulSoup(body.get_text(" ", strip=True), "lxml").get_text(" ", strip=True))) if body else ""
+        date_tag = node.find(["pubDate", "updated", "published", "date"])
+        if title:
+            items.append({
+                "title": title,
+                "url": link,
+                "summary": summary[:1000],
+                "published_date": _clean(date_tag.get_text()) if date_tag else "",
+            })
+    return items
+
+
+def _feed_candidates(source: Source, xml: str) -> list[dict]:
+    findings = []
+    for item in feed_items(xml)[:MAX_ITEMS_PER_SOURCE]:
+        blob = f"{item['title']} {item['summary']}"
+        findings.append(
+            {
+                "title": item["title"][:590],
+                "url": (item["url"] or source.url)[:1020],
+                "summary": item["summary"][:1000],
+                "raw_content": "",
+                "technology": item["title"][:390],
+                "technology_type": _classify_type(blob),
+                "horizon": _classify_horizon(blob) or "transicional",
+                "phase": "",
+                "therapeutic_area": _guess_area(blob),
+                "published_date": item["published_date"][:80],
+            }
+        )
+    return findings
+
+
 def extract_candidates(source: Source, html: str) -> list[dict]:
     if html and len(html) > MAX_HTML_CHARS:
         html = html[:MAX_HTML_CHARS]
+    if is_feed(html):
+        feed = _feed_candidates(source, html)
+        if feed:
+            return feed
     soup = BeautifulSoup(html, "lxml")
 
     for tag in soup(["script", "style", "noscript", "nav", "header", "footer"]):
@@ -786,6 +869,9 @@ def _first_paragraph(soup: BeautifulSoup) -> str:
 # --------------------------------------------------------------------------- #
 def extract_main_text(html: str, url: str = "") -> str:
     """Extrae el contenido principal (articulo) de una pagina con trafilatura."""
+    if html and is_feed(html):
+        # Un canal no es un articulo: su texto util son los titulos y resumenes.
+        return _clean(" ".join(f"{i['title']}. {i['summary']}" for i in feed_items(html)))
     if not html or not _TRAFILATURA:
         return ""
     try:
@@ -947,7 +1033,9 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
         started_at=datetime.now(timezone.utc),
     )
     db.add(log)
-    db.flush()
+    # Se confirma ya: un flush dejaba abierta la transaccion de escritura durante
+    # descargas, rastreo e IA (60-90 s) y en SQLite bloqueaba el login y la UI.
+    db.commit()
     started = time.perf_counter()
     crawl = None
     steps: list[dict] = []
@@ -981,7 +1069,10 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                 "source_level": source.source_level or "",
                 "message": log.message,
                 "steps": extra,
-            }
+            },
+            # Misma sesion: los hallazgos ya tienen la escritura abierta y una sesion
+            # aparte esperaba ese candado ~15 s (busy_timeout), bloqueando a todos.
+            db,
         )
 
     def download(url: str, action: str) -> tuple[int, str, str, bytes]:
@@ -1004,7 +1095,7 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
         status_code, content_type, text, raw = download(source.url, "descarga")
         if not (0 < status_code < 400):
             # La URL principal fallo: se prueba la ruta de la matriz EH antes de rendirse.
-            for alt in [u for u in profile["entry_urls"] if _normalize_url(u) != _normalize_url(source.url)][:3]:
+            for alt in fallback_urls(source, profile["entry_urls"]):
                 alt_result = download(alt, "respaldo")
                 if 0 < alt_result[0] < 400:
                     landing_url = alt
