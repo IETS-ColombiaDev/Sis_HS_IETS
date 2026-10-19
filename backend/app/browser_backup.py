@@ -177,7 +177,9 @@ def export_snapshot() -> tuple[bytes, dict]:
         raise RestoreRejected("La copia en el navegador solo aplica a SQLite.", status=400)
     meta = info()
     taken_at = _now_iso()
-    with _export_lock, tempfile.TemporaryDirectory() as tmp:
+    # En Windows el antivirus retiene un instante el archivo recien escrito: si el
+    # temporal no se puede borrar, la copia igual es valida y no debe abortarse.
+    with _export_lock, tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         copy = Path(tmp) / "snapshot.db"
         src = sqlite3.connect(str(path), timeout=30)
         dst = sqlite3.connect(str(copy))
@@ -273,7 +275,7 @@ def restore_snapshot(data: bytes, *, force: bool = False) -> dict:
     if not _restore_lock.acquire(blocking=False):
         raise RestoreRejected("Ya hay una restauracion en curso.", status=409)
     try:
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             incoming, snap = _read_snapshot(data, Path(tmp))
             if not force:
                 _decide(info(), snap)

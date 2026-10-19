@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { apiError } from "../api/client";
+import { downloadFromApi } from "../utils/download";
 import { useAuth } from "../auth/AuthContext";
 import { useCycle } from "../cycle/CycleContext";
 import { useRealtime } from "../realtime/RealtimeContext";
@@ -286,9 +287,11 @@ export default function Evaluation() {
     if (!techId || !cycleId || loading) return;
     const key = `${cycleId}:${techId}`;
     if (queue.some((i) => i.technology_id === techId)) {
+      // Siempre se limpia: al cambiar de ciclo la cola nueva puede llegar antes que
+      // la consulta de ubicacion (que se cancela) y el aviso viejo quedaba en pantalla.
+      setLinkNotice(null);
       if (handledLink.current === key) return;
       handledLink.current = key;
-      setLinkNotice(null);
       setActiveId(techId);
       focusElement(`eval-item-${techId}`);
       return;
@@ -521,6 +524,15 @@ export default function Evaluation() {
     }
   };
 
+  const exportPdf = async () => {
+    if (!doc) return;
+    try {
+      await downloadFromApi(api, `/reports/${doc.id}/export?format=pdf`, `iets-evaluacion-${doc.id}.pdf`);
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo generar el PDF"));
+    }
+  };
+
   if (!cycleId) {
     return (
       <Card>
@@ -718,6 +730,9 @@ export default function Evaluation() {
                     </Button>
                     <HintButton variant="secondary" onClick={exportHtml} hint={GLOSSARY.fa_exportar_html}>
                       Exportar HTML institucional
+                    </HintButton>
+                    <HintButton variant="secondary" onClick={exportPdf} hint="Descarga el documento institucional en PDF (A4).">
+                      Descargar PDF
                     </HintButton>
                     {(doc.allowed_transitions || []).map((status) => {
                       const block = hints[status] || "";

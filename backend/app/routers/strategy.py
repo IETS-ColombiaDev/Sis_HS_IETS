@@ -269,6 +269,7 @@ def approve_bulletin(
 @router.get("/api/bulletins/{bulletin_id}/export")
 def export_bulletin(
     bulletin_id: int,
+    format: str = "html",
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -276,6 +277,10 @@ def export_bulletin(
     if row is None:
         raise HTTPException(status_code=404, detail="Boletín no encontrado")
     html = strategy_service.render_bulletin_html(row)
+    if format == "pdf":
+        from ..pdf_export import pdf_response
+
+        return pdf_response(html, f"boletin-{row.id}.pdf", row.title or "Boletín")
     return Response(
         content=html,
         media_type="text/html; charset=utf-8",

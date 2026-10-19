@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import api, { apiError } from "../api/client";
+import api, { SCAN_TIMEOUT, apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { useToast } from "../components/Toast";
@@ -257,7 +257,7 @@ export default function Sources() {
     setSearchingWeb(true);
     setWebSearch(null);
     try {
-      const { data } = await api.post(`/sources/${s.id}/web-search`);
+      const { data } = await api.post(`/sources/${s.id}/web-search`, null, { timeout: SCAN_TIMEOUT });
       setWebSearch(data);
       if ((data.results || []).length) toast.success(`Búsqueda web: ${data.results.length} resultado(s) en ${data.domain}`);
       else toast.warning("Búsqueda web sin resultados en el dominio");
@@ -352,7 +352,7 @@ export default function Sources() {
     setPreviewing(true);
     setPreview(null);
     try {
-      const { data } = await api.post("/scan/preview", { url: quick.url.trim() });
+      const { data } = await api.post("/scan/preview", { url: quick.url.trim() }, { timeout: SCAN_TIMEOUT });
       setPreview(data);
       if (!quick.title.trim() && data.title) setQuick((q) => ({ ...q, title: data.title.slice(0, 200) }));
     } catch (e) {
@@ -365,7 +365,7 @@ export default function Sources() {
   const scanOne = async (s) => {
     setScanningId(s.id);
     try {
-      const { data } = await api.post(`/scan/source/${s.id}`);
+      const { data } = await api.post(`/scan/source/${s.id}`, null, { timeout: SCAN_TIMEOUT });
       if (data.status === "error") toast.error(`Ingesta con error: ${data.message || "sin detalle"}`);
       else toast.success(`Ingesta: ${data.items_new} nuevas de ${data.items_found}`);
       load();

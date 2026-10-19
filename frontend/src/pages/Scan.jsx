@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import api, { apiError } from "../api/client";
+import api, { SCAN_TIMEOUT, apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { useToast } from "../components/Toast";
@@ -165,7 +165,7 @@ export default function Scan() {
     e?.stopPropagation();
     setScanningId(s.id);
     try {
-      const { data } = await api.post(`/scan/source/${s.id}`);
+      const { data } = await api.post(`/scan/source/${s.id}`, null, { timeout: SCAN_TIMEOUT });
       if (data.status === "error") toast.error(`${s.title}: ${data.message || "error de ingesta"}`);
       else toast.success(`${s.title}: ${data.items_new} señales nuevas de ${data.items_found}`);
       load();
@@ -185,7 +185,7 @@ export default function Scan() {
     setPreviewing(true);
     setPreview(null);
     try {
-      const { data } = await api.post("/scan/preview", { url: previewUrl.trim() });
+      const { data } = await api.post("/scan/preview", { url: previewUrl.trim() }, { timeout: SCAN_TIMEOUT });
       setPreview(data);
     } catch (err) {
       toast.error(apiError(err, "No se pudo previsualizar el enlace"));

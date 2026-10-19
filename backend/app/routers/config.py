@@ -105,7 +105,7 @@ def _build_config_out(db: Session) -> ConfigOut:
         scan_max_pages=int(prompts["max_pages"]),
         scan_fetch_timeout=int(prompts.get("fetch_timeout") or 25),
         scan_child_timeout=int(prompts.get("child_timeout") or 15),
-        scan_ai_timeout=int(prompts.get("ai_timeout") or 60),
+        scan_ai_timeout=int(prompts.get("ai_timeout") or 120),
         scan_retries=int(prompts.get("retries") or 3),
         scan_pause_ms=int(prompts.get("pause_ms") or 350),
         ai_usage_prompt_tokens=int(usage.get("prompt_tokens") or 0),

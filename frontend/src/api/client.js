@@ -36,6 +36,11 @@ const api = axios.create({
   timeout: 45000,
 });
 
+// Las llamadas que consultan a la IA esperan al modelo (hasta 120 s en el
+// servidor); el escaneo de una fuente suma descarga, fichas, busqueda e IA.
+export const AI_TIMEOUT = 150000;
+export const SCAN_TIMEOUT = 300000;
+
 api.interceptors.request.use((config) => {
   const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;

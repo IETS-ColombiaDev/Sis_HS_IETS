@@ -25,6 +25,72 @@ CONTACT = "escaneo.horizonte@iets.org.co"
 USER_AGENT = f"IETS-HorizonScanning/4.0 (+https://www.iets.org.co; {CONTACT})"
 
 
+# --------------------------------------------------------------------------- #
+#  TLS: servidores que no envian el certificado intermedio
+# --------------------------------------------------------------------------- #
+# Algunos portales publicos (p. ej. PCORI) sirven solo el certificado hoja. Los
+# navegadores completan la cadena con la URL "CA Issuers" del propio certificado
+# (AIA); httpx no. Aqui se hace lo mismo: se descarga ese intermedio y se valida
+# la cadena completa contra las raices de certifi. La verificacion nunca se apaga.
+_intermediates: dict[str, object] = {}
+_aia_tried: set[str] = set()
+
+
+def _host(url: str) -> str:
+    from urllib.parse import urlsplit
+
+    return (urlsplit(url).hostname or "").lower()
+
+
+def _http_client(url: str, timeout: float, headers: dict) -> httpx.Client:
+    verify = _intermediates.get(_host(url), True)
+    return httpx.Client(timeout=timeout, follow_redirects=True, headers=headers, verify=verify)
+
+
+def _learn_missing_intermediate(url: str, exc: Exception) -> bool:
+    """True si se aprendio el intermedio del host y conviene reintentar ya."""
+    host = _host(url)
+    if not host or host in _aia_tried or "CERTIFICATE_VERIFY_FAILED" not in str(exc):
+        return False
+    _aia_tried.add(host)
+    try:
+        import socket
+        import ssl
+
+        import certifi
+        from cryptography import x509
+        from cryptography.hazmat.primitives.serialization import Encoding
+        from cryptography.x509.oid import AuthorityInformationAccessOID, ExtensionOID
+
+        probe = ssl.create_default_context()
+        probe.check_hostname = False
+        probe.verify_mode = ssl.CERT_NONE
+        with socket.create_connection((host, 443), timeout=15) as raw:
+            with probe.wrap_socket(raw, server_hostname=host) as tls:
+                leaf = x509.load_der_x509_certificate(tls.getpeercert(binary_form=True))
+        aia = leaf.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_INFORMATION_ACCESS).value
+        issuers = [
+            d.access_location.value
+            for d in aia
+            if d.access_method == AuthorityInformationAccessOID.CA_ISSUERS
+        ]
+        if not issuers:
+            return False
+        blob = httpx.get(issuers[0], timeout=15, follow_redirects=True).content
+        try:
+            inter = x509.load_der_x509_certificate(blob)
+        except ValueError:
+            inter = x509.load_pem_x509_certificate(blob)
+        ctx = ssl.create_default_context(cafile=certifi.where())
+        ctx.load_verify_locations(cadata=inter.public_bytes(Encoding.PEM).decode("ascii"))
+        _intermediates[host] = ctx
+        log.info("Intermedio TLS de %s obtenido por AIA (%s)", host, issuers[0])
+        return True
+    except Exception as err:  # noqa: BLE001
+        log.warning("No se pudo completar la cadena TLS de %s: %s", host, err)
+        return False
+
+
 class ConnectorError(RuntimeError):
     """Fallo atribuible a la fuente externa, no al codigo del conector."""
 
@@ -166,8 +232,9 @@ def request_json(
     min_interval: float = 0.0,
     timeout: float = 40.0,
     max_attempts: int = 4,
+    json_body: dict | None = None,
 ) -> dict:
-    """GET con reintento exponencial y jitter.
+    """GET (o POST si hay `json_body`) con reintento exponencial y jitter.
 
     El jitter no es cosmetico: sin el, varios conectores que fallan a la vez
     reintentan sincronizados y golpean la fuente en el mismo instante.
@@ -180,8 +247,11 @@ def request_json(
     for attempt in range(1, max_attempts + 1):
         _respect_interval(connector_code or url, min_interval)
         try:
-            with httpx.Client(timeout=timeout, follow_redirects=True, headers=headers) as client:
-                resp = client.get(url, params=params)
+            with _http_client(url, timeout, headers) as client:
+                if json_body is not None:
+                    resp = client.post(url, params=params, json=json_body)
+                else:
+                    resp = client.get(url, params=params)
 
             if resp.status_code in RETRYABLE_STATUS:
                 retry_after = _retry_after_seconds(resp)
@@ -199,6 +269,8 @@ def request_json(
             return resp.json()
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             last_error = f"{type(exc).__name__}: {exc}"
+            if _learn_missing_intermediate(url, exc):
+                continue
             if attempt == max_attempts:
                 raise ConnectorError(f"Red inaccesible tras {attempt} intentos. {last_error}")
             _sleep_backoff(attempt, None)
@@ -228,7 +300,7 @@ def request_bytes(
     for attempt in range(1, max_attempts + 1):
         _respect_interval(connector_code or url, min_interval)
         try:
-            with httpx.Client(timeout=timeout, follow_redirects=True, headers=headers) as client:
+            with _http_client(url, timeout, headers) as client:
                 resp = client.get(url, params=params)
 
             if resp.status_code in RETRYABLE_STATUS:
@@ -247,6 +319,8 @@ def request_bytes(
             return resp.content, resp.headers.get("content-type", "")
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             last_error = f"{type(exc).__name__}: {exc}"
+            if _learn_missing_intermediate(url, exc):
+                continue
             if attempt == max_attempts:
                 raise ConnectorError(f"Red inaccesible tras {attempt} intentos. {last_error}")
             _sleep_backoff(attempt, None)
@@ -314,7 +388,7 @@ def request_text(
     for attempt in range(1, max_attempts + 1):
         _respect_interval(connector_code or url, min_interval)
         try:
-            with httpx.Client(timeout=timeout, follow_redirects=True, headers=headers) as client:
+            with _http_client(url, timeout, headers) as client:
                 resp = client.get(url, params=params)
 
             if resp.status_code in RETRYABLE_STATUS:
@@ -333,6 +407,8 @@ def request_text(
             return resp.text
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             last_error = f"{type(exc).__name__}: {exc}"
+            if _learn_missing_intermediate(url, exc):
+                continue
             if attempt == max_attempts:
                 raise ConnectorError(f"Red inaccesible tras {attempt} intentos. {last_error}")
             _sleep_backoff(attempt, None)
@@ -392,5 +468,6 @@ def parse_compact_date(value: str | None) -> date | None:
 
 
 def clean_text(value: str | None, limit: int = 0) -> str:
-    text = re.sub(r"\s+", " ", (value or "").strip())
+    # Las APIs devuelven a veces codigos numericos (drug_code, licence_no).
+    text = re.sub(r"\s+", " ", ("" if value is None else str(value)).strip())
     return text[:limit] if limit else text

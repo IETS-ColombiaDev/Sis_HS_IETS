@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import api, { apiError } from "../api/client";
+import api, { AI_TIMEOUT, apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { useToast } from "./Toast";
@@ -133,7 +133,7 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
   const enhanceNote = async (note) => {
     setEnhancingId(note.id);
     try {
-      await api.post(`/notes/${note.id}/enhance-ai`);
+      await api.post(`/notes/${note.id}/enhance-ai`, null, { timeout: AI_TIMEOUT });
       toast.success("Nota mejorada con IA");
       load();
     } catch (e) {

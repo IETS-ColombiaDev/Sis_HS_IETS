@@ -17,9 +17,13 @@ from .config import EMBEDDED_MINIMAX_API_KEY, settings
 BASE_URL = "https://api.minimax.io/v1"
 CODING_PLAN_REMAINS = f"{BASE_URL}/api/openplatform/coding_plan/remains"
 
-# De mas capaz a mas ligero. M3 es el unico con vision/OCR documentado.
+# De mas capaz a mas ligero. M3 es el unico con vision/OCR documentado y el
+# unico que acepta apagar el razonamiento (thinking disabled): responde rapido.
+# Los nombres se comparan exactos: variantes nuevas (p. ej. M3.1-Flash) tienen
+# otras reglas de parametros y no deben heredar la posicion de M3.
 MODEL_PREFERENCE = [
     "MiniMax-M3",
+    "MiniMax-M3.1-Flash",
     "MiniMax-M2.7",
     "MiniMax-M2.7-highspeed",
     "MiniMax-M2.5",
@@ -32,6 +36,8 @@ VISION_MODELS = {"MiniMax-M3"}
 KNOWN_MODELS = list(MODEL_PREFERENCE)
 
 _THINK_RE = re.compile(r"<think>[\s\S]*?</think>|<thinking>[\s\S]*?</thinking>", re.I)
+# Razonamiento cortado por max_tokens: <think> sin cierre hasta el final.
+_OPEN_THINK_RE = re.compile(r"<think(?:ing)?>[\s\S]*$", re.I)
 
 _lock = threading.Lock()
 _runtime_api_key: str = (settings.minimax_api_key or "").strip()
@@ -90,7 +96,7 @@ def _extract_text(payload: dict) -> str:
             elif isinstance(item, str):
                 parts.append(item)
         content = "".join(parts)
-    text = _THINK_RE.sub("", str(content)).strip()
+    text = _OPEN_THINK_RE.sub("", _THINK_RE.sub("", str(content))).strip()
     if text:
         return text
     reasoning = message.get("reasoning_content") or ""
@@ -148,11 +154,9 @@ def _order_models(names: list[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
     for pref in MODEL_PREFERENCE:
-        for name in names:
-            if name == pref or name.startswith(pref):
-                if name not in seen:
-                    out.append(name)
-                    seen.add(name)
+        if pref in names and pref not in seen:
+            out.append(pref)
+            seen.add(pref)
     for name in names:
         if name not in seen:
             out.append(name)
@@ -165,7 +169,7 @@ def _pick_model(available: list[str], preferred: str = "") -> str:
         if preferred in available:
             return preferred
         for name in available:
-            if name.startswith(preferred):
+            if name.lower() == preferred.lower():
                 return name
         return preferred
     ordered = _order_models(available)
@@ -225,7 +229,7 @@ def vision_model() -> str:
 
 def supports_vision(model: str | None = None) -> bool:
     name = model or current_model()
-    return name in VISION_MODELS or (name or "").startswith("MiniMax-M3")
+    return name in VISION_MODELS
 
 
 def _probe_model(key: str, model: str) -> bool:
@@ -234,14 +238,10 @@ def _probe_model(key: str, model: str) -> bool:
             model=model,
             messages=[{"role": "user", "content": "Responde solo con: OK"}],
             temperature=1.0,
-            max_tokens=16,
+            # Holgura para modelos que razonan antes de contestar.
+            max_tokens=512,
         )
-        with _client(timeout=25.0) as client:
-            resp = client.post(
-                f"{BASE_URL}/chat/completions",
-                headers=_headers(key),
-                json=payload,
-            )
+        resp = _post_completion(key, payload, timeout=25.0)
         if resp.status_code >= 400:
             return False
         text = _extract_text(resp.json())
@@ -263,9 +263,23 @@ def _completion_body(
         "max_tokens": max_tokens,
         "max_completion_tokens": max_tokens,
     }
-    if model.startswith("MiniMax-M3"):
+    if model in _THINKING_OFF_MODELS:
         body["thinking"] = {"type": "disabled"}
     return body
+
+
+# Modelos que aceptan thinking disabled. Otros (M3.1-Flash) responden 400 si se
+# envia; si el API rechaza el parametro, _post_completion reintenta sin el.
+_THINKING_OFF_MODELS = {"MiniMax-M3"}
+
+
+def _post_completion(key: str, body: dict[str, Any], timeout: float) -> httpx.Response:
+    with _client(timeout=timeout) as client:
+        resp = client.post(f"{BASE_URL}/chat/completions", headers=_headers(key), json=body)
+        if resp.status_code == 400 and "thinking" in body and "thinking" in resp.text.lower():
+            body = {k: v for k, v in body.items() if k != "thinking"}
+            resp = client.post(f"{BASE_URL}/chat/completions", headers=_headers(key), json=body)
+    return resp
 
 
 def generate(
@@ -282,6 +296,7 @@ def generate(
     key = (api_key or _runtime_api_key or "").strip()
     if not key:
         return ("", "")
+    auto_model = not model
     model_name = model or detect_model() or MODEL_PREFERENCE[0]
     if images and not supports_vision(model_name):
         model_name = vision_model()
@@ -312,12 +327,15 @@ def generate(
 
     try:
         payload = _completion_body(model_name, messages, temperature, max_tokens)
-        with _client(timeout=float(timeout or 60.0)) as client:
-            resp = client.post(
-                f"{BASE_URL}/chat/completions",
-                headers=_headers(key),
-                json=payload,
-            )
+        resp = _post_completion(key, payload, timeout=float(timeout or 60.0))
+        if resp.status_code in (400, 404) and auto_model and not api_key:
+            # El modelo autodetectado no sirve (retirado o con otras reglas):
+            # se valida uno que responda y se reintenta una vez.
+            fallback = detect_model(force=True, probe=True)
+            if fallback and fallback != model_name and not (images and not supports_vision(fallback)):
+                model_name = fallback
+                payload = _completion_body(model_name, messages, temperature, max_tokens)
+                resp = _post_completion(key, payload, timeout=float(timeout or 60.0))
         if resp.status_code >= 400:
             return (f"[Error MiniMax HTTP {resp.status_code}: {resp.text[:240]}]", model_name)
         payload_out = resp.json()
@@ -340,7 +358,7 @@ def test_connection(api_key: str | None = None) -> dict:
         text, used = generate(
             "Responde solo con: OK",
             temperature=1.0,
-            max_tokens=16,
+            max_tokens=512,
             model=chosen,
             api_key=key,
         )

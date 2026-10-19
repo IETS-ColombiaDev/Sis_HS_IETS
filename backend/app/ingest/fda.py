@@ -118,13 +118,15 @@ class FdaConnector(Connector):
             ),
             summary=clean_text(
                 f"{brand}. {inn}. Titular: {makers[0] if makers else 'n/d'}. "
-                f"Forma: {clean_text(product.get('dosage_form'))}.",
+                f"Forma: {clean_text(product.get('dosage_form'))}. Via: {clean_text(product.get('route')) or 'n/d'}."
+                + (f" Clase: {'; '.join(_as_list(openfda.get('pharm_class_epc')))}." if openfda.get("pharm_class_epc") else ""),
                 1500,
             ),
             commercial_name=clean_text(brand, 400),
             inn_name=clean_text(inn, 400),
             manufacturer=clean_text(makers[0] if makers else "", 300),
-            indication=clean_text(product.get("route"), 2000),
+            # Drugs@FDA no publica la indicacion; la via ("ORAL") no lo es.
+            indication="",
             technology_type="medicamento",
             development_phase="Aprobado" if approval else "En revision regulatoria",
             horizon="inminente",

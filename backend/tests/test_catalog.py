@@ -261,6 +261,93 @@ def test_coverage_detects_gap(db):
     assert result["gaps"][0]["commercial_name"] == "Molecula Hueco"
 
 
+def test_ema_json_report_keeps_novel_human_medicines_newest_first(monkeypatch):
+    from app.ingest import ema
+
+    rows = [
+        {"category": "Human", "name_of_medicine": "Viejo", "medicine_status": "Authorised", "marketing_authorisation_date": "29/06/2007", "european_commission_decision_date": "24/09/2026", "ema_product_number": "EMEA/H/C/1"},
+        {"category": "Human", "name_of_medicine": "Foundayo", "international_non_proprietary_name_common_name": "orforglipron", "medicine_status": "Opinion", "opinion_adopted_date": "15/10/2026", "ema_product_number": "EMEA/H/C/2", "medicine_url": "https://www.ema.europa.eu/en/medicines/human/EPAR/foundayo"},
+        {"category": "Human", "name_of_medicine": "Generico", "generic": "Yes", "marketing_authorisation_date": "01/10/2026", "ema_product_number": "EMEA/H/C/3"},
+        {"category": "Veterinary", "name_of_medicine": "Vet", "marketing_authorisation_date": "02/10/2026", "ema_product_number": "EMEA/V/C/4"},
+        {"category": "Human", "name_of_medicine": "Retirado", "medicine_status": "Withdrawn", "marketing_authorisation_date": "03/10/2026", "ema_product_number": "EMEA/H/C/5"},
+    ]
+    monkeypatch.setattr(ema, "request_json", lambda *a, **k: {"meta": {}, "data": rows})
+    result = ema.EmaConnector().fetch(config={"page_size": 10})
+    assert [r.title for r in result.records] == ["Foundayo", "Viejo"]
+    first = result.records[0]
+    assert first.inn_name == "orforglipron" and first.development_phase == "Opinion CHMP"
+    assert first.url.endswith("/foundayo") and first.horizon == "inminente"
+
+
+def test_ctis_posts_the_search_and_maps_current_fields(monkeypatch):
+    from app.ingest import ctis
+
+    sent = {}
+
+    def fake(url, **kw):
+        sent.update(kw)
+        return {"pagination": {}, "data": [{"ctNumber": "2026-1-00", "ctTitle": "Ensayo X", "conditions": "melanoma", "trialPhase": "Therapeutic confirmatory (Phase III)", "product": "Xmab", "sponsor": "Acme", "decisionDateOverall": "16/10/2026"}]}
+
+    monkeypatch.setattr(ctis, "request_json", fake)
+    rec = CtisConnector().fetch(config={"page_size": 5}, url="https://euclinicaltrials.eu/ctis-public/search").records[0]
+    assert sent["json_body"]["pagination"]["size"] == 5
+    assert rec.title == "Ensayo X" and rec.indication == "melanoma" and rec.commercial_name == "Xmab"
+    assert rec.horizon == "inminente" and rec.published_date == "16/10/2026"
+
+
+def test_pcori_api_hits_skip_archived_and_strip_markup(monkeypatch):
+    from app.ingest import pcori_hs
+
+    hits = [
+        {"originalId": 1, "documentType": "topics", "title": "Intismeran (<span class=\"abbrv\">mRNA</span>-4157)", "recordStatus": "Active", "developmentPhase": "Phase 3", "interventionClass": [{"title": "Pharmaceutical"}], "updatedDate": "2026-09-01"},
+        {"originalId": 2, "documentType": "topics", "title": "Viejo", "recordStatus": "Archived", "updatedDate": "2026-10-01"},
+    ]
+    monkeypatch.setattr(pcori_hs, "request_json", lambda *a, **k: {"response": {"hits": hits}})
+    result = PcoriHsConnector().fetch(config={})
+    assert len(result.records) == 1
+    rec = result.records[0]
+    assert rec.title == "Intismeran (mRNA-4157)" and rec.technology_type == "medicamento"
+    assert rec.url == "https://horizonscandb.pcori.org/report/topics/1" and rec.horizon == "inminente"
+
+
+def test_health_canada_licences_keep_high_risk_newest_first(monkeypatch):
+    from app.ingest import health_canada
+
+    licences = [
+        {"original_licence_no": 1, "appl_risk_class": 2, "licence_name": "SYRINGE", "first_licence_status_dt": "2026-10-16", "company_id": 9},
+        {"original_licence_no": 2, "appl_risk_class": 4, "licence_name": "VALVE X", "first_licence_status_dt": "2026-10-01", "company_id": 9},
+        {"original_licence_no": 3, "appl_risk_class": 3, "licence_name": "PUMP Y", "first_licence_status_dt": "2026-10-10", "company_id": 9},
+    ]
+    monkeypatch.setattr(health_canada, "request_json", lambda *a, **k: licences)
+    monkeypatch.setattr(health_canada, "_company_name", lambda cid: "MedCo")
+    result = HealthCanadaConnector().fetch(config={"page_size": 5}, url=health_canada.MDALL_URL)
+    assert [r.external_id for r in result.records] == ["MDL-3", "MDL-2"]
+    assert result.records[0].manufacturer == "MedCo"
+
+
+def test_health_canada_drugs_skip_generics_and_repeated_strengths(monkeypatch):
+    from app.ingest import health_canada
+
+    products = [
+        {"drug_code": 30, "class_name": "Human", "brand_name": "MYQORZO", "company_name": "Cytokinetics"},
+        {"drug_code": 29, "class_name": "Human", "brand_name": "MYQORZO", "company_name": "Cytokinetics"},
+        {"drug_code": 28, "class_name": "Human", "brand_name": "BISOPROLOL TABLETS", "company_name": "Sanis"},
+        {"drug_code": 27, "class_name": "Human", "brand_name": "HAND SOAP", "company_name": "Clean"},
+        {"drug_code": 26, "class_name": "Disinfectant", "brand_name": "NUGEN", "company_name": "Arxada"},
+    ]
+    names = {30: ["AFICAMTEN"], 28: ["BISOPROLOL FUMARATE"]}
+    monkeypatch.setattr(health_canada, "request_json", lambda *a, **k: products)
+    monkeypatch.setattr(health_canada, "_ingredients", lambda code: names.get(code, []))
+    result = HealthCanadaConnector().fetch(config={"page_size": 10}, url=health_canada.DPD_URL)
+    assert [(r.title, r.inn_name) for r in result.records] == [("MYQORZO", "AFICAMTEN")]
+
+
+def test_clean_text_accepts_numeric_codes():
+    from app.ingest.base import clean_text
+
+    assert clean_text(21855) == "21855" and clean_text(None) == ""
+
+
 def test_json_path_and_signature():
     payload = {"studies": [{"protocolSection": {"identificationModule": {"nctId": "NCT1"}}}]}
     assert json_path_exists(payload, "studies.0.protocolSection.identificationModule.nctId")

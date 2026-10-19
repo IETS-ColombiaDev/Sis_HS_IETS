@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import api, { apiError } from "../api/client";
+import api, { AI_TIMEOUT, apiError } from "../api/client";
 import {
   TYPE_COLOR,
   TYPE_LABEL,
@@ -200,7 +200,7 @@ function GraphTool({ cycleId, filters, restricted }) {
         node_key: selected.id,
         cycle_id: cycleId,
         graph_id: activeSave,
-      });
+      }, { timeout: AI_TIMEOUT });
       const answer = data?.answer;
       setSessionId(data?.session?.id || sessionId);
       setMessages((m) => [

@@ -30,8 +30,28 @@ _STOPWORDS = {
 
 
 def _keywords(text: str) -> list[str]:
-    words = re.findall(r"[a-zA-Zaeiouñ]{4,}", text.lower())
-    return [w for w in words if w not in _STOPWORDS][:8]
+    words = re.findall(r"[a-záéíóúüñ]{4,}", text.lower())
+    out: list[str] = []
+    for w in words:
+        if w in _STOPWORDS:
+            continue
+        # Raiz corta: "regulatorias" encuentra "regulatory" y "Agencias regulatorias".
+        stem = w[:6]
+        if stem not in out:
+            out.append(stem)
+    return out[:8]
+
+
+def _rank(rows: list, keywords: list[str], fields, limit: int) -> list:
+    """Ordena por cantidad de palabras clave presentes; empate = orden original."""
+
+    def hits(row) -> int:
+        blob = " ".join(str(getattr(row, f, "") or "") for f in fields).lower()
+        return sum(1 for kw in keywords if kw in blob)
+
+    scored = [(hits(r), i, r) for i, r in enumerate(rows)]
+    scored.sort(key=lambda t: (-t[0], t[1]))
+    return [r for _h, _i, r in scored[:limit]]
 
 
 def _retrieve_context(db: Session, question: str, max_findings: int = 8, max_sources: int = 5) -> tuple[str, list[str]]:
@@ -48,7 +68,8 @@ def _retrieve_context(db: Session, question: str, max_findings: int = 8, max_sou
             conds.append(func.lower(Finding.summary).like(like))
             conds.append(func.lower(Finding.technology).like(like))
         f_query = f_query.filter(or_(*conds))
-    findings = f_query.order_by(Finding.created_at.desc()).limit(max_findings).all()
+    findings = f_query.order_by(Finding.created_at.desc()).limit(200).all()
+    findings = _rank(findings, keywords, ("title", "technology", "summary"), max_findings)
     if not findings:
         findings = db.query(Finding).order_by(Finding.created_at.desc()).limit(max_findings).all()
 
@@ -70,8 +91,9 @@ def _retrieve_context(db: Session, question: str, max_findings: int = 8, max_sou
             conds.append(func.lower(Source.title).like(like))
             conds.append(func.lower(Source.description).like(like))
             conds.append(func.lower(Source.tags).like(like))
+            conds.append(func.lower(Source.category).like(like))
         s_query = s_query.filter(or_(*conds))
-    sources = s_query.limit(max_sources).all()
+    sources = _rank(s_query.limit(200).all(), keywords, ("title", "category", "tags", "description"), max_sources)
     if sources:
         parts.append("\nFUENTES RELEVANTES:")
         for s in sources:

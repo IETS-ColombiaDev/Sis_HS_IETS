@@ -18,6 +18,8 @@ rapidfuzz==3.14.6
 openpyxl==3.1.5
 pypdfium2==4.30.0
 Pillow==11.3.0
+# PDF nativo de fichas, informes y boletines (RF14, RF18, RF19). Python puro.
+reportlab==4.2.5
 # Fase 0 (P0-1/P0-2): migraciones versionadas y driver de PostgreSQL 15.
 # DATABASE_URL de produccion: postgresql+psycopg://usuario:clave@host:5432/base
 alembic==1.19.2

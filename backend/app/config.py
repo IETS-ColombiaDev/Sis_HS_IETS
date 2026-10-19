@@ -82,6 +82,8 @@ class Settings(BaseSettings):
     firebase_db_enabled: bool = True
     firebase_db_database: str = "hs-iets"
     firebase_db_collection: str = "hs_iets_db"
+    # Solo para soporte: un entorno no productivo lee/escribe la copia de produccion.
+    firebase_db_share_with_production: bool = False
     firebase_db_location: str = "nam5"
 
     @property

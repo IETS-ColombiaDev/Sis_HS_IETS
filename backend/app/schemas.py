@@ -564,11 +564,11 @@ class ConfigOut(BaseModel):
     minimax_active_model: str = ""
     minimax_available_models: list[str] = []
     minimax_vision_model: str = ""
-    scan_max_tokens: int = 2048
+    scan_max_tokens: int = 4096
     scan_max_pages: int = 8
     scan_fetch_timeout: int = 25
     scan_child_timeout: int = 15
-    scan_ai_timeout: int = 60
+    scan_ai_timeout: int = 120
     scan_retries: int = 3
     scan_pause_ms: int = 350
     ai_usage_prompt_tokens: int = 0

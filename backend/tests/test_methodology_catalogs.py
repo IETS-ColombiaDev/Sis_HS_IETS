@@ -37,6 +37,28 @@ def test_six_clusters_and_seven_tech_types(db):
     assert db.query(TechType).count() == 7
 
 
+def test_suggestions_match_whole_words_not_substrings(db):
+    """'ia' dentro de 'diabetes' clasificaba Wegovy como sistema de IA."""
+    from app.classification import suggest_cluster, suggest_tech_type
+
+    codes = {t.id: t.code for t in db.query(TechType)}
+    wegovy, _ = suggest_tech_type(
+        db,
+        legacy_type="medicamento",
+        title="Wegovy 0.25 mg FlexTouch solution for injection",
+        summary="Semaglutide. Indicated for obesity and type 2 diabetes. Approved.",
+    )
+    triage, _ = suggest_tech_type(db, title="Triage tool", summary="Uses AI to read chest X-rays")
+    assert codes[wegovy] == "medicamento"
+    assert codes[triage] == "ia"
+    # "app" ya no coincide dentro de "approved".
+    approved, _ = suggest_tech_type(db, title="Valve", summary="Approved transcatheter heart valve implant")
+    assert codes[approved] == "dispositivo"
+    # Las fuentes en ingles tambien llegan a un cluster.
+    cl, _ = suggest_cluster(db, indication="Niemann-Pick disease type C1, a rare lysosomal disorder")
+    assert db.get(Cluster, cl).code == "huerfanas"
+
+
 def test_taxonomies_are_data_not_code(db):
     """Cada clusteres trae las claves de clasificacion asistida."""
     for cluster in db.query(Cluster):

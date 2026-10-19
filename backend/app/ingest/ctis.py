@@ -30,7 +30,7 @@ class CtisConnector(Connector):
         "verifica el esquema en cada corrida y se apaga si cambia."
     )
     min_interval = 1.0
-    adapter_version = "1"
+    adapter_version = "2"
 
     def fetch(self, *, config: dict, url: str = "") -> ConnectorResult:
         config = config or {}
@@ -44,18 +44,23 @@ class CtisConnector(Connector):
                 )
             return result
 
-        endpoint = clean_text(config.get("base_url") or url) or DEFAULT_URL
+        endpoint = clean_text(config.get("base_url") or "")
+        if not endpoint and "ctis-public-api" in (url or ""):
+            endpoint = clean_text(url)
+        endpoint = endpoint or DEFAULT_URL
         page_size = int(config.get("page_size", 40))
-        params = {
-            "page": 1,
-            "size": max(1, min(page_size, 80)),
+        # El portal solo acepta POST con paginacion y orden en el cuerpo; un GET
+        # recibe 403 "Missing Authentication Token" del API Gateway.
+        body = {
+            "pagination": {"page": 1, "size": max(1, min(page_size, 80))},
+            "sort": {"property": "decisionDate", "direction": "DESC"},
+            "searchCriteria": dict(config.get("search_criteria") or {}),
         }
-        params.update(config.get("params") or {})
 
         try:
             data = request_json(
                 endpoint,
-                params=params,
+                json_body=body,
                 connector_code=self.code,
                 min_interval=self.min_interval,
             )
@@ -102,7 +107,8 @@ class CtisConnector(Connector):
     def _to_record(self, row: dict) -> CanonicalRecord | None:
         trial_id = _trial_id(row)
         title = clean_text(
-            row.get("title")
+            row.get("ctTitle")
+            or row.get("title")
             or row.get("fullTitle")
             or row.get("publicTitle")
             or row.get("medicalCondition")
@@ -117,25 +123,52 @@ class CtisConnector(Connector):
             sponsor_name = sponsors[0].get("name")
         sponsor = clean_text(sponsor_name, 300)
         condition = clean_text(
-            row.get("medicalCondition") or row.get("condition") or row.get("indication"),
+            row.get("conditions") or row.get("medicalCondition") or row.get("condition") or row.get("indication"),
             2000,
         )
+        phase = clean_text(row.get("trialPhase") or row.get("phase") or "Ensayo UE")
+        product = clean_text(row.get("product") or row.get("productName"), 400)
+        decided = clean_text(row.get("decisionDateOverall"))
         nct = find_nct_ids(trial_id, title, clean_text(row.get("nctId") or row.get("secondaryIds")))
         return CanonicalRecord(
             external_id=trial_id or title[:80],
             title=title or trial_id,
             url=clean_text(row.get("url") or f"https://euclinicaltrials.eu/search-for-clinical-trials/?lang=en&EUCT={trial_id}", 1000),
-            summary=clean_text(condition or title, 1500),
-            commercial_name=clean_text(row.get("productName") or title, 400),
+            summary=clean_text(
+                ". ".join(
+                    p
+                    for p in (
+                        title,
+                        f"Fase: {phase}" if phase else "",
+                        f"Condicion: {condition}" if condition else "",
+                        f"Producto: {product}" if product else "",
+                        f"Promotor: {sponsor}" if sponsor else "",
+                        f"Autorizado en la UE: {decided}" if decided else "",
+                    )
+                    if p
+                ),
+                1500,
+            ),
+            commercial_name=product or clean_text(row.get("shortTitle") or title, 400),
             manufacturer=sponsor,
             indication=condition,
             technology_type="medicamento",
-            development_phase=clean_text(row.get("phase") or row.get("trialPhase") or "Ensayo UE"),
-            horizon="emergente",
+            development_phase=phase,
+            horizon=_horizon_for_phase(phase),
             nct_ids=nct,
             regulatory_status=clean_text(row.get("status") or "Ensayo CTIS"),
+            published_date=decided,
             raw=row,
         )
+
+
+def _horizon_for_phase(phase: str) -> str:
+    text = (phase or "").lower()
+    if "phase iii" in text or "phase iv" in text or "(phase 3" in text:
+        return "inminente"
+    if "phase ii" in text or "phase 2" in text:
+        return "transicional"
+    return "emergente"
 
 
 def _as_rows(data) -> list[dict]:

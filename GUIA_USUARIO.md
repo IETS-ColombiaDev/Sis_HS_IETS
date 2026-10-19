@@ -863,7 +863,7 @@ Borrador
 6. Invite revisor externo (correo o copiar enlace si no hay SMTP).  
 7. Atienda observaciones.  
 8. Pase a comité y publique.  
-9. Exporte HTML si necesita versión institucional.
+9. Exporte la versión institucional: **Exportar HTML institucional** o **Descargar PDF**.
 
 ### 15.4 Invitaciones
 
@@ -926,7 +926,7 @@ Desde administración / API de paquete: ZIP con Listado Único, informes aprobad
 2. **Compilar** borrador a partir de lo publicado/priorizado según reglas del módulo.  
 3. Revisar contenido.  
 4. **Aprobar** (líder / perfil habilitado).  
-5. **Publicar** y/ o exportar.  
+5. **Publicar** y exportar: **Ver HTML ejecutivo** (pestaña nueva) o **Descargar PDF** (A4, listo para distribuir).  
 
 Coordine con la fecha de boletín definida al crear el ciclo.
 
@@ -1127,7 +1127,7 @@ Edite valores/etiquetas/rangos de prioridad, niveles, tipos de tecnología, orí
 |---|---|---|
 | `/postular` | Ciudadanía / industria / academia | Postula tecnología + COI |
 | `/expedientes` | Público | Busca fichas publicadas |
-| `/expedientes/:id` | Público | Lee una ficha |
+| `/expedientes/:id` | Público | Lee una ficha; **Descargar ficha técnica** entrega PDF y **Ver versión web**, HTML |
 | `/transparencia` | Público | Cifras agregadas |
 | `/revisar/:token` | Revisor invitado | Evalúa expediente |
 
