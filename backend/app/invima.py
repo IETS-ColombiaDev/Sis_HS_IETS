@@ -24,6 +24,7 @@ import httpx
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from .config import settings
 from .dedup import _blend, _triple_similarity, normalize_name
 from .methodology import INVIMA_STALE_DAYS, get_param
 from .models import InvimaRecord, InvimaSync, Technology
@@ -38,10 +39,10 @@ SOCRATA_PAGE_SIZE = 1000
 # (`i7cb-raxc`) responde HTTP 200 con cero filas. Se conserva en la lista para
 # que el indice lo recoja apenas la entidad lo republique.
 #
-# Limitacion conocida: ninguno de los conjuntos disponibles expone el principio
-# activo, solo el nombre del producto. La verificacion por DCI queda degradada
-# hasta que el CUM vuelva a publicar datos o se acuerde con el INVIMA una ruta
-# estructurada (decision D-04 del BACKLOG).
+# El CUM (i7cb-raxc) publica el principio activo; los otros dos, solo el nombre
+# del producto. Los tres suman cerca de 2 millones de filas: la sincronizacion
+# trae una muestra y la busqueda consulta en vivo lo que el indice no tiene
+# (ver `live_lookup`), guardando lo encontrado.
 SOCRATA_DATASETS: tuple[tuple[str, str], ...] = (
     ("ui32-p9f2", "Registros sanitarios y NSO, vigentes y vencidos"),
     ("y4qt-w6tk", "Registros sanitarios de dispositivos médicos"),
@@ -79,37 +80,42 @@ def _pick(row: dict, names: Iterable[str]) -> str:
     return ""
 
 
-def _parse_date(value: str) -> date | None:
+def _parse_date(value: str, *, us_order: bool = False) -> date | None:
+    """Fecha del dato abierto. Socrata publica el CUM como mes/dia/ano (us_order);
+    los archivos planos del INVIMA usan dia/mes/ano."""
     if not value:
         return None
     text = value.strip()[:10]
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+    slash = ("%m/%d/%Y", "%d/%m/%Y") if us_order else ("%d/%m/%Y", "%m/%d/%Y")
+    for fmt in ("%Y-%m-%d", *slash, "%d-%m-%Y", "%Y/%m/%d"):
         try:
-            return datetime.strptime(text, fmt).date()
+            parsed = datetime.strptime(text, fmt).date()
         except ValueError:
             continue
+        # 01/01/1900 es relleno del dato abierto ("sin fecha"), no un vencimiento.
+        return None if parsed.year <= 1900 else parsed
     return None
 
 
-def _to_record_fields(row: dict) -> dict:
+def _to_record_fields(row: dict, *, us_dates: bool = False) -> dict:
     lowered = {str(k).strip().lower(): v for k, v in row.items()}
     data = {dest: _pick(lowered, names) for dest, names in FIELD_MAP.items()}
     return {
         **data,
-        "fecha_expedicion": _parse_date(data["fecha_expedicion"]),
-        "fecha_vencimiento": _parse_date(data["fecha_vencimiento"]),
+        "fecha_expedicion": _parse_date(data["fecha_expedicion"], us_order=us_dates),
+        "fecha_vencimiento": _parse_date(data["fecha_vencimiento"], us_order=us_dates),
         "producto_norm": normalize_name(data["producto"]),
         "principio_norm": normalize_name(data["principio_activo"]),
         "raw_payload": row,
     }
 
 
-def _upsert(db: Session, rows: Iterable[dict]) -> tuple[int, int]:
+def _upsert(db: Session, rows: Iterable[dict], *, us_dates: bool = False) -> tuple[int, int]:
     """Inserta o actualiza por expediente, o por registro si no hay expediente."""
     inserted = updated = 0
     now = datetime.now(timezone.utc)
     for row in rows:
-        fields = _to_record_fields(row)
+        fields = _to_record_fields(row, us_dates=us_dates)
         if not (fields["producto"] or fields["principio_activo"]):
             continue
 
@@ -152,7 +158,7 @@ def _sync_dataset(
         rows = response.json()
         if not rows:
             break
-        a, b = _upsert(db, rows)
+        a, b = _upsert(db, rows, us_dates=True)
         ingested += a
         changed += b
         offset += len(rows)
@@ -316,7 +322,91 @@ def _is_valid_registry(record: InvimaRecord) -> bool:
     return False
 
 
-def search(db: Session, term: str, *, limit: int = 20) -> list[dict]:
+def _stems(core: str) -> list[str]:
+    """Raices para el prefiltro: 'semaglutide' (FDA) y 'semaglutida' (INVIMA)
+    comparten 'semaglut'. Se recortan las dos ultimas letras de cada palabra."""
+    tokens = [t for t in core.split() if len(t) >= 4] or [core]
+    out = []
+    for token in tokens[:3]:
+        stem = token[: max(5, len(token) - 2)] if len(token) > 6 else token
+        if stem not in out:
+            out.append(stem)
+    return out
+
+
+def _good_enough(db: Session, core: str, candidates: list) -> bool:
+    minimum = match_threshold(db)
+    for record in candidates:
+        for value in (record.producto_norm, record.principio_norm):
+            if value and _blend(_triple_similarity(core, value)) >= minimum:
+                return True
+    return False
+
+
+# Terminos ya consultados en vivo sin resultados (evita repetir la llamada).
+_LIVE_MISSES: dict[str, float] = {}
+LIVE_MISS_TTL_S = 6 * 3600
+LIVE_ROWS_PER_DATASET = 60
+# Columnas de busqueda por conjunto (SoQL, en mayusculas como las publica el INVIMA).
+LIVE_COLUMNS: dict[str, tuple[str, ...]] = {
+    "i7cb-raxc": ("principioactivo", "producto", "descripcionatc"),
+    "y4qt-w6tk": ("prodcuto", "marca"),
+    "ui32-p9f2": ("producto",),
+}
+
+
+def live_lookup(db: Session, term: str, *, timeout: float = 8.0) -> int:
+    """Consulta datos.gov.co por el termino y guarda en el indice lo encontrado.
+
+    Devuelve cuantos registros nuevos o actualizados quedaron. Si la fuente no
+    responde, devuelve 0 y la verificacion sigue con el indice local.
+    """
+    import time
+
+    core = normalize_name(term)
+    if not core:
+        return 0
+    missed = _LIVE_MISSES.get(core)
+    if missed and time.time() - missed < LIVE_MISS_TTL_S:
+        return 0
+    stems = [s.upper().replace("'", "") for s in _stems(core)]
+
+    def fetch(item: tuple[str, tuple[str, ...]]) -> list[dict]:
+        dataset, columns = item
+        clauses = [f"upper({col}) like '%{stem}%'" for col in columns for stem in stems]
+        try:
+            with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+                response = client.get(
+                    f"{SOCRATA_HOST}/resource/{dataset}.json",
+                    params={"$where": " OR ".join(clauses), "$limit": LIVE_ROWS_PER_DATASET},
+                )
+                response.raise_for_status()
+                rows = response.json()
+        except (httpx.HTTPError, ValueError):
+            return []
+        return rows if isinstance(rows, list) else []
+
+    stored = 0
+    try:
+        from concurrent.futures import ThreadPoolExecutor
+
+        # Los tres conjuntos en paralelo: en serie la primera consulta tardaba ~12 s.
+        with ThreadPoolExecutor(max_workers=len(LIVE_COLUMNS)) as pool:
+            batches = list(pool.map(fetch, LIVE_COLUMNS.items()))
+        for rows in batches:
+            if rows:
+                a, b = _upsert(db, rows, us_dates=True)
+                stored += a + b
+    except Exception:  # noqa: BLE001
+        return 0
+    if stored:
+        db.commit()
+    else:
+        _LIVE_MISSES[core] = time.time()
+    return stored
+
+
+def search(db: Session, term: str, *, limit: int = 20, live: bool = True) -> list[dict]:
     """Busca en el indice local por producto o principio activo.
 
     El prefiltro se hace en SQL sobre las columnas normalizadas y solo entonces
@@ -327,14 +417,16 @@ def search(db: Session, term: str, *, limit: int = 20) -> list[dict]:
     if not core:
         return []
 
-    tokens = [t for t in core.split() if len(t) >= 4] or [core]
     filters = []
-    for token in tokens[:3]:
+    for token in _stems(core):
         pattern = f"%{token}%"
         filters.append(InvimaRecord.producto_norm.like(pattern))
         filters.append(InvimaRecord.principio_norm.like(pattern))
 
     candidates = db.query(InvimaRecord).filter(or_(*filters)).limit(400).all()
+    if live and settings.invima_live_lookup and not _good_enough(db, core, candidates):
+        if live_lookup(db, term):
+            candidates = db.query(InvimaRecord).filter(or_(*filters)).limit(400).all()
 
     scored: list[dict] = []
     for record in candidates:

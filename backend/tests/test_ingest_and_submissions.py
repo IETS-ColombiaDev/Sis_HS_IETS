@@ -195,6 +195,46 @@ def test_circuit_opens_after_repeated_failures(db):
     assert "Circuito abierto" in blocked.message
 
 
+def test_a_blocked_html_source_fails_the_job_instead_of_reporting_ok(db, monkeypatch):
+    from app import scraper
+
+    source = _source(db, connector="html", url="https://bloqueado.test", connector_config={})
+    monkeypatch.setattr(scraper, "fetch_url", lambda url, timeout=None: (403, "text/html", "", b""))
+    job = ingest_service.run_job(db, ingest_service.enqueue(db, [source], triggered_by="test")[0].id)
+    assert job.status != "ok"
+    assert "403" in job.message
+
+
+def test_the_scan_log_is_committed_before_any_download(tmp_path, monkeypatch):
+    """Con la escritura abierta durante el rastreo (60-90 s) SQLite bloqueaba a todos."""
+    from app import scraper
+    from app.models import ScrapeLog
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'scan.db'}")
+    Base.metadata.create_all(bind=engine)
+    Session = sessionmaker(bind=engine, autoflush=False)
+    db = Session()
+    methodology.seed_catalogs(db)
+    source = _source(db, connector="html", url="https://lenta.test", connector_config={})
+    seen = {}
+
+    def fetch(url, timeout=None):
+        other = Session()  # otra conexion, como la de otro usuario
+        try:
+            seen["visible"] = other.query(ScrapeLog).filter(ScrapeLog.source_id == source.id).count()
+            other.add(ScrapeLog(source_id=source.id, status="ok", triggered_by="otro"))
+            other.commit()  # no debe esperar un candado del escaneo en curso
+            seen["wrote"] = True
+        finally:
+            other.close()
+        return (404, "text/html", "", b"")
+
+    monkeypatch.setattr(scraper, "fetch_url", fetch)
+    scraper.scrape_source(db, source, triggered_by="test")
+    assert seen == {"visible": 1, "wrote": True}
+    db.close()
+
+
 def test_submission_requires_coi_and_lands_as_reactive(db):
     with pytest.raises(SubmissionRuleError):
         submission_service.create_submission(

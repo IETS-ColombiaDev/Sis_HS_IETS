@@ -65,6 +65,8 @@ export default defineConfig({
           FIREBASE_RRHH_ENV_FILE: "",
           // Nunca tocar la copia de produccion en Firestore desde las pruebas.
           FIREBASE_DB_ENABLED: "false",
+          // Sin red externa: el cruce INVIMA usa solo el indice local.
+          INVIMA_LIVE_LOOKUP: "false",
         },
       },
 });

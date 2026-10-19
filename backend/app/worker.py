@@ -39,8 +39,9 @@ def start_worker() -> None:
     if not settings.ingest_worker_enabled:
         log.info("Worker de ingesta deshabilitado por configuracion.")
         return
-    # Con SQLite el worker en hilo pelea escrituras con el login y la UI se queda
-    # en "El servidor tardó demasiado". Use Postgres o INGEST_WORKER_FORCE=1.
+    # Con SQLite el worker comparte el candado de escritura con la UI. Ya no retiene
+    # escrituras durante descargas ni IA (ver scraper.scrape_source), pero sigue
+    # siendo opt-in: INGEST_WORKER_FORCE=1 (asi lo activa render.yaml).
     if IS_SQLITE and not _force_worker_on_sqlite():
         log.warning(
             "Worker de ingesta apagado con SQLite (protege el login). "

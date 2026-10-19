@@ -116,6 +116,13 @@ test.describe("evaluacion temprana y revision por pares", () => {
     await expect(popup.locator("body")).toContainText("Instituto de Evaluación Tecnológica en Salud");
     await popup.close();
 
+    // PDF nativo del documento institucional (RF14).
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Descargar PDF" }).click(),
+    ]);
+    expect(download.suggestedFilename()).toMatch(/^iets-evaluacion-\d+-v[\d.]+\.pdf$/);
+
     const queue = await api.get(`/reports?cycle_id=${cycle.id}`);
     expect(queue.find((i) => i.technology_id === tech.id).entry_status).toBe("publicada");
     const cyc = await api.get(`/cycles/${cycle.id}`);

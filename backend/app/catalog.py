@@ -666,7 +666,7 @@ _HT = [
     _src(
         "FP-HT-07",
         "AIHTA y sistema de escaneo de la UE",
-        url="https://aihta.at/page/horizon-scanning/en",
+        url="https://aihta.at/forschungsprogramme",
         entity_type="organismo_hta",
         category=CAT_HTA,
         access_level="D",
@@ -807,7 +807,7 @@ _HT = [
     _src(
         "FP-LI-02",
         "OMS publicaciones sobre tecnologias emergentes",
-        url="https://www.who.int/teams/health-product-policy-and-standards/assistive-and-medical-technology/medical-devices/emerging-technologies",
+        url="https://www.who.int/news-room/fact-sheets/detail/medical-devices",
         entity_type="literatura",
         category=CAT_LITERATURA,
         access_level="E",

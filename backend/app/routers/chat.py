@@ -168,7 +168,9 @@ def send_message(payload: ChatSendIn, db: Session = Depends(get_db), user: User 
 
     user_msg = ChatMessage(session_id=session.id, role="user", content=payload.message.strip())
     db.add(user_msg)
-    db.flush()
+    # Confirmado antes de esperar a la IA (~25 s): con un flush la escritura quedaba
+    # abierta todo ese tiempo y en SQLite bloqueaba al resto de usuarios.
+    db.commit()
 
     history = [{"role": m.role, "content": m.content} for m in session.messages]
     context, used = _retrieve_context(db, payload.message)

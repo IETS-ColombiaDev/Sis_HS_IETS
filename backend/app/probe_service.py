@@ -53,13 +53,38 @@ def probe_source(db: Session, source: Source, *, persist: bool = True) -> dict:
         _store(db, source, "rojo", detail, persist)
         return detail
 
-    headers = {"User-Agent": USER_AGENT, "Accept": "application/json, text/html, */*"}
+    if (source.connector or "html") in {"html", "pdf", "manual"}:
+        # Las fuentes web se sondean como las recorre el escaner (cabeceras de
+        # navegador): con el agente de robot muchas respondian 403 sin razon real.
+        from .scraper import BROWSER_HEADERS
+
+        headers = dict(BROWSER_HEADERS)
+    else:
+        headers = {"User-Agent": USER_AGENT, "Accept": "application/json, text/html, */*"}
     try:
-        with httpx.Client(timeout=25.0, follow_redirects=True, headers=headers) as client:
-            resp = client.get(url, params=params)
+        from .ingest.base import tls_get
+
+        resp = tls_get(url, timeout=25.0, headers=headers, params=params)
         detail["http_status"] = resp.status_code
+        if resp.status_code != expect_status and (source.connector or "html") == "html":
+            # Igual que el escaner: si la portada bloquea, vale la ruta de respaldo.
+            from .scraper import fallback_urls
+
+            for alt in fallback_urls(source, getattr(source, "entry_urls", None) or []):
+                alt_resp = tls_get(alt, timeout=25.0, headers=headers)
+                if alt_resp.status_code == expect_status:
+                    detail["status"] = "verde"
+                    detail["message"] = f"La portada responde HTTP {resp.status_code}; el escaneo usa la ruta de respaldo {alt}."
+                    _store(db, source, "verde", detail, persist)
+                    return detail
         if resp.status_code != expect_status:
             detail["message"] = f"HTTP {resp.status_code} (se esperaba {expect_status})."
+            if resp.status_code in (202, 401, 403, 429) and (source.connector or "html") in {"html", "manual"}:
+                detail["message"] += (
+                    " El sitio bloquea el acceso automatico (proteccion anti-robot): registre sus "
+                    "senales con la carga manual de la bandeja de entrada o agregue una ruta "
+                    "alternativa (RSS, PDF) en el flujo de la fuente."
+                )
             _store(db, source, "rojo", detail, persist)
             return detail
 
