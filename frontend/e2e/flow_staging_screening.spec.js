@@ -81,6 +81,37 @@ test.describe("bandeja de entrada", () => {
     await expect(page.getByText(`${closed.code} no admite asignaciones.`)).toBeVisible();
     expectClean(errors);
   });
+
+  test("al clasificar se ve el origen: enlace, JSON original y confiabilidad", async ({ page }) => {
+    const errors = watchErrors(page);
+    const api = await apiAs(page.request);
+    const tag = uid("Origen");
+    const [tech] = await seedTechs(api, [{ name: `${tag} Delta`, nct: ["NCT01234567"] }]);
+
+    await loginAs(page, "superadmin", "/bandeja-entrada");
+    await settle(page);
+    await page.getByLabel("Buscar señales").fill(tag);
+    await page.getByTestId(`staging-row-${tech.id}`).getByRole("button", { name: "Clasificar" }).click();
+
+    const origin = page.getByTestId("signal-origin");
+    await expect(origin).toBeVisible();
+    await origin.getByTestId("signal-json-toggle").click();
+    await expect(origin.getByTestId("signal-json")).toContainText("fixture");
+    await expect(origin.getByTestId("signal-json").locator("pre")).toContainText("\"id\"");
+
+    // Sin IA en las pruebas: el dictamen sale de los chequeos y lo dice.
+    await origin.getByTestId("signal-reliability-run").click();
+    await expect(origin.getByTestId("signal-verdict")).toBeVisible({ timeout: 60_000 });
+    await expect(origin.getByText("IA está apagada", { exact: false })).toBeVisible();
+    await origin.getByRole("button", { name: /chequeos automáticos/ }).click();
+    await expect(origin.getByTestId("signal-checks")).toContainText("Identificadores comprobables");
+    await expect(origin.getByTestId("signal-checks")).toContainText("NCT01234567");
+
+    // El dictamen queda en la fila al cerrar.
+    await page.getByRole("button", { name: "Cancelar" }).click();
+    await expect(page.getByTestId(`staging-row-${tech.id}`).locator(".staging-rel")).toBeVisible();
+    expectClean(errors);
+  });
 });
 
 test.describe("filtrado y depuracion", () => {

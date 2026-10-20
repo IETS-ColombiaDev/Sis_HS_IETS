@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from .. import audit, cycle_service, evaluation_service, screening_service
+from .. import audit, cycle_service, evaluation_service, reliability_service, screening_service
 from ..classification import suggest_cluster, suggest_tech_type
 from ..database import get_db
 from ..deps import get_current_user, require_permission
@@ -60,6 +60,10 @@ def _to_out(db: Session, tech: Technology, entry: CycleTechnology | None = None)
     payload = tech.raw_payload if isinstance(tech.raw_payload, dict) else {}
     out.has_raw = bool(payload)
     out.raw_origin = str(payload.get("origin") or "")
+    out.signal_url = reliability_service.signal_url(db, tech)
+    verdict = tech.reliability if isinstance(tech.reliability, dict) else {}
+    out.reliability_verdict = str(verdict.get("verdict") or "")
+    out.reliability_score = verdict.get("score") if isinstance(verdict.get("score"), int) else None
 
     if entry is not None:
         out.cycle_id = entry.cycle_id
@@ -446,6 +450,39 @@ def suggest_classification(
         "tech_type_name": tech_type.name if tech_type else "",
         "tech_type_reason": type_reason,
     }
+
+
+@router.get("/{technology_id}/reliability")
+def get_reliability(
+    technology_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Ultimo dictamen guardado (o null) y la URL de la senal para abrirla."""
+    tech = _get(db, technology_id)
+    return {
+        "url": reliability_service.signal_url(db, tech),
+        "assessment": tech.reliability if isinstance(tech.reliability, dict) else None,
+    }
+
+
+@router.post("/{technology_id}/reliability")
+def assess_reliability(
+    technology_id: int,
+    use_ai: bool = Query(True),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_TECHNOLOGY_WRITE)),
+):
+    """Revisa si la senal es confiable: chequeos verificables y dictamen de la IA.
+
+    Orienta, no decide: el evaluador sigue clasificando y puede descartarla.
+    """
+    tech = _get(db, technology_id)
+    result = reliability_service.assess(db, tech, use_ai=use_ai)
+    result["assessed_by"] = user.email
+    tech.reliability = result
+    db.commit()
+    return {"url": result["url"], "assessment": result}
 
 
 # --------------------------------------------------------------------------- #

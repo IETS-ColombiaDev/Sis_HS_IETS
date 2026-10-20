@@ -13,6 +13,7 @@ import ClampText from "../components/ClampText";
 import Icon from "../components/Icon";
 import { TermLabel } from "../components/InfoTip";
 import Modal from "../components/Modal";
+import SignalOrigin from "../components/SignalOrigin";
 import { Input, Select } from "../components/Field";
 import EmptyState from "../components/EmptyState";
 import { LoadingBlock } from "../components/Spinner";
@@ -31,6 +32,7 @@ import {
 } from "../utils/techLink";
 
 const PAGE_SIZE = 100;
+const RELIABILITY_LABEL = { confiable: "Confiable", verificar: "Verificar", baja: "Baja confiabilidad" };
 
 /**
  * Bandeja de entrada del staging (RF04): senales capturadas que aun no
@@ -51,7 +53,6 @@ export default function Staging() {
   const [filters, setFilters] = useState({ q: "", source_id: "", channel: "" });
   const [query, setQuery] = useState({ q: "", source_id: "", channel: "" });
   const [editing, setEditing] = useState(null);
-  const [rawPreview, setRawPreview] = useState(null);
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
@@ -239,7 +240,6 @@ export default function Staging() {
   }, [techId, loading, invalidParam]);
 
   const openEdit = (item, { readOnly = false } = {}) => {
-    setRawPreview(null);
     handledLink.current = item.id;
     setTechId(item.id);
     setEditing({
@@ -547,6 +547,28 @@ export default function Staging() {
                           {item.source_title || "Sin fuente"} ·{" "}
                           {new Date(item.captured_at).toLocaleDateString("es-CO")} ·{" "}
                           {item.source_channel === "reactiva" ? "Reactiva" : "Proactiva"}
+                          <span className="staging-links">
+                            {item.signal_url && (
+                              <a
+                                className="staging-extlink"
+                                href={item.signal_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={`Abrir la fuente original: ${item.signal_url}`}
+                                aria-label={`Abrir la fuente original de ${name.slice(0, 60)}`}
+                              >
+                                <Icon name="external" size={13} />
+                              </a>
+                            )}
+                            {RELIABILITY_LABEL[item.reliability_verdict] && (
+                              <span
+                                className={`staging-rel staging-rel--${item.reliability_verdict}`}
+                                title={`Confiabilidad ${item.reliability_score ?? "-"}/100`}
+                              >
+                                {RELIABILITY_LABEL[item.reliability_verdict]}
+                              </span>
+                            )}
+                          </span>
                         </div>
                       </td>
                       <td>
@@ -604,7 +626,7 @@ export default function Staging() {
         open={Boolean(editing)}
         onClose={closeEdit}
         title={editing?.readOnly ? "Detalle de la señal" : "Clasificar señal"}
-        width={640}
+        width={720}
         footer={
           <>
             <Button variant="secondary" onClick={closeEdit}>
@@ -625,6 +647,19 @@ export default function Staging() {
                 Su perfil consulta la señal; clasificarla corresponde a los evaluadores.
               </p>
             )}
+            <SignalOrigin
+              tech={editing}
+              canAnalyze={canWrite}
+              onAssessed={(a, url) =>
+                setItems((prev) =>
+                  prev.map((i) =>
+                    i.id === editing.id
+                      ? { ...i, reliability_verdict: a.verdict, reliability_score: a.score, signal_url: url || i.signal_url }
+                      : i
+                  )
+                )
+              }
+            />
             <div style={{ marginBottom: 14 }} hidden={editing.readOnly}>
               <HintButton
                 variant="outline"
@@ -767,27 +802,6 @@ export default function Staging() {
               Las fechas alimentan el pre-llenado de los criterios P1, P5 y P6 y el cálculo de
               time-to-market.
             </p>
-            {editing.has_raw && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    const { data } = await api.get(`/ingest/raw/${editing.id}`);
-                    setRawPreview(data);
-                  } catch (err) {
-                    toast.error(apiError(err, "No se pudo abrir el crudo"));
-                  }
-                }}
-              >
-                Ver señal original (RF03)
-              </Button>
-            )}
-            {rawPreview && rawPreview.technology_id === editing.id && (
-              <pre className="raw-preview">
-                {JSON.stringify(rawPreview.payload, null, 2).slice(0, 4000)}
-              </pre>
-            )}
           </>
         )}
       </Modal>
