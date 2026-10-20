@@ -445,7 +445,10 @@ _RG = [
         entity_type="agencia_regulatoria",
         category=CAT_REGULATORIA,
         access_level="B",
-        connector="file_feed",
+        # El ARTG es un buscador, no un archivo: el escaner web lo recorre y, si el
+        # sitio no responde desde fuera de Australia, usa las noticias del dominio.
+        # Un CSV exportado a mano se sigue cargando como lote (file_feed).
+        connector="html",
         country="Australia",
         authors="Therapeutic Goods Administration",
         description=(
