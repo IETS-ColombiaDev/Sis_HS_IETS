@@ -137,9 +137,9 @@ test("profundizacion: clic en barra, boton de datos y teclado filtran el recorte
   await settle(page);
   expect(new URL(page.url()).searchParams.get("cluster_id")).toBeNull();
 
-  // Clic directo en una barra de Recharts (embudo -> etapa "Filtradas").
+  // Clic en una etapa del embudo -> "Filtradas".
   const filtered = cycle.dash.funnel.filtered;
-  await page.getByTestId("chart-funnel").locator(".recharts-bar-rectangle").nth(1).click();
+  await page.getByTestId("pick-stage-filtered").click();
   await settle(page);
   await expect(page).toHaveURL(/stage=filtered/);
   await expect(page.locator(".dc-table-tools")).toContainText(`de ${filtered} tecnología(s)`);
