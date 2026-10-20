@@ -821,6 +821,10 @@ class TechnologyOut(BaseModel):
     source_title: str = ""
     has_raw: bool = False
     raw_origin: str = ""
+    # URL mas especifica de la senal (propia, del hallazgo o del crudo).
+    signal_url: str = ""
+    reliability_verdict: str = ""
+    reliability_score: int | None = None
     finding_id: int | None = None
     captured_at: datetime
     captured_by: str = ""

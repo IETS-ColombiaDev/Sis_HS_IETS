@@ -436,6 +436,8 @@ class Technology(Base):
 
     # Trazabilidad de captura (RF03).
     raw_payload: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
+    # Ultimo dictamen de confiabilidad (reliability_service): chequeos + IA.
+    reliability: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
     source_channel: Mapped[str] = mapped_column(String(20), default="proactiva")  # proactiva | reactiva
     source_id: Mapped[int | None] = mapped_column(
         ForeignKey("sources.id", ondelete="SET NULL"), nullable=True, index=True
