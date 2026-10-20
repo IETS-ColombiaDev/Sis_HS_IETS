@@ -14,6 +14,47 @@ const PIPE = [
   { n: "04", label: "Publicar" },
 ];
 
+// Lo que cada perfil hace, en las palabras de Usuarios y perfiles.
+const ROLE_INFO = {
+  superadmin: {
+    text: "Control total: usuarios, configuración, catálogos, bitácora y cierre de ciclos.",
+    can: ["Vigilancia y bandeja", "Calificar P1 a P6", "Redactar y publicar", "Usuarios y configuración"],
+  },
+  evaluador_tecnico: {
+    text: "Opera la vigilancia, la bandeja de entrada, el filtrado y los ciclos.",
+    can: ["Vigilancia y bandeja", "Filtrado e INVIMA", "Calificar P1, P5 y P6", "Redactar informes"],
+  },
+  evaluador_clinico: {
+    text: "Opera la vigilancia, la bandeja y el filtrado; redacta informes.",
+    can: ["Vigilancia y bandeja", "Calificar P2, P3 y P4", "Redactar informes"],
+  },
+  tomador_decisiones: {
+    text: "Consulta el sistema y los tableros restringidos (presupuesto y comparadores).",
+    can: ["Tablero estratégico", "Alertas tempranas", "Notas del equipo"],
+  },
+  revisor_pares: {
+    text: "Lee los expedientes y registra revisiones por pares.",
+    can: ["Revisar expedientes", "Comentar por campo", "Emitir veredicto"],
+  },
+};
+
+const CRITERIA = [
+  { code: "P1", label: "Nueva en el país", who: "tec" },
+  { code: "P2", label: "Relevancia clínica", who: "cli" },
+  { code: "P3", label: "Carga e impacto financiero", who: "cli" },
+  { code: "P4", label: "Impacto organizacional", who: "cli" },
+  { code: "P5", label: "Aprobada por FDA/EMA (≤ 12 meses)", who: "tec" },
+  { code: "P6", label: "En trámite regulatorio (≤ 6 meses)", who: "tec" },
+];
+
+const EDITORIAL = [
+  { label: "Borrador", hint: "El equipo redacta" },
+  { label: "Revisión interna", hint: "Par del IETS" },
+  { label: "Revisión externa", hint: "Experto por enlace" },
+  { label: "Comité técnico", hint: "Visto bueno" },
+  { label: "Publicado", hint: "Listo para difundir" },
+];
+
 function firstNameOf(user) {
   const raw = (user?.first_name || user?.name || "").trim();
   const n = raw.split(/\s+/)[0] || "";
@@ -45,68 +86,264 @@ function startActions(user) {
     ];
   }
   return [
-    { to: "/vigilancia", icon: "radar", label: "Ejecutar vigilancia", hint: "Captura señales de las 95 fuentes del catálogo." },
+    { to: "/vigilancia", icon: "radar", label: "Ejecutar vigilancia", hint: "Captura señales de las fuentes del catálogo." },
     { to: "/bandeja-entrada", icon: "inbox", label: "Clasificar la bandeja", hint: "Sin clúster y tipología la señal no entra al ciclo." },
     { to: "/priorizacion", icon: "layers", label: "Priorizar (P1 a P6)", hint: "Seis preguntas oficiales. La IA sugiere; usted decide." },
   ];
 }
 
+/* ---------- Diagramas de cada paso ---------- */
+
+function WelcomeVisual({ user }) {
+  const info = ROLE_INFO[user?.role] || ROLE_INFO.tomador_decisiones;
+  const outputs = [
+    { icon: "radar", phase: "Identificar", out: "Señales en la bandeja" },
+    { icon: "layers", phase: "Priorizar", out: "Puntaje %P de 0 a 6" },
+    { icon: "doc", phase: "Evaluar", out: "Ficha, informe o Mini-HTA" },
+    { icon: "bulb", phase: "Publicar", out: "Boletín, ficha pública y tablero" },
+  ];
+  return (
+    <div className="onb-visual">
+      <div className="onb-role">
+        <span className="onb-role-ico"><Icon name="users" size={20} /></span>
+        <div>
+          <small>Su perfil</small>
+          <strong>{user?.role_label || "Usuario"}</strong>
+          <p>{info.text}</p>
+          <div className="onb-chips">
+            {info.can.map((c) => (
+              <span key={c} className="onb-chip"><Icon name="check" size={12} /> {c}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="onb-cycle" aria-label="Qué produce cada fase del ciclo">
+        {outputs.map((o, i) => (
+          <div key={o.phase} className="onb-cycle-step">
+            <span className="onb-cycle-ico"><Icon name={o.icon} size={18} /></span>
+            <strong>{o.phase}</strong>
+            <small>{o.out}</small>
+            {i < outputs.length - 1 && <span className="onb-arrow" aria-hidden="true">→</span>}
+          </div>
+        ))}
+      </div>
+      <p className="onb-caption">
+        <Icon name="calendar" size={14} /> <span>Todo ocurre dentro de un <b>ciclo</b> de 10 a 16 semanas. El ciclo activo se ve en la cabecera.</span>
+      </p>
+    </div>
+  );
+}
+
+function IntakeVisual() {
+  return (
+    <div className="onb-visual">
+      <div className="onb-flow" aria-label="Camino de una señal hasta el ciclo">
+        <div className="onb-flow-sources">
+          <div className="onb-node">
+            <Icon name="globe" size={16} />
+            <span><strong>Vigilancia</strong><small>Ensayos, agencias, HTA y revistas</small></span>
+          </div>
+          <div className="onb-node">
+            <Icon name="note" size={16} />
+            <span><strong>Postulaciones</strong><small>Formulario público /postular</small></span>
+          </div>
+        </div>
+        <span className="onb-flow-arrow" aria-hidden="true">→</span>
+        <div className="onb-node is-key">
+          <Icon name="inbox" size={16} />
+          <span><strong>Bandeja de entrada</strong><small>Señales sin ciclo</small></span>
+        </div>
+        <span className="onb-flow-arrow" aria-hidden="true">→</span>
+        <div className="onb-gate">
+          <small>Usted clasifica</small>
+          <strong>Clúster + tipología</strong>
+        </div>
+        <span className="onb-flow-arrow" aria-hidden="true">→</span>
+        <div className="onb-node is-end">
+          <Icon name="calendar" size={16} />
+          <span><strong>Ciclo activo</strong><small>Entra a filtrado</small></span>
+        </div>
+      </div>
+      <p className="onb-caption">
+        <Icon name="info" size={14} /> <span>Una <b>señal</b> es el recorte capturado. Al clasificarla y asignarla al ciclo se vuelve una <b>tecnología</b> de trabajo.</span>
+      </p>
+    </div>
+  );
+}
+
+function PriorityVisual() {
+  return (
+    <div className="onb-visual">
+      <div className="onb-filter-row" aria-label="Filtrado antes de calificar">
+        {["Quitar duplicados", "Verificar novedad con INVIMA", "Listado único por clúster"].map((t, i) => (
+          <span key={t} className="onb-filter-pill"><b>{i + 1}</b> {t}</span>
+        ))}
+      </div>
+      <div className="onb-matrix" aria-label="Seis criterios de priorización">
+        {CRITERIA.map((c) => (
+          <div key={c.code} className={`onb-crit is-${c.who}`}>
+            <span className="onb-crit-code">{c.code}</span>
+            <span className="onb-crit-label">{c.label}</span>
+            <span className="onb-crit-who">{c.who === "tec" ? "Técnico" : "Clínico"}</span>
+          </div>
+        ))}
+      </div>
+      <div className="onb-scale" aria-label="Escala de puntos y resultado">
+        <div className="onb-scale-bar">
+          {[0, 1, 2, 3, 4, 5, 6].map((n) => (
+            <span key={n} className={n <= 2 ? "is-no" : n === 3 ? "is-watch" : "is-yes"}>{n}</span>
+          ))}
+        </div>
+        <div className="onb-scale-labels">
+          <span className="is-no">0–2 · No priorizada</span>
+          <span className="is-watch">3 · Bajo vigilancia</span>
+          <span className="is-yes">4–6 · Priorizada</span>
+        </div>
+        <div className="onb-scale-labels onb-scale-levels">
+          <span />
+          <span />
+          <span>4 Ficha · 5 Informe · 6 Mini-HTA</span>
+        </div>
+      </div>
+      <p className="onb-caption">
+        <Icon name="spark" size={14} /> <span>Cada sí vale 1 punto. La IA prellena P1, P5 y P6 como sugerencia; una persona confirma cada criterio.</span>
+      </p>
+    </div>
+  );
+}
+
+function EditorialVisual() {
+  return (
+    <div className="onb-visual">
+      <ol className="onb-track" aria-label="Estados editoriales del expediente">
+        {EDITORIAL.map((s, i) => (
+          <li key={s.label} className={i === EDITORIAL.length - 1 ? "is-end" : ""}>
+            <span className="onb-track-dot">{i + 1}</span>
+            <strong>{s.label}</strong>
+            <small>{s.hint}</small>
+          </li>
+        ))}
+      </ol>
+      <div className="onb-loop">
+        <Icon name="refresh" size={14} />
+        <span>Si el revisor externo pide cambios, el expediente pasa a <b>Con observaciones</b> y vuelve a borrador.</span>
+      </div>
+      <div className="onb-outputs" aria-label="Productos que se publican">
+        {[
+          { icon: "doc", t: "PDF del expediente" },
+          { icon: "book", t: "Boletín del ciclo" },
+          { icon: "globe", t: "Ficha pública" },
+          { icon: "chart", t: "Tablero y alertas" },
+        ].map((o) => (
+          <span key={o.t} className="onb-output"><Icon name={o.icon} size={16} /> {o.t}</span>
+        ))}
+      </div>
+      <p className="onb-caption">
+        <Icon name="key" size={14} /> <span>Nadie lee ni edita un expediente sin firmar antes su <b>declaración de conflicto de interés</b>.</span>
+      </p>
+    </div>
+  );
+}
+
+function HelpVisual() {
+  return (
+    <div className="onb-visual">
+      <div className="onb-compare">
+        <div className="onb-col is-ai">
+          <strong><Icon name="spark" size={16} /> La IA puede</strong>
+          <ul>
+            <li>Resumir y extraer datos de las fuentes</li>
+            <li>Sugerir clasificación y criterios P1, P5, P6</li>
+            <li>Redactar borradores y mejorar notas</li>
+            <li>Responder preguntas en el Asistente IA</li>
+          </ul>
+        </div>
+        <div className="onb-col is-human">
+          <strong><Icon name="users" size={16} /> Solo una persona puede</strong>
+          <ul>
+            <li>Fusionar duplicados</li>
+            <li>Confirmar el puntaje de priorización</li>
+            <li>Aprobar y publicar un expediente</li>
+            <li>Cerrar el ciclo</li>
+          </ul>
+        </div>
+      </div>
+      <div className="onb-tips">
+        <div className="onb-tip"><span className="onb-tip-ico"><Icon name="info" size={16} /></span><span><strong>Ícono ⓘ</strong><small>Al lado de cada término: lo explica en lenguaje sencillo.</small></span></div>
+        <div className="onb-tip"><span className="onb-tip-ico"><Icon name="compass" size={16} /></span><span><strong>Guía de fase</strong><small>Arriba de cada módulo: qué hacer ahí y botón al paso siguiente.</small></span></div>
+        <div className="onb-tip"><span className="onb-tip-ico"><Icon name="pulse" size={16} /></span><span><strong>En vivo</strong><small>Los cambios del equipo aparecen solos, sin recargar.</small></span></div>
+        <div className="onb-tip"><span className="onb-tip-ico"><Icon name="shield" size={16} /></span><span><strong>Bitácora</strong><small>Cada cambio queda registrado con usuario y fecha.</small></span></div>
+      </div>
+    </div>
+  );
+}
+
 function stepsFor(user) {
   const name = firstNameOf(user);
-  const role = user?.role_label || "su perfil";
-  const actions = startActions(user);
   return [
     {
+      tab: "Inicio",
       kicker: "Bienvenida",
       title: name ? `${name}, este es el mapa del sistema` : "Este es el mapa del sistema",
-      lead: `El IETS vigila tecnologías sanitarias emergentes antes de que lleguen a Colombia. Usted entra como ${role}. El trabajo vive dentro de un ciclo (pastilla de la cabecera): nada se prioriza ni se publica por fuera de él.`,
+      lead: "El IETS vigila tecnologías sanitarias emergentes antes de que lleguen a Colombia. El trabajo avanza en cuatro fases; cada una deja un producto para la siguiente.",
       pipe: null,
-      points: [
-        { icon: "radar", title: "Detectar", text: "Fuentes internacionales y postulaciones externas alimentan una sola bandeja." },
-        { icon: "layers", title: "Decidir", text: "Personas califican la matriz P1 a P6. La IA no cierra el puntaje." },
-        { icon: "shield", title: "Dejar rastro", text: "Cada cambio queda en una bitácora que no se edita ni se borra." },
-      ],
+      visual: <WelcomeVisual user={user} />,
     },
     {
-      kicker: "Paso 1 · Identificar",
+      tab: "Identificar",
+      kicker: "Fase 1 · Identificar",
       title: "De la fuente a la bandeja",
-      lead: "Hay dos puertas de entrada. Las dos terminan en la misma bandeja: lo que no se clasifica y asigna al ciclo no sigue.",
+      lead: "Hay dos puertas de entrada y las dos llegan a la misma bandeja. Lo que no se clasifica ni se asigna al ciclo no sigue adelante.",
       pipe: 0,
-      points: [
-        { icon: "globe", title: "Canal proactivo", text: "Vigilancia consulta cerca de 95 fuentes (ensayos, agencias, HTA, revistas). Puede dispararla a mano." },
-        { icon: "note", title: "Canal reactivo", text: "Alguien externo postula en /postular. Primero se modera; si se acepta, llega a la bandeja." },
-        { icon: "inbox", title: "Señal ≠ tecnología", text: "La señal es el recorte capturado. La tecnología es la unidad que se clasifica (clúster + tipología) y entra al ciclo." },
+      visual: <IntakeVisual />,
+      where: [
+        { to: "/vigilancia", label: "Vigilancia" },
+        { to: "/bandeja-entrada", label: "Bandeja de entrada" },
+        { to: "/postulaciones", label: "Postulaciones" },
       ],
     },
     {
-      kicker: "Paso 2 · Priorizar",
+      tab: "Priorizar",
+      kicker: "Fase 2 · Priorizar",
       title: "Filtrar, luego calificar",
-      lead: "Antes de poner nota se depura. Después, seis preguntas sí/no. Cuatro a seis puntos = priorizada (66,7 %). Tres = bajo vigilancia para el ciclo siguiente.",
+      lead: "Primero se depura la lista. Después cada tecnología responde seis preguntas de sí o no, y el total decide qué pasa con ella.",
       pipe: 1,
-      points: [
-        { icon: "filter", title: "Filtrado", text: "Duplicados (umbral 85 %, confirma una persona), novedad y cruce con INVIMA. Sin novedad no hay %P." },
-        { icon: "users", title: "Quién califica", text: "Técnico: P1, P5 y P6. Clínico: P2, P3 y P4. Superadministrador puede todos." },
-        { icon: "spark", title: "La IA sugiere", text: "Puede prellenar o redactar borradores. No fusiona, no prioriza ni publica sola." },
+      visual: <PriorityVisual />,
+      where: [
+        { to: "/filtrado", label: "Filtrado y depuración" },
+        { to: "/priorizacion", label: "Priorización" },
       ],
     },
     {
-      kicker: "Pasos 3 y 4 · Evaluar y publicar",
+      tab: "Evaluar y publicar",
+      kicker: "Fases 3 y 4 · Evaluar y publicar",
       title: "Documentar, revisar y diseminar",
-      lead: "Lo priorizado pasa a ficha, informe o Mini-HTA, con revisión por pares y conflicto de interés. Al cerrar el ciclo se congela el puntaje.",
+      lead: "Cada tecnología priorizada recibe un expediente que pasa por revisión de pares antes de publicarse. Al cerrar el ciclo los puntajes quedan congelados.",
       pipe: [2, 3],
-      points: [
-        { icon: "doc", title: "Evaluación", text: "Seis estados editoriales, de borrador a publicado. El revisor externo entra con un enlace, sin cuenta." },
-        { icon: "bulb", title: "Diseminación", text: "Informes de adopción, boletín del ciclo, ficha pública (/expedientes) y alertas." },
-        { icon: "chart", title: "Tablero", text: "Embudo del ciclo, clúster y tiempo al mercado. La capa presupuestal es restringida." },
+      visual: <EditorialVisual />,
+      where: [
+        { to: "/evaluacion", label: "Evaluación" },
+        { to: "/diseminacion", label: "Diseminación" },
+        { to: "/boletines", label: "Boletines" },
       ],
     },
     {
+      tab: "Ayudas",
+      kicker: "Para trabajar tranquilo",
+      title: "La IA sugiere, usted decide",
+      lead: "La inteligencia artificial ahorra lectura y redacción, pero las decisiones metodológicas siempre las toma una persona. Estas ayudas están en todas las pantallas.",
+      pipe: "all",
+      visual: <HelpVisual />,
+      where: [{ to: "/chat", label: "Asistente IA" }],
+    },
+    {
+      tab: "Empezar",
       kicker: "Empiece aquí",
       title: "Tres acciones de hoy",
-      lead: "Confirme el ciclo en la cabecera y entre por cualquiera de estas puertas. Puede reabrir esta guía con el botón Guía.",
+      lead: "Confirme el ciclo en la cabecera y entre por cualquiera de estas puertas. Puede volver a esta guía cuando quiera con el botón Guía.",
       pipe: "all",
-      actions,
-      note: "En equipos compartidos cierre sesión al terminar. Si el servidor está en Render (disco temporal), la base vive en Firebase; confirme el indicador Firebase en la cabecera.",
+      actions: startActions(user),
+      note: "En equipos compartidos cierre sesión al terminar.",
     },
   ];
 }
@@ -122,6 +359,7 @@ export default function OnboardingGuide({ open, onClose, onNavigate }) {
   const navigate = useNavigate();
   const steps = useMemo(() => stepsFor(user), [user]);
   const dialogRef = useRef(null);
+  const bodyRef = useRef(null);
   const [index, setIndex] = useState(0);
   const last = index === steps.length - 1;
   const step = steps[index];
@@ -132,6 +370,14 @@ export default function OnboardingGuide({ open, onClose, onNavigate }) {
     const t = window.setTimeout(() => dialogRef.current?.focus(), 30);
     return () => window.clearTimeout(t);
   }, [open]);
+
+  useEffect(() => {
+    bodyRef.current?.scrollTo?.(0, 0);
+    // En celular las pestañas se desplazan: la activa debe quedar a la vista.
+    dialogRef.current
+      ?.querySelector(".onb-tabs .is-now")
+      ?.scrollIntoView?.({ block: "nearest", inline: "center" });
+  }, [index]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -179,7 +425,7 @@ export default function OnboardingGuide({ open, onClose, onNavigate }) {
             </button>
           </div>
           <h2 id="onb-title">Cómo funciona el escaneo de horizonte</h2>
-          <p className="onb-hero-sub">Cuatro fases, un ciclo, decisiones humanas. Cinco pantallas para orientarse.</p>
+          <p className="onb-hero-sub">Cuatro fases, un ciclo y decisiones humanas. Seis pantallas para orientarse.</p>
           <div className="onb-pipeline" aria-hidden="true">
             {PIPE.map((p, i) => (
               <div key={p.n} className={`onb-pipe${pipeActive(step.pipe, i) ? " is-on" : ""}`}>
@@ -190,29 +436,35 @@ export default function OnboardingGuide({ open, onClose, onNavigate }) {
           </div>
         </div>
 
-        <div className="onb-body">
-          <div className="onb-progress" aria-hidden="true">
-            {steps.map((s, i) => (
-              <span key={s.kicker} className={i < index ? "is-done" : i === index ? "is-now" : ""} />
-            ))}
-          </div>
+        <nav className="onb-tabs" aria-label="Pantallas de la guía">
+          {steps.map((s, i) => (
+            <button
+              type="button"
+              key={s.tab}
+              className={i < index ? "is-done" : i === index ? "is-now" : ""}
+              aria-current={i === index ? "step" : undefined}
+              onClick={() => setIndex(i)}
+            >
+              <span className="onb-tab-num">{i + 1}</span>
+              <span className="onb-tab-label">{s.tab}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="onb-body" ref={bodyRef}>
           <div className="onb-step-kicker">{step.kicker}</div>
           <h3>{step.title}</h3>
           <p className="onb-lead">{step.lead}</p>
-          {step.points && (
-            <ul className="onb-points">
-              {step.points.map((p) => (
-                <li key={p.title}>
-                  <span className="onb-ico">
-                    <Icon name={p.icon} size={18} />
-                  </span>
-                  <div>
-                    <strong>{p.title}</strong>
-                    <span>{p.text}</span>
-                  </div>
-                </li>
+          {step.visual}
+          {step.where && (
+            <div className="onb-where">
+              <span>Dónde se hace:</span>
+              {step.where.map((w) => (
+                <button type="button" key={w.to} className="onb-where-link" onClick={() => go(w.to)}>
+                  {w.label} →
+                </button>
               ))}
-            </ul>
+            </div>
           )}
           {step.actions && (
             <div className="onb-actions">
