@@ -20,6 +20,13 @@ test("la guía rápida se abre al ingresar y recorre el mapa del sistema", async
   await guide.getByRole("button", { name: "Siguiente" }).click();
   await expect(guide.getByRole("heading", { name: "Documentar, revisar y diseminar" })).toBeVisible();
   await guide.getByRole("button", { name: "Siguiente" }).click();
+  // Perfiles: el del usuario va marcado; relevos entre perfiles a lo largo del ciclo.
+  await expect(guide.getByRole("heading", { name: "Quién hace qué" })).toBeVisible();
+  await expect(guide.locator(".onb-rolecard.is-mine")).toContainText("Superadministrador");
+  await guide.getByRole("button", { name: "Siguiente" }).click();
+  await expect(guide.getByRole("heading", { name: "Cómo se pasan el trabajo" })).toBeVisible();
+  await expect(guide.locator(".onb-relay li")).toHaveCount(9);
+  await guide.getByRole("button", { name: "Siguiente" }).click();
   await expect(guide.getByRole("heading", { name: "La IA sugiere, usted decide" })).toBeVisible();
   // Las pestañas permiten saltar a cualquier pantalla y volver.
   await guide.getByRole("button", { name: /Priorizar/ }).click();
