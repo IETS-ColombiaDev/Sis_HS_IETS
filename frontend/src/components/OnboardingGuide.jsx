@@ -55,6 +55,99 @@ const EDITORIAL = [
   { label: "Publicado", hint: "Listo para difundir" },
 ];
 
+// Perfiles y momento en que participan. Coincide con los permisos de rbac.py y las
+// transiciones editoriales de evaluation_service.py.
+const PHASES = ["Identificar", "Priorizar", "Evaluar", "Publicar", "Cierre"];
+const ROLES = [
+  {
+    key: "superadmin",
+    name: "Superadministrador",
+    who: "Coordinación del escaneo",
+    color: "#334155",
+    phases: [0, 1, 2, 3, 4],
+    tasks: [
+      "Crea usuarios, asigna perfiles y configura la metodología",
+      "Puede hacer cualquier tarea y calificar los seis criterios",
+      "Es el único que cierra el ciclo y congela los puntajes",
+    ],
+  },
+  {
+    key: "evaluador_tecnico",
+    name: "Evaluador técnico",
+    who: "Equipo de escaneo IETS",
+    color: "#4f46e5",
+    phases: [0, 1, 2, 3],
+    tasks: [
+      "Ejecuta la vigilancia, clasifica la bandeja y arma el ciclo",
+      "Depura duplicados y verifica la novedad con INVIMA",
+      "Califica P1, P5 y P6 y coedita los expedientes",
+      "Pasa a revisión externa, invita revisores, registra el comité y publica",
+    ],
+  },
+  {
+    key: "evaluador_clinico",
+    name: "Evaluador clínico",
+    who: "Equipo de escaneo IETS",
+    color: "#0d9488",
+    phases: [0, 1, 2],
+    tasks: [
+      "Apoya la vigilancia, la bandeja y el filtrado",
+      "Califica P2, P3 y P4 (relevancia, carga e impacto organizacional)",
+      "Redacta y coedita fichas, informes y Mini-HTA; corrige observaciones",
+    ],
+  },
+  {
+    key: "revisor_pares",
+    name: "Revisor de pares",
+    who: "Par interno con cuenta",
+    color: "#d97706",
+    phases: [2],
+    tasks: [
+      "Firma su conflicto de interés antes de leer",
+      "Comenta el expediente campo por campo",
+      "Puede devolverlo con observaciones",
+    ],
+  },
+  {
+    key: "externo",
+    name: "Revisor externo",
+    who: "Experto invitado, sin cuenta",
+    color: "#ea580c",
+    phases: [2],
+    tasks: [
+      "Entra con un enlace temporal que le llega por invitación",
+      "Firma su conflicto de interés, comenta y emite veredicto",
+      "Aprobado: sigue al comité. Observado: vuelve a corrección",
+    ],
+  },
+  {
+    key: "tomador_decisiones",
+    name: "Tomador de decisiones",
+    who: "MinSalud, INVIMA y directivos",
+    color: "#059669",
+    phases: [3],
+    tasks: [
+      "Consulta el tablero estratégico, incluida la capa presupuestal",
+      "Recibe alertas tempranas y el boletín del ciclo",
+      "Deja notas; no modifica la metodología",
+    ],
+  },
+];
+const ROLE_BY_KEY = Object.fromEntries(ROLES.map((r) => [r.key, r]));
+
+// Relevos del ciclo: quien entrega y quien recibe en cada paso.
+const RELAY = [
+  { phase: 0, roles: ["evaluador_tecnico", "evaluador_clinico"], text: "Capturan señales (vigilancia y postulaciones), las clasifican por clúster y tipología y las asignan al ciclo." },
+  { phase: 0, roles: ["evaluador_tecnico"], text: "Depura duplicados y cruza con INVIMA: queda el listado único listo para calificar." },
+  { phase: 1, roles: ["evaluador_tecnico", "evaluador_clinico"], text: "Califican en paralelo: técnico P1, P5 y P6; clínico P2, P3 y P4. Con los seis, el sistema da el puntaje." },
+  { phase: 2, roles: ["evaluador_tecnico", "evaluador_clinico"], text: "Abren el expediente (ficha, informe o Mini-HTA), lo coeditan y lo envían a revisión interna." },
+  { phase: 2, roles: ["revisor_pares"], text: "El par interno comenta. El técnico pasa el expediente a revisión externa e invita al experto." },
+  { phase: 2, roles: ["externo"], text: "El experto revisa por enlace. Si pide cambios, vuelve a borrador y los evaluadores corrigen." },
+  { phase: 3, roles: ["evaluador_tecnico", "superadmin"], text: "Registran el visto bueno del comité técnico y publican: ficha pública, boletín y tablero." },
+  { phase: 3, roles: ["tomador_decisiones"], text: "Consulta el tablero, las alertas y el boletín para decidir." },
+  { phase: 4, roles: ["superadmin"], text: "Cierra el ciclo: los puntajes se congelan y lo que quedó en vigilancia pasa al siguiente." },
+];
+
 function firstNameOf(user) {
   const raw = (user?.first_name || user?.name || "").trim();
   const n = raw.split(/\s+/)[0] || "";
@@ -278,6 +371,89 @@ function HelpVisual() {
   );
 }
 
+function RolesVisual({ user }) {
+  return (
+    <div className="onb-visual">
+      <div className="onb-roles" aria-label="Perfiles del sistema">
+        {ROLES.map((r) => {
+          const mine = user?.role === r.key;
+          return (
+            <div key={r.key} className={`onb-rolecard${mine ? " is-mine" : ""}`} style={{ "--role": r.color }}>
+              <div className="onb-rolecard-head">
+                <span className="onb-rolecard-dot" aria-hidden="true" />
+                <div>
+                  <strong>
+                    {r.name}
+                    {mine && <span className="onb-you">Usted</span>}
+                  </strong>
+                  <small>{r.who}</small>
+                </div>
+              </div>
+              <div className="onb-rolephases" aria-label={`Participa en: ${r.phases.map((p) => PHASES[p]).join(", ")}`}>
+                {PHASES.map((p, i) => (
+                  <span key={p} className={r.phases.includes(i) ? "is-on" : ""} title={p}>
+                    {p}
+                  </span>
+                ))}
+              </div>
+              <ul>
+                {r.tasks.map((t) => (
+                  <li key={t}>{t}</li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+      <p className="onb-caption">
+        <Icon name="shield" size={14} />{" "}
+        <span>
+          Cada perfil solo ve los botones que le corresponden. Si un botón aparece gris, al pasar el cursor el sistema
+          explica qué <b>perfil</b> lo puede usar.
+        </span>
+      </p>
+    </div>
+  );
+}
+
+function RelayVisual({ user }) {
+  return (
+    <div className="onb-visual">
+      <ol className="onb-relay" aria-label="Relevos entre perfiles a lo largo del ciclo">
+        {RELAY.map((step, i) => {
+          const mine = step.roles.includes(user?.role);
+          const showPhase = i === 0 || RELAY[i - 1].phase !== step.phase;
+          return (
+            <li key={i} className={mine ? "is-mine" : ""}>
+              <span className="onb-relay-phase">{showPhase ? PHASES[step.phase] : ""}</span>
+              <span className="onb-relay-dot" aria-hidden="true">
+                {i + 1}
+              </span>
+              <div className="onb-relay-body">
+                <div className="onb-relay-roles">
+                  {step.roles.map((k) => (
+                    <span key={k} className="onb-relay-role" style={{ "--role": ROLE_BY_KEY[k].color }}>
+                      {ROLE_BY_KEY[k].name}
+                    </span>
+                  ))}
+                </div>
+                <p>{step.text}</p>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="onb-caption">
+        <Icon name="pulse" size={14} />{" "}
+        <span>
+          Los pasos donde usted participa están resaltados. Lo que cada uno termina aparece al instante en la{" "}
+          <b>Bandeja de trabajo</b> de quien sigue.
+        </span>
+      </p>
+    </div>
+  );
+}
+
 function stepsFor(user) {
   const name = firstNameOf(user);
   return [
@@ -315,7 +491,7 @@ function stepsFor(user) {
       ],
     },
     {
-      tab: "Evaluar y publicar",
+      tab: "Evaluar",
       kicker: "Fases 3 y 4 · Evaluar y publicar",
       title: "Documentar, revisar y diseminar",
       lead: "Cada tecnología priorizada recibe un expediente que pasa por revisión de pares antes de publicarse. Al cerrar el ciclo los puntajes quedan congelados.",
@@ -326,6 +502,24 @@ function stepsFor(user) {
         { to: "/diseminacion", label: "Diseminación" },
         { to: "/boletines", label: "Boletines" },
       ],
+    },
+    {
+      tab: "Perfiles",
+      kicker: "Personas del proceso",
+      title: "Quién hace qué",
+      lead: "Seis perfiles se reparten el trabajo. Cada tarjeta dice quién es, en qué fases participa y qué hace en ellas.",
+      pipe: "all",
+      visual: <RolesVisual user={user} />,
+      where: user?.role === "superadmin" ? [{ to: "/usuarios", label: "Usuarios y perfiles" }] : undefined,
+    },
+    {
+      tab: "Relevos",
+      kicker: "Cómo interactúan",
+      title: "Cómo se pasan el trabajo",
+      lead: "El ciclo avanza por relevos: cada perfil termina su parte y la siguiente persona la recibe. Así se ve un ciclo completo, de la señal al cierre.",
+      pipe: "all",
+      visual: <RelayVisual user={user} />,
+      where: [{ to: "/", label: "Bandeja de trabajo" }],
     },
     {
       tab: "Ayudas",
@@ -425,7 +619,7 @@ export default function OnboardingGuide({ open, onClose, onNavigate }) {
             </button>
           </div>
           <h2 id="onb-title">Cómo funciona el escaneo de horizonte</h2>
-          <p className="onb-hero-sub">Cuatro fases, un ciclo y decisiones humanas. Seis pantallas para orientarse.</p>
+          <p className="onb-hero-sub">Cuatro fases, un ciclo y decisiones humanas. Ocho pantallas para orientarse.</p>
           <div className="onb-pipeline" aria-hidden="true">
             {PIPE.map((p, i) => (
               <div key={p.n} className={`onb-pipe${pipeActive(step.pipe, i) ? " is-on" : ""}`}>
