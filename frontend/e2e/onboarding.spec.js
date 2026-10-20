@@ -20,6 +20,12 @@ test("la guía rápida se abre al ingresar y recorre el mapa del sistema", async
   await guide.getByRole("button", { name: "Siguiente" }).click();
   await expect(guide.getByRole("heading", { name: "Documentar, revisar y diseminar" })).toBeVisible();
   await guide.getByRole("button", { name: "Siguiente" }).click();
+  await expect(guide.getByRole("heading", { name: "La IA sugiere, usted decide" })).toBeVisible();
+  // Las pestañas permiten saltar a cualquier pantalla y volver.
+  await guide.getByRole("button", { name: /Priorizar/ }).click();
+  await expect(guide.getByText("4–6 · Priorizada")).toBeVisible();
+  await guide.getByRole("button", { name: /Ayudas/ }).click();
+  await guide.getByRole("button", { name: "Siguiente" }).click();
   await expect(guide.getByRole("heading", { name: "Tres acciones de hoy" })).toBeVisible();
   await expect(guide.getByRole("button", { name: "Ejecutar vigilancia" })).toBeVisible();
 
