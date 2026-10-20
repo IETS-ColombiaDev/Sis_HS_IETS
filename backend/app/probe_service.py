@@ -24,6 +24,8 @@ from .ingest.base import (
 from .models import Source
 
 CONTACT = "escaneo.horizonte@iets.org.co"
+# Respuestas de un sitio en linea que no deja entrar robots (o pide sesion).
+MANUAL_ONLINE = (202, 401, 403, 406, 429)
 
 
 def probe_source(db: Session, source: Source, *, persist: bool = True) -> dict:
@@ -61,22 +63,52 @@ def probe_source(db: Session, source: Source, *, persist: bool = True) -> dict:
         headers = dict(BROWSER_HEADERS)
     else:
         headers = {"User-Agent": USER_AGENT, "Accept": "application/json, text/html, */*"}
+    connector = source.connector or "html"
     try:
         from .ingest.base import tls_get
 
-        resp = tls_get(url, timeout=25.0, headers=headers, params=params)
+        try:
+            resp = tls_get(url, timeout=25.0, headers=headers, params=params)
+        except (httpx.TimeoutException, httpx.TransportError) as exc:
+            if connector != "html":
+                raise
+            # Igual que el escaner: si la portada no responde, vale la ruta de respaldo.
+            alt = _working_fallback(source, headers, expect_status)
+            if not alt:
+                raise
+            detail["message"] = (
+                f"La portada no responde ({type(exc).__name__}); el escaneo usa {_route_label(alt)}."
+            )
+            _store(db, source, "verde", detail, persist)
+            return detail
         detail["http_status"] = resp.status_code
-        if resp.status_code != expect_status and (source.connector or "html") == "html":
+        if resp.status_code != expect_status and connector == "html":
             # Igual que el escaner: si la portada bloquea, vale la ruta de respaldo.
-            from .scraper import fallback_urls
-
-            for alt in fallback_urls(source, getattr(source, "entry_urls", None) or []):
-                alt_resp = tls_get(alt, timeout=25.0, headers=headers)
-                if alt_resp.status_code == expect_status:
-                    detail["status"] = "verde"
-                    detail["message"] = f"La portada responde HTTP {resp.status_code}; el escaneo usa la ruta de respaldo {alt}."
-                    _store(db, source, "verde", detail, persist)
+            alt = _working_fallback(source, headers, expect_status)
+            if alt:
+                if resp.status_code in (404, 410):
+                    # La direccion ya no existe: se sigue escaneando, pero hay que corregirla.
+                    detail["message"] = (
+                        f"La dirección principal ya no existe (HTTP {resp.status_code}); mientras tanto "
+                        f"el escaneo usa {_route_label(alt)}. Actualice la URL de la fuente."
+                    )
+                    _store(db, source, "ambar", detail, persist)
                     return detail
+                detail["message"] = (
+                    f"La portada responde HTTP {resp.status_code} (bloqueo anti-robot); "
+                    f"el escaneo usa {_route_label(alt)}."
+                )
+                _store(db, source, "verde", detail, persist)
+                return detail
+        if resp.status_code != expect_status and connector == "manual" and resp.status_code in MANUAL_ONLINE:
+            # Fuente de consulta manual (base con licencia o portal con login): la
+            # consulta la hace una persona en su navegador; basta con que este en linea.
+            detail["message"] = (
+                f"Fuente de consulta manual: el sitio está en línea (HTTP {resp.status_code} al acceso "
+                "automático, esperado). Se consulta con usuario en el navegador."
+            )
+            _store(db, source, "verde", detail, persist)
+            return detail
         if resp.status_code != expect_status:
             detail["message"] = f"HTTP {resp.status_code} (se esperaba {expect_status})."
             if resp.status_code in (202, 401, 403, 429) and (source.connector or "html") in {"html", "manual"}:
@@ -105,6 +137,15 @@ def probe_source(db: Session, source: Source, *, persist: bool = True) -> dict:
                 _store(db, source, "ambar", detail, persist, signature=signature)
                 return detail
             previous = (source.schema_signature or "").strip()
+            # Con ruta de contrato declarada y presente, la huella solo cambia porque
+            # varian los campos opcionales del primer registro (o porque la ingesta la
+            # guardo con otra consulta): no es ruptura y no debe suspender la fuente.
+            if previous and signature and previous != signature and expect_path:
+                detail["schema_changed"] = True
+                detail["status"] = "verde"
+                detail["message"] = "Responde y el contrato se sostiene (variaron campos opcionales)."
+                _store(db, source, "verde", detail, persist, signature=signature)
+                return detail
             if previous and signature and previous != signature:
                 detail["schema_changed"] = True
                 detail["message"] = "El esquema cambió respecto de la última corrida exitosa."
@@ -138,6 +179,32 @@ def probe_source(db: Session, source: Source, *, persist: bool = True) -> dict:
         detail["message"] = str(exc)
         _store(db, source, "rojo", detail, persist)
         return detail
+
+
+def _working_fallback(source: Source, headers: dict, expect_status: int) -> str:
+    """Primera ruta de respaldo que responde (y, si es un canal, trae items)."""
+    from .ingest.base import tls_get
+    from .scraper import fallback_urls, feed_items, is_feed
+
+    for alt in fallback_urls(source, getattr(source, "entry_urls", None) or []):
+        try:
+            alt_resp = tls_get(alt, timeout=25.0, headers=headers)
+        except (httpx.TimeoutException, httpx.TransportError):
+            continue
+        if alt_resp.status_code != expect_status:
+            continue
+        if is_feed(alt_resp.text) and not feed_items(alt_resp.text):
+            continue
+        return alt
+    return ""
+
+
+def _route_label(url: str) -> str:
+    from .scraper import is_news_feed_url
+
+    if is_news_feed_url(url):
+        return "el canal de Google News del dominio"
+    return f"la ruta de respaldo {url}"
 
 
 def probe_all(db: Session, *, only_ab: bool = False) -> list[dict]:
@@ -198,6 +265,11 @@ def _store(
     detail["status"] = status
     if not persist:
         return
+    previous = source.last_probe_detail if isinstance(source.last_probe_detail, dict) else {}
+    if status == "verde" and previous.get("ingestion_suspended") and not source.scrape_enabled:
+        # La sonda la suspendio sola; si vuelve a verde, se reactiva sola.
+        source.scrape_enabled = True
+        detail["ingestion_resumed"] = True
     source.health_status = status
     source.last_probe_at = datetime.now(timezone.utc)
     source.last_probe_detail = detail

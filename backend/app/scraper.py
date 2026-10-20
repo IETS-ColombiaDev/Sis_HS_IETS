@@ -12,7 +12,7 @@ import io
 import html as html_lib
 import re
 from datetime import datetime, timezone
-from urllib.parse import urljoin, urlparse, urlunparse
+from urllib.parse import quote_plus, urljoin, urlparse, urlunparse
 import time
 import warnings
 
@@ -652,17 +652,62 @@ FEED_FALLBACKS: dict[str, tuple[str, ...]] = {
     "jamanetwork.com": ("https://jamanetwork.com/rss/site_3/onlineFirst_67.xml", "https://jamanetwork.com/rss/site_3/67.xml"),
     "bmj.com": ("https://www.bmj.com/rss/recent.xml",),
     "nytimes.com": ("https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",),
+    "england.nhs.uk": ("https://www.england.nhs.uk/aac/feed/", "https://www.england.nhs.uk/feed/"),
+    "cochranelibrary.com": ("https://www.cochrane.org/news/rss.xml",),
 }
+
+# Ultimo respaldo para cualquier sitio que bloquee robots (Cloudflare, Akamai) o no
+# responda: el canal RSS de Google News con lo publicado en ese dominio.
+GOOGLE_NEWS_RSS = "https://news.google.com/rss/search"
+GOOGLE_NEWS_WINDOW = "when:90d"
+
+
+UNREACHABLE_TTL_S = 12 * 3600
+_unreachable_until: dict[str, float] = {}
+
+
+def _host_of(url: str) -> str:
+    return (urlparse(url or "").hostname or "").lower()
+
+
+def _recently_unreachable(url: str) -> bool:
+    return _unreachable_until.get(_host_of(url), 0.0) > time.monotonic()
+
+
+def _mark_unreachable(url: str) -> None:
+    host = _host_of(url)
+    if host:
+        _unreachable_until[host] = time.monotonic() + UNREACHABLE_TTL_S
+
+
+def is_news_feed_url(url: str) -> bool:
+    return (urlparse(url or "").hostname or "").lower() == "news.google.com"
+
+
+def news_feed_url(source: Source) -> str:
+    """Canal de Google News restringido al dominio de la fuente (ultimos 90 dias)."""
+    parts = urlparse(source.url or "")
+    host = (parts.hostname or "").lower().removeprefix("www.")
+    if not host or is_news_feed_url(source.url or ""):
+        return ""
+    if (getattr(source, "language", "") or "").lower().startswith("es"):
+        locale = "hl=es-419&gl=CO&ceid=CO:es-419"
+    else:
+        locale = "hl=en-US&gl=US&ceid=US:en"
+    return f"{GOOGLE_NEWS_RSS}?q={quote_plus(f'site:{host} {GOOGLE_NEWS_WINDOW}')}&{locale}"
 
 
 def fallback_urls(source: Source, entry_urls: list[str] | None = None) -> list[str]:
-    """Rutas de respaldo: las de la matriz EH y, si existe, el canal RSS del dominio."""
+    """Rutas de respaldo: las de la matriz EH, el RSS oficial del dominio y Google News."""
     main = _normalize_url(source.url or "")
     out = [u for u in (entry_urls or []) if _normalize_url(u) != main][:3]
     host = (urlparse(source.url or "").hostname or "").lower().removeprefix("www.")
     for domain, feeds in FEED_FALLBACKS.items():
         if host == domain or host.endswith("." + domain):
             out.extend(feeds)
+    news = news_feed_url(source)
+    if news:
+        out.append(news)
     return out
 
 
@@ -1092,12 +1137,20 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
 
     try:
         landing_url = source.url
-        status_code, content_type, text, raw = download(source.url, "descarga")
+        if _recently_unreachable(source.url):
+            # No respondio en una corrida reciente: esperar otra vez sus reintentos
+            # (hasta 3 minutos) frenaba la vigilancia. Se va directo al respaldo.
+            status_code, content_type, text, raw = 0, "", "", b""
+            steps.append({"action": "descarga", "url": source.url, "status": "omitida_sin_respuesta_reciente", "ms": 0, "detail": ""})
+        else:
+            status_code, content_type, text, raw = download(source.url, "descarga")
         if not (0 < status_code < 400):
             # La URL principal fallo: se prueba la ruta de la matriz EH antes de rendirse.
             for alt in fallback_urls(source, profile["entry_urls"]):
                 alt_result = download(alt, "respaldo")
                 if 0 < alt_result[0] < 400:
+                    if status_code == 0:
+                        _mark_unreachable(source.url)
                     landing_url = alt
                     status_code, content_type, text, raw = alt_result
                     break
@@ -1161,7 +1214,9 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                 target.title, target.description = source.title, source.description
             findings_data = extract_candidates(target, text)
             crawl = None
-            if not is_pipeline_source(source):
+            # Los enlaces de Google News son redirecciones por JavaScript: rastrearlos
+            # solo gasta tiempo. Titulo, resumen y fecha del canal bastan como senal.
+            if not is_pipeline_source(source) and not is_news_feed_url(landing_url):
                 crawl = _crawl_with_profile(db, source, landing_url, text, profile, context)
                 findings_data = apply_crawled_text(findings_data, crawl)
             findings_data = _enrich_with_ai(

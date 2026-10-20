@@ -219,6 +219,8 @@ def test_the_scan_log_is_committed_before_any_download(tmp_path, monkeypatch):
     seen = {}
 
     def fetch(url, timeout=None):
+        if seen:  # solo importa la primera descarga; las demas son rutas de respaldo
+            return (404, "text/html", "", b"")
         other = Session()  # otra conexion, como la de otro usuario
         try:
             seen["visible"] = other.query(ScrapeLog).filter(ScrapeLog.source_id == source.id).count()
