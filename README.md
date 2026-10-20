@@ -35,12 +35,29 @@ corporativa definida en [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md).
 >
 > **Octubre 2026 — Operación en Render y copia local.** MiniMax queda disponible con
 > llave embebida (el panel puede sustituirla). El login ya no espera a Firestore ni
-> escribe en SQLite si el usuario existe. Con SQLite el worker de vigilancia programada
-> se apaga para no bloquear el ingreso; el escaneo **manual** sigue. **La base vive en
-> Firebase** (colección `hs_iets_db` del mismo proyecto RRHH): al arrancar se restaura
-> y cada escritura se publica. SQLite solo es el motor local. Hace falta
-> `FIREBASE_SERVICE_ACCOUNT_KEY` en Render. Cumplimiento RF/RNF:
+> escribe en SQLite si el usuario existe. **La base vive en Firebase** (colección
+> `hs_iets_db` del mismo proyecto RRHH): al arrancar se restaura y cada escritura se
+> publica. SQLite solo es el motor local. Hace falta `FIREBASE_SERVICE_ACCOUNT_KEY` en
+> Render. Cumplimiento RF/RNF:
 > [`Comparacion_Requerimientos_Validacion_SI_Escaneo_Horizonte.md`](Comparacion_Requerimientos_Validacion_SI_Escaneo_Horizonte.md).
+>
+> **20 de octubre de 2026 — Versión final.** Revisión completa con la IA real y cierre
+> de lo pendiente:
+>
+> - **IA (MiniMax-M3)** operativa en chat, vigilancia, OCR, informes, notas y grafo;
+>   cuando responde, la IA decide qué enlaces son señales reales.
+> - **Conectores** reparados o nuevos: EMA, CTIS, PCORI y Health Canada.
+> - **Sonda en verde**: los sitios que bloquean robots se recorren por su RSS oficial
+>   o por Google News ([detalle](#sonda-de-salud-y-rutas-de-respaldo)).
+> - **Vigilancia programada encendida** con SQLite, sin bloquear el ingreso.
+> - **Cruce INVIMA en vivo** con datos.gov.co.
+> - **PDF nativo** de expedientes, boletines y fichas públicas.
+> - **Tablero estratégico rediseñado** para quien decide
+>   ([detalle](#tablero-estratégico)).
+> - **Guía rápida** de ocho pantallas que explica perfiles y relevos.
+> - **Tooltips** que ya no quedan ocultos detrás de tarjetas o del menú.
+> - **Servidores locales y de prueba** que ya no escriben sobre la copia de producción
+>   en Firestore.
 
 ---
 
@@ -52,6 +69,7 @@ corporativa definida en [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md).
 - [Filtrado, desduplicación e INVIMA](#filtrado-desduplicación-e-invima)
 - [Matriz oficial de priorización %P](#matriz-oficial-de-priorización-p)
 - [Perfiles y permisos](#perfiles-y-permisos)
+- [Tablero estratégico](#tablero-estratégico)
 - [Acceso, cuentas y seguridad](#acceso-cuentas-y-seguridad)
 - [Bitácora de auditoría](#bitácora-de-auditoría)
 - [Catálogos y parámetros metodológicos](#catálogos-y-parámetros-metodológicos)
@@ -89,7 +107,7 @@ Cuatro conceptos ordenan todo el sistema. Entenderlos evita la mayor parte de la
 | Fase | Módulo | Ruta | Qué hace |
 |---|---|---|---|
 | **Operación** | Bandeja de trabajo | `/` | Pendientes del perfil (`my-work`) e indicadores del ciclo; cada tarjeta enlaza a la acción |
-| **1. Identificación** | Vigilancia | `/vigilancia` | Conectores API (ClinicalTrials, FDA, EMA, PubMed) y HTML de último recurso, en cola |
+| **1. Identificación** | Vigilancia | `/vigilancia` | Conectores API (ClinicalTrials, openFDA, EMA, CTIS, PubMed, PCORI, Health Canada) y HTML con RSS o Google News de respaldo, en cola; vigilancia programada |
 | **Canal reactivo** | Postulación pública | `/postular` | Formulario externo con conflicto de interés; entra a moderación, no al catálogo |
 | **Canal reactivo** | Postulaciones | `/postulaciones` | Cola de aceptación o rechazo; lo aceptado llega a la bandeja como reactivo |
 | **1. Identificación** | Inventario | `/fuentes` | Catálogo D-06 + matriz EH: 95 fuentes con prioridad, nivel de fuente, tipos de tecnología y flujo de escaneo; sonda de salud y cobertura |
@@ -98,18 +116,22 @@ Cuatro conceptos ordenan todo el sistema. Entenderlos evita la mayor parte de la
 | **Filtrado** | **Filtrado y depuración** | `/filtrado` | Duplicados difusos, verificación de novedad, cruce INVIMA y Listado Único |
 | **2. Priorización** | **Priorización oficial** | `/priorizacion` | Matriz P1–P6, cálculo de %P y clasificación en tres franjas |
 | **2. Priorización** | Señales | `/senales` | Cola de cribado por `screening_score`, aún sin calificar |
-| **5. Evaluación** | Evaluación temprana | `/evaluacion` | Ficha, informe o Mini-HTA; seis estados editoriales; COI bloqueante |
+| **5. Evaluación** | Evaluación temprana | `/evaluacion` | Ficha, informe o Mini-HTA; seis estados editoriales; COI bloqueante; exporta HTML institucional y **PDF** |
 | **5. Evaluación** | Revisión por pares | `/revisar/:token` | Portal externo sin cuenta; token JWT de 10 días |
 | **4. Diseminación** | Informes de adopción | `/diseminacion` | Recomendaciones para Colombia (IA o manual) |
 | **4. Diseminación** | Notas | `/notas` | Anotaciones vinculadas a señales, fuentes e informes |
-| **6. Diseminación** | Tablero estratégico | `/dashboards` | Cluster, TTM, embudo, calor presupuestal (restringido) y grafo de gobernanza (ampliable, chat por nodo, vistas guardadas) |
-| **6. Diseminación** | Ficha pública | `/expedientes` | Buscador y ficha sin autenticación |
-| **6. Diseminación** | Boletines | `/boletines` | Compilación al cierre; aprobación del líder |
+| **6. Diseminación** | Tablero estratégico | `/dashboards` | Resumen para decidir, embudo con pérdidas, lectura rápida, listas de atención, llegada al mercado, matriz de decisión, clústeres por etapa, avance de expedientes, impacto presupuestal (restringido) y grafo de gobernanza. Ver [Tablero estratégico](#tablero-estratégico) |
+| **6. Diseminación** | Ficha pública | `/expedientes` | Buscador y ficha sin autenticación; ficha técnica en **PDF** |
+| **6. Diseminación** | Boletines | `/boletines` | Compilación al cierre; aprobación del líder; descarga en **PDF** |
 | **6. Diseminación** | Alertas | `/alertas` | Fase III en país y alto riesgo presupuestal |
 | **Análisis** | Asistente IA | `/chat` | Chat con contexto del sistema; las consultas por nodo del grafo se guardan aparte |
 | **Gobierno** | **Auditoría** | `/auditoria` | Bitácora inmutable con filtros y vida completa de cada entidad |
 | **Admin** | Usuarios y perfiles | `/usuarios` | Alta, edición, perfil, contraseña temporal, desbloqueo, activación y baja de cuentas; matriz de permisos |
 | **Admin** | Configuración | `/configuracion` | IA, prompts, llaves de fuentes, parámetros de fuentes (listas de la matriz, búsqueda web, carga del Excel), tareas programadas, catálogos, parámetros metodológicos y **copia de la base en este navegador** |
+
+**Guía rápida.** Se abre sola en el primer ingreso y luego con el botón *Guía* de la cabecera. Son ocho pantallas con diagramas: mapa del sistema y perfil de quien entra, las cuatro fases (identificar, priorizar con la escala P1–P6, evaluar y publicar con los estados editoriales), **quién hace qué** (una tarjeta por perfil con las fases en que participa), **cómo se pasan el trabajo** (los relevos del ciclo, de la señal al cierre), las ayudas de la interfaz y tres acciones para empezar según el perfil. Cada fase tiene botones que llevan a la pantalla donde se trabaja.
+
+**Ayudas en pantalla.** Cada término técnico lleva un ícono ⓘ con su explicación. La burbuja se dibuja por encima de toda la página, se voltea si no cabe y nunca queda tapada por una tarjeta, una tabla o el menú lateral (`components/Tooltip.jsx`). Los botones deshabilitados explican por qué al pasar el cursor.
 
 **Rutas heredadas** (redirección automática): `/escaneo → /vigilancia`, `/hallazgos → /senales`, `/recomendaciones → /diseminacion`, `/caracterizacion → /evaluacion`.
 
@@ -200,7 +222,7 @@ Se alimenta por dos rutas:
 
 Cada sincronización queda en `invima_syncs` con su origen, filas ingresadas y resultado. **A los 30 días sin sincronizar, la pantalla muestra una alerta de obsolescencia**, porque un filtro regulatorio desactualizado produce falsos negativos silenciosos: dice que algo no está registrado cuando sí lo está.
 
-> **Limitación conocida.** El conjunto del CUM (`i7cb-raxc`) publica cero filas al momento de esta versión, y ninguno de los conjuntos disponibles expone el principio activo, solo el nombre del producto. La verificación por DCI queda degradada hasta que se resuelva la decisión **D-04**. El sistema funciona con lo que hay y lo dice en la interfaz en lugar de aparentar una cobertura que no tiene.
+**Cruce en vivo.** El registro completo tiene cerca de dos millones de filas y la copia local guarda una parte. Cuando un cruce no encuentra un candidato suficiente en casa, el sistema consulta en paralelo los tres conjuntos de datos.gov.co: CUM `i7cb-raxc` (con principio activo), dispositivos `y4qt-w6tk` y registro general `ui32-p9f2`. Busca por raíces del nombre, así que un DCI en inglés encuentra el registro en español. Lo hallado se guarda en el índice local. La consulta espera como máximo 8 segundos y recuerda durante 6 horas lo que no encontró. Se apaga con `INVIMA_LIVE_LOOKUP=false`, y las pruebas aisladas lo apagan. Las fechas del CUM vienen en formato estadounidense y se interpretan como tales; las fechas de relleno (año 1900 o anterior) se descartan.
 
 ### Listado Único por clúster
 
@@ -259,11 +281,57 @@ Cinco perfiles con permisos declarativos por módulo y, en la matriz de prioriza
 | **Tomador de decisiones** | Consulta y tableros restringidos; puede escribir notas |
 | **Revisor por pares** | Consulta y envío de revisiones; el experto externo entra por token, sin cuenta permanente |
 
+A esos cinco se suma el **revisor externo**, que no tiene cuenta: entra con el enlace temporal de su invitación, firma su conflicto de interés, comenta por campo y da su veredicto.
+
+### Cuándo participa cada perfil y cómo se pasan el trabajo
+
+| # | Fase | Quién | Qué hace |
+|:-:|---|---|---|
+| 1 | Identificar | Técnico y clínico | Capturan señales (vigilancia y postulaciones), las clasifican por clúster y tipología y las asignan al ciclo |
+| 2 | Identificar | Técnico | Depura duplicados y cruza con INVIMA; queda el Listado Único |
+| 3 | Priorizar | Técnico y clínico | Califican en paralelo: técnico P1, P5 y P6; clínico P2, P3 y P4. Con los seis, el sistema calcula el `%P` |
+| 4 | Evaluar | Técnico y clínico | Abren el expediente (ficha, informe o Mini-HTA), lo coeditan y lo envían a revisión interna |
+| 5 | Evaluar | Revisor de pares | Comenta; el técnico pasa a revisión externa e invita al experto |
+| 6 | Evaluar | Revisor externo | Revisa por enlace; si pide cambios, el expediente vuelve a borrador y los evaluadores corrigen |
+| 7 | Publicar | Técnico o superadministrador | Registran el visto bueno del comité técnico y publican (ficha pública, boletín y tablero) |
+| 8 | Publicar | Tomador de decisiones | Consulta tablero, alertas y boletín |
+| 9 | Cierre | Superadministrador | Cierra el ciclo: los puntajes se congelan y lo que quedó bajo vigilancia pasa al siguiente |
+
+Las transiciones editoriales exigen un permiso concreto (`TRANSITION_PERMISSION` en [`evaluation_service.py`](backend/app/evaluation_service.py)):
+
+- Pasar a revisión interna o volver a borrador: `report:write` (los dos evaluadores).
+- Devolver con observaciones: `review:submit` (el revisor de pares, o el externo por su enlace).
+- Pasar a revisión externa, registrar el comité y publicar: `cycle:write` (técnico y superadministrador).
+
+La guía rápida muestra esta misma tabla como dos pantallas y resalta los pasos de quien la abre.
+
 La matriz completa de los 20 permisos está en [`BACKLOG.md`](BACKLOG.md#matriz-rbac-de-cinco-perfiles) y su fuente de verdad en [`backend/app/rbac.py`](backend/app/rbac.py).
 
 **Migración automática de roles heredados** al arrancar: `admin → superadmin`, `editor → evaluador_tecnico`, `viewer → tomador_decisiones`. Los perfiles `evaluador_clinico` y `revisor_pares` requieren alta manual desde `/usuarios`.
 
 El frontend no reimplementa la autorización: `GET /api/auth/me` devuelve `permissions` y `rateable_criteria`, y la interfaz se dibuja a partir de esa respuesta.
+
+---
+
+## Tablero estratégico
+
+`/dashboards` resume el ciclo para quien decide (RF17). Todo se calcula con el **recorte** activo: clúster, tipología, etapa alcanzada y llegada al mercado; en *Más filtros*, fase, estado, puntos mínimos y fechas de captura. Los filtros viajan en el enlace, así que se puede compartir un recorte. Casi todo es clicable y filtra el tablero.
+
+| Bloque | Qué responde |
+|---|---|
+| **Resumen para decidir** | Priorizadas · *Actuar ya* (priorizadas que llegan en ≤ 12 meses) · Llegan en menos de un año (y cuántas ya aprobó FDA/EMA) · Expedientes publicados y en curso · Impacto presupuestal a 3 años (capa restringida) o tecnologías por calificar |
+| **Embudo del ciclo** | Capturadas → filtradas → priorizadas → evaluadas → publicadas, con cuántas se quedaron entre una etapa y otra |
+| **Lectura rápida** | Frases calculadas: el mayor corte del embudo, el clúster que concentra lo priorizado, priorizadas inminentes, aprobadas sin informe, priorizadas sin expediente y tecnologías sin fecha para estimar su llegada |
+| **Requieren atención** | Cuatro listas con enlace: llegan pronto y no están priorizadas, priorizadas sin expediente, aprobadas FDA/EMA sin informe publicado, expedientes con observaciones |
+| **¿Cuándo llegan al mercado?** | Columnas por franja de time-to-market (inminente, transición, emergente, lejano, sin dato), divididas por resultado de la priorización |
+| **Matriz de decisión** | Cada tecnología según puntos P1–P6 y meses al mercado, en cuadrantes *Actuar ya*, *Preparar*, *Revisar* y *Vigilar* |
+| **Clústeres por etapa** | Dónde se acumula el trabajo: sin priorizar, priorizada sin expediente, en evaluación o publicada |
+| **Avance de los expedientes** | Fichas, informes y Mini-HTA por estado editorial; muestra el cuello de botella de la revisión |
+| **Tipología y fase clínica** | Distribución con porcentaje |
+| **Impacto presupuestal** | Mapa de calor por clúster y año, y las 8 tecnologías de mayor impacto a 3 años. Solo con `analytics:restricted` |
+| **Tabla, comparadores y grafo** | Tecnologías del recorte (ordenable, con enlace al módulo de cada una), comparadores del SGSSS (restringido) y grafo de gobernanza con chat por nodo |
+
+Un ciclo abierto se calcula en vivo; uno cerrado usa el **datamart** guardado al cierre, que se puede recalcular. El recorte se exporta a CSV o Excel respetando la capa de acceso, y la página se imprime sin menú ni cabecera.
 
 ---
 
@@ -403,12 +471,43 @@ Las listas desplegables (niveles, prioridades con rango, tipos de tecnología, o
 
 Cada fuente tiene casillas propias en *Editar*: **recorrido del sitio**, **seguir enlaces internos**, **OCR**, **lectura con IA** y **búsqueda web**, más páginas a seguir (0 = valor global), palabras guía, términos propios y dominio de búsqueda. Los interruptores globales de IA y OCR siguen mandando. El orden de una corrida es:
 
-1. Descarga de la URL principal; si falla, prueba las URLs de entrada (paso `respaldo` en la bitácora).
+1. Descarga de la URL principal; si falla, prueba las rutas de respaldo en orden (paso `respaldo` en la bitácora): las URLs de entrada de la matriz, el RSS oficial del dominio si se conoce, y el canal de Google News del dominio. Ver [Sonda de salud y rutas de respaldo](#sonda-de-salud-y-rutas-de-respaldo).
 2. **Búsqueda web**: la IA redacta hasta N consultas `site:dominio` con el contexto de la matriz (sin IA, reglas que rotan los términos por día) y las lanza en cascada en Yahoo → DuckDuckGo → DuckDuckGo Lite → Bing, o Brave Search API / SearXNG si se configuran. Un motor que bloquea queda en pausa unos minutos. Solo se conservan resultados del dominio y, opcionalmente, los documentos (PDF, informes) primero.
 3. Recorrido: página principal → URLs de entrada → resultados de búsqueda → fichas internas mejor puntuadas por la ruta de acceso.
 4. OCR e IA según las casillas, con el bloque de contexto de la matriz; luego huella y bandeja.
 
 *Probar búsqueda web* (en *Editar*) ejecuta el paso 2 sin capturar señales. La bitácora de *Configuración › IA* muestra cada paso, la prioridad y si hubo búsqueda web.
+
+**La IA decide qué es señal.** El recorrido heurístico recoge muchos enlaces de navegación. Cuando la IA responde con un JSON válido, sus señales reemplazan a las heurísticas; solo se conservan las filas de pipeline de los fabricantes. Si la respuesta llega cortada, se rescatan todos los objetos completos en lugar de quedarse con uno. Los canales RSS y Atom se leen como lista de señales (título, enlace, resumen y fecha).
+
+**La vigilancia no frena el sistema.** El registro de cada escaneo se confirma antes de descargar nada, y la traza se escribe en la misma sesión. Antes, una escritura abierta durante 60–90 segundos de red bloqueaba el ingreso y la interfaz. En una prueba de carga de 5 minutos, con la vigilancia programada y 6 usuarios a la vez, hubo 0 bloqueos y la escritura más lenta tardó 1,3 s.
+
+### Sonda de salud y rutas de respaldo
+
+La sonda (`POST /api/ingest/sources/{id}/probe`, también desde el inventario de `/fuentes` y antes de cada corrida de nivel A/B) marca cada fuente en verde, ámbar o rojo. Las fuentes web se sondean con las mismas cabeceras de navegador que usa el escáner.
+
+| Situación | Resultado |
+|---|---|
+| La portada responde | Verde |
+| La portada bloquea robots (HTTP 202, 401, 403, 406 o 429) o no responde, y una ruta de respaldo funciona | Verde, con la ruta que usará el escaneo |
+| La dirección ya no existe (404/410), pero hay respaldo | Ámbar: el escaneo sigue por el respaldo y el mensaje pide actualizar la URL |
+| Fuente de consulta manual (por ejemplo Scopus) que está en línea pero exige sesión | Verde: la consulta la hace una persona en su navegador |
+| API cuya ruta de contrato (`expect_json_path`) sigue presente aunque varíen campos opcionales | Verde; ya no se marca ámbar ni se suspende la ingesta |
+| Cambio real de contrato sin ruta declarada, o sin ningún respaldo que funcione | Ámbar o rojo |
+
+Rutas de respaldo, en orden:
+
+1. Las URLs de entrada de la matriz.
+2. El RSS oficial del dominio, cuando se conoce (`FEED_FALLBACKS` en [`scraper.py`](backend/app/scraper.py): JAMA, BMJ, NYT, NHS England, Cochrane).
+3. El canal RSS de **Google News** restringido al dominio de la fuente (últimos 90 días; en español para las fuentes en español).
+
+Los enlaces de Google News son redirecciones, así que de ese canal se toman título, resumen y fecha sin rastrear cada enlace.
+
+Si un sitio no responde, el escáner lo recuerda durante 12 horas y en las corridas siguientes va directo al respaldo. Antes, cada corrida esperaba hasta 3,5 minutos de reintentos.
+
+Cuando una suspensión automática de la sonda deja de tener motivo y la fuente vuelve a verde, la ingesta se reactiva sola.
+
+En la prueba local de octubre de 2026, las 94 fuentes activas del catálogo quedaron en verde. Render sale a internet desde direcciones de centro de datos que algunos sitios bloquean más: si una fuente sigue en rojo allí, la vía es la carga manual en la bandeja de entrada.
 
 ### Actualizar la matriz
 
@@ -465,9 +564,11 @@ flowchart LR
 |---|---|
 | Backend | FastAPI 0.115 · SQLAlchemy 2 · Pydantic 2 |
 | Datos | SQLite como motor local (Render y desarrollo) persistido en Firestore (`hs_iets_db`) · PostgreSQL 15 cuando `DATABASE_URL` lo indica |
-| Scraping | httpx · trafilatura · BeautifulSoup (lxml) · pypdf |
+| Scraping | httpx · trafilatura · BeautifulSoup (lxml) · pypdf · lectura de RSS/Atom · completado de la cadena TLS (AIA) para sitios que omiten el certificado intermedio |
+| Conectores | ClinicalTrials.gov v2 · openFDA · EMA (informe JSON de medicamentos) · CTIS (búsqueda POST) · PubMed · PCORI (API de búsqueda) · Health Canada (licencias MDALL clase III–IV y DPD) · WHO ICTRP por lote · TGA por lote CSV |
 | Similitud difusa | RapidFuzz (Levenshtein, Jaro-Winkler, token sort) |
-| IA | MiniMax (principal, llave embebida de respaldo) · Gemini (opcional); `AI_PROVIDER=auto` |
+| IA | MiniMax (`MiniMax-M3` con visión; `MiniMax-M3.1-Flash` de reserva; llave embebida de respaldo) · Gemini (opcional); `AI_PROVIDER=auto` · `minimax` · `gemini` · `off` |
+| PDF | reportlab 4.2: expediente, boletín y ficha pública en PDF nativo a partir de las mismas plantillas HTML |
 | Directorio | Firestore (colección `usuarios` del sistema de permisos IETS), emparejado por correo |
 | Auth | Correo y contraseña (scrypt + JWT) · Google Identity Services opcional |
 | Frontend | React 18 · Vite 5 · React Router 6 · Recharts · axios |
@@ -505,6 +606,12 @@ Sis_HS_IETS/
 │   │   ├── source_profile.py       # Listas de la matriz, flujo por fuente y config. de búsqueda
 │   │   ├── web_search.py           # Búsqueda web en cascada y consultas redactadas por la IA
 │   │   ├── data/matriz_fuentes_eh.json  # Matriz EH empaquetada (89 filas, 11 criterios)
+│   │   ├── probe_service.py        # Sonda de salud por fuente y rutas de respaldo
+│   │   ├── ingest/                 # Conectores API (ClinicalTrials, FDA, EMA, CTIS, PCORI, Health Canada…)
+│   │   ├── pdf_export.py           # PDF nativo (reportlab) de expedientes, boletines y fichas
+│   │   ├── firebase_db.py          # Instantánea de la base en Firestore (restaurar y publicar)
+│   │   ├── browser_backup.py       # Copia de la base en el navegador del administrador
+│   │   ├── strategy_service.py     # Filas del tablero, agregados y datamart del ciclo
 │   │   ├── minimax_service.py      # IA principal
 │   │   ├── gemini_service.py       # IA de respaldo
 │   │   ├── firestore_directory.py  # Nombres y apellidos por correo (RRHH)
@@ -526,7 +633,8 @@ Sis_HS_IETS/
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/                  # Dashboard, Dashboards, Cycles, Staging, Screening, …
-│   │   ├── components/             # StrategyGraph, PriorityMatrix, TriageBoard, Layout, …
+│   │   ├── components/             # OnboardingGuide (guía rápida), Tooltip, StrategyGraph,
+│   │   │                           # PriorityMatrix, TriageBoard, Layout, …
 │   │   ├── graph/controller.js     # Cámara, búsqueda y layout del grafo
 │   │   ├── cycle/CycleContext.jsx  # Ciclo activo persistente
 │   │   ├── auth/AuthContext.jsx    # JWT y permisos
@@ -656,6 +764,14 @@ Documentación interactiva: **`http://127.0.0.1:8000/docs`**
 | `GET` · `PUT /api/config/source-options` · `POST /reset` | Listas de la matriz (`config:manage`) |
 | `GET` · `PUT /api/config/web-search` · `POST /reset` · `/cooldowns/clear` · `/test` | Motores, límites, términos por categoría, llave Brave (enmascarada) y URL SearXNG |
 
+### Exportación PDF (octubre 2026)
+
+| Método y ruta | Propósito |
+|---|---|
+| `GET /api/reports/{id}/export?format=pdf` | Expediente de evaluación en PDF (`format=html` sigue dando el HTML institucional) |
+| `GET /api/bulletins/{id}/export?format=pdf` | Boletín del ciclo en PDF |
+| `GET /api/public/technologies/{id}/export?format=pdf` | Ficha técnica pública en PDF, sin autenticación y sin campos confidenciales ni presupuesto |
+
 El CSV de `/api/sources/export` incluye nivel de fuente, prioridad, tipos de tecnología, referencia de la matriz, URLs de entrada, ruta de acceso, qué consultar, restricciones y flujo.
 
 ### Persistencia Firebase y copia en el navegador (octubre 2026)
@@ -670,6 +786,8 @@ El CSV de `/api/sources/export` incluye nivel de fuente, prioridad, tipos de tec
 | `POST /api/backup/restore?force=` | Restaura la instantánea local; `force=true` pisa una base con trabajo. Luego publica en Firebase |
 
 Con PostgreSQL el origen durable es el propio Postgres; Firebase y la copia del navegador no aplican.
+
+**Producción y pruebas no comparten copia.** Solo el servidor de producción (`ENVIRONMENT=production` o Render, que define `RENDER=true`) usa la colección `hs_iets_db`. Los servidores locales, de prueba y de E2E usan `hs_iets_db_dev`; para compartir la de producción en un soporte puntual hay que pedirlo expresamente con `FIREBASE_DB_SHARE_WITH_PRODUCTION=true`. Las publicaciones y restauraciones se serializan, de modo que una copia vieja nunca pisa a una más nueva. La copia se publica 5 segundos después del último cambio y también al apagar el servidor. Firestore conserva solo una hora de versiones anteriores (PITR apagado): la red de seguridad para recuperar datos más antiguos es la **copia local en el navegador del administrador** (*Configuración › Copia local*, hasta cinco copias guardadas).
 
 ### Operación heredada
 
@@ -758,7 +876,14 @@ Con `frontend/dist` presente, **solo hace falta el backend**: sirve la SPA en `/
 
 Para un servidor de producción siga [`DEPLOY.md`](DEPLOY.md): Docker Compose con PostgreSQL 15 y HTTPS, o `start-prod.ps1` en Windows sin contenedores.
 
-**Render (plan gratuito, estado actual).** Corre SQLite en disco efímero, un solo proceso y worker de vigilancia apagado. El login de usuarios existentes no escribe. MiniMax funciona con la llave embebida. **La base se restaura y se publica en Firestore** (`hs_iets_db`); hay que definir `FIREBASE_SERVICE_ACCOUNT_KEY` en el panel. Hoy `ENVIRONMENT` sigue en `development` en ese hosting (el acceso rápido sigue visible); hay que ponerlo en `production` cuando exista `SECRET_KEY` propia.
+**Render (plan gratuito, estado actual).** Corre SQLite en disco efímero y un solo proceso. Desde el 19 de octubre de 2026 el worker de vigilancia programada está encendido (`INGEST_WORKER_ENABLED=true` e `INGEST_WORKER_FORCE=true` en [`render.yaml`](render.yaml)), porque el escaneo ya no deja escrituras abiertas. El login de usuarios existentes no escribe. MiniMax funciona con la llave embebida. **La base se restaura y se publica en Firestore** (`(default)/hs_iets_db`); hay que definir `FIREBASE_SERVICE_ACCOUNT_KEY` en el panel. Un cron de GitHub visita el sitio cada 10 minutos para que no se duerma.
+
+> **Pendiente de seguridad en Render.** `ENVIRONMENT` sigue en `development`, así que el acceso rápido sin contraseña está abierto a cualquiera que conozca la dirección. Para cerrarlo, en el panel de Render:
+> 1. Defina `BOOTSTRAP_ADMIN_EMAIL` y `BOOTSTRAP_ADMIN_PASSWORD`.
+> 2. Cambie a `ENVIRONMENT=production`.
+> 3. Entre con esa cuenta y asigne contraseña al resto del equipo en `/usuarios`.
+>
+> No pase a producción antes de crear ese administrador: sin Google configurado, nadie podría entrar. Cambie también la llave de MiniMax: genere una propia, guárdela en `MINIMAX_API_KEY`, revoque la embebida y luego retírela de `config.py`.
 
 Resumen para un despliegue institucional:
 
@@ -778,7 +903,7 @@ cd backend
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Cubren el motor de priorización y sus bordes, la máquina de estados del ciclo, el RBAC por campo, los catálogos, el filtrado difuso e INVIMA, la ingesta y los conectores con crudo real, la evaluación temprana, los tableros (900 combinaciones de filtros contra conteos independientes y bordes de franjas TTM), el acceso con contraseña y la administración de cuentas, las migraciones de Alembic y el arranque sobre una base vacía.
+Cubren el motor de priorización y sus bordes, la máquina de estados del ciclo, el RBAC por campo, los catálogos, el filtrado difuso e INVIMA (incluido el cruce en vivo simulado), la ingesta y los conectores con crudo real, la sonda y sus rutas de respaldo, la evaluación temprana, el PDF, los tableros (900 combinaciones de filtros contra conteos independientes y bordes de franjas TTM), la IA (variantes de modelo, reintento sin `thinking`, JSON cortado), la persistencia en Firestore (separación de producción y publicaciones concurrentes), el acceso con contraseña y la administración de cuentas, las migraciones de Alembic y el arranque sobre una base vacía. Estado al 20 de octubre de 2026: **477 pruebas pasan** y 1 se omite.
 
 ### Pruebas de navegador (E2E, Playwright)
 
@@ -789,7 +914,7 @@ npx playwright test                                        # autocontenido: leva
 $env:E2E_BASE_URL="http://127.0.0.1:8000"; npx playwright test   # contra un servidor ya levantado
 ```
 
-Recorren la interfaz con los cinco perfiles: navegación sin errores de consola, acceso y administración de usuarios, cada CRUD, el ciclo completo (captura, bandeja, filtrado, priorización, evaluación, pares, cierre, boletín y alertas), enlaces directos, tableros por perfil y ausencia de desbordes en un teléfono de 390 px. Usan el Chrome instalado (`E2E_CHANNEL=chromium` en CI).
+Recorren la interfaz con los cinco perfiles: navegación sin errores de consola, guía rápida, acceso y administración de usuarios, cada CRUD, el ciclo completo (captura, bandeja, filtrado, priorización, evaluación con descarga del PDF, pares, cierre, boletín en PDF y alertas), enlaces directos, tableros por perfil y ausencia de desbordes en un teléfono de 390 px. Usan el Chrome instalado (`E2E_CHANNEL=chromium` en CI). El servidor de prueba arranca con la IA apagada (`AI_PROVIDER=off`), sin Firestore (`FIREBASE_DB_ENABLED=false`) y sin cruce INVIMA en vivo, para no depender de la red ni tocar la copia de producción. Estado al 20 de octubre de 2026: **91 pruebas pasan**.
 
 ### Suite de regresión de extremo a extremo
 
@@ -849,12 +974,13 @@ Copie [`backend/.env.example`](backend/.env.example) como `.env`.
 | `PUBLIC_SUBMISSIONS_PER_WINDOW` · `PUBLIC_SUBMISSIONS_WINDOW_SECONDS` | Tope de postulaciones públicas por IP |
 | `FRONTEND_DIST` | Carpeta del frontend compilado que sirve el backend (defecto `frontend/dist`) |
 | `SEED_OFFICIAL_CYCLES` | Siembra de los ciclos oficiales 2026 al arrancar. Por defecto activa en desarrollo y **apagada en producción** (allí los ciclos los gobierna la coordinación); `true` la fuerza |
-| `MINIMAX_API_KEY` · `MINIMAX_MODEL` | IA principal. Si la llave va vacía, se usa la embebida en `config.py`. El modelo vacío se detecta solo |
-| `AI_PROVIDER` | `auto` · `minimax` · `gemini` |
+| `MINIMAX_API_KEY` · `MINIMAX_MODEL` | IA principal. Si la llave va vacía, se usa la embebida en `config.py`. El modelo vacío se detecta solo y prefiere `MiniMax-M3` (acepta visión y respuesta sin razonamiento); si un modelo rechaza la petición, se reintenta sin `thinking` o con el siguiente |
+| `AI_PROVIDER` | `auto` · `minimax` · `gemini` · `off`. Solo `off` apaga la IA del todo, porque la llave embebida siempre está disponible. En el panel equivale a *Apagada* |
 | `AI_WEB_ENABLED` · `AI_OCR_ENABLED` | La IA entra a sitios y, si se activa, lee PDF o imágenes escaneados |
 | `GEMINI_API_KEY` · `GEMINI_MODEL` | Respaldo de [Google AI Studio](https://aistudio.google.com/app/apikey); modelo vacío = autodetección |
 | `FIREBASE_PROJECT_ID` | Proyecto GCP (directorio RRHH en `(default)` y base Horizonte en `hs-iets`) |
-| `FIREBASE_SERVICE_ACCOUNT_KEY` · `FIREBASE_SERVICE_ACCOUNT_FILE` | Credencial de servicio. Sin ella no hay directorio ni persistencia. Si ambas van vacías, se intenta el `.env.local` del sistema RRHH hermano |
+| `FIREBASE_SERVICE_ACCOUNT_KEY` · `FIREBASE_SERVICE_ACCOUNT_FILE` | Credencial de servicio. Sin ella no hay directorio ni persistencia. Si ambas van vacías, se intenta el `.env.local` del sistema RRHH hermano; `FIREBASE_RRHH_ENV_FILE=` (vacía) desactiva esa búsqueda |
+| `FIREBASE_DB_SHARE_WITH_PRODUCTION` | `false` por defecto. Fuera de producción la copia va a `hs_iets_db_dev`; `true` hace que un servidor local lea y escriba la copia de producción (solo para soporte) |
 | `FIREBASE_DB_ENABLED` | `true` por defecto. Publica y restaura la SQLite en la base Firestore `hs-iets` |
 | `FIREBASE_DB_DATABASE` | Base Firestore propia (defecto `hs-iets`). No puede ser `(default)` |
 | `FIREBASE_DB_COLLECTION` | Colección de la instantánea (defecto `hs_iets_db`) |
@@ -862,15 +988,16 @@ Copie [`backend/.env.example`](backend/.env.example) como `.env`.
 | `CORS_ORIGINS` | Orígenes del frontend, separados por coma |
 | `DATABASE_URL` | Defecto `sqlite:///./iets_horizonte.db`; acepta `postgresql+psycopg://…`. Con SQLite el entrypoint fuerza `WEB_CONCURRENCY=1` y apaga el worker de ingesta salvo `INGEST_WORKER_FORCE=1` |
 | `WEB_CONCURRENCY` | Procesos de uvicorn. Debe ser `1` con SQLite |
-| `INGEST_WORKER_ENABLED` | Worker en hilo. En SQLite se ignora (salvo `INGEST_WORKER_FORCE`) para no bloquear el login |
-| `INGEST_WORKER_FORCE` | `1` fuerza el worker aunque la base sea SQLite (no usar en Render free) |
+| `INGEST_WORKER_ENABLED` | Worker en hilo para la cola de ingesta y la vigilancia programada. En SQLite se ignora salvo `INGEST_WORKER_FORCE` |
+| `INGEST_WORKER_FORCE` | `true` fuerza el worker aunque la base sea SQLite. Render lo usa desde el 19 de octubre de 2026: el escaneo ya no bloquea el ingreso |
+| `INVIMA_LIVE_LOOKUP` | `true` por defecto. Si el índice local no encuentra un registro, consulta datos.gov.co en vivo (máx. 8 s). `false` lo apaga (pruebas o sin red) |
 | `BOOTSTRAP_ADMIN_EMAIL` · `BOOTSTRAP_ADMIN_PASSWORD` | Crea o actualiza el superadministrador al arrancar el contenedor |
 
 **Login con Google:** cree credenciales OAuth 2.0 de tipo "Aplicación web" en Google Cloud Console y agregue el origen del frontend a "Orígenes autorizados de JavaScript".
 
 **Sin `GOOGLE_CLIENT_ID`:** use el acceso rápido de la pantalla de login o `POST /api/auth/dev-login` con un correo `@iets.org.co`.
 
-La configuración de MiniMax y Gemini también puede guardarse desde `/configuracion` y tiene prioridad sobre el `.env`. Vaciar la llave en el panel **no apaga** MiniMax: vuelve la embebida. La búsqueda web (motores, Brave, SearXNG) solo se configura desde *Parámetros de fuentes*.
+La configuración de MiniMax y Gemini también puede guardarse desde `/configuracion` y tiene prioridad sobre el `.env`. Vaciar la llave en el panel **no apaga** MiniMax: vuelve la embebida; para apagarla elija el proveedor *Apagada*. Los valores por defecto de la IA son 4.096 tokens de respuesta y 120 s de espera, y la interfaz espera hasta 150 s una respuesta de IA y 300 s un escaneo. La búsqueda web (motores, Brave, SearXNG) solo se configura desde *Parámetros de fuentes*.
 
 **Base en Firebase.** Instantánea gzip en la colección exclusiva **`hs_iets_db`** (nunca `usuarios` de RRHH). Si el proyecto permite bases nombradas, se usa `hs-iets`; si no, esa colección en `(default)`. `python -m app.cli ensure-firebase-db --probe` verifica el espacio.
 
@@ -915,19 +1042,25 @@ El último punto es el único que cambia la operación de un ciclo en curso. Si 
 
 La migración Alembic `0002_source_matrix_profile` agrega los campos de la matriz a `sources` (idempotente; no toca datos existentes). Al arrancar, la sincronización del catálogo crea las 42 fuentes nuevas y completa los campos de la matriz solo donde estén vacíos. El prompt de extracción incorpora `{source_context}`; si guardó un prompt propio sin ese marcador, el contexto se antepone al contenido igualmente (o restaure el prompt por defecto en *Prompts de vigilancia*).
 
+### Versión final (20 de octubre de 2026)
+
+No hay migraciones de esquema: basta desplegar. Al arrancar, la sincronización del catálogo actualiza las URL de AIHTA y de la OMS, y pasa TGA al escáner web (un CSV del ARTG exportado a mano se sigue cargando como lote). Las fuentes que la sonda había suspendido por una falsa deriva de esquema (ClinicalTrials.gov, openFDA) se reactivan solas en la primera sonda en verde.
+
+Si guardó en el panel un tope de tokens o un tiempo de espera de IA menores, súbalos en *Configuración › IA* a 4.096 tokens y 120 s. Con valores bajos, las respuestas largas llegan cortadas.
+
 ---
 
 ## Flujo de uso sugerido
 
-1. **Iniciar sesión** — con el correo y la contraseña que asignó el superadministrador (en el primer ingreso se reemplaza la temporal). En Render la base se restaura desde Firebase al arrancar; confirme el indicador *Firebase* en la cabecera. La bandeja de trabajo muestra de inmediato los pendientes de su perfil, cada uno con enlace directo a la tecnología.
+1. **Iniciar sesión** — con el correo y la contraseña que asignó el superadministrador (en el primer ingreso se reemplaza la temporal). En Render la base se restaura desde Firebase al arrancar; confirme el indicador *Firebase* en la cabecera. La primera vez se abre la **guía rápida**, que muestra su perfil, en qué fases participa y a quién le pasa el trabajo; se vuelve a abrir con el botón *Guía*. La bandeja de trabajo muestra de inmediato los pendientes de su perfil, cada uno con enlace directo a la tecnología.
 2. **Abrir un ciclo** en `/ciclos`: código, apertura, corte de datos y fecha de boletín. El sistema valida la ventana y la cuota anual.
 3. **Vigilancia** — ejecutar el rastreo masivo o por referente. Las fuentes de prioridad alta de la matriz EH se atienden primero; ajuste el flujo de cada fuente en `/fuentes › Editar`.
 4. **Bandeja de entrada** — clasificar las señales capturadas (clúster, tipología, condición, fechas regulatorias) apoyándose en la sugerencia asistida, y asignarlas por lotes al ciclo. Sin clúster ni tipología, el sistema no permite asignar.
 5. **Filtrado** — pasar el ciclo a *En filtrado* e ir a `/filtrado`: correr el barrido de duplicados y resolver las propuestas, declarar la novedad de cada tecnología con su cruce contra INVIMA, y revisar el Listado Único que resulta. Lo que no supere la compuerta de novedad no llega a la matriz.
 6. **Priorización** — pasar a *En priorización*. Cada perfil ve en `/priorizacion` solo lo que le corresponde calificar. Al completarse los seis criterios, el sistema calcula el `%P` y clasifica.
-7. **Caracterización y diseminación** — enviar las priorizadas a evaluación, completar las fichas y generar los informes.
+7. **Evaluación y diseminación** — enviar las priorizadas a evaluación, completar fichas, informes o Mini-HTA, pasarlos por revisión interna y externa, registrar el comité y publicar. El expediente, el boletín y la ficha pública se descargan en PDF.
 8. **Cierre** — pasar a *En evaluación* y cerrar. Se congelan los puntajes y lo que quedó bajo vigilancia se propone para el ciclo siguiente.
-9. **Tablero** — en `/dashboards`, recorte del ciclo, grafo de gobernanza (controlador interno, chat MiniMax por nodo, vistas guardadas) y capa presupuestal si el perfil la ve.
+9. **Tablero** — en `/dashboards`, el resumen para decidir (qué actuar ya, qué llega pronto, qué falta), el embudo, la matriz de decisión, el avance de los expedientes, la capa presupuestal si el perfil la ve y el grafo de gobernanza con chat por nodo.
 10. **Auditoría** — en `/auditoria`, reconstruir la vida completa de cualquier ciclo, tecnología o calificación.
 
 ---
