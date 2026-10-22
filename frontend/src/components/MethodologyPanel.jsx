@@ -206,9 +206,13 @@ export default function MethodologyPanel() {
               }}
             >
               <div style={{ minWidth: 0 }}>
-                <code style={{ fontSize: 12.5, fontWeight: 700, color: "#0F172A" }}>{p.key}</code>
-                <InfoTip text={`${p.description || ""} ${GLOSSARY.fb_param}`.trim()} label={`Qué es ${p.key}`} />
-                <div style={{ fontSize: 12.5, color: "#64748B", marginTop: 3 }}>{p.description}</div>
+                {/* Lo que significa va primero; la clave tecnica queda como referencia. */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600, color: "#0F172A" }}>
+                  {p.description || p.key}
+                  <InfoTip text={GLOSSARY.fb_param} label={`Qué es ${p.key}`} />
+                  {dirty.includes(p.key) && <span className="param-dirty">Sin guardar</span>}
+                </div>
+                <code style={{ fontSize: 11.5, color: "#64748B" }}>{p.key}</code>
               </div>
               <Input
                 aria-label={`Valor de ${p.key}`}

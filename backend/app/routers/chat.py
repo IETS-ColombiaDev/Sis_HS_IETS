@@ -1,6 +1,7 @@
 """Chat LLM (RAG) sobre la informacion del sistema de escaneo de horizonte."""
 from __future__ import annotations
 
+import json
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -206,3 +207,70 @@ def send_message(payload: ChatSendIn, db: Session = Depends(get_db), user: User 
         answer=ChatMessageOut.model_validate(assistant_msg),
         model_used=model,
     )
+
+
+# --------------------------------------------------------------------------- #
+#  Asistente de navegacion: "como hago X en el sistema"
+# --------------------------------------------------------------------------- #
+NAV_SYSTEM = (
+    "Eres el asistente de navegacion del Sistema de Escaneo de Horizonte del IETS. "
+    "Ayudas a encontrar pantallas y botones del sistema. Respondes en espanol, en "
+    "2 a 5 frases cortas o pasos numerados (cada paso en su propia linea), nombrando los botones entre comillas « ». "
+    "Usa SOLO el mapa del sistema que se te entrega; si algo no esta en el mapa, dilo "
+    "y sugiere la Guia o a un administrador. Nunca inventes pantallas ni botones."
+)
+
+
+@router.post("/navigate")
+def navigate_help(
+    payload: dict,
+    user: User = Depends(get_current_user),
+):
+    """Responde "como llego a / como hago" con el mapa que envia la interfaz.
+
+    El mapa (pantallas, pasos y permisos del perfil) lo arma el frontend desde
+    la misma fuente que el menu, asi que la IA no puede recomendar pantallas
+    que no existen. Sin IA devuelve `ai_used=false` y la interfaz responde con
+    su buscador local.
+    """
+    question = str(payload.get("question") or "").strip()[:500]
+    site_map = str(payload.get("context") or "").strip()[:9000]
+    path = str(payload.get("path") or "")[:80]
+    history = payload.get("history") if isinstance(payload.get("history"), list) else []
+    if not question:
+        raise HTTPException(status_code=422, detail="Escriba una pregunta.")
+    if not ai_service.is_enabled():
+        return {"answer": "", "routes": [], "ai_used": False, "model": ""}
+
+    hist = "\n".join(
+        f"{'Usuario' if h.get('role') == 'user' else 'Asistente'}: {str(h.get('content') or '')[:400]}"
+        for h in history[-4:]
+        if isinstance(h, dict)
+    )
+    prompt = f"""MAPA DEL SISTEMA (rutas, botones, pasos y lo que el perfil puede hacer):
+{site_map}
+
+Perfil del usuario: {user.role}. Pantalla actual: {path or '/'}.
+Conversacion previa:
+{hist or '(sin historial)'}
+
+Pregunta: {question}
+
+Responde SOLO con JSON:
+{{"answer": "respuesta breve con pasos", "routes": ["/ruta-mas-util", "/otra-si-aplica"]}}
+Las rutas deben existir en el mapa. Si el perfil no tiene permiso, dilo y sugiere a quien pedirlo."""
+    text, model = ai_service.generate(prompt, system=NAV_SYSTEM, temperature=0.2, max_tokens=700)
+    if not text or text.startswith("[Error"):
+        return {"answer": "", "routes": [], "ai_used": False, "model": model or ""}
+    answer, routes = text.strip(), []
+    match = re.search(r"\{[\s\S]*\}", text)
+    if match:
+        try:
+            data = json.loads(match.group(0))
+            answer = str(data.get("answer") or "").strip() or answer
+            routes = [str(r) for r in (data.get("routes") or []) if isinstance(r, str) and r.startswith("/")][:3]
+        except (ValueError, TypeError, AttributeError):
+            pass
+    known = set(re.findall(r"(/[a-z\-]*)\b", site_map))
+    routes = [r for r in routes if r in known]
+    return {"answer": answer[:1500], "routes": routes, "ai_used": True, "model": model or ""}

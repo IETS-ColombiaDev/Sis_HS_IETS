@@ -14,9 +14,18 @@ export default function InfoTip({ text, position = "top", label = "Más informac
         className="info-tip"
         aria-label={label}
         tabIndex={0}
+        // La ayuda nunca dispara la accion del contenedor (enlace, fila, etiqueta
+        // de formulario, encabezado ordenable): solo se muestra.
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            e.stopPropagation();
+          }
         }}
       >
         <Icon name="info" size={12} strokeWidth={2} />

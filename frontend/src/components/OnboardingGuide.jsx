@@ -363,7 +363,8 @@ function HelpVisual() {
       </div>
       <div className="onb-tips">
         <div className="onb-tip"><span className="onb-tip-ico"><Icon name="info" size={16} /></span><span><strong>Ícono ⓘ</strong><small>Al lado de cada término: lo explica en lenguaje sencillo.</small></span></div>
-        <div className="onb-tip"><span className="onb-tip-ico"><Icon name="compass" size={16} /></span><span><strong>Guía de fase</strong><small>Arriba de cada módulo: qué hacer ahí y botón al paso siguiente.</small></span></div>
+        <div className="onb-tip"><span className="onb-tip-ico"><Icon name="compass" size={16} /></span><span><strong>¿Cómo llego a…?</strong><small>Abajo a la derecha (o Ctrl+K): pregunte cómo hacer algo y le muestra los pasos y el botón para ir.</small></span></div>
+        <div className="onb-tip"><span className="onb-tip-ico"><Icon name="list" size={16} /></span><span><strong>Guía de fase</strong><small>Arriba de cada módulo: qué hacer ahí y botón al paso siguiente. Se puede plegar.</small></span></div>
         <div className="onb-tip"><span className="onb-tip-ico"><Icon name="pulse" size={16} /></span><span><strong>En vivo</strong><small>Los cambios del equipo aparecen solos, sin recargar.</small></span></div>
         <div className="onb-tip"><span className="onb-tip-ico"><Icon name="shield" size={16} /></span><span><strong>Bitácora</strong><small>Cada cambio queda registrado con usuario y fecha.</small></span></div>
       </div>

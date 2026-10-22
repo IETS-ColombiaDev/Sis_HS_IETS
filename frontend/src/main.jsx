@@ -1,3 +1,7 @@
+// Estilos base primero: los de cada componente se cargan despues y los afinan.
+import "./styles/globals.css";
+import "./styles/shell.css";
+import "./styles/ui.css";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
@@ -6,8 +10,6 @@ import { AuthProvider } from "./auth/AuthContext";
 import { RealtimeProvider } from "./realtime/RealtimeContext";
 import { ToastProvider } from "./components/Toast";
 import { BackupProvider } from "./backup/BackupContext";
-import "./styles/globals.css";
-import "./styles/shell.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

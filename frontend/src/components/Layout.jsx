@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useCycle } from "../cycle/CycleContext";
@@ -6,6 +6,7 @@ import { useRealtime } from "../realtime/RealtimeContext";
 import { aiEnabled, aiLabel } from "../ai/status";
 import { CYCLE_STATUS_LABELS } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
+import { NAV, TITLES, fold, sectionFor } from "../constants/navigation";
 import Icon from "./Icon";
 import Tooltip from "./Tooltip";
 import InfoTip from "./InfoTip";
@@ -13,186 +14,92 @@ import SafeAvatar from "./SafeAvatar";
 import Modal from "./Modal";
 import ChangePasswordForm from "./ChangePasswordForm";
 import OnboardingGuide, { ONBOARDING_KEY } from "./OnboardingGuide";
+import NavAssistant from "./NavAssistant";
 import { useToast } from "./Toast";
 import { useBackup } from "../backup/BackupContext";
-
-const NAV = [
-  { section: "Operación diaria" },
-  { to: "/", label: "Bandeja de trabajo", icon: "home", end: true, help: GLOSSARY.bandeja_trabajo },
-  { to: "/ciclos", label: "Ciclos de escaneo", icon: "calendar", help: GLOSSARY.ciclo },
-  { section: "Metodología IETS" },
-  { to: "/vigilancia", label: "1. Vigilancia", icon: "radar", help: GLOSSARY.vigilancia },
-  { to: "/fuentes", label: "Catálogo de fuentes", icon: "globe", help: GLOSSARY.catalogo_fuentes },
-  { to: "/bandeja-entrada", label: "Bandeja de entrada", icon: "inbox", help: GLOSSARY.bandeja_entrada },
-  { to: "/postulaciones", label: "Postulaciones", icon: "note", help: GLOSSARY.postulacion },
-  { to: "/filtrado", label: "Filtrado y depuración", icon: "filter", help: GLOSSARY.filtrado },
-  { to: "/priorizacion", label: "2. Priorización", icon: "layers", help: GLOSSARY.priorizacion },
-  { to: "/evaluacion", label: "3. Evaluación", icon: "doc", help: GLOSSARY.evaluacion },
-  { to: "/diseminacion", label: "4. Diseminación", icon: "bulb", help: GLOSSARY.diseminacion },
-  { to: "/boletines", label: "Boletines del ciclo", icon: "doc", help: GLOSSARY.boletin },
-  { to: "/notas", label: "Notas del equipo", icon: "note", help: "Notas internas del equipo, vinculadas a señales, fuentes o informes. No son el informe público." },
-  { section: "Análisis y alertas" },
-  { to: "/dashboards", label: "Tablero estratégico", icon: "chart", help: GLOSSARY.tablero },
-  { to: "/alertas", label: "Alertas tempranas", icon: "pulse", help: GLOSSARY.alertas },
-  { to: "/senales", label: "Señales capturadas", icon: "list", help: GLOSSARY.senal },
-  { to: "/chat", label: "Asistente IA", icon: "chat", help: GLOSSARY.minimax },
-  { section: "Administración", permission: "config:manage" },
-  { to: "/auditoria", label: "Bitácora de auditoría", icon: "shield", permission: "audit:read", help: GLOSSARY.bitacora },
-  { to: "/configuracion", label: "Configuración", icon: "cog", permission: "config:manage", help: "Parámetros de la metodología, el modelo de IA y las llaves de las fuentes automáticas." },
-  { to: "/usuarios", label: "Usuarios y perfiles", icon: "users", permission: "user:manage", help: GLOSSARY.rbac },
-];
+import "./layout.css";
 
 function Sidebar({ open, onClose }) {
   const { can } = useAuth();
+  const [filter, setFilter] = useState("");
+  const q = fold(filter);
+
+  // Con filtro se ocultan las secciones vacias; sin filtro, el menu completo.
+  const items = useMemo(() => {
+    const out = [];
+    let pendingSection = null;
+    for (const item of NAV) {
+      if (item.section) {
+        pendingSection = item.permission && !can(item.permission) ? null : item;
+        continue;
+      }
+      if (item.permission && !can(item.permission)) continue;
+      if (q && !fold(`${item.label} ${item.help || ""}`).includes(q)) continue;
+      if (pendingSection) {
+        out.push(pendingSection);
+        pendingSection = null;
+      }
+      out.push(item);
+    }
+    return out;
+  }, [can, q]);
+
   return (
     <>
-      {open && (
-        <div
-          onClick={onClose}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15,23,42,0.4)",
-            zIndex: 40,
-          }}
-          className="sidebar-overlay"
-        />
-      )}
-      <aside
-        style={{
-          width: 280,
-          background: "#fff",
-          borderRight: "1px solid #E2E8F0",
-          height: "100vh",
-          position: "fixed",
-          left: 0,
-          top: 0,
-          zIndex: 50,
-          display: "flex",
-          flexDirection: "column",
-          transform: open ? "translateX(0)" : undefined,
-        }}
-        className={`sidebar ${open ? "sidebar-open" : ""}`}
-      >
-        <div style={{ padding: "20px 22px", borderBottom: "1px solid #E2E8F0" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 13,
-                background: "linear-gradient(135deg,#6366F1,#3B82F6)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#fff",
-                boxShadow: "0 6px 16px rgba(99,102,241,0.35)",
-                flexShrink: 0,
-              }}
-            >
-              <Icon name="radar" size={24} strokeWidth={2} />
-            </div>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: 16, lineHeight: 1.1 }}>
-                Escaneo de Horizonte
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  letterSpacing: 1,
-                  textTransform: "uppercase",
-                  color: "#94A3B8",
-                  fontWeight: 600,
-                  marginTop: 2,
-                }}
-              >
-                IETS Colombia
-              </div>
-            </div>
+      {open && <div onClick={onClose} className="sidebar-overlay" />}
+      <aside className={`sidebar sb ${open ? "sidebar-open" : ""}`} aria-label="Menú de módulos">
+        <div className="sb-brand">
+          <div className="sb-logo">
+            <Icon name="radar" size={22} strokeWidth={2} />
+          </div>
+          <div>
+            <div className="sb-name">Escaneo de Horizonte</div>
+            <div className="sb-org">IETS Colombia</div>
           </div>
         </div>
 
-        <nav style={{ flex: 1, overflowY: "auto", padding: "14px 12px" }}>
-          {NAV.map((item, i) => {
-            if (item.section) {
-              if (item.permission && !can(item.permission)) return null;
-              return (
-                <div
-                  key={`s-${i}`}
-                  style={{
-                    fontSize: 11,
-                    letterSpacing: 0.5,
-                    textTransform: "uppercase",
-                    color: "#94A3B8",
-                    fontWeight: 600,
-                    padding: "16px 12px 6px",
-                  }}
-                >
-                  {item.section}
-                </div>
-              );
-            }
-            if (item.permission && !can(item.permission)) return null;
-            return (
+        <div className="sb-search">
+          <Icon name="search" size={15} />
+          <input
+            type="search"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Buscar módulo…"
+            aria-label="Buscar módulo en el menú"
+          />
+        </div>
+
+        <nav className="sb-nav">
+          {items.map((item, i) =>
+            item.section ? (
+              <div key={`s-${i}`} className="sb-section">
+                {item.section}
+              </div>
+            ) : (
               <div key={item.to} className="nav-row">
                 <NavLink
                   to={item.to}
                   end={item.end}
-                  onClick={onClose}
-                  style={({ isActive }) => ({
-                    position: "relative",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "10px 12px 10px 14px",
-                    borderRadius: 9,
-                    flex: 1,
-                    minWidth: 0,
-                    color: isActive ? "#4F46E5" : "#475569",
-                    background: isActive ? "#EEF2FF" : "transparent",
-                    fontWeight: isActive ? 600 : 500,
-                    fontSize: 14,
-                    textDecoration: "none",
-                    transition: "background 150ms ease-in-out, color 150ms",
-                  })}
-                  onMouseEnter={(e) => {
-                    if (e.currentTarget.getAttribute("aria-current") !== "page")
-                      e.currentTarget.style.background = "#F1F5F9";
+                  onClick={() => {
+                    setFilter("");
+                    onClose();
                   }}
-                  onMouseLeave={(e) => {
-                    const active = e.currentTarget.getAttribute("aria-current") === "page";
-                    e.currentTarget.style.background = active ? "#EEF2FF" : "transparent";
-                  }}
+                  className={({ isActive }) => `sb-link${isActive ? " is-active" : ""}`}
                 >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <span
-                          style={{
-                            position: "absolute",
-                            left: 0,
-                            top: 8,
-                            bottom: 8,
-                            width: 3,
-                            borderRadius: 3,
-                            background: "linear-gradient(180deg,#6366F1,#3B82F6)",
-                          }}
-                        />
-                      )}
-                      <Icon name={item.icon} size={19} strokeWidth={isActive ? 2.1 : 1.8} />
-                      {item.label}
-                    </>
-                  )}
+                  <Icon name={item.icon} size={18} strokeWidth={1.9} />
+                  <span className="sb-label">{item.label}</span>
                 </NavLink>
-                {item.help && (
-                  <InfoTip text={item.help} position="right" label={`Qué es ${item.label}`} />
-                )}
+                {item.help && <InfoTip text={item.help} position="right" label={`Qué es ${item.label}`} />}
               </div>
-            );
-          })}
+            )
+          )}
+          {items.length === 0 && <div className="sb-empty">Ningún módulo coincide con «{filter}».</div>}
         </nav>
-        <div style={{ padding: 16, borderTop: "1px solid #E2E8F0", fontSize: 11, color: "#94A3B8" }}>
-          Sistema de alerta temprana de tecnologías sanitarias.
+        <div className="sb-foot">
+          <Icon name="compass" size={14} />
+          <span>
+            ¿No encuentra algo? Pulse <kbd>Ctrl</kbd>+<kbd>K</kbd> o «¿Cómo llego a…?».
+          </span>
         </div>
       </aside>
     </>
@@ -203,9 +110,6 @@ function GeminiPill({ status, isAdmin }) {
   const navigate = useNavigate();
   const enabled = aiEnabled(status);
   const label = aiLabel(status);
-  const tone = enabled
-    ? { color: "#065F46", bg: "#ECFDF5", border: "#A7F3D0", dot: "#10B981" }
-    : { color: "#92400E", bg: "#FEF3C7", border: "#FDE68A", dot: "#F59E0B" };
   const tip = enabled
     ? `Inteligencia artificial activa (${label}).${status?.ai_ocr_enabled ? " OCR de sitios habilitado." : ""}${isAdmin ? " Clic para gestionar." : ""}`
     : isAdmin
@@ -214,25 +118,13 @@ function GeminiPill({ status, isAdmin }) {
   return (
     <Tooltip text={tip}>
       <button
+        type="button"
         onClick={() => isAdmin && navigate("/configuracion")}
-        className="gemini-pill"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 7,
-          fontSize: 12,
-          fontWeight: 600,
-          color: tone.color,
-          background: tone.bg,
-          border: `1px solid ${tone.border}`,
-          padding: "5px 11px",
-          borderRadius: 9999,
-          cursor: isAdmin ? "pointer" : "default",
-          maxWidth: 260,
-        }}
+        className={`gemini-pill hdr-chip ${enabled ? "is-on" : "is-off"}`}
+        style={{ cursor: isAdmin ? "pointer" : "default" }}
       >
-        <span style={{ width: 8, height: 8, borderRadius: "50%", background: tone.dot, flexShrink: 0 }} />
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+        <span className="hdr-dot" />
+        <span className="hdr-chip-text">{label}</span>
       </button>
     </Tooltip>
   );
@@ -367,29 +259,6 @@ function CycleOption({ cycle, selected, onPick }) {
   );
 }
 
-// Titulo de la cabecera por ruta: coincide con el nombre del modulo en el menu.
-const TITLES = {
-  "/": "Bandeja de trabajo",
-  "/ciclos": "Ciclos de escaneo",
-  "/dashboards": "Tablero estratégico",
-  "/vigilancia": "Vigilancia",
-  "/fuentes": "Catálogo de fuentes",
-  "/bandeja-entrada": "Bandeja de entrada",
-  "/postulaciones": "Postulaciones",
-  "/filtrado": "Filtrado y depuración",
-  "/senales": "Señales capturadas",
-  "/priorizacion": "Priorización",
-  "/evaluacion": "Evaluación temprana",
-  "/diseminacion": "Diseminación",
-  "/boletines": "Boletines del ciclo",
-  "/alertas": "Alertas tempranas",
-  "/notas": "Notas del equipo",
-  "/chat": "Asistente IA",
-  "/auditoria": "Bitácora de auditoría",
-  "/usuarios": "Usuarios y perfiles",
-  "/configuracion": "Configuración",
-};
-
 function BackupStatusPill() {
   const { status } = useAuth();
   const backup = useBackup();
@@ -475,122 +344,75 @@ function Header({ onToggle, onOpenGuide }) {
   }, [menuOpen]);
 
   const title = TITLES[location.pathname] || "IETS";
+  const section = sectionFor(location.pathname);
   useEffect(() => {
     document.title = `${title} | Escaneo de Horizonte IETS`;
   }, [title]);
 
   return (
-    <header
-      className="app-header"
-      style={{
-        height: 64,
-        background: "rgba(255,255,255,0.9)",
-        backdropFilter: "blur(8px)",
-        borderBottom: "1px solid #E2E8F0",
-        position: "sticky",
-        top: 0,
-        zIndex: 30,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 24px",
-      }}
-    >
-      <div className="app-header-left" style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
-        <button
-          onClick={onToggle}
-          aria-label="Abrir menú de módulos"
-          className="hamburger"
-          style={{
-            border: "1px solid #E2E8F0",
-            background: "#fff",
-            borderRadius: 8,
-            width: 38,
-            height: 38,
-            fontSize: 18,
-            display: "none",
-          }}
-        >
-          ☰
+    <header className="app-header hdr">
+      <div className="app-header-left hdr-left">
+        <button type="button" onClick={onToggle} aria-label="Abrir menú de módulos" className="hamburger">
+          <Icon name="menu" size={18} />
         </button>
-        <h2 className="header-title" style={{ fontSize: 20, fontWeight: 700 }}>{title}</h2>
+        <div className="hdr-crumb">
+          {section && <span className="hdr-section">{section}</span>}
+          <h2 className="header-title">{title}</h2>
+        </div>
       </div>
 
-      <div className="app-header-right" style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-        <Tooltip text="Cómo funciona el sistema, en cinco pantallas.">
-          <button
-            type="button"
-            className="header-guide-btn"
-            aria-label="Abrir guía rápida"
-            onClick={onOpenGuide}
-          >
+      <div className="app-header-right hdr-right">
+        <Tooltip text="Cómo funciona el sistema, pantalla por pantalla.">
+          <button type="button" className="header-guide-btn" aria-label="Abrir guía rápida" onClick={onOpenGuide}>
             <Icon name="compass" size={16} />
             <span className="header-guide-label">Guía</span>
           </button>
         </Tooltip>
         <CycleSelector />
 
-        <Tooltip text={`Sincronización en tiempo real.${updatedAt ? ` Última: ${new Date(updatedAt).toLocaleTimeString()}.` : ""}`}>
-          <div className="header-status" title="En vivo">
-            <span className="header-status-dot" />
-            <span className="header-status-label">En vivo</span>
-          </div>
-        </Tooltip>
-        <BackupStatusPill />
+        <div className="hdr-status">
+          <Tooltip text={`Sincronización en tiempo real.${updatedAt ? ` Última: ${new Date(updatedAt).toLocaleTimeString()}.` : ""}`}>
+            <div className="header-status" title="En vivo">
+              <span className="header-status-dot" />
+              <span className="header-status-label">En vivo</span>
+            </div>
+          </Tooltip>
+          <BackupStatusPill />
+          {status && <GeminiPill status={status} isAdmin={isAdmin} />}
+        </div>
 
-        {status && (
-          <GeminiPill status={status} isAdmin={isAdmin} />
-        )}
-
-        <div style={{ position: "relative" }}>
+        <div className="hdr-user">
           <button
+            type="button"
             onClick={() => setMenuOpen((v) => !v)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             aria-label={`Menú de ${user?.name || "usuario"}`}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              border: "none",
-              background: "transparent",
-              padding: 4,
-            }}
+            className="hdr-user-btn"
           >
             <SafeAvatar user={user} />
-            <div style={{ textAlign: "left" }} className="user-meta">
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#0F172A" }}>{user?.name}</div>
-              <div style={{ fontSize: 11, color: "#94A3B8" }}>
-                {user?.role_label || user?.role}
-              </div>
+            <div className="user-meta">
+              <div className="hdr-user-name">{user?.name}</div>
+              <div className="hdr-user-role">{user?.role_label || user?.role}</div>
             </div>
+            <span className="hdr-caret">
+              <Icon name="chevron" size={14} />
+            </span>
           </button>
           {menuOpen && (
             <>
-              <div style={{ position: "fixed", inset: 0, zIndex: 5 }} onClick={() => setMenuOpen(false)} />
-              <div
-                style={{
-                  position: "absolute",
-                  right: 0,
-                  top: 52,
-                  background: "#fff",
-                  border: "1px solid #E2E8F0",
-                  borderRadius: 10,
-                  boxShadow: "var(--shadow-dropdown)",
-                  minWidth: 220,
-                  zIndex: 10,
-                  overflow: "hidden",
-                }}
-              >
-                <div style={{ padding: "12px 16px", borderBottom: "1px solid #E2E8F0" }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.name}</div>
-                  <div style={{ fontSize: 12, color: "#64748B" }}>{user?.email}</div>
-                  <div style={{ fontSize: 11, color: "#4F46E5", fontWeight: 600, marginTop: 4 }}>
+              <div className="hdr-menu-veil" onClick={() => setMenuOpen(false)} />
+              <div className="hdr-menu" role="menu">
+                <div className="hdr-menu-head">
+                  <div className="hdr-user-name">{user?.name}</div>
+                  <div className="hdr-menu-mail">{user?.email}</div>
+                  <div className="hdr-menu-role">
                     {user?.role_label}
                     {user?.rateable_criteria?.length ? ` · califica ${user.rateable_criteria.join(", ")}` : ""}
                   </div>
                 </div>
                 <button
+                  type="button"
                   role="menuitem"
                   className="user-menu-item"
                   onClick={() => {
@@ -602,6 +424,7 @@ function Header({ onToggle, onOpenGuide }) {
                   Guía rápida
                 </button>
                 <button
+                  type="button"
                   role="menuitem"
                   className="user-menu-item"
                   onClick={() => {
@@ -612,24 +435,7 @@ function Header({ onToggle, onOpenGuide }) {
                   <Icon name="shield" size={17} />
                   Cambiar contraseña
                 </button>
-                <button
-                  role="menuitem"
-                  onClick={() => logout()}
-                  style={{
-                    width: "100%",
-                    textAlign: "left",
-                    padding: "10px 16px",
-                    border: "none",
-                    background: "transparent",
-                    fontSize: 14,
-                    color: "#EF4444",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "#FEE2E2")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
+                <button type="button" role="menuitem" className="user-menu-item is-danger" onClick={() => logout()}>
                   <Icon name="logout" size={17} />
                   Cerrar sesión
                 </button>
@@ -655,6 +461,7 @@ export default function Layout({ children }) {
   const { user, justLoggedIn, clearJustLoggedIn } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const { pathname } = useLocation();
 
   useEffect(() => {
     if (!user || !justLoggedIn) return;
@@ -662,22 +469,30 @@ export default function Layout({ children }) {
     if (localStorage.getItem(ONBOARDING_KEY) !== "1") setGuideOpen(true);
   }, [user, justLoggedIn, clearJustLoggedIn]);
 
+  // El marco ya no se rearma al navegar: la pantalla nueva empieza arriba.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [pathname]);
+
   const closeGuide = (persist) => {
     setGuideOpen(false);
     if (persist) localStorage.setItem(ONBOARDING_KEY, "1");
   };
 
   return (
-    <div>
+    <div className="app-frame">
       <a href="#contenido" className="skip-link">Saltar al contenido</a>
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="content-shell" style={{ marginLeft: 280, minHeight: "100vh" }}>
+      <div className="content-shell">
         <EnvironmentBanner />
         <Header onToggle={() => setSidebarOpen((v) => !v)} onOpenGuide={() => setGuideOpen(true)} />
-        <main id="contenido" tabIndex={-1} style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }} className="fade-in">
-          {children}
+        <main id="contenido" tabIndex={-1} className="app-main">
+          <div key={pathname} className="page-enter">
+            {children}
+          </div>
         </main>
       </div>
+      <NavAssistant onOpenGuide={() => setGuideOpen(true)} />
       {guideOpen ? <OnboardingGuide open onClose={closeGuide} /> : null}
     </div>
   );
