@@ -1,88 +1,68 @@
-import { useEffect } from "react";
+import { useEffect, useId, useRef } from "react";
+import Icon from "./Icon";
 
+/**
+ * Ventana modal. Cabecera y pie quedan fijos y el cuerpo se desplaza, asi los
+ * botones de guardar siempre estan a la vista. Al abrir lleva el foco al
+ * dialogo y al cerrar lo devuelve a donde estaba.
+ */
 export default function Modal({ open, onClose, title, children, footer, width = 560 }) {
+  const box = useRef(null);
+  const titleId = useId();
+  // onClose suele ser una funcion nueva en cada render: con ella como
+  // dependencia el foco saltaria al primer campo en cada tecla.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
   useEffect(() => {
     if (!open) return undefined;
+    const previous = document.activeElement;
     const onKey = (e) => {
-      if (e.key === "Escape") onClose?.();
+      if (e.key === "Escape") closeRef.current?.();
     };
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
+    // Foco al primer campo editable; si no hay, al dialogo.
+    const t = setTimeout(() => {
+      const field = box.current?.querySelector(
+        ".ui-modal-body input:not([type=hidden]):not([disabled]), .ui-modal-body select:not([disabled]), .ui-modal-body textarea:not([disabled])"
+      );
+      (field || box.current)?.focus({ preventScroll: true });
+    }, 30);
     return () => {
+      clearTimeout(t);
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
+      if (previous && typeof previous.focus === "function") previous.focus({ preventScroll: true });
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
   return (
     <div
+      className="ui-modal-veil"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose?.();
       }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(15,23,42,0.45)",
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "center",
-        padding: "48px 16px",
-        zIndex: 1000,
-        overflowY: "auto",
-      }}
     >
       <div
+        ref={box}
         role="dialog"
         aria-modal="true"
-        style={{
-          background: "#fff",
-          borderRadius: 12,
-          width: "100%",
-          maxWidth: width,
-          boxShadow: "var(--shadow-xl)",
-          animation: "fadeIn 0.25s ease-out",
-        }}
+        aria-labelledby={title ? titleId : undefined}
+        tabIndex={-1}
+        className="ui-modal"
+        style={{ maxWidth: width }}
       >
-        <div
-          style={{
-            padding: "18px 24px",
-            borderBottom: "1px solid #E2E8F0",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <h3 style={{ fontSize: 18, fontWeight: 700 }}>{title}</h3>
-          <button
-            onClick={onClose}
-            aria-label="Cerrar"
-            style={{
-              border: "none",
-              background: "transparent",
-              fontSize: 22,
-              color: "#94A3B8",
-              lineHeight: 1,
-            }}
-          >
-            ×
+        <div className="ui-modal-head">
+          <h3 id={titleId}>{title}</h3>
+          <button type="button" onClick={onClose} aria-label="Cerrar" className="ui-modal-close">
+            <Icon name="x" size={18} />
           </button>
         </div>
-        <div style={{ padding: 24 }}>{children}</div>
-        {footer && (
-          <div
-            style={{
-              padding: "16px 24px",
-              borderTop: "1px solid #E2E8F0",
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 10,
-            }}
-          >
-            {footer}
-          </div>
-        )}
+        <div className="ui-modal-body">{children}</div>
+        {footer && <div className="ui-modal-foot">{footer}</div>}
       </div>
     </div>
   );

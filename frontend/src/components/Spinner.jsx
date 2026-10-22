@@ -16,19 +16,14 @@ export function Spinner({ size = 22, color = "#6366F1" }) {
 
 export function LoadingBlock({ label = "Cargando..." }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 14,
-        padding: "64px 0",
-        color: "#64748B",
-      }}
-    >
-      <Spinner size={32} />
-      <span style={{ fontSize: 14 }}>{label}</span>
+    <div className="loading-block" role="status" aria-live="polite">
+      <Spinner size={30} />
+      <span>{label}</span>
+      <div className="loading-skeleton" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
     </div>
   );
 }

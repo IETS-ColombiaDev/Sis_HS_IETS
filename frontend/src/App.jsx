@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import Layout from "./components/Layout";
 import { LoadingBlock } from "./components/Spinner";
@@ -31,18 +31,33 @@ import Submissions from "./pages/Submissions";
 import { CycleProvider } from "./cycle/CycleContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 
-/** Protege una ruta por autenticacion y, opcionalmente, por permiso RBAC. */
-function Protected({ children, permission }) {
-  const { user, can } = useAuth();
+/**
+ * Marco de las pantallas internas. Se monta una sola vez: al cambiar de modulo
+ * solo cambia el contenido, sin rearmar menu ni cabecera (antes cada ruta
+ * creaba su propio Layout y la navegacion se sentia como recargar la pagina).
+ */
+function ProtectedShell() {
+  const { user } = useAuth();
+  const location = useLocation();
   if (!user) return <Navigate to="/login" replace />;
-  if (permission && !can(permission)) return <Navigate to="/" replace />;
   return (
     <Layout>
-      <ErrorBoundary title="Esta pantalla se detuvo" hint="El menú sigue disponible. Reintente o cambie de módulo.">
-        {children}
+      <ErrorBoundary
+        key={location.pathname}
+        title="Esta pantalla se detuvo"
+        hint="El menú sigue disponible. Reintente o cambie de módulo."
+      >
+        <Outlet />
       </ErrorBoundary>
     </Layout>
   );
+}
+
+/** Protege una ruta por permiso RBAC dentro del marco ya montado. */
+function Protected({ children, permission }) {
+  const { can } = useAuth();
+  if (permission && !can(permission)) return <Navigate to="/" replace />;
+  return children;
 }
 
 function LegacyRedirect({ to }) {
@@ -72,6 +87,7 @@ export default function App() {
         <Route path="/expedientes" element={<PublicCatalog />} />
         <Route path="/expedientes/:id" element={<PublicFiche />} />
         <Route path="/transparencia" element={<PublicStats />} />
+        <Route element={<ProtectedShell />}>
         <Route path="/" element={<Protected><Dashboard /></Protected>} />
         <Route path="/dashboards" element={<Protected><Dashboards /></Protected>} />
 
@@ -104,6 +120,7 @@ export default function App() {
         <Route path="/auditoria" element={<Protected permission="audit:read"><Audit /></Protected>} />
         <Route path="/usuarios" element={<Protected permission="user:manage"><Users /></Protected>} />
         <Route path="/configuracion" element={<Protected permission="config:manage"><Settings /></Protected>} />
+        </Route>
 
         {/* Rutas heredadas: se conservan durante dos ciclos operativos completos */}
         <Route path="/escaneo" element={<LegacyRedirect to="/vigilancia" />} />

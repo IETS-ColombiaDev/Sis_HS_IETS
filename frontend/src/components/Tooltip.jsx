@@ -67,6 +67,23 @@ export default function Tooltip({ text, children, position = "top", maxWidth = 2
     };
   }, [open, place]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    // En pantallas tactiles no hay "salir del cursor": se cierra al tocar fuera o con Esc.
+    const onDown = (e) => {
+      if (anchor.current && !anchor.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   useEffect(() => () => clearTimeout(timer.current), []);
 
   if (!text) return children;
@@ -79,6 +96,13 @@ export default function Tooltip({ text, children, position = "top", maxWidth = 2
     clearTimeout(timer.current);
     setOpen(false);
   };
+  // Un toque muestra u oculta la ayuda; el raton sigue usando hover.
+  const onPointerUp = (e) => {
+    if (e.pointerType === "touch") {
+      clearTimeout(timer.current);
+      setOpen((v) => !v);
+    }
+  };
 
   return (
     <span
@@ -88,6 +112,7 @@ export default function Tooltip({ text, children, position = "top", maxWidth = 2
       onMouseLeave={hide}
       onFocus={show}
       onBlur={hide}
+      onPointerUp={onPointerUp}
     >
       {children}
       {open &&
@@ -103,13 +128,13 @@ export default function Tooltip({ text, children, position = "top", maxWidth = 2
               visibility: coords ? "visible" : "hidden",
               maxWidth: Math.min(maxWidth, window.innerWidth - MARGIN * 2),
               width: "max-content",
-              background: "#0F172A",
+              background: "#1E293B",
               color: "#fff",
-              fontSize: 12,
-              lineHeight: 1.45,
+              fontSize: 12.5,
+              lineHeight: 1.5,
               fontWeight: 500,
-              padding: "8px 10px",
-              borderRadius: 8,
+              padding: "9px 12px",
+              borderRadius: 10,
               boxShadow: "0 8px 24px rgba(15,23,42,0.28)",
               pointerEvents: "none",
               whiteSpace: "normal",
