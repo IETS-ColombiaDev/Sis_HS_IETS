@@ -17,7 +17,8 @@ import { LoadingBlock } from "../components/Spinner";
 import { PERM } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
 
-const TONE = { recibida: "warning", aceptada: "success", rechazada: "danger" };
+const TONE = { recibida: "warning", aceptada: "ok", rechazada: "error" };
+const STATUS_LABEL = { recibida: "Por moderar", aceptada: "Aceptada", rechazada: "Rechazada" };
 const TABS = [
   { key: "recibida", label: "Por moderar" },
   { key: "aceptada", label: "Aceptadas" },
@@ -130,7 +131,13 @@ export default function Submissions() {
 
       <div className="screening-tabs" style={{ marginBottom: 16, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
         {TABS.map((t) => (
-          <button key={t.key || "todas"} type="button" className={filter === t.key ? "is-active" : ""} onClick={() => setFilter(t.key)}>
+          <button
+            key={t.key || "todas"}
+            type="button"
+            className={`screening-tab${filter === t.key ? " is-active" : ""}`}
+            aria-pressed={filter === t.key}
+            onClick={() => setFilter(t.key)}
+          >
             {t.label}
           </button>
         ))}
@@ -151,7 +158,7 @@ export default function Submissions() {
           {rows.map((row) => (
             <Card key={row.id} title={row.commercial_name} hint={`${row.inn_name} · ${row.submitter_org || row.submitter_email}`}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }} data-testid={`submission-${row.id}`}>
-                <span title={GLOSSARY.fb_estado_postulacion}><Badge tone={TONE[row.status] || "neutral"}>{row.status}</Badge></span>
+                <span title={GLOSSARY.fb_estado_postulacion}><Badge tone={TONE[row.status] || "neutral"}>{STATUS_LABEL[row.status] || row.status}</Badge></span>
                 {row.has_conflict ? (
                   <span title={GLOSSARY.coi}><Badge tone="warning">Declara conflicto de interés</Badge></span>
                 ) : (

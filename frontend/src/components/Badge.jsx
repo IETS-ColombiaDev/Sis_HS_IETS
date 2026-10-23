@@ -62,6 +62,9 @@ const PRESETS = {
   historico: { bg: "#F1F5F9", color: "#64748B", border: "#E2E8F0" },
   info: { bg: "#EEF2FF", color: "#4338CA", border: "#C7D2FE" },
   warning: { bg: "#FEF3C7", color: "#92400E", border: "#FDE68A" },
+  success: { bg: "#D1FAE5", color: "#065F46", border: "#6EE7B7" },
+  danger: { bg: "#FEE2E2", color: "#991B1B", border: "#FCA5A5" },
+  neutral: { bg: "#F1F5F9", color: "#475569", border: "#E2E8F0" },
   default: { bg: "#F1F5F9", color: "#475569", border: "#E2E8F0" },
 };
 
@@ -73,6 +76,7 @@ export default function Badge({ children, tone, style }) {
       style={{
         display: "inline-block",
         padding: "2px 10px",
+        lineHeight: 1.6,
         borderRadius: 9999,
         fontSize: 12,
         fontWeight: 600,

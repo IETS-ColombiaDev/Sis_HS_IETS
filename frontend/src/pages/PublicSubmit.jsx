@@ -159,44 +159,65 @@ export default function PublicSubmit() {
                 : "Verificación anti-robot en modo degradado: el formulario funciona con controles básicos (límite de envíos por conexión)."}
             </p>
           )}
-          <Input id="ps-commercial" label="Nombre comercial" hint={HINTS.commercial_name} required value={form.commercial_name} onChange={set("commercial_name")} />
-          <Input id="ps-inn" label="Denominación común internacional (DCI)" hint={HINTS.inn_name} required value={form.inn_name} onChange={set("inn_name")} />
-          <Textarea id="ps-mechanism" label="Mecanismo de acción" hint={HINTS.mechanism} required value={form.mechanism} onChange={set("mechanism")} />
-          <Input id="ps-manufacturer" label="Fabricante o desarrollador" required value={form.manufacturer} onChange={set("manufacturer")} />
-          <Textarea id="ps-indication" label="Indicación / patología" hint={HINTS.indication} required value={form.indication} onChange={set("indication")} />
-          <Select id="ps-phase" label="Fase de desarrollo" hint={HINTS.development_phase} required value={form.development_phase} onChange={set("development_phase")}>
-            <option value="">Seleccione...</option>
-            <option value="Fase II">Fase II</option>
-            <option value="Fase III">Fase III</option>
-            <option value="Fase IV">Fase IV</option>
-            <option value="Aprobado en agencia de referencia">Aprobado en agencia de referencia</option>
-            <option value="Otro">Otro</option>
-          </Select>
-          <Textarea
-            id="ps-links"
-            label="Enlaces a evidencia (uno por línea)"
-            hint={HINTS.evidence_links}
-            required
-            value={form.evidence_links}
-            onChange={set("evidence_links")}
-            placeholder="https://clinicaltrials.gov/study/NCT..."
-          />
+          <fieldset className="ps-section">
+            <legend><span>1</span> La tecnología</legend>
+            <div className="form-two-col">
+              <Input id="ps-commercial" label="Nombre comercial" hint={HINTS.commercial_name} required value={form.commercial_name} onChange={set("commercial_name")} />
+              <Input id="ps-inn" label="Denominación común internacional (DCI)" hint={HINTS.inn_name} required value={form.inn_name} onChange={set("inn_name")} />
+            </div>
+            <div className="form-two-col">
+              <Input id="ps-manufacturer" label="Fabricante o desarrollador" required value={form.manufacturer} onChange={set("manufacturer")} />
+              <Select id="ps-phase" label="Fase de desarrollo" hint={HINTS.development_phase} required value={form.development_phase} onChange={set("development_phase")}>
+                <option value="">Seleccione...</option>
+                <option value="Fase II">Fase II</option>
+                <option value="Fase III">Fase III</option>
+                <option value="Fase IV">Fase IV</option>
+                <option value="Aprobado en agencia de referencia">Aprobado en agencia de referencia</option>
+                <option value="Otro">Otro</option>
+              </Select>
+            </div>
+            <Textarea id="ps-indication" label="Indicación / patología" hint={HINTS.indication} required rows={3} value={form.indication} onChange={set("indication")} help="Enfermedad o condición y población a la que se destina." />
+            <Textarea id="ps-mechanism" label="Mecanismo de acción" hint={HINTS.mechanism} required rows={3} value={form.mechanism} onChange={set("mechanism")} />
+          </fieldset>
 
-          <label className="public-check" title={HINTS.coi}>
-            <input type="checkbox" checked={form.has_conflict} onChange={set("has_conflict")} />
-            Declaro que existe un conflicto de interés
-          </label>
-          {form.has_conflict && (
-            <Textarea id="ps-conflict" label="Descripción del conflicto" hint={HINTS.coi} required value={form.conflict_statement} onChange={set("conflict_statement")} />
-          )}
-          <label className="public-check">
-            <input type="checkbox" checked={form.coi_accepted} onChange={set("coi_accepted")} required />
-            Firmo la declaración de conflicto de interés. Sin esta firma la postulación no se guarda.
-          </label>
+          <fieldset className="ps-section">
+            <legend><span>2</span> Evidencia</legend>
+            <Textarea
+              id="ps-links"
+              label="Enlaces a evidencia (uno por línea)"
+              hint={HINTS.evidence_links}
+              required
+              rows={3}
+              value={form.evidence_links}
+              onChange={set("evidence_links")}
+              placeholder="https://clinicaltrials.gov/study/NCT..."
+              help="ClinicalTrials.gov, FDA, EMA, artículos o comunicados oficiales. Un enlace por línea."
+            />
+          </fieldset>
 
-          <Input id="ps-name" label="Su nombre" required value={form.submitter_name} onChange={set("submitter_name")} />
-          <Input id="ps-email" label="Correo" type="email" required value={form.submitter_email} onChange={set("submitter_email")} />
-          <Input id="ps-org" label="Organización" value={form.submitter_org} onChange={set("submitter_org")} />
+          <fieldset className="ps-section">
+            <legend><span>3</span> Conflicto de interés</legend>
+            <label className="public-check" title={HINTS.coi}>
+              <input type="checkbox" checked={form.has_conflict} onChange={set("has_conflict")} />
+              <span>Declaro que existe un conflicto de interés</span>
+            </label>
+            {form.has_conflict && (
+              <Textarea id="ps-conflict" label="Descripción del conflicto" hint={HINTS.coi} required value={form.conflict_statement} onChange={set("conflict_statement")} />
+            )}
+            <label className="public-check">
+              <input type="checkbox" checked={form.coi_accepted} onChange={set("coi_accepted")} required />
+              <span>Firmo la declaración de conflicto de interés. Sin esta firma la postulación no se guarda.</span>
+            </label>
+          </fieldset>
+
+          <fieldset className="ps-section">
+            <legend><span>4</span> Sus datos de contacto</legend>
+            <div className="form-two-col">
+              <Input id="ps-name" label="Su nombre" required value={form.submitter_name} onChange={set("submitter_name")} />
+              <Input id="ps-email" label="Correo" type="email" required value={form.submitter_email} onChange={set("submitter_email")} help="Le escribimos solo sobre esta postulación." />
+            </div>
+            <Input id="ps-org" label="Organización" value={form.submitter_org} onChange={set("submitter_org")} help="Opcional." />
+          </fieldset>
           <div className="honeypot" aria-hidden="true">
             <input tabIndex={-1} autoComplete="off" value={form.website} onChange={set("website")} />
           </div>

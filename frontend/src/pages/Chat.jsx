@@ -3,6 +3,7 @@ import api, { AI_TIMEOUT, apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
 import Button from "../components/Button";
+import Icon from "../components/Icon";
 import Markdown from "../components/Markdown";
 import { Spinner } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
@@ -104,7 +105,9 @@ export default function Chat() {
       {/* Sesiones */}
       <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, display: "flex", flexDirection: "column", overflow: "hidden" }} className="chat-sessions">
         <div style={{ padding: 14, borderBottom: "1px solid #E2E8F0" }}>
-          <Button onClick={newChat} style={{ width: "100%" }}>+ Nueva conversación</Button>
+          <Button onClick={newChat} style={{ width: "100%" }}>
+            <Icon name="plus" size={16} /> Nueva conversación
+          </Button>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
           {sessions.length === 0 && (
@@ -153,7 +156,9 @@ export default function Chat() {
       {/* Conversacion */}
       <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ padding: "14px 20px", borderBottom: "1px solid #E2E8F0", display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#6366F1,#3B82F6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17 }}>🤖</div>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#6366F1,#3B82F6)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+            <Icon name="spark" size={18} />
+          </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, display: "inline-flex", alignItems: "center", gap: 6 }}>
               Asistente de Escaneo de Horizonte <InfoTip text={GLOSSARY.fb_chat} label="Cómo responde el asistente" />

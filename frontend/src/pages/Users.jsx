@@ -7,6 +7,7 @@ import { GLOSSARY } from "../constants/glossary";
 import Badge from "../components/Badge";
 import { Input, Select } from "../components/Field";
 import Button from "../components/Button";
+import Icon from "../components/Icon";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Tooltip from "../components/Tooltip";
@@ -467,7 +468,9 @@ export default function Users() {
         titleHint={GLOSSARY.rbac}
         subtitle="Cree las cuentas del equipo, asigne su perfil y administre el acceso. Cada cambio queda registrado en la bitácora con su autor."
         actions={
-          <Button onClick={() => setForm({ open: true, mode: "create", initial: null })}>+ Nuevo usuario</Button>
+          <Button onClick={() => setForm({ open: true, mode: "create", initial: null })}>
+            <Icon name="plus" size={16} /> Nuevo usuario
+          </Button>
         }
       />
 

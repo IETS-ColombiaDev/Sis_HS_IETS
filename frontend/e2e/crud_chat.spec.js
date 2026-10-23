@@ -22,7 +22,7 @@ test("revisor por pares conversa sin IA, reabre y elimina la sesion", async ({ p
   const sessions = await api.get("/chat/sessions");
   const session = sessions.find((s) => s.title === question.slice(0, 80));
   expect(session).toBeTruthy();
-  await page.getByRole("button", { name: "+ Nueva conversación" }).click();
+  await page.getByRole("button", { name: "Nueva conversación" }).click();
   await page.getByTestId(`chat-session-${session.id}`).getByRole("button").first().click();
   await expect(page.getByText(question, { exact: true })).toBeVisible();
 

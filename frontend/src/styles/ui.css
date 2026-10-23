@@ -683,3 +683,242 @@ main textarea:not(.field-control):focus-visible {
   background-repeat: no-repeat;
   background-position: right 9px center;
 }
+
+/* Listas de tarjetas apiladas (postulaciones, propuestas de fusion). */
+.merge-list {
+  display: grid;
+  gap: 14px;
+}
+
+/* Pestañas subrayadas: mismo aspecto en filtrado, postulaciones y demas. */
+.screening-tabs {
+  border-bottom-width: 1px;
+  gap: 2px;
+  align-items: center;
+}
+.screening-tab {
+  border-radius: 8px 8px 0 0;
+  margin-bottom: -1px;
+}
+.screening-tab:hover {
+  background: #f5f6ff;
+}
+.screening-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+/* Evaluacion: titulos y aire en la cola y en el panel del expediente. */
+.eval-layout .ui-card > h3,
+.eval-layout .ui-card > .clamp-text:first-child {
+  font-size: 16px;
+  font-weight: 650;
+  margin-bottom: 12px;
+}
+.eval-layout .ui-card > p {
+  margin-bottom: 14px;
+  line-height: 1.55;
+}
+
+/* Acceso */
+.login-logo {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  margin-bottom: 22px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+.login-feature-ico {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.14);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Formulario publico de postulacion: secciones numeradas. */
+.ps-section {
+  border: 0;
+  border-top: 1px solid #eef1f5;
+  padding: 18px 0 4px;
+  margin: 0;
+  min-width: 0;
+}
+.ps-section:first-of-type {
+  border-top: 0;
+  padding-top: 8px;
+}
+.ps-section legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  padding: 0;
+  margin-bottom: 12px;
+}
+.ps-section legend span {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 12.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.public-check {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1.5px solid #e5e9f0;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  line-height: 1.45;
+  transition: border-color 140ms, background 140ms;
+}
+.public-check:hover {
+  border-color: #c7d2fe;
+}
+.public-check:has(input:checked) {
+  border-color: #a5b4fc;
+  background: #f5f6ff;
+}
+.public-check input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+/* Transparencia: cada cluster con su barra proporcional. */
+.public-cluster-list li {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.public-cluster-list li::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--share, 0%);
+  background: linear-gradient(90deg, #eef2ff, #e0e7ff);
+  z-index: -1;
+  transition: width 400ms ease;
+}
+
+/* Expedientes publicos: tarjetas con flecha y realce al pasar. */
+.public-fiche-list a {
+  position: relative;
+  padding-right: 40px !important;
+  transition: border-color 140ms, box-shadow 140ms, transform 140ms;
+}
+.public-fiche-list a::after {
+  content: "›";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 22px;
+  color: #a5b4fc;
+  transition: transform 140ms, color 140ms;
+}
+.public-fiche-list a:hover {
+  text-decoration: none;
+}
+.public-fiche-list li {
+  transition: border-color 140ms, box-shadow 140ms;
+}
+.public-fiche-list li:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.08);
+}
+.public-fiche-list a:hover::after {
+  color: #6366f1;
+  transform: translate(3px, -50%);
+}
+
+/* Avisos emergentes */
+.toast-stack {
+  position: fixed;
+  top: 76px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(400px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 10px 12px 14px;
+  background: #fff;
+  border: 1px solid #e5e9f0;
+  border-left: 4px solid var(--toast-accent);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+  animation: slideIn 0.22s ease-out;
+}
+.toast-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--toast-bg);
+  color: var(--toast-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.toast-msg {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink);
+  padding-top: 2px;
+}
+.toast-close {
+  border: 0;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 20px;
+  line-height: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.toast-close:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+@media (max-width: 640px) {
+  .toast-stack {
+    top: 12px;
+    right: 16px;
+    left: 16px;
+    width: auto;
+  }
+}
+
+/* Aviso anti-robot del formulario publico separado del texto de entrada. */
+form > .fb-public-note:first-child {
+  margin: 14px 0 6px;
+}
