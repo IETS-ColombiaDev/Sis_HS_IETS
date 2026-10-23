@@ -5,7 +5,7 @@ const ToastContext = createContext(null);
 const STATUS = {
   success: { bg: "#D1FAE5", border: "#10B981", color: "#065F46", icon: "✓" },
   error: { bg: "#FEE2E2", border: "#EF4444", color: "#991B1B", icon: "!" },
-  warning: { bg: "#FEF3C7", border: "#F59E0B", color: "#92400E", icon: "⚠" },
+  warning: { bg: "#FEF3C7", border: "#F59E0B", color: "#92400E", icon: "!" },
   info: { bg: "#DBEAFE", border: "#3B82F6", color: "#1E40AF", icon: "i" },
 };
 
@@ -38,56 +38,23 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={toast}>
       {children}
-      <div
-        style={{
-          position: "fixed",
-          top: 20,
-          right: 20,
-          zIndex: 9999,
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          maxWidth: 380,
-        }}
-      >
+      <div className="toast-stack" aria-live="polite">
         {toasts.map((t) => {
           const s = STATUS[t.type] || STATUS.info;
           return (
             <div
               key={t.id}
-              role="alert"
-              onClick={() => remove(t.id)}
-              style={{
-                background: "#fff",
-                borderLeft: `4px solid ${s.border}`,
-                borderRadius: 10,
-                boxShadow: "var(--shadow-lg)",
-                padding: "12px 16px",
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 12,
-                cursor: "pointer",
-                animation: "slideIn 0.25s ease-out",
-              }}
+              role={t.type === "error" ? "alert" : "status"}
+              className={`toast toast--${t.type}`}
+              style={{ "--toast-accent": s.border, "--toast-bg": s.bg, "--toast-ink": s.color }}
             >
-              <span
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: "50%",
-                  background: s.bg,
-                  color: s.color,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: 700,
-                  fontSize: 13,
-                  flexShrink: 0,
-                }}
-              >
+              <span className="toast-icon" aria-hidden="true">
                 {s.icon}
               </span>
-              <span style={{ fontSize: 14, color: "#0f172a" }}>{t.message}</span>
+              <span className="toast-msg">{t.message}</span>
+              <button type="button" className="toast-close" onClick={() => remove(t.id)} aria-label="Cerrar aviso">
+                ×
+              </button>
             </div>
           );
         })}

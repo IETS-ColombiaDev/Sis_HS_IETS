@@ -9,7 +9,7 @@ function uniqueEmail(tag) {
 }
 
 async function createViaUi(page, email, roleLabel = "Evaluador técnico") {
-  await page.getByRole("button", { name: "+ Nuevo usuario" }).click();
+  await page.getByRole("button", { name: "Nuevo usuario" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.locator("#user-email").fill(email);
   await dialog.locator("#user-name").fill("Persona E2E");

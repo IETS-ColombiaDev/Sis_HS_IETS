@@ -39,12 +39,15 @@ export default function PublicStats() {
             <p className="public-submit-lead">Aún no hay fichas publicadas clasificadas.</p>
           ) : (
             <ul className="public-cluster-list">
-              {(data.by_cluster || []).map((row) => (
-                <li key={row.label}>
-                  <span>{row.label}</span>
-                  <strong>{row.value}</strong>
-                </li>
-              ))}
+              {(data.by_cluster || []).map((row) => {
+                const max = Math.max(1, ...(data.by_cluster || []).map((r) => r.value || 0));
+                return (
+                  <li key={row.label} style={{ "--share": `${Math.round(((row.value || 0) / max) * 100)}%` }}>
+                    <span>{row.label}</span>
+                    <strong>{row.value}</strong>
+                  </li>
+                );
+              })}
             </ul>
           )}
           <p className="public-submit-foot">

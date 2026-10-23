@@ -5,11 +5,12 @@ import { apiError, getLastEmail } from "../api/client";
 import Button from "../components/Button";
 import { Input } from "../components/Field";
 import PasswordField from "../components/PasswordField";
+import Icon from "../components/Icon";
 
 const FEATURES = [
-  ["🌐", "Vigilancia automatizada de agencias, registros de ensayos y literatura internacional"],
-  ["🧭", "Ciclo metodológico IETS: filtrado, matriz P1-P6, evaluación temprana y pares"],
-  ["📊", "Tablero de gobernanza, boletines y alertas tempranas para el SGSSS"],
+  ["radar", "Vigilancia automatizada de agencias, registros de ensayos y literatura internacional"],
+  ["layers", "Ciclo metodológico IETS: filtrado, matriz P1-P6, evaluación temprana y pares"],
+  ["chart", "Tablero de gobernanza, boletines y alertas tempranas para el SGSSS"],
 ];
 
 export default function Login() {
@@ -118,7 +119,9 @@ export default function Login() {
         }}
       >
         <div style={{ position: "relative", zIndex: 2, maxWidth: 460 }}>
-          <div style={{ fontSize: 46, marginBottom: 20 }} aria-hidden="true">🔭</div>
+          <div className="login-logo" aria-hidden="true">
+            <Icon name="radar" size={30} strokeWidth={2} />
+          </div>
           <h1 style={{ fontSize: 34, fontWeight: 800, lineHeight: 1.15, color: "#fff" }}>
             Sistema de Escaneo de Horizonte
           </h1>
@@ -129,7 +132,9 @@ export default function Login() {
           <div style={{ marginTop: 32, display: "flex", flexDirection: "column", gap: 14 }}>
             {FEATURES.map(([ic, t]) => (
               <div key={t} style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 14 }}>
-                <span style={{ fontSize: 18 }} aria-hidden="true">{ic}</span>
+                <span className="login-feature-ico" aria-hidden="true">
+                  <Icon name={ic} size={17} />
+                </span>
                 <span style={{ opacity: 0.95 }}>{t}</span>
               </div>
             ))}

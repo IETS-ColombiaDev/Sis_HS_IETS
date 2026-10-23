@@ -9,6 +9,8 @@ import Markdown from "./Markdown";
 import "./nav-assistant.css";
 
 const STORE_KEY = "iets_hs_nav_assistant";
+// Pantallas con una caja de escritura fija abajo: el boton sube para no taparla.
+const RAISED = new Set(["/chat"]);
 const DEFAULT_SUGGESTED = ["¿Qué tengo pendiente?", "¿Cómo clasifico una señal?", "¿Cómo califico P1 a P6?"];
 
 function loadHistory() {
@@ -200,7 +202,7 @@ export default function NavAssistant({ onOpenGuide }) {
       {!open && (
         <button
           type="button"
-          className="na-fab"
+          className={`na-fab${RAISED.has(location.pathname) ? " is-raised" : ""}`}
           onClick={() => setOpen(true)}
           aria-label="Abrir asistente de navegación"
           title="¿Cómo llego a…? (Ctrl+K)"

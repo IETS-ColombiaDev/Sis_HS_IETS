@@ -1,14 +1,15 @@
 /* Asistente de navegacion flotante. */
 .na-fab {
   position: fixed;
-  right: 22px;
-  bottom: 22px;
+  right: 20px;
+  bottom: 20px;
   z-index: 900;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 48px;
-  padding: 0 18px 0 14px;
+  gap: 0;
+  height: 50px;
+  min-width: 50px;
+  padding: 0 15px;
   border: 0;
   border-radius: 999px;
   background: var(--gradient);
@@ -16,11 +17,33 @@
   font-weight: 600;
   font-size: 14px;
   box-shadow: 0 10px 28px rgba(79, 70, 229, 0.35);
-  transition: transform 150ms ease, box-shadow 150ms ease;
+  transition: transform 150ms ease, box-shadow 150ms ease, gap 180ms ease;
 }
-.na-fab:hover {
+/* Compacto: solo el icono. La etiqueta aparece al pasar o enfocar, asi no tapa
+   botones ni tarjetas de la esquina. */
+.na-fab-label {
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width 220ms ease;
+}
+.na-fab:hover,
+.na-fab:focus-visible {
+  gap: 8px;
   transform: translateY(-2px);
   box-shadow: 0 14px 32px rgba(79, 70, 229, 0.42);
+}
+.na-fab:hover .na-fab-label,
+.na-fab:focus-visible .na-fab-label {
+  max-width: 160px;
+}
+.na-fab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.3), 0 14px 32px rgba(79, 70, 229, 0.42);
+}
+/* En pantallas con caja de escritura abajo (chat) sube para no tapar Enviar. */
+.na-fab.is-raised {
+  bottom: 96px;
 }
 
 .na-panel {
@@ -222,8 +245,8 @@
 .na-form button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 @media (max-width: 640px) {
-  .na-fab { right: 14px; bottom: 14px; width: 50px; height: 50px; padding: 0; justify-content: center; }
-  .na-fab-label { display: none; }
+  .na-fab { right: 14px; bottom: 14px; }
+  .na-fab:hover .na-fab-label { max-width: 0; }
   .na-panel {
     right: 8px;
     left: 8px;
