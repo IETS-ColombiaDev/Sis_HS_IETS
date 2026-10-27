@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from .. import ai_service
+from .. import ai_service, rbac
 from ..database import get_db
 from ..deps import get_current_user
 from .. import graph_service
@@ -250,7 +250,7 @@ def navigate_help(
     prompt = f"""MAPA DEL SISTEMA (rutas, botones, pasos y lo que el perfil puede hacer):
 {site_map}
 
-Perfil del usuario: {user.role}. Pantalla actual: {path or '/'}.
+Perfil del usuario: {rbac.effective_role(user)}. Pantalla actual: {path or '/'}.
 Conversacion previa:
 {hist or '(sin historial)'}
 

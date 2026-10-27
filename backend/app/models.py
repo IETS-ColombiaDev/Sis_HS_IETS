@@ -137,6 +137,9 @@ class Source(Base):
     usage_restrictions: Mapped[str] = mapped_column(Text, default="")
     # Flujo del escaneo de esta fuente (ver source_profile.DEFAULT_SCAN_PROFILE).
     scan_profile: Mapped[dict | None] = mapped_column(JSONType, default=dict)
+    # Campos de la matriz que el equipo cambio en el panel: la sincronizacion del
+    # catalogo los respeta; el resto sigue a la matriz vigente. None = aun sin registro.
+    edited_fields: Mapped[list | None] = mapped_column(JSONType, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
@@ -172,6 +175,9 @@ class Finding(Base):
     # Puntaje de cribado (fase 2 del plan): ordena la cola de trabajo de senales aun
     # no calificadas. NO es el indice de priorizacion %P, que vive en priority_scores.
     screening_score: Mapped[int] = mapped_column(Integer, default=0)
+    # Datos de producto extraidos en la captura (IA o reglas): forma farmaceutica,
+    # concentracion, via, marca, modelo, fabricante (ver product_details).
+    details: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -433,6 +439,19 @@ class Technology(Base):
     invima_registry: Mapped[str] = mapped_column(String(200), default="")
     regulatory_status: Mapped[str] = mapped_column(String(120), default="")
     development_phase: Mapped[str] = mapped_column(String(120), default="")
+
+    # Datos de producto (RF-003 de la validacion del modulo 0).
+    dosage_form: Mapped[str] = mapped_column(String(200), default="")  # forma farmaceutica (MED)
+    strength: Mapped[str] = mapped_column(String(200), default="")  # concentracion (MED)
+    route: Mapped[str] = mapped_column(String(120), default="")  # via de administracion (MED)
+    brand: Mapped[str] = mapped_column(String(200), default="")  # marca (DM)
+    device_model: Mapped[str] = mapped_column(String(200), default="")  # modelo (DM)
+
+    # Corroboracion entre fuentes (RF-002): la misma tecnologia vista en otras
+    # fuentes. Solo ordena la bandeja; no es importancia clinica (ver corroboration).
+    corroboration_count: Mapped[int] = mapped_column(Integer, default=1)
+    corroboration_bonus: Mapped[int] = mapped_column(Integer, default=0)
+    corroborating: Mapped[list | None] = mapped_column(JSONType, nullable=True)
 
     # Trazabilidad de captura (RF03).
     raw_payload: Mapped[dict | None] = mapped_column(JSONType, nullable=True)

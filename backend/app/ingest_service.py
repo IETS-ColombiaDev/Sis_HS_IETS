@@ -15,7 +15,7 @@ from typing import Iterable
 
 from sqlalchemy.orm import Session
 
-from . import ingest
+from . import ingest, product_details
 from .audit import record_action
 from .events import bump_state_version
 from .ingest.base import CanonicalRecord, ConnectorError, RateLimited, SchemaChanged
@@ -325,6 +325,13 @@ def persist_record(
         content_hash=content_hash,
         screening_score=score,
         status="nuevo",
+        details=product_details.merge(
+            record.details,
+            product_details.extract(
+                title=record.title, summary=record.summary, technology_type=record.technology_type
+            ),
+        )
+        or None,
     )
     db.add(finding)
     db.flush()

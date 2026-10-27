@@ -147,6 +147,25 @@ def migrate_to_technologies() -> None:
         db.close()
 
 
+def backfill_product_details() -> None:
+    """Una sola vez: datos de producto (RF-003) de lo capturado antes de existir."""
+    from . import settings_store
+    from .reprocess_service import reprocess_product_details
+
+    key = "product_details.backfill_v1"
+    db = SessionLocal()
+    try:
+        if settings_store.get_value(db, key, ""):
+            return
+        result = reprocess_product_details(db, apply=True, actor="arranque")
+        settings_store.set_value(db, key, str(result["changed"]))
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        log.warning("No se pudieron completar los datos de producto: %s", exc)
+    finally:
+        db.close()
+
+
 def seed_official_cycles() -> None:
     """Sincroniza los ciclos oficiales 2026 sin impedir nunca el arranque.
 
@@ -246,6 +265,7 @@ async def lifespan(app: FastAPI):
         seed_methodology()
         backfill_screening_scores()
         migrate_to_technologies()
+        backfill_product_details()
         seed_official_cycles()
         seed_api_sources()
     load_runtime_config()

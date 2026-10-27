@@ -195,7 +195,7 @@ def raw_preview(
 
 @router.post("/reprocess")
 def reprocess_from_raw(
-    target: str = Query("all", pattern="^(all|fda|pipeline)$"),
+    target: str = Query("all", pattern="^(all|fda|pipeline|producto)$"),
     apply: bool = Query(False),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission(P_CONFIG_MANAGE)),

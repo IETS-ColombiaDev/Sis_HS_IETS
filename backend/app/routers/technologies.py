@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from .. import audit, cycle_service, evaluation_service, reliability_service, screening_service
+from .. import audit, corroboration, cycle_service, evaluation_service, reliability_service, screening_service
 from ..classification import suggest_cluster, suggest_tech_type
 from ..database import get_db
 from ..deps import get_current_user, require_permission
@@ -45,6 +45,9 @@ router = APIRouter(prefix="/api/technologies", tags=["technologies"])
 def _to_out(db: Session, tech: Technology, entry: CycleTechnology | None = None) -> TechnologyOut:
     out = TechnologyOut.model_validate(tech)
     out.nct_ids = list(tech.nct_ids or [])
+    out.corroborating = list(tech.corroborating or [])
+    out.corroboration_count = tech.corroboration_count or 1
+    out.corroboration_bonus = tech.corroboration_bonus or 0
     out.icd10_codes = list(tech.icd10_codes or [])
     out.status_label = TECHNOLOGY_STATUS_LABELS.get(tech.status, tech.status)
     if tech.cluster:
@@ -118,11 +121,18 @@ def list_staging(
     source_id: int | None = Query(None),
     channel: str | None = Query(None),
     since: datetime | None = Query(None),
+    corroborated: bool | None = Query(None, description="Solo las que otra fuente tambien reporta"),
     limit: int = Query(100, le=500),
     offset: int = Query(0, ge=0),
 ):
-    """Senales capturadas aun no asignadas a ningun ciclo."""
+    """Senales capturadas aun no asignadas a ningun ciclo.
+
+    Orden: puntaje de cribado + bono de corroboracion (RF-002), luego lo mas reciente.
+    """
+    corroboration.refresh(db)
     query = db.query(Technology).filter(Technology.status == "capturada_no_asignada")
+    if corroborated:
+        query = query.filter(Technology.corroboration_count > 1)
     if source_id:
         query = query.filter(Technology.source_id == source_id)
     if channel:
@@ -141,7 +151,11 @@ def list_staging(
     # Total filtrado para paginar desde la interfaz sin cambiar el contrato de lista.
     response.headers["X-Total-Count"] = str(query.with_entities(func.count(Technology.id)).scalar() or 0)
     rows = (
-        query.order_by(Technology.screening_score.desc(), Technology.captured_at.desc(), Technology.id.desc())
+        query.order_by(
+            (Technology.screening_score + func.coalesce(Technology.corroboration_bonus, 0)).desc(),
+            Technology.captured_at.desc(),
+            Technology.id.desc(),
+        )
         .offset(offset)
         .limit(limit)
         .all()
@@ -178,6 +192,10 @@ def staging_stats(db: Session = Depends(get_db), user: User = Depends(get_curren
     without_type = base.filter(Technology.tech_type_id.is_(None)).with_entities(
         func.count(Technology.id)
     ).scalar() or 0
+    corroboration.refresh(db)
+    corroborated = base.filter(Technology.corroboration_count > 1).with_entities(
+        func.count(Technology.id)
+    ).scalar() or 0
 
     return StagingStats(
         total=total,
@@ -186,6 +204,7 @@ def staging_stats(db: Session = Depends(get_db), user: User = Depends(get_curren
         by_source=by_source,
         without_cluster=without_cluster,
         without_tech_type=without_type,
+        corroborated=corroborated,
     )
 
 
@@ -405,6 +424,11 @@ def update_technology(
                     status_code=422,
                     detail=f"La tecnología ya está asignada a un ciclo: no se puede quitar {label}.",
                 )
+
+    # Datos de producto (RF-003): texto libre; nulo equivale a vaciar el campo.
+    for key in ("dosage_form", "strength", "route", "brand", "device_model"):
+        if key in data:
+            data[key] = (data[key] or "").strip()
 
     for key, value in data.items():
         setattr(tech, key, value)

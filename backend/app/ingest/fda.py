@@ -136,6 +136,16 @@ class FdaConnector(Connector):
             fda_approval_date=parse_compact_date(approval),
             regulatory_status=regulatory["status"],
             published_date=approval or regulatory["last_date"] or "",
+            details={
+                "dosage_form": clean_text(product.get("dosage_form")).title(),
+                "route": clean_text(product.get("route")).title(),
+                "strength": "; ".join(
+                    clean_text(i.get("strength")) for i in ingredients if isinstance(i, dict) and i.get("strength")
+                ),
+                # Un generico repite la DCI como "marca": no aporta.
+                "brand": clean_text(brand, 200) if brands and brand.lower() != (inn or "").lower() else "",
+                "manufacturer": clean_text(makers[0] if makers else "", 300),
+            },
             raw=row,
         )
 
@@ -181,6 +191,7 @@ class FdaConnector(Connector):
             fda_approval_date=parse_compact_date(decision),
             regulatory_status=regulatory["status"],
             published_date=decision or regulatory["last_date"],
+            details={"brand": clean_text(row.get("trade_name"), 200), "manufacturer": maker},
             raw=row,
         )
 

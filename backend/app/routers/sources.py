@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from .. import ingest, source_profile
 from ..catalog import CATEGORIES, FREQ_HOURS
-from ..catalog_service import LOCAL_SOURCE_MARK, normalize_url
+from ..catalog_service import LOCAL_SOURCE_MARK, mark_edited, normalize_url
 from ..database import get_db
 from ..deps import get_current_user, require_permission
 from ..events import bump_state_version
@@ -271,10 +271,10 @@ def export_sources(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Exporta el listado maestro de fuentes en CSV (con BOM para Excel)."""
+    """Exporta el listado maestro de fuentes en CSV (con BOM y ';' para Excel en es-CO)."""
     sources = db.query(Source).order_by(Source.category, Source.title).all()
     buf = io.StringIO()
-    writer = csv.writer(buf)
+    writer = csv.writer(buf, delimiter=";", lineterminator="\r\n")
     writer.writerow([
         "codigo", "titulo", "url", "bloque", "nivel_acceso", "nivel_fuente", "prioridad",
         "tipos_tecnologia", "conector", "frecuencia", "salud", "vigilada", "hallazgos", "pais",
@@ -293,7 +293,7 @@ def export_sources(
             s.access_level,
             s.source_level or "",
             s.priority_level or "",
-            ";".join(s.tech_types or []),
+            ", ".join(s.tech_types or []),
             s.connector,
             s.sync_frequency,
             s.health_status,
@@ -303,17 +303,195 @@ def export_sources(
             s.verification_status,
             "si" if s.retired else "no",
             s.matrix_ref or "",
-            " ".join(s.entry_urls or []),
+            " | ".join(s.entry_urls or []),
             s.access_path or "",
             s.consult_info or "",
             s.usage_restrictions or "",
-            ";".join(v for k, v in flow_labels.items() if profile.get(k)),
+            ", ".join(v for k, v in flow_labels.items() if profile.get(k)),
         ])
     return StreamingResponse(
         iter([CSV_BOM + buf.getvalue()]),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="fuentes_iets.csv"'},
     )
+
+
+# --------------------------------------------------------------------------- #
+#  Prioridad sugerida por la relevancia de las senales (OBS-001)
+# --------------------------------------------------------------------------- #
+@router.get("/priority-suggestions")
+def priority_suggestions(
+    days: int = Query(365, ge=30, le=1825),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Prioridad sugerida por fuente segun sus senales. No toca la prioridad oficial."""
+    from .. import source_signal_priority as ssp
+
+    rows = ssp.compute(db, days=days)
+    return {"window_days": days, "rule": ssp.RULE_TEXT, "items": list(rows.values())}
+
+
+@router.post("/{source_id}/priority-suggestion/apply", response_model=SourceOut)
+def apply_priority_suggestion(
+    source_id: int,
+    days: int = Query(365, ge=30, le=1825),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_SOURCE_WRITE)),
+):
+    """Copia la prioridad sugerida (recalculada en el servidor) a la oficial y lo deja en la bitacora."""
+    from .. import audit
+    from .. import source_signal_priority as ssp
+
+    source = db.get(Source, source_id)
+    if not source:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fuente no encontrada")
+    row = ssp.compute(db, days=days, source_ids=[source_id]).get(source_id)
+    level = (row or {}).get("suggested") or ""
+    if not level:
+        raise HTTPException(
+            status_code=409,
+            detail="La fuente no tiene señales en la ventana: no hay prioridad sugerida que aplicar.",
+        )
+    allowed = source_profile.option_values(source_profile.load_options(db), "priority_level")
+    if level not in allowed:
+        raise HTTPException(
+            status_code=422,
+            detail=f"La prioridad '{level}' no está en la lista de Parámetros de fuentes.",
+        )
+    old = source.priority_level or ""
+    if old != level:
+        # Antes de asignar: la sincronizacion del catalogo no debe revertirla.
+        mark_edited(source, {"priority_level": level})
+        source.priority_level = level
+        audit.record_action(
+            db,
+            entity_type="sources",
+            entity_id=source.id,
+            action="priority_suggestion_applied",
+            old_value={"priority_level": old},
+            new_value={
+                "priority_level": level,
+                "reason": row["reason"],
+                "window_days": days,
+                "stats": row["stats"],
+            },
+        )
+        db.commit()
+        db.refresh(source)
+        bump_state_version(db)
+    return _to_out(db, source)
+
+
+# --------------------------------------------------------------------------- #
+#  Deteccion de fuentes con IA
+# --------------------------------------------------------------------------- #
+@router.post("/discover")
+def discover_sources(
+    payload: dict | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_SOURCE_WRITE)),
+):
+    """Busca en la web fuentes de EH que no esten en el catalogo y las propone (no crea nada)."""
+    from .. import audit
+    from .. import source_discovery as sd
+
+    try:
+        req = sd.DiscoverRequest(**(payload or {}))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Enfoque inválido: revise el tema y la región.") from exc
+    key = (user.email or str(user.id)).lower()
+    if not sd.discovery_limiter.allow(key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Alcanzó el máximo de detecciones por ahora (6 cada 10 minutos). Espere unos minutos.",
+            headers={"Retry-After": str(sd.discovery_limiter.retry_after(key))},
+        )
+    try:
+        result = sd.discover(db, req)
+    except Exception as exc:  # noqa: BLE001  - nunca un 500 por red o IA
+        raise HTTPException(
+            status_code=503,
+            detail=f"No se pudo completar la detección de fuentes ({type(exc).__name__}). Intente de nuevo.",
+        ) from exc
+    audit.record_action(
+        db,
+        entity_type="sources",
+        entity_id="discovery",
+        action="ai_source_discovery",
+        new_value={
+            "focus": req.model_dump(),
+            "candidates": len(result["candidates"]),
+            "already_in_catalog": len(result["already_in_catalog"]),
+            "discarded": len(result["discarded"]),
+            "ai_used": result["ai_used"],
+            "ai_calls": result["ai_calls"],
+            "queries": result["queries"],
+        },
+    )
+    db.commit()
+    return result
+
+
+@router.post("/discover/accept", response_model=SourceOut, status_code=status.HTTP_201_CREATED)
+def accept_discovered_source(
+    payload: dict,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_SOURCE_WRITE)),
+):
+    """Da de alta una fuente propuesta por la deteccion, marcada como pendiente de verificacion."""
+    from .. import audit
+    from .. import source_discovery as sd
+
+    try:
+        item = sd.DiscoveredSourceIn(**payload)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail="Datos de la fuente propuesta incompletos (nombre y URL)."
+        ) from exc
+    cand = sd.normalize_candidate(item.model_dump(), focus_tech=[], region="")
+    url = cand["url"]
+    if not url.lower().startswith(("http://", "https://")):
+        raise HTTPException(status_code=422, detail="La URL debe iniciar con http:// o https://")
+    hit = sd.match_existing(sd.build_index(db), url, cand["name"])
+    if hit:
+        where = f"'{hit['title']}'" if hit["title"] else "una fuente del catálogo"
+        raise HTTPException(
+            status_code=409,
+            detail=f"Ya existe {where} con el mismo {'dominio' if hit['reason'] == 'dominio' else 'nombre'}.",
+        )
+    allowed_tech = source_profile.option_values(source_profile.load_options(db), "tech_type")
+    note = f"{sd.AI_NOTE}. {cand['justification']}".strip()
+    data = SourceCreate(
+        title=cand["name"],
+        url=url,
+        category=cand["category"],
+        description=cand["justification"] or f"Fuente propuesta por la detección con IA: {cand['name']}",
+        country=cand["country"],
+        connector="html",
+        access_level=cand["access_level"],
+        sync_frequency="semanal",
+        scan_interval_hours=FREQ_HOURS["semanal"],
+        scrape_enabled=bool(item.enable_ingest),
+        link_status="Activo",
+        tags=sd.AI_MARK_TAG,
+        catalog_note=note[:2000],
+        source_level=cand["source_level"],
+        priority_level="revisar",
+        tech_types=[t for t in cand["tech_types"] if t in allowed_tech],
+        entry_urls=[cand["entry_url"]] if cand["entry_url"] else [],
+        verification_status=LOCAL_SOURCE_MARK,
+    )
+    out = create_source(data, db=db, user=user)
+    audit.record_action(
+        db,
+        entity_type="sources",
+        entity_id=out.id,
+        action="ai_source_accepted",
+        new_value={"title": out.title, "url": out.url, "justification": cand["justification"]},
+    )
+    db.commit()
+    return out
 
 
 @router.get("/{source_id}", response_model=SourceOut)
@@ -427,6 +605,9 @@ def update_source(
                 status_code=409,
                 detail=f"Otra fuente ya usa esa URL: '{dup.title}'.",
             )
+    # Lo que el equipo cambia de la matriz deja de seguir a la sincronizacion del
+    # catalogo. El cambio queda en la bitacora generica (after_flush).
+    mark_edited(source, data)
     for key, value in data.items():
         setattr(source, key, value)
     db.commit()

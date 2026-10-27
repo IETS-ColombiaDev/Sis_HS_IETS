@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from .. import audit, rbac
@@ -48,11 +49,15 @@ def _as_utc(value: datetime | None) -> datetime | None:
     return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
 
-def user_out(user: User, *, use_directory: bool = True) -> UserOut:
+def user_out(user: User, *, use_directory: bool = True, effective: bool = False) -> UserOut:
     """Serializa el usuario con su matriz de permisos resuelta.
 
     `use_directory=False` en el login: evita una ida a Firestore que puede
     tardar varios segundos y hacer que la UI muestre error/timeout.
+
+    `effective=True` (solo para la propia sesion) aplica el "ver como" del
+    superadministrador: el perfil, los permisos y los criterios son los del
+    perfil simulado. Los listados de cuentas siempre muestran el perfil real.
     """
     if use_directory:
         full, first, last = resolve_name(email=user.email, leftover=user.name, incoming="")
@@ -64,10 +69,17 @@ def user_out(user: User, *, use_directory: bool = True) -> UserOut:
     out.name = full or user.name
     out.first_name = first or getattr(user, "first_name", "") or ""
     out.last_name = last or getattr(user, "last_name", "") or ""
-    out.role = rbac.canonical_role(user.role)
-    out.role_label = rbac.role_label(user.role)
-    out.permissions = sorted(rbac.permissions_for(user.role))
-    out.rateable_criteria = sorted(rbac.rateable_criteria(user))
+    real = rbac.real_role(user)
+    role = rbac.effective_role(user) if effective else real
+    out.role = role
+    out.role_label = rbac.role_label(role)
+    out.real_role = real
+    out.real_role_label = rbac.role_label(real)
+    out.acting_as = role != real
+    out.permissions = sorted(rbac.permissions_for(role))
+    out.rateable_criteria = sorted(
+        code for code, perm in rbac.CRITERION_PERMISSION.items() if perm in rbac.permissions_for(role)
+    )
     out.has_password = bool(user.password_hash)
     out.must_change_password = bool(user.must_change_password)
     locked = _as_utc(user.locked_until)
@@ -391,4 +403,46 @@ def dev_login(payload: DevLoginIn, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(get_current_user)):
     # Sin Firestore: /me se llama al cargar la app y no debe retrasar la entrada.
-    return user_out(user, use_directory=False)
+    # Refleja el "ver como" activo (cabecera X-Acting-Role del superadministrador).
+    return user_out(user, use_directory=False, effective=True)
+
+
+class ActingRoleIn(BaseModel):
+    """Perfil a simular; vacio, nulo o "superadmin" vuelve al perfil propio."""
+
+    role: str | None = None
+
+
+@router.post("/acting-role", response_model=UserOut)
+def set_acting_role(
+    payload: ActingRoleIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Activa o termina el "ver como" del superadministrador y lo deja en bitacora.
+
+    El servidor no guarda estado: el perfil elegido viaja despues en la cabecera
+    `X-Acting-Role` de cada peticion. Este punto valida la eleccion, la registra
+    y devuelve la sesion tal como se vera con ese perfil.
+    """
+    if rbac.real_role(user) != rbac.SUPERADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el superadministrador puede ver el sistema como otro perfil.",
+        )
+    requested = (payload.role or "").strip().lower()
+    if requested and requested not in rbac.ROLES:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Perfil no válido.")
+    previous = rbac.effective_role(user)
+    user.acting_role = rbac.resolve_acting_role(user, requested)
+    current = rbac.effective_role(user)
+    audit.record_action(
+        db,
+        entity_type="users",
+        entity_id=str(user.id),
+        action="auth:acting_role" if user.acting_role else "auth:acting_role_end",
+        old_value={"role": previous},
+        new_value={"role": current, "label": rbac.role_label(current), "email": user.email},
+    )
+    db.commit()
+    return user_out(user, use_directory=False, effective=True)

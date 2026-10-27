@@ -1,6 +1,6 @@
 {
  "sheet": "MATRIZ FI EH",
- "generated_at": "2026-10-06T16:32:56+00:00",
+ "generated_at": "2026-10-27T18:54:08+00:00",
  "rows": [
   {
    "excel_row": 3,
@@ -21,7 +21,8 @@
    "consult_urls": [
     "https://www.abbott.com/en-us/products-solutions",
     "https://www.abbott.com/for-healthcare-professionals.html",
-    "https://www.abbott.com/en-us/corpnewsroom/strategy-and-strength/guiding-future-innovation"
+    "https://www.abbott.com/en-us/corpnewsroom/strategy-and-strength/guiding-future-innovation",
+    "https://medicines.abbott.com/"
    ],
    "methodology_urls": [],
    "consult_note": "",
@@ -63,14 +64,14 @@
    "methodology_note": "",
    "material_type": "1. Listado de medicamentos",
    "access_path": "",
-   "consult_info": "",
-   "observations": "",
+   "consult_info": "Innovación en desarrollo por parte del laboratorio",
+   "observations": "Solo se da el nombre de la molécula o su código de clasificación y la fase del estudio en el que está",
    "priority_level": "",
    "publication_structure": "",
    "format": "",
    "frequency": "",
    "frequency_raw": "",
-   "language": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   },
@@ -98,14 +99,14 @@
    "methodology_note": "",
    "material_type": "1. Listado de medicamentos",
    "access_path": "",
-   "consult_info": "",
-   "observations": "",
+   "consult_info": "Innovación en desarrollo por parte del laboratorio",
+   "observations": "Figura el nombre de la molécula, el área terapéutica, indicación en investigación, modalidad (clasificación de la molécula) y fase de ensayo clínico",
    "priority_level": "",
    "publication_structure": "",
    "format": "",
    "frequency": "",
    "frequency_raw": "",
-   "language": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   },
@@ -133,14 +134,14 @@
    "methodology_note": "",
    "material_type": "1. Listado de medicamentos",
    "access_path": "",
-   "consult_info": "",
-   "observations": "",
+   "consult_info": "Innovación en desarrollo por parte del laboratorio",
+   "observations": "Se muestra un listado de moleculas en investigación (clasificadas por fases) y la indicación en que están siendo evaluadas",
    "priority_level": "",
    "publication_structure": "",
    "format": "",
    "frequency": "",
    "frequency_raw": "",
-   "language": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   },
@@ -206,13 +207,13 @@
    "material_type": "1. Listado de medicamentos\n2. Pharma Innovation and Pipeline",
    "access_path": "",
    "consult_info": "Development Pipeline de Pharmaceuticals y presenta principalmente moléculas, terapias celulares/génicas, radioterapias",
-   "observations": "",
+   "observations": "Permite verificar moléculas en desarrollo en diferentes fases, permite diferenciar entre nuevas entidades moleculares y nuevas indicaciones en moléculas ya existentes",
    "priority_level": "",
    "publication_structure": "",
    "format": "",
    "frequency": "",
    "frequency_raw": "",
-   "language": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   },
@@ -278,14 +279,14 @@
    "methodology_note": "",
    "material_type": "1. Listado de medicamentos",
    "access_path": "",
-   "consult_info": "",
-   "observations": "",
+   "consult_info": "Innovación en desarrollo por parte del laboratorio",
+   "observations": "En el link figura un consolidado de las moléculas en investigación y la fase de estudio, sin embargo, la página también tiene un módulo interactivo para ver estos desarrollos y también permite descargar el pipeline como una especie de cartilla en PDF",
    "priority_level": "",
    "publication_structure": "",
    "format": "",
    "frequency": "",
    "frequency_raw": "",
-   "language": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   },
@@ -349,14 +350,14 @@
    "methodology_note": "",
    "material_type": "1. Listado de medicamentos",
    "access_path": "",
-   "consult_info": "",
-   "observations": "",
+   "consult_info": "Innovación en desarrollo por parte del laboratorio",
+   "observations": "En el link menciona la molécula en investigación, el área terapéutica, la condición de salud, indicación y fase del estudio",
    "priority_level": "",
    "publication_structure": "",
    "format": "",
    "frequency": "",
    "frequency_raw": "",
-   "language": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   },
@@ -373,10 +374,10 @@
    "origin": "FVEH042025",
    "country": "EE. UU. / Global",
    "tech_types": [
-    "MED",
+    "DM",
     "IA"
    ],
-   "tech_types_raw": "MED-IA",
+   "tech_types_raw": "DM-IA",
    "consult_urls": [
     "https://latam.gehealthcare.com/",
     "https://www.gehealthcare.com/en-us/products/software",
@@ -422,14 +423,14 @@
    "methodology_note": "",
    "material_type": "1. Listado de medicamentos",
    "access_path": "",
-   "consult_info": "",
-   "observations": "",
+   "consult_info": "Innovación en desarrollo por parte del laboratorio",
+   "observations": "Listado de moléculas en investigación por enfermedades, además se indica la fase del estudio clínico en el que están, no hay información detallada",
    "priority_level": "",
    "publication_structure": "",
    "format": "",
    "frequency": "",
    "frequency_raw": "",
-   "language": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   },
@@ -457,14 +458,14 @@
    "methodology_note": "",
    "material_type": "1. Listado de medicamentos",
    "access_path": "",
-   "consult_info": "",
-   "observations": "",
+   "consult_info": "Innovación en desarrollo por parte del laboratorio",
+   "observations": "Listado de moléculas en investigación por enfermedades, además se indica la fase del estudio clínico en el que están, no hay información detallada",
    "priority_level": "",
    "publication_structure": "",
    "format": "",
    "frequency": "",
    "frequency_raw": "",
-   "language": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   },
@@ -495,13 +496,13 @@
    "material_type": "1. Listado desarrollo- Lista de patente medicamentos\n2. Información de Innovación",
    "access_path": "",
    "consult_info": "Development Pipeline, que es principalmente farmacéutico.\nTerapias innovadoras, pipeline, nuevas tecnologías, ciencia de datos, salud digital y MedTech.",
-   "observations": "La información permite explorar por diferentes articulo con multiples accesos pero no es como un listado verificar pertinencia de los links de acceso",
+   "observations": "La información permite explorar por diferentes articulo con multiples accesos pero no es como un listado verificar pertinencia de los links de acceso. En el caso de medicamentos si hay un listado de las moléculas en desarrollo, con su indicación y la fase clínica en que se encuentra, y otra pestaña con la información de terapias novedosas de reciente aprobación",
    "priority_level": "revisar",
    "publication_structure": "",
    "format": "",
    "frequency": "",
    "frequency_raw": "",
-   "language": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   },
@@ -529,14 +530,14 @@
    "methodology_note": "",
    "material_type": "1. Listado de medicamentos",
    "access_path": "",
-   "consult_info": "",
-   "observations": "",
+   "consult_info": "Innovación en desarrollo por parte del laboratorio",
+   "observations": "Se tiene un listado de moléculas en distintas fases de estudios clínicos y preaprobación",
    "priority_level": "",
    "publication_structure": "",
    "format": "",
    "frequency": "",
    "frequency_raw": "",
-   "language": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   },
@@ -548,8 +549,8 @@
    ],
    "name": "Medtronic",
    "entity_label": "Fabricantes I+D",
-   "source_level": "por_definir",
-   "source_level_raw": "",
+   "source_level": "primaria",
+   "source_level_raw": "Primaria",
    "origin": "FVEH042025",
    "country": "EE. UU. / Global",
    "tech_types": [
@@ -602,14 +603,14 @@
    "methodology_note": "",
    "material_type": "1. Listado de medicamentos",
    "access_path": "",
-   "consult_info": "",
-   "observations": "",
+   "consult_info": "Innovación en desarrollo por parte del laboratorio",
+   "observations": "En el link proporcionado está un listado con el nombre de la molécula, área terapéutica, indicaciones potenciales, estatus o fase de estudio y tipo de molécula. Además se permite la descarga del pipeline en PDF",
    "priority_level": "",
    "publication_structure": "",
    "format": "",
    "frequency": "",
    "frequency_raw": "",
-   "language": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   },
@@ -674,14 +675,14 @@
    "methodology_note": "",
    "material_type": "1. Listado de medicamentos",
    "access_path": "",
-   "consult_info": "",
-   "observations": "",
+   "consult_info": "Innovación en desarrollo por parte del laboratorio",
+   "observations": "Se tiene listado con el nombre o código de la molécula, indicación, fase del estudio y tipo de molécula. Hay un enlace para descargar documento con el pipeline en PDF",
    "priority_level": "",
    "publication_structure": "",
    "format": "",
    "frequency": "",
    "frequency_raw": "",
-   "language": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   },
@@ -709,14 +710,14 @@
    "methodology_note": "",
    "material_type": "1. Avances",
    "access_path": "",
-   "consult_info": "",
-   "observations": "",
+   "consult_info": "Innovación en desarrollo por parte del laboratorio",
+   "observations": "En el link se encuentra el listado con la información de los compuestos, indicación, area de uso, tipo de evaluación (nueva entidad molecular, nuevo uso, etc), tipo de compuesto y las fases clínicas (comprehensive list). Adicionalmente hay un hipervinculo Key 2026 Catalysts que muestra las posibles moleculas \"catalizadoras\" o relevantes para 2026, y también tiene para descargar en PDF el pipeline",
    "priority_level": "",
    "publication_structure": "",
    "format": "",
    "frequency": "",
    "frequency_raw": "",
-   "language": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   },
@@ -821,14 +822,14 @@
    "methodology_note": "",
    "material_type": "1. Listado de medicamentos",
    "access_path": "",
-   "consult_info": "",
-   "observations": "",
+   "consult_info": "Innovación en monitorización, intervencionismo, imagen, informática clínica, IA, software y salud personal.",
+   "observations": "Listado con el área terapéutica, fase del estudio, nombre de la molécula, descripción (tipo de molécula) e indicación. Hay tres descargas disponibles el pipeline completo, un informe resumen (rich pipeline newsflow) con los resultados del laboratorio en cuanto a su negocio, finanzas, investigación y desarrollo, etc; y pipeline progress (tiene la misma información del rich pipeline newsflow)",
    "priority_level": "",
    "publication_structure": "",
    "format": "",
    "frequency": "",
    "frequency_raw": "",
-   "language": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   },
@@ -953,14 +954,16 @@
    "origin": "FVEH042025",
    "country": "Estados Unidos",
    "tech_types": [
-    "MT"
+    "DM"
    ],
-   "tech_types_raw": "MT",
+   "tech_types_raw": "DM",
    "consult_urls": [
     "https://www.fda.gov/medical-devices/device-approvals-and-clearances/recently-approved-devices",
     "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfPMA/pma.cfm",
-    "https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm?event=reportsSearch.process",
-    "https://www.fda.gov/vaccines-blood-biologics/cellular-gene-therapy-products/approved-cellular-and-gene-therapy-products",
+    "https://www.fda.gov/vaccines-blood-biologics/approved-blood-products/premarket-approvals-and-humanitarian-device-exemptions-supporting-documents",
+    "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfPMN/denovo.cfm",
+    "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfHDE/hde.cfm",
+    "https://www.fda.gov/vaccines-blood-biologics/development-approval-process-cber/2026-biological-device-application-approvals",
     "https://www.fda.gov/medical-devices/digital-health-center-excellence/medical-devices-incorporate-sensor-based-digital-health-technology",
     "https://www.fda.gov/medical-devices/software-medical-device-samd/artificial-intelligence-enabled-medical-devices"
    ],
@@ -976,7 +979,7 @@
    ],
    "consult_note": "",
    "methodology_note": "",
-   "material_type": "1. Pagina principal\n2. Información Dispositivos Médicos\n2.1. Link acceso a listado de DM aprobados por año\n2.2 Buscador base de datos aprobación previa a la comercialización Dispositivos médicos\n2.3 Bases de datos de dispositivos médicos\n3. Informacion de Medicamentos\n3.1 Listado de medicamentos aprobados\n3.2 Aprobaciones de medicamentos y bases de datos.\n4. Informacion de Vacunas, sangre y productos biologicos\n4.1 Listado de productos aprobados de terapia celular y génica\n5. Programa de dispositivos medicos innovadores\n6. Glosario de la FDA sobre salud digital e inteligencia artificial: recurso educativo.\n6.1 Listado Dispositivos médicos que incorporan tecnología de salud digital basada en sensores.\n6.2 Listado de dispositivos medicos con inteligencia artificial",
+   "material_type": "1. Pagina principal\n2. Información Dispositivos Médicos\n2.1. Link acceso a listado de DM aprobados por año\n2.2 Buscador base de datos aprobación previa a la comercialización Dispositivos médicos\n2.3 Bases de datos de dispositivos médicos\n2.4 Autorizaciones previas para dispositivos humanitarios\n2.5 Listado de dispositivos medicos De Novo (Dispositivos noveodsosr de riesgo bajo a moderado)\n2.6 Listado de Dispositivos premarket approval (Dispositivos de mayor riesgo)\n2.7 Dispositivos aprobados de tecnologias aprobadas dirigidas a enfermedades raras\n3. Informacion de Medicamentos\n3.1 Listado de medicamentos aprobados\n3.2 Aprobaciones de medicamentos y bases de datos.\n4. Informacion de Vacunas, sangre y productos biologicos\n4.1 Listado de productos aprobados de terapia celular y génica\n4.2 Aprobaciones de solicitudes de dispositivos biologicos 2026\n5. Programa de dispositivos medicos innovadores\n6. Glosario de la FDA sobre salud digital e inteligencia artificial: recurso educativo.\n6.1 Listado Dispositivos médicos que incorporan tecnología de salud digital basada en sensores.\n6.2 Listado de dispositivos medicos con inteligencia artificial",
    "access_path": "Accesos directos con link\nVerificar la aplicación de los buscadores",
    "consult_info": "3.1 En este link se describe los medicamentos aprobados la búsqueda se da con opcion de elegir mediante pestaña mes y año y posibilidad de descarga del archivo en excel.\n4. En el link 4 se desceibe un listado de productos aprobados para terapia celular y géncia el cual cual de manera individual da enlace de acceso por producto (Indicaciones, Información del producto, Documentos de apoyo)\n6.1. Listado de DM que incorporan tencologia en salud digital basada en sensores permite descarga de archivo en excel\n6.1. Listado de DM con inteligencia artificial permite descarga de archivo en excel",
    "observations": "Alta aplicabilidad proyecto EH",
@@ -993,6 +996,45 @@
    "excel_row": 30,
    "matrix_ref": "MATRIZ FI EH fila 30",
    "codes": [
+    "FP-RG-01",
+    "FP-RG-02",
+    "FP-RG-03"
+   ],
+   "name": "FDA – Food and Drug Administration",
+   "entity_label": "Agencia regulatoria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "FVEH042025",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm?event=reportsSearch.process",
+    "https://www.fda.gov/vaccines-blood-biologics/cellular-gene-therapy-products/approved-cellular-and-gene-therapy-products",
+    "https://www.fda.gov/vaccines-blood-biologics/development-approval-process-cber/biological-approvals-year"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "",
+   "access_path": "",
+   "consult_info": "1. Todas las aprobaciones o evaluaciones de aprobaciones en curso, se puede filtrar por mes y año. Constituye todo lo aprobado tanto moléculas nuevas como por ejemplo, nuevas marcas de moléculas ya conocidas\n2. Aprobaciones de terapias celulares y génicas\n3. Productos biológicos aprobados (se debe hacer filtro por año)",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Inglés",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 31,
+   "matrix_ref": "MATRIZ FI EH fila 31",
+   "codes": [
     "FP-RG-04",
     "FP-RG-05"
    ],
@@ -1008,7 +1050,8 @@
    "tech_types_raw": "MED",
    "consult_urls": [
     "https://www.ema.europa.eu/en/search?f%5B0%5D=ema_medicine_bundle%3Aema_medicine&f%5B1%5D=ema_search_categories%3A83",
-    "https://www.ema.europa.eu/en/medicines/medicines-human-use-under-evaluation"
+    "https://www.ema.europa.eu/en/medicines/medicines-human-use-under-evaluation",
+    "https://www.ema.europa.eu/en/medicines/download-medicine-data"
    ],
    "methodology_urls": [
     "https://www.ema.europa.eu/en/homepage",
@@ -1016,10 +1059,10 @@
    ],
    "consult_note": "",
    "methodology_note": "",
-   "material_type": "1. Página principal\n2. Guia de Programa de dispositivos innovadores (PDF)\n3. Buscador Base de datos, el cual se requiere aplicación de filtros\n4. Buscador Base de datos, requiere descarga de archivo en excel por periodo de tiempo.",
+   "material_type": "1. Página principal\n2. Guia de Programa de dispositivos innovadores (PDF)\n3. Buscador Base de datos, el cual se requiere aplicación de filtros\n4. Buscador Base de datos, requiere descarga de archivo en excel por periodo de tiempo.\n5. estado de solicitudes de aprobación; esto implica tanto nuevas entidades moleculares como medicamentos ya autorizados (nuevas marcas)",
    "access_path": "3. Pide validación de Humano",
    "consult_info": "2. En el link 2 describe la prueba piloto aplicada por la organización comparable a DT Dialogos Tempranos.",
-   "observations": "",
+   "observations": "El link 5 arroja un archivo de Excel con el estado de solicitudes de aprobación; esto implica tanto nuevas entidades moleculares como medicamentos ya autorizados (nuevas marcas)",
    "priority_level": "",
    "publication_structure": "",
    "format": "",
@@ -1030,8 +1073,8 @@
    "restrictions": "Al ingreso pide validación por humano"
   },
   {
-   "excel_row": 31,
-   "matrix_ref": "MATRIZ FI EH fila 31",
+   "excel_row": 32,
+   "matrix_ref": "MATRIZ FI EH fila 32",
    "codes": [
     "FP-RG-14"
    ],
@@ -1069,8 +1112,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 32,
-   "matrix_ref": "MATRIZ FI EH fila 32",
+   "excel_row": 33,
+   "matrix_ref": "MATRIZ FI EH fila 33",
    "codes": [
     "FP-RG-09"
    ],
@@ -1094,7 +1137,7 @@
    ],
    "consult_note": "",
    "methodology_note": "",
-   "material_type": "1. Listado en PDF de licencias otorgadas por periodo de tiempo\n2. Documento metodologico Horizon Scanning Case Study: What is an Actionable Horizon Scanning Signal\n3. Guia de Introducción al acelerador de la innovación",
+   "material_type": "1. Listado en PDF de autorizaciones por año, se genera archivo PDF en donde figuran todos los medicamentos autorizados (no diferencia entre nuevas entidades moleculares y principios activos ya conocidos que registran nuevas marcas)\n2. Documento metodologico Horizon Scanning Case Study: What is an Actionable Horizon Scanning Signal\n3. Guia de Introducción al acelerador de la innovación",
    "access_path": "Accesos directos con link",
    "consult_info": "MHRA sí tiene una metodología y un proceso institucional de Horizon Scanning, pero no encontré un único “Manual metodológico de Horizon Scanning”\nLo que existe actualmente está distribuido entre:\nInnovation Accelerator\nHorizon Scanning\nActionable Horizon Scanning Signals\nHorizon Scanning Case Studies\nRegulatory Science\nInnovation Office",
    "observations": "Alta aplicabilidad proyecto EH\nLa MHRA señala que su Horizon Scanning tiene como objetivo identificar Actionable Horizon Scanning Signals\nNo se evidencia listado de tecnologias innovadoras y de alto riesgo, se evidencian guias alertas y regulación.",
@@ -1108,8 +1151,50 @@
    "restrictions": ""
   },
   {
-   "excel_row": 33,
-   "matrix_ref": "MATRIZ FI EH fila 33",
+   "excel_row": 34,
+   "matrix_ref": "MATRIZ FI EH fila 34",
+   "codes": [
+    "FP-RG-06",
+    "FP-RG-07"
+   ],
+   "name": "Health Canada",
+   "entity_label": "Agencia regulatoria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "Canadá",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://www.canada.ca/en/health-canada/services/drug-health-product-review-approval/submissions-under-review.html",
+    "https://clinical-trials-search.canada.ca/en/home"
+   ],
+   "methodology_urls": [
+    "https://www.canada.ca/en/health-canada/services/drug-health-product-review-approval/submissions-under-review/new-drug-submissions-under-review.html",
+    "https://www.canada.ca/en/health-canada/services/drug-health-product-review-approval/submissions-under-review/supplemental-submissions-under-review.html",
+    "https://www.canada.ca/en/health-canada/services/drug-health-product-review-approval/submissions-under-review/new-drug-submissions-completed.html",
+    "https://www.canada.ca/en/health-canada/services/drug-health-product-review-approval/submissions-under-review/supplemental-submissions-completed.html"
+   ],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "Listado de moléculas en proceso de revisión, y listados de aprobadas",
+   "access_path": "En el link mencionado hay varios hipervínculos:\n1. New drug submissions under review\n2. Suplemental submissions under review\n3. New drug submissions complete\n4. Suplemental submissions complete",
+   "consult_info": "a. Listado de medicamentos aprobados y/o en proceso de evaluación en Canada\nb. Listado de ensayos clínicos que se están llevando a cabo en Canada",
+   "observations": "No implica solo nuevas entidades moleculares, sino todo lo aprobado por la agencia",
+   "priority_level": "",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Inglés",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 35,
+   "matrix_ref": "MATRIZ FI EH fila 35",
    "codes": [
     "FP-RG-06",
     "FP-RG-07"
@@ -1145,8 +1230,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 34,
-   "matrix_ref": "MATRIZ FI EH fila 34",
+   "excel_row": 36,
+   "matrix_ref": "MATRIZ FI EH fila 36",
    "codes": [
     "FP-RG-08"
    ],
@@ -1173,7 +1258,7 @@
    "methodology_note": "",
    "material_type": "1. Listado de tecnologias recientemente incluidas en Australia (PDF)\n2. Lista de dispositivos medicos habilitados para inteligencia artificial\n3. Contiene el plan de trabajo de TGA en donde incluye el ingreso a tecnologias emergentes",
    "access_path": "tga-gov-au→Resources and guidance →Search → Filter for product type (DM-MED-OTROS)",
-   "consult_info": "Listado de tecnologia aprobada en Australia.",
+   "consult_info": "Listado de tecnologia aprobada en Australia. En la página se muestra la información de medicamentos, dispositivos médicos, biológicos y otros productos terapéuticos sin diferenciar nuevos de moléculas ya conocidas, al intentar aplicar filtro por tipo de producto, presenta falla",
    "observations": "Alta aplicabilidad proyecto EH",
    "priority_level": "alta",
    "publication_structure": "",
@@ -1185,8 +1270,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 35,
-   "matrix_ref": "MATRIZ FI EH fila 35",
+   "excel_row": 37,
+   "matrix_ref": "MATRIZ FI EH fila 37",
    "codes": [
     "FP-RG-10"
    ],
@@ -1228,8 +1313,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 36,
-   "matrix_ref": "MATRIZ FI EH fila 36",
+   "excel_row": 38,
+   "matrix_ref": "MATRIZ FI EH fila 38",
    "codes": [
     "FP-RG-11"
    ],
@@ -1255,7 +1340,7 @@
    "methodology_note": "",
    "material_type": "1. Página principal\n2. Información medicamentos\n3. Información dispositivos médicos\n4. Información de productos aprobados",
    "access_path": "nmpa.gov→Drugs or Medical Devices",
-   "consult_info": "Información general de medicamentos y dispositivos médicos.Información general de dispositivos medicos.\nEl link 4 envia CISEMA el cual es el rastreador de aprobaciones de NMPA",
+   "consult_info": "Información general de medicamentos y dispositivos médicos.Información general de dispositivos medicos. Como tal no hay listado, por ejemplo en el campo \"Drugs\" figuran noticias varias relacionadas con medicamentos, entre las cuales hay anuncios en algunos casos de aprobación de nuevos medicamentos\nEl link 4 envia CISEMA el cual es el rastreador de aprobaciones de NMPA",
    "observations": "Media aplicabilidad proyecto EH, no se evidencia listados o guias metodologicas.",
    "priority_level": "media",
    "publication_structure": "",
@@ -1267,8 +1352,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 37,
-   "matrix_ref": "MATRIZ FI EH fila 37",
+   "excel_row": 39,
+   "matrix_ref": "MATRIZ FI EH fila 39",
    "codes": [
     "FP-RG-12"
    ],
@@ -1283,18 +1368,21 @@
     "DM"
    ],
    "tech_types_raw": "MED-DM",
-   "consult_urls": [],
+   "consult_urls": [
+    "https://www.mfds.go.kr/eng/brd/m_19/list.do",
+    "https://www.mfds.go.kr/eng/brd/m_41/list.do"
+   ],
    "methodology_urls": [
     "https://www.mfds.go.kr/eng/index.do",
     "https://www.mfds.go.kr/eng/wpge/m_39/de011026l001.do"
    ],
    "consult_note": "",
    "methodology_note": "",
-   "material_type": "1. Página principal\n2. Informacion de aprobación de DM",
+   "material_type": "1. Página principal\n2. Informacion de aprobación de DM\n3 corresponde a medicamentos\n4. Se genera un informe anual en PDF en donde muestran las estadísticas de aprobación y adicionalmente un listado de las tecnologías aprobadas durante el año en evaluación",
    "access_path": "",
    "consult_info": "Dispositivos médicos, medicamentos, alimentos,",
-   "observations": "Baja aplicabilidad proyecto EH Criterios de aprobacion de tecnologia",
-   "priority_level": "baja",
+   "observations": "El listado 3 corresponde a medicamentos y el listado 4. Se genera un informe anual en PDF en donde muestran las estadísticas de aprobación y adicionalmente un listado de las tecnologías aprobadas durante el año en evaluación",
+   "priority_level": "",
    "publication_structure": "",
    "format": "",
    "frequency": "",
@@ -1304,8 +1392,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 38,
-   "matrix_ref": "MATRIZ FI EH fila 38",
+   "excel_row": 40,
+   "matrix_ref": "MATRIZ FI EH fila 40",
    "codes": [
     "FP-RG-13"
    ],
@@ -1321,7 +1409,9 @@
    ],
    "tech_types_raw": "MED-DM",
    "consult_urls": [
-    "https://www.swissmedic.ch/swissmedic/en/home/medical-devices/klinische-versuche/klinische-pruefungen.html"
+    "https://www.swissmedic.ch/swissmedic/en/home/medical-devices/klinische-versuche/klinische-pruefungen.html",
+    "https://www.swissmedic.ch/swissmedic/en/home/humanarzneimittel/authorisations/new-medicines.html",
+    "https://www.swissmedic.ch/swissmedic/en/home/humanarzneimittel/authorisations/new-medicines/zl-ham-nas-ie-2024.html"
    ],
    "methodology_urls": [
     "https://www.swissmedic.ch/swissmedic/en/home.html",
@@ -1329,10 +1419,10 @@
    ],
    "consult_note": "",
    "methodology_note": "",
-   "material_type": "1. Página principal\n2. Información de dispositivos médicos\n3. Invesigaciones Clinicas con dispositivos médicos\n4.",
+   "material_type": "1. Página principal\n2. Información de dispositivos médicos\n3. Invesigaciones Clinicas con dispositivos médicos\n4. listado de medicamentos de uso humano con nuevas sustancias activas\n5. listado consolidado anual con nuevas sustancias e indicaciones adicionales. De DM no se encontró listado similar",
    "access_path": "swissmedic.chl →about us →what is horizon scanning",
    "consult_info": "2. Informacion de Escaneo Horizonte descripcion sintetizada, amplia el concepto de los boletines informativos en los que incluyen nuevos enfoques regulatorios, avances científicos y tecnológicos, así como actividades internacionales y el marco político vigente. El contenido se presenta de forma concisa y se publica en línea y en formato PDF descargable.\n3. Investigaciones clinicas con dispositivos medicos previas a la a comercialización, se descarga un archivo en pdf.",
-   "observations": "Alta aplicabilidad proyecto EH, en el link 3 se evidencia estudios clinico previos a la comercialización.\nNo se evidencia listado de tecnologias innovadoras",
+   "observations": "Alta aplicabilidad proyecto EH, en el link 3 se evidencia estudios clinico previos a la comercialización.\nSe evidencia listado de medicamentos de uso humano con nuevas sustancias activas y también un listado consolidado anual con nuevas sustancias e indicaciones adicionales. De DM no se encontró listado similar",
    "priority_level": "alta",
    "publication_structure": "",
    "format": "",
@@ -1343,8 +1433,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 39,
-   "matrix_ref": "MATRIZ FI EH fila 39",
+   "excel_row": 41,
+   "matrix_ref": "MATRIZ FI EH fila 41",
    "codes": [
     "FP-RG-15"
    ],
@@ -1381,8 +1471,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 40,
-   "matrix_ref": "MATRIZ FI EH fila 40",
+   "excel_row": 42,
+   "matrix_ref": "MATRIZ FI EH fila 42",
    "codes": [
     "FP-RG-16"
    ],
@@ -1396,16 +1486,19 @@
     "MED"
    ],
    "tech_types_raw": "MED",
-   "consult_urls": [],
+   "consult_urls": [
+    "https://medicinali.aifa.gov.it/en/#/en/",
+    "https://medicinali.aifa.gov.it/en/#/en/risultati?orfano=true"
+   ],
    "methodology_urls": [
     "https://www.aifa.gov.it/en/web/guest/horizon-scanning",
     "https://www.aifa.gov.it/en/orizzonte-farmaci"
    ],
    "consult_note": "",
    "methodology_note": "",
-   "material_type": "1. Información Escaneo Horizonte\n2. Informes de 2019 a 2025 El informe 2025 identifica medicamentos nuevos y nuevas indicaciones que recibieron opinión positiva de EMA",
+   "material_type": "1. Información Escaneo Horizonte\n2. Informes de 2019 a 2025 El informe 2025 identifica medicamentos nuevos y nuevas indicaciones que recibieron opinión positiva de EMA\n3. búscador y figuran las 10 últimas autorizaciones, solo de medicamentos huérfanos\n4. Listado de otras tipologias de medicamentos",
    "access_path": "",
-   "consult_info": "Se descarga archivos en pdf *Rutas de HTA y exploración de horizontes\n*Prospectiva Análisis del entorno Panorama de los medicamentos en desarrollo Informe de 2025",
+   "consult_info": "Se descarga archivos en pdf *Rutas de HTA y exploración de horizontes\n*Prospectiva Análisis del entorno Panorama de los medicamentos en desarrollo Informe de 2025\nEn el link 1 se despliega un búscador y figuran las 10 últimas autorizaciones, solo de medicamentos huérfanos se genera un listado adicional que figura en el link 2, para lasbúscador y figuran las 10 últimas autorizaciones, solo de medicamentos huérfanosno se evidencia listados o link adicionales",
    "observations": "Alta aplicabilidad proyecto EH",
    "priority_level": "alta",
    "publication_structure": "",
@@ -1417,8 +1510,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 41,
-   "matrix_ref": "MATRIZ FI EH fila 41",
+   "excel_row": 43,
+   "matrix_ref": "MATRIZ FI EH fila 43",
    "codes": [
     "FP-HT-13"
    ],
@@ -1454,8 +1547,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 42,
-   "matrix_ref": "MATRIZ FI EH fila 42",
+   "excel_row": 44,
+   "matrix_ref": "MATRIZ FI EH fila 44",
    "codes": [
     "FP-HT-04"
    ],
@@ -1489,8 +1582,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 43,
-   "matrix_ref": "MATRIZ FI EH fila 43",
+   "excel_row": 45,
+   "matrix_ref": "MATRIZ FI EH fila 45",
    "codes": [
     "FP-HT-12"
    ],
@@ -1524,8 +1617,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 44,
-   "matrix_ref": "MATRIZ FI EH fila 44",
+   "excel_row": 46,
+   "matrix_ref": "MATRIZ FI EH fila 46",
    "codes": [
     "FP-HT-03"
    ],
@@ -1540,8 +1633,7 @@
    ],
    "tech_types_raw": "MT",
    "consult_urls": [
-    "https://www.cda-amc.ca/find-reports",
-    "https://www.cda-amc.ca/horizon-scan"
+    "https://www.cda-amc.ca/find-reports"
    ],
    "methodology_urls": [
     "https://www.cda-amc.ca/horizon-scanning"
@@ -1562,8 +1654,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 45,
-   "matrix_ref": "MATRIZ FI EH fila 45",
+   "excel_row": 47,
+   "matrix_ref": "MATRIZ FI EH fila 47",
    "codes": [
     "FP-HT-15",
     "FP-HT-07"
@@ -1599,8 +1691,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 46,
-   "matrix_ref": "MATRIZ FI EH fila 46",
+   "excel_row": 48,
+   "matrix_ref": "MATRIZ FI EH fila 48",
    "codes": [
     "FP-HT-05"
    ],
@@ -1636,8 +1728,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 47,
-   "matrix_ref": "MATRIZ FI EH fila 47",
+   "excel_row": 49,
+   "matrix_ref": "MATRIZ FI EH fila 49",
    "codes": [
     "FP-HT-06"
    ],
@@ -1672,8 +1764,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 48,
-   "matrix_ref": "MATRIZ FI EH fila 48",
+   "excel_row": 50,
+   "matrix_ref": "MATRIZ FI EH fila 50",
    "codes": [
     "FP-HT-10"
    ],
@@ -1698,8 +1790,8 @@
    "material_type": "1. Página principal\n2. Buscador de informes evaluación de farmacos",
    "access_path": "En el link 2 iqwig→ área→ evaluación de farmacos",
    "consult_info": "Informes de seguimiento y evaluación de tecnologia",
-   "observations": "REVISAR PERTINENCIA",
-   "priority_level": "revisar",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
    "publication_structure": "",
    "format": "",
    "frequency": "",
@@ -1709,8 +1801,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 49,
-   "matrix_ref": "MATRIZ FI EH fila 49",
+   "excel_row": 51,
+   "matrix_ref": "MATRIZ FI EH fila 51",
    "codes": [
     "FP-HT-11"
    ],
@@ -1734,8 +1826,8 @@
    "material_type": "1. Página principal\n2. Informe de escaneo horizonte productos farmaceuticos",
    "access_path": "",
    "consult_info": "HTA, innovaciones, procedimientos y tecnologías",
-   "observations": "REVISAR PERTINENCIA",
-   "priority_level": "revisar",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
    "publication_structure": "",
    "format": "",
    "frequency": "",
@@ -1745,8 +1837,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 50,
-   "matrix_ref": "MATRIZ FI EH fila 50",
+   "excel_row": 52,
+   "matrix_ref": "MATRIZ FI EH fila 52",
    "codes": [
     "FP-HT-09"
    ],
@@ -1780,8 +1872,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 51,
-   "matrix_ref": "MATRIZ FI EH fila 51",
+   "excel_row": 53,
+   "matrix_ref": "MATRIZ FI EH fila 53",
    "codes": [
     "FP-HT-08"
    ],
@@ -1798,8 +1890,7 @@
    "consult_urls": [],
    "methodology_urls": [
     "https://www.nice.org.uk/process/pmg36",
-    "https://www.nice.org.uk/corporate/ecd77",
-    "https://www.nice.org.uk/corporate/ecd7"
+    "https://www.nice.org.uk/corporate/ecd77"
    ],
    "consult_note": "",
    "methodology_note": "",
@@ -1817,8 +1908,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 52,
-   "matrix_ref": "MATRIZ FI EH fila 52",
+   "excel_row": 54,
+   "matrix_ref": "MATRIZ FI EH fila 54",
    "codes": [
     "FP-HT-02",
     "FP-CT-04"
@@ -1862,8 +1953,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 53,
-   "matrix_ref": "MATRIZ FI EH fila 53",
+   "excel_row": 55,
+   "matrix_ref": "MATRIZ FI EH fila 55",
    "codes": [
     "FP-HT-01"
    ],
@@ -1878,8 +1969,7 @@
    ],
    "tech_types_raw": "MT",
    "consult_urls": [
-    "https://horizonscandb.pcori.org/",
-    "https://www.pcori.org/"
+    "https://horizonscandb.pcori.org/"
    ],
    "methodology_urls": [
     "https://www.pcori.org/",
@@ -1902,8 +1992,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 54,
-   "matrix_ref": "MATRIZ FI EH fila 54",
+   "excel_row": 56,
+   "matrix_ref": "MATRIZ FI EH fila 56",
    "codes": [
     "FP-LI-02"
    ],
@@ -1937,15 +2027,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 55,
-   "matrix_ref": "MATRIZ FI EH fila 55",
+   "excel_row": 57,
+   "matrix_ref": "MATRIZ FI EH fila 57",
    "codes": [
     "FP-LI-01"
    ],
    "name": "PubMed / NLM- NIH",
    "entity_label": "BUSCADOR LITERATURA CIENTIFICA",
-   "source_level": "por_definir",
-   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Internacional",
    "tech_types": [
@@ -1974,15 +2064,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 56,
-   "matrix_ref": "MATRIZ FI EH fila 56",
+   "excel_row": 58,
+   "matrix_ref": "MATRIZ FI EH fila 58",
    "codes": [
     "FP-CT-01"
    ],
    "name": "Clinical Trials.gov / NIH National Library of Medicine",
    "entity_label": "BUSCADOR ENSAYOS CLINICOS",
-   "source_level": "por_definir",
-   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Estados Unidos",
    "tech_types": [
@@ -2009,15 +2099,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 57,
-   "matrix_ref": "MATRIZ FI EH fila 57",
+   "excel_row": 59,
+   "matrix_ref": "MATRIZ FI EH fila 59",
    "codes": [
     "FP-CT-02"
    ],
    "name": "WHO- Plataforma internacional de Registro de Ensayos Clinicos ICTRP",
    "entity_label": "BUSCADOR ENSAYOS CLINICOS",
-   "source_level": "por_definir",
-   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Internacional",
    "tech_types": [
@@ -2044,15 +2134,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 58,
-   "matrix_ref": "MATRIZ FI EH fila 58",
+   "excel_row": 60,
+   "matrix_ref": "MATRIZ FI EH fila 60",
    "codes": [
     "FP-CT-05"
    ],
    "name": "ISRCTN The UK\"s Clinical Study Register",
    "entity_label": "BUSCADOR ENSAYOS CLINICOS",
-   "source_level": "por_definir",
-   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Reino Unido",
    "tech_types": [
@@ -2079,15 +2169,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 59,
-   "matrix_ref": "MATRIZ FI EH fila 59",
+   "excel_row": 61,
+   "matrix_ref": "MATRIZ FI EH fila 61",
    "codes": [
     "FP-CT-06"
    ],
    "name": "ANZCTR Australian New Zealan Clinical Trials Registry",
    "entity_label": "BUSCADOR ENSAYOS CLINICOS",
-   "source_level": "por_definir",
-   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Autralia- Nueva Zelanda",
    "tech_types": [
@@ -2114,15 +2204,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 60,
-   "matrix_ref": "MATRIZ FI EH fila 60",
+   "excel_row": 62,
+   "matrix_ref": "MATRIZ FI EH fila 62",
    "codes": [
     "FP-CT-07"
    ],
    "name": "ChiCTR- Chines Clinica Trial Registry",
    "entity_label": "BUSCADOR ENSAYOS CLINICOS",
-   "source_level": "por_definir",
-   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "China",
    "tech_types": [
@@ -2149,15 +2239,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 61,
-   "matrix_ref": "MATRIZ FI EH fila 61",
+   "excel_row": 63,
+   "matrix_ref": "MATRIZ FI EH fila 63",
    "codes": [
     "FP-CT-03"
    ],
    "name": "CTIS",
    "entity_label": "BUSCADOR ENSAYOS CLINICOS",
-   "source_level": "por_definir",
-   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Union Europea",
    "tech_types": [
@@ -2184,15 +2274,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 62,
-   "matrix_ref": "MATRIZ FI EH fila 62",
+   "excel_row": 64,
+   "matrix_ref": "MATRIZ FI EH fila 64",
    "codes": [
     "FP-CT-08"
    ],
    "name": "DRKS German Clinical Trials Register",
    "entity_label": "BUSCADOR ENSAYOS CLINICOS",
-   "source_level": "por_definir",
-   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Alemania",
    "tech_types": [
@@ -2220,15 +2310,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 63,
-   "matrix_ref": "MATRIZ FI EH fila 63",
+   "excel_row": 65,
+   "matrix_ref": "MATRIZ FI EH fila 65",
    "codes": [
     "FP-CT-09"
    ],
    "name": "PACTR Pan African Clinical Trials Registry",
    "entity_label": "BUSCADOR ENSAYOS CLINICOS",
-   "source_level": "por_definir",
-   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Africa",
    "tech_types": [
@@ -2255,15 +2345,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 64,
-   "matrix_ref": "MATRIZ FI EH fila 64",
+   "excel_row": 66,
+   "matrix_ref": "MATRIZ FI EH fila 66",
    "codes": [
     "FP-CT-10"
    ],
    "name": "ReBEC Registro Brasileiro de Ensaios Clínicos",
    "entity_label": "BUSCADOR ENSAYOS CLINICOS",
-   "source_level": "por_definir",
-   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Brasil",
    "tech_types": [
@@ -2290,15 +2380,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 65,
-   "matrix_ref": "MATRIZ FI EH fila 65",
+   "excel_row": 67,
+   "matrix_ref": "MATRIZ FI EH fila 67",
    "codes": [
     "FP-CT-11"
    ],
    "name": "CTRI Clinical Trials Registry–India",
    "entity_label": "BUSCADOR ENSAYOS CLINICOS",
-   "source_level": "por_definir",
-   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "India",
    "tech_types": [
@@ -2325,15 +2415,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 66,
-   "matrix_ref": "MATRIZ FI EH fila 66",
+   "excel_row": 68,
+   "matrix_ref": "MATRIZ FI EH fila 68",
    "codes": [
     "FP-CT-12"
    ],
    "name": "JPRN Japan Primary Registries Network",
    "entity_label": "BUSCADOR ENSAYOS CLINICOS",
-   "source_level": "por_definir",
-   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Japón",
    "tech_types": [
@@ -2360,15 +2450,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 67,
-   "matrix_ref": "MATRIZ FI EH fila 67",
+   "excel_row": 69,
+   "matrix_ref": "MATRIZ FI EH fila 69",
    "codes": [
     "FP-CT-13"
    ],
    "name": "IRCT Iranian Registry of Clinical Trials",
    "entity_label": "BUSCADOR ENSAYOS CLINICOS",
-   "source_level": "por_definir",
-   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Irán",
    "tech_types": [
@@ -2395,15 +2485,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 68,
-   "matrix_ref": "MATRIZ FI EH fila 68",
+   "excel_row": 70,
+   "matrix_ref": "MATRIZ FI EH fila 70",
    "codes": [
     "FP-CT-14"
    ],
    "name": "CRiS Clinical Research Information Service",
    "entity_label": "BUSCADOR ENSAYOS CLINICOS",
-   "source_level": "por_definir",
-   "source_level_raw": "REVISAR NIVEL DE FUENTE",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Corea del Sur",
    "tech_types": [
@@ -2430,15 +2520,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 69,
-   "matrix_ref": "MATRIZ FI EH fila 69",
+   "excel_row": 71,
+   "matrix_ref": "MATRIZ FI EH fila 71",
    "codes": [
     "FP-LI-03"
    ],
    "name": "Scopus",
    "entity_label": "BUSCADOR",
-   "source_level": "terciaria",
-   "source_level_raw": "Terciaria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Amterdam -Paises bajos",
    "tech_types": [
@@ -2465,15 +2555,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 70,
-   "matrix_ref": "MATRIZ FI EH fila 70",
+   "excel_row": 72,
+   "matrix_ref": "MATRIZ FI EH fila 72",
    "codes": [
     "FP-CT-15"
    ],
    "name": "Cochrane Library",
    "entity_label": "BUSCADOR ENSAYOS CLINICOS",
-   "source_level": "terciaria",
-   "source_level_raw": "Terciaria",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Reino Unido",
    "tech_types": [
@@ -2502,15 +2592,50 @@
    "restrictions": ""
   },
   {
-   "excel_row": 71,
-   "matrix_ref": "MATRIZ FI EH fila 71",
+   "excel_row": 73,
+   "matrix_ref": "MATRIZ FI EH fila 73",
+   "codes": [
+    "FP-CT-16"
+   ],
+   "name": "Synapse",
+   "entity_label": "BUSCADOR ENSAYOS CLINICOS",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "AGREGADA",
+   "country": "Estados Unidos",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MED",
+   "consult_urls": [
+    "https://synapse.patsnap.com/homepage"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "Herramienta que consolida ensayos clínicos y demás información de distintos laboratorios",
+   "access_path": "Tiene un buscador por medicamento, indicación, laboratorio, etc y un registro histórico (latest) con innovaciones en curso",
+   "consult_info": "Medicamentos en investigación (es de suscripción, la versión gratuita tiene busquedas limitadas)",
+   "observations": "Alta aplicabilidad en proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Inglés",
+   "interface": "",
+   "restrictions": "Requiere creación de usuario. Búsquedas limitadas en acceso gratuito"
+  },
+  {
+   "excel_row": 74,
+   "matrix_ref": "MATRIZ FI EH fila 74",
    "codes": [
     "FP-LI-04"
    ],
    "name": "IEEE Xplore (Institute of Electrical and Electronics Engineers o Instituto de Ingenieros Eléctricos y Electrónicos)",
-   "entity_label": "BUSCADOR",
-   "source_level": "terciaria",
-   "source_level_raw": "Terciaria",
+   "entity_label": "BUSCADOR ESPECIALIZADO",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Estados Unidos",
    "tech_types": [
@@ -2537,15 +2662,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 72,
-   "matrix_ref": "MATRIZ FI EH fila 72",
+   "excel_row": 75,
+   "matrix_ref": "MATRIZ FI EH fila 75",
    "codes": [
     "FP-LI-05"
    ],
    "name": "EMBASE - Elsevier",
-   "entity_label": "BUSCADOR",
-   "source_level": "terciaria",
-   "source_level_raw": "Terciaria",
+   "entity_label": "BUSCADOR ESPECIALIZADO",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
    "origin": "AGREGADA",
    "country": "Paises bajos- Amsterdam",
    "tech_types": [
@@ -2573,13 +2698,13 @@
    "restrictions": ""
   },
   {
-   "excel_row": 73,
-   "matrix_ref": "MATRIZ FI EH fila 73",
+   "excel_row": 76,
+   "matrix_ref": "MATRIZ FI EH fila 76",
    "codes": [
     "FP-LI-06"
    ],
    "name": "PATENTSCOPE- OMPI Organización mundial de la propiedad intelectual",
-   "entity_label": "BUSCADOR",
+   "entity_label": "BUSCADOR ESPECIALIZADO",
    "source_level": "terciaria",
    "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
@@ -2608,13 +2733,13 @@
    "restrictions": ""
   },
   {
-   "excel_row": 74,
-   "matrix_ref": "MATRIZ FI EH fila 74",
+   "excel_row": 77,
+   "matrix_ref": "MATRIZ FI EH fila 77",
    "codes": [
     "FP-LI-07"
    ],
    "name": "Medical Device Netwoork",
-   "entity_label": "BUSCADOR",
+   "entity_label": "BUSCADOR ESPECIALIZADO",
    "source_level": "terciaria",
    "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
@@ -2643,13 +2768,13 @@
    "restrictions": ""
   },
   {
-   "excel_row": 75,
-   "matrix_ref": "MATRIZ FI EH fila 75",
+   "excel_row": 78,
+   "matrix_ref": "MATRIZ FI EH fila 78",
    "codes": [
     "FP-LI-08"
    ],
    "name": "Medline",
-   "entity_label": "BUSCADOR",
+   "entity_label": "BUSCADOR ESPECIALIZADO",
    "source_level": "terciaria",
    "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
@@ -2678,8 +2803,8 @@
    "restrictions": ""
   },
   {
-   "excel_row": 76,
-   "matrix_ref": "MATRIZ FI EH fila 76",
+   "excel_row": 79,
+   "matrix_ref": "MATRIZ FI EH fila 79",
    "codes": [
     "FP-HT-14"
    ],
@@ -2716,15 +2841,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 77,
-   "matrix_ref": "MATRIZ FI EH fila 77",
+   "excel_row": 80,
+   "matrix_ref": "MATRIZ FI EH fila 80",
    "codes": [
     "FP-NW-01"
    ],
    "name": "Medical Data",
    "entity_label": "Revista en linea",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "No especifica",
    "tech_types": [
@@ -2752,15 +2877,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 78,
-   "matrix_ref": "MATRIZ FI EH fila 78",
+   "excel_row": 81,
+   "matrix_ref": "MATRIZ FI EH fila 81",
    "codes": [
     "FP-NW-02"
    ],
    "name": "Science Daily",
    "entity_label": "Revista en linea",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "No especifica",
    "tech_types": [
@@ -2776,8 +2901,8 @@
    "material_type": "1. Publicación de noticias de salud",
    "access_path": "sciencedaily→ health",
    "consult_info": "Informacion de noticias de innovación tecnolologica\nLink rererenciado NIH \"Use of the Internet in Scanning the Horizon for New and Emerging Health Technologies: A Survey of Agencies Involved in Horizon Scanning\"",
-   "observations": "",
-   "priority_level": "",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
    "publication_structure": "",
    "format": "",
    "frequency": "",
@@ -2787,15 +2912,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 79,
-   "matrix_ref": "MATRIZ FI EH fila 79",
+   "excel_row": 82,
+   "matrix_ref": "MATRIZ FI EH fila 82",
    "codes": [
     "FP-NW-03"
    ],
    "name": "Reuters Salud",
    "entity_label": "Revista en linea",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "No especifica",
    "tech_types": [
@@ -2811,8 +2936,8 @@
    "material_type": "1. Publicación de noticias de salud",
    "access_path": "reuters→ business→ health care & Pharmaceuticals",
    "consult_info": "Informacion de noticias de innovación tecnolologica\nLink rererenciado NIH \"Use of the Internet in Scanning the Horizon for New and Emerging Health Technologies: A Survey of Agencies Involved in Horizon Scanning\"",
-   "observations": "",
-   "priority_level": "",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
    "publication_structure": "",
    "format": "",
    "frequency": "",
@@ -2822,15 +2947,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 80,
-   "matrix_ref": "MATRIZ FI EH fila 80",
+   "excel_row": 83,
+   "matrix_ref": "MATRIZ FI EH fila 83",
    "codes": [
     "FP-NW-04"
    ],
    "name": "IVANHOE",
    "entity_label": "Revista en linea",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "No especifica",
    "tech_types": [
@@ -2857,15 +2982,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 81,
-   "matrix_ref": "MATRIZ FI EH fila 81",
+   "excel_row": 84,
+   "matrix_ref": "MATRIZ FI EH fila 84",
    "codes": [
     "FP-NW-05"
    ],
    "name": "Medscape",
    "entity_label": "Revista en linea",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "No especifica",
    "tech_types": [
@@ -2892,15 +3017,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 82,
-   "matrix_ref": "MATRIZ FI EH fila 82",
+   "excel_row": 85,
+   "matrix_ref": "MATRIZ FI EH fila 85",
    "codes": [
     "FP-NW-06"
    ],
    "name": "Med device online",
    "entity_label": "Revista en linea",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "No especifica",
    "tech_types": [
@@ -2927,15 +3052,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 83,
-   "matrix_ref": "MATRIZ FI EH fila 83",
+   "excel_row": 86,
+   "matrix_ref": "MATRIZ FI EH fila 86",
    "codes": [
     "FP-NW-07"
    ],
    "name": "Doc guide (Guía del médico)",
    "entity_label": "Portales en salud",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "No especifica",
    "tech_types": [
@@ -2962,15 +3087,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 84,
-   "matrix_ref": "MATRIZ FI EH fila 84",
+   "excel_row": 87,
+   "matrix_ref": "MATRIZ FI EH fila 87",
    "codes": [
     "FP-NW-08"
    ],
    "name": "CNN",
    "entity_label": "Revista en linea",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "No especifica",
    "tech_types": [
@@ -2997,15 +3122,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 85,
-   "matrix_ref": "MATRIZ FI EH fila 85",
+   "excel_row": 88,
+   "matrix_ref": "MATRIZ FI EH fila 88",
    "codes": [
     "FP-NW-09"
    ],
    "name": "The New York Times",
    "entity_label": "Revista en linea",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "No especifica",
    "tech_types": [
@@ -3032,15 +3157,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 86,
-   "matrix_ref": "MATRIZ FI EH fila 86",
+   "excel_row": 89,
+   "matrix_ref": "MATRIZ FI EH fila 89",
    "codes": [
     "FP-NW-10"
    ],
    "name": "Revista de la Asociación Médica Estadounidense (JAMA)",
    "entity_label": "Revista en linea",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "Estados Unidos",
    "tech_types": [
@@ -3067,15 +3192,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 87,
-   "matrix_ref": "MATRIZ FI EH fila 87",
+   "excel_row": 90,
+   "matrix_ref": "MATRIZ FI EH fila 90",
    "codes": [
     "FP-NW-11"
    ],
    "name": "Diario Médico",
    "entity_label": "Revista en linea",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "España",
    "tech_types": [
@@ -3102,15 +3227,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 88,
-   "matrix_ref": "MATRIZ FI EH fila 88",
+   "excel_row": 91,
+   "matrix_ref": "MATRIZ FI EH fila 91",
    "codes": [
     "FP-NW-12"
    ],
    "name": "Noticias Médicas",
    "entity_label": "Revista en linea",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "España",
    "tech_types": [
@@ -3137,15 +3262,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 89,
-   "matrix_ref": "MATRIZ FI EH fila 89",
+   "excel_row": 92,
+   "matrix_ref": "MATRIZ FI EH fila 92",
    "codes": [
     "FP-NW-13"
    ],
    "name": "LANCET",
    "entity_label": "Revistas cientificas",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "No especifica",
    "tech_types": [
@@ -3172,15 +3297,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 90,
-   "matrix_ref": "MATRIZ FI EH fila 90",
+   "excel_row": 93,
+   "matrix_ref": "MATRIZ FI EH fila 93",
    "codes": [
     "FP-NW-14"
    ],
    "name": "New England Journal of Medicine – NEJM",
    "entity_label": "Revistas cientificas",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "Estados Unidos",
    "tech_types": [
@@ -3207,15 +3332,15 @@
    "restrictions": ""
   },
   {
-   "excel_row": 91,
-   "matrix_ref": "MATRIZ FI EH fila 91",
+   "excel_row": 94,
+   "matrix_ref": "MATRIZ FI EH fila 94",
    "codes": [
     "FP-NW-15"
    ],
    "name": "BMJ",
    "entity_label": "Revistas cientificas",
-   "source_level": "secundaria",
-   "source_level_raw": "Secundaria",
+   "source_level": "terciaria",
+   "source_level_raw": "Terciaria",
    "origin": "AGREGADA",
    "country": "Reino Unido",
    "tech_types": [
@@ -3242,6 +3367,41 @@
    "frequency": "",
    "frequency_raw": "No especifica",
    "language": "Ingles",
+   "interface": "",
+   "restrictions": ""
+  },
+  {
+   "excel_row": 95,
+   "matrix_ref": "MATRIZ FI EH fila 95",
+   "codes": [
+    "FP-LI-09"
+   ],
+   "name": "WHO ATC/DDD INDEX",
+   "entity_label": "Base de datos",
+   "source_level": "secundaria",
+   "source_level_raw": "Secundaria",
+   "origin": "FVEH042025",
+   "country": "Global",
+   "tech_types": [
+    "MED"
+   ],
+   "tech_types_raw": "MD",
+   "consult_urls": [
+    "https://atcddd.fhi.no/atc_ddd_index/updates_included_in_the_atc_ddd_index/"
+   ],
+   "methodology_urls": [],
+   "consult_note": "",
+   "methodology_note": "",
+   "material_type": "Relación de nuevos códigos ATC asignados a moléculas (en muchos casos corresponden a nuevas entidades moleculares)",
+   "access_path": "En el link mencionado hay dos hipervínculos de interés:\n1. List of new ATC codes, DDS and alterations to be included in the ATC/DDD index en formato excel, donde la pestaña de interes son los nuevos ATC nivel 5\n2. Updates included in the ATC/DDD Index del año anterior, también es un archivo de excel donde la pestaña de interés son los nuevos ATC nivel 5",
+   "consult_info": "Nuevos ATC asignados a moleculas",
+   "observations": "Alta aplicabilidad proyecto EH",
+   "priority_level": "alta",
+   "publication_structure": "",
+   "format": "",
+   "frequency": "",
+   "frequency_raw": "",
+   "language": "Inglés",
    "interface": "",
    "restrictions": ""
   }
@@ -3345,7 +3505,14 @@
   {
    "category": "Medicamentos",
    "tech_type": "MED",
-   "terms": []
+   "terms": [
+    "new drug approval",
+    "investigational drug",
+    "drug pipeline",
+    "new molecular entity",
+    "orphan drug",
+    "biosimilar"
+   ]
   }
  ]
 }

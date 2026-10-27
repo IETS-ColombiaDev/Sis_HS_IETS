@@ -150,6 +150,9 @@ class CanonicalRecord:
     ema_approval_date: date | None = None
     regulatory_status: str = ""
     published_date: str = ""
+    # Datos de producto (RF-003): dosage_form, strength, route, brand, model,
+    # manufacturer. Ver product_details.
+    details: dict = field(default_factory=dict)
 
     raw: dict = field(default_factory=dict)
 

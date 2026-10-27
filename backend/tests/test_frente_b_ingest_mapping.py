@@ -251,4 +251,4 @@ def test_reprocess_endpoint_is_superadmin_only_and_simulates_by_default(api):
     res = api.post("/api/ingest/reprocess?target=all")
     assert res.status_code == 200
     body = res.json()
-    assert {r["target"] for r in body} == {"fda", "pipeline"} and all(r["applied"] is False for r in body)
+    assert {r["target"] for r in body} == {"fda", "pipeline", "producto"} and all(r["applied"] is False for r in body)

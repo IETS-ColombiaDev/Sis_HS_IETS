@@ -11,7 +11,7 @@ from ..database import get_db
 from ..deps import get_current_user, require_permission
 from ..events import bump_state_version
 from ..models import Finding, Recommendation, User
-from ..rbac import P_REPORT_WRITE, P_RESTRICTED_ANALYTICS, has_permission, role_label
+from ..rbac import P_REPORT_WRITE, P_RESTRICTED_ANALYTICS, effective_role, has_permission, role_label
 from ..schemas import (
     GenerateRecommendationIn,
     RecommendationCreate,
@@ -173,7 +173,7 @@ def dissemination_package(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
-                f"El perfil '{role_label(user.role)}' no puede descargar el paquete de diseminación "
+                f"El perfil '{role_label(effective_role(user))}' no puede descargar el paquete de diseminación "
                 "(requiere report:write o analytics:restricted)."
             ),
         )

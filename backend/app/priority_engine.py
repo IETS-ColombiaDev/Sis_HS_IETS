@@ -236,7 +236,7 @@ def rate_criterion(
 
     if not rbac.can_rate(user, code):
         raise PermissionError(
-            f"El perfil '{rbac.role_label(user.role)}' no califica el criterio {code}."
+            f"El perfil '{rbac.role_label(rbac.effective_role(user))}' no califica el criterio {code}."
         )
 
     catalog = {c.code: c for c in active_criteria(db)}

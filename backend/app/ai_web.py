@@ -16,7 +16,7 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 
-from . import ai_service, prompt_store
+from . import ai_service, product_details, prompt_store
 
 MAX_AI_ITEMS = 18
 MAX_IMAGES = 3
@@ -204,6 +204,10 @@ def _normalize_item(item: dict, source_url: str, source_title: str, source_text:
         "therapeutic_area": s._clean(str(item.get("therapeutic_area") or s._guess_area(blob)))[:190],
         "published_date": s._clean(str(item.get("published_date") or ""))[:80],
     }
+    # RF-003: datos de producto que el modelo leyo en el texto (forma, marca, modelo...).
+    details = product_details.clean({key: item.get(key) for key in product_details.FIELDS})
+    if details:
+        out["details"] = details
     return _drop_invented_nct(out, source_text)
 
 

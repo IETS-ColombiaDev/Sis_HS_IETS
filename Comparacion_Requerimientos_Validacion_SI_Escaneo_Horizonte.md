@@ -30,7 +30,7 @@ Las mediciones de Render se tomaron con el servicio ya despierto. El arranque en
 | Concepto IETS | Viable. Observación: sitios con CAPTCHA o arquitectura cambiante deben permitir **carga manual**. |
 | Estado en el prototipo (matriz) | Adaptadores `clinicaltrials`, `fda`, `ema`, `pubmed` y `who_ictrp`; WHO ICTRP por lote |
 
-**Hoy.** Catálogo D-06 + matriz EH: **95 fuentes** en seis bloques. Conectores API (`clinicaltrials`, `fda`, `ema`, `pubmed`, `who_ictrp`, `ctis`, Health Canada, etc.) y HTML de último recurso. Cada fuente tiene flujo (recorrido, OCR, IA, búsqueda web `site:`). Alta y edición manual en `/fuentes` y señales en `/bandeja-entrada`. Cola `ingest_jobs` con `POST /api/scan/run`.
+**Hoy.** Catálogo D-06 + matriz EH: **97 fuentes** en seis bloques. Conectores API (`clinicaltrials`, `fda`, `ema`, `pubmed`, `who_ictrp`, `ctis`, Health Canada, etc.) y HTML de último recurso. Cada fuente tiene flujo (recorrido, OCR, IA, búsqueda web `site:`). Alta y edición manual en `/fuentes` y señales en `/bandeja-entrada`. Cola `ingest_jobs` con `POST /api/scan/run`.
 
 **Verificado 19 oct (ingesta real, una corrida por conector):** ClinicalTrials.gov 100 estudios, openFDA 120, PubMed 20, EMA 40 (reporte oficial JSON; el RSS antiguo daba 404), CTIS 40 (el portal ahora exige POST; antes 403), PCORI 40 fichas activas (API del buscador; el servidor omite el certificado intermedio y se completa por AIA), Health Canada 50 dispositivos clase III–IV y 50 medicamentos nuevos (sin genéricos ni productos de consumo). WHO ICTRP y TGA siguen por lote.
 

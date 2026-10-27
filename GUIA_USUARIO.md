@@ -5,10 +5,24 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.0.0 · octubre 2026 (catálogo + matriz EH de fuentes) |
+| **Versión del sistema** | 7.0.0 · actualizada el 27 de octubre de 2026 (validación del módulo 0) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
+
+### Novedades del 27 de octubre de 2026
+
+Ajustes del consolidado de observaciones SI EAA (módulo 0: identificación y captura de señales):
+
+| Qué cambió | Dónde leerlo |
+|---|---|
+| **Misma tecnología en varias fuentes**: la bandeja la marca «En N fuentes» y la sube en el orden, sin tocar el cribado ni el %P (RF-002) | [10.7](#107-misma-tecnología-en-varias-fuentes-corroboración) |
+| **Datos de producto**: forma farmacéutica, concentración, vía, marca y modelo en cada señal (RF-003) | [10.3](#103-clasificar-una-señal-paso-a-paso) y [10.8](#108-de-dónde-salen-los-datos-de-producto) |
+| **Matriz EH vigente**: 93 filas, 128 URL de consulta; las fuentes ya cargadas reciben las URL nuevas sin perder lo editado (OBS-002) | [8.7](#87-recargar-catálogo--qué-se-conserva) y [30.1](#301-origen) |
+| **Prioridad sugerida** por el rendimiento real de cada fuente (OBS-001) | [4.4](#44-prioridad-de-la-fuente) y [8.9](#89-prioridad-sugerida-por-las-señales) |
+| **Detectar fuentes con IA**: propone sitios que aún no están en el catálogo | [8.8](#88-detectar-fuentes-con-ia-paso-a-paso) |
+| **Ver como otro perfil** (solo superadministrador) | [3.3](#33-ver-como-otro-perfil-solo-superadministrador) |
+| CSV del catálogo legible en Excel (punto y coma, UTF-8) | [8.3](#83-botones-de-la-barra-superior) |
 
 ---
 
@@ -55,7 +69,7 @@ El escaneo de horizonte (EH) busca **tecnologías sanitarias emergentes** antes 
 
 El sistema:
 
-1. **Vigila** de forma automática (y manual) cerca de **95 fuentes** internacionales.
+1. **Vigila** de forma automática (y manual) cerca de **97 fuentes** internacionales.
 2. **Recibe** postulaciones externas con conflicto de interés declarado.
 3. **Clasifica** lo capturado (clúster, tipología, condición).
 4. **Filtra** duplicados y verifica novedad frente al INVIMA.
@@ -115,7 +129,7 @@ En servidores de prueba puede verse «Acceso rápido como administrador». **En 
 | **Estado del ciclo** | «En filtrado», «En priorización», etc. |
 | **En vivo** | El sistema está sincronizando cambios entre pantallas |
 | **Modelo de IA** | Si MiniMax/Gemini está conectado |
-| **Su nombre / perfil** | Cerrar sesión y datos de cuenta |
+| **Su nombre / perfil** | Cerrar sesión, cambiar contraseña, guía rápida y, para el superadministrador, **Ver como (cambiar de perfil)** (ver 3.3) |
 
 **Regla de oro:** antes de priorizar, filtrar o mirar el tablero, confirme que el **ciclo del encabezado** es el correcto. Un error aquí es la causa más frecuente de “no veo mis tecnologías”.
 
@@ -169,6 +183,24 @@ El sistema no oculta todo: a menudo muestra el botón **apagado** con el motivo:
 
 No intente “forzar” con otra URL: la API también bloqueará (403/409) y el intento puede quedar en bitácora.
 
+### 3.3 Ver como otro perfil (solo superadministrador)
+
+Sirve para comprobar qué ve y qué puede hacer cada perfil sin crear cuentas de prueba.
+
+1. Pulse su nombre en la esquina superior derecha.
+2. En **Ver como (cambiar de perfil)** elija Evaluador técnico, Evaluador clínico, Tomador de decisiones o Revisor por pares.
+3. La pantalla se recarga con ese perfil: menús, botones apagados, rutas permitidas y **también los permisos del servidor** son los de ese perfil. Si abre una pantalla que el perfil no puede usar (ej. Configuración), el sistema lo devuelve a la Bandeja de trabajo.
+4. Mientras dure, verá una franja ámbar «**Viendo como: …**» bajo el encabezado y un borde ámbar en su nombre.
+5. Para terminar pulse **Volver a Superadministrador** en la franja, o elija «Volver a mi perfil» en el menú.
+
+Reglas:
+
+- Solo cambia el perfil **efectivo** de su sesión: su cuenta sigue siendo superadministrador y nadie más se ve afectado.
+- Cada activación y cada regreso quedan en la bitácora (`auth:acting_role`, `auth:acting_role_end`).
+- Los cambios que haga mientras actúa como otro perfil quedan a su nombre en la bitácora.
+- La elección se recuerda al recargar la página y se borra al cerrar sesión.
+- Otros perfiles no ven esta opción; el servidor ignora el intento si no es superadministrador.
+
 ---
 
 ## 4. Conceptos que debe dominar
@@ -193,11 +225,13 @@ Contrato de datos (no confundir con “nivel de fuente” primaria/secundaria):
 
 | Nivel | Significado práctico |
 |---|---|
-| **A** | API estable (ej. ClinicalTrials, openFDA) — gobierna pre-llenado |
-| **B** | Feed o descarga oficial |
-| **C** | Página estructurada |
-| **D** | Página que confirma; no pisa datos de A/B |
-| **E** | Curaduría humana |
+| **A** | API estable (ej. ClinicalTrials, openFDA): sus datos pre-llenan la ficha |
+| **B** | Feed o descarga oficial (RSS, CSV, XML) |
+| **C** | Página web estructurada: tablas o listados que se leen automáticamente |
+| **D** | Página que solo confirma: se lee como texto y no pisa datos de A/B |
+| **E** | Curaduría humana: login, pago o captcha; la consulta la hace una persona |
+
+Indica **cómo** se obtiene el dato, no qué tan importante es la fuente. A y B se prueban en lote con **Sondear A/B**; si dos fuentes se contradicen, prevalece el nivel más alto.
 
 ### 4.3 Nivel de fuente (matriz EH)
 
@@ -217,12 +251,18 @@ Aplicabilidad para el escaneo (columna de observaciones de la matriz):
 - **Revisar** — pertinencia dudosa o acceso restringido.
 - **Sin asignar** — la matriz no fijó prioridad.
 
+Se lee del texto «Alta / Media / Baja aplicabilidad» o «Revisar / verificar pertinencia» de Observaciones. Califica la **fuente**, no cada señal: la relevancia de la señal la ordena el screening_score y la decide el %P.
+
+**Prioridad sugerida.** Junto a la prioridad oficial, el catálogo muestra una **sugerida** calculada con lo que la fuente realmente aportó en el último año (señales con cribado alto, tecnologías que llegaron a un ciclo o se priorizaron). Es un apoyo para reclasificar: el sistema nunca cambia la oficial solo; una persona pulsa **Aplicar** (ver 8.9).
+
 ### 4.5 %P vs screening_score
 
 | Escala | Dónde | Qué es |
 |---|---|---|
 | **%P** | Priorización | Oficial: (suma P1–P6 / 6) × 100. Solo con los 6 criterios |
 | **screening_score** | Señales | Heurística 0–100 para **ordenar** la cola. No decide priorización |
+
+Cómo se suma el screening_score: +35 inminente / +25 transicional / +15 emergente; +12 si es medicamento, dispositivo o digital; +18 si menciona fase III, aprobación, FDA, EMA, NICE o regulador (o +10 si fase II o ensayo); +8 con área terapéutica; +10 con resumen de 120 caracteres o más; +7 si la tecnología está identificada aparte del título. Con **70 o más** se resalta en la cola.
 
 ### 4.6 Condición de la tecnología
 
@@ -386,7 +426,7 @@ Solo ciclos en configuración **sin trabajo**. Si ya hay tecnologías asignadas,
 
 Es el inventario maestro: **qué sitios** se vigilan, con qué **adaptador**, cada cuánto, con qué **prioridad** y con qué **flujo** (recorrido, OCR, IA, búsqueda web).
 
-Hay **95 fuentes** en seis bloques, alineadas a la matriz «Fuentes de información proactiva EH».
+Hay **97 fuentes** en seis bloques, alineadas a la matriz «Fuentes de información proactiva EH», con **128 URL de consulta SI EAA** (columna «Cant URL SI EAA»). El indicador «Fuentes del catálogo» muestra **96** porque AHRQ queda inactiva (consulta manual); las retiradas del inventario anterior se cuentan aparte.
 
 ### 8.2 Las tres pestañas
 
@@ -410,8 +450,9 @@ Listado en tarjetas o tabla. Filtros:
 - Prioridad …  
 - Primaria / Secundaria / …  
 - Salud (verde / ámbar / rojo / sin sonda)  
-- Contraste / Retirada / Ingesta apagada  
+- Contraste / Retirada / Ingesta apagada
 - Chips: Recorrido · OCR · IA · Búsqueda web (tachados = apagados)
+- **Sugerida: Alta / Media / Baja (motivo)** — prioridad sugerida por las señales; botón **Aplicar** si difiere de la oficial (ver 8.9)
 
 #### Salud de fuentes
 
@@ -432,9 +473,10 @@ Tecnologías que aparecen en fuentes de **contraste** y no están en el ciclo. C
 
 | Botón | Quién | Qué hace |
 |---|---|---|
-| **CSV** | Quien consulta | Descarga el listado (incluye matriz y flujo) |
+| **CSV** | Quien consulta | Descarga el listado (incluye matriz y flujo). Separado por punto y coma y en UTF-8: abre con doble clic en Excel, en columnas y con tildes |
 | **Sondear A/B** | Vigilancia | Sonda masiva de niveles A y B |
-| **Recargar catálogo** | Escritura | Reaplica D-06: actualiza oficiales, retira obsoletas; **conserva** prioridad/ruta/flujo editados |
+| **Recargar catálogo** | Escritura | Reaplica D-06 y la matriz vigente: actualiza oficiales y URL de la matriz, retira obsoletas; **conserva** lo que el equipo editó (ver 8.7) |
+| **Detectar fuentes con IA** | Escritura | Busca en la web sitios de escaneo de horizonte que aún no están en el catálogo y los propone (ver 8.8) |
 | **Alta rápida** | Escritura | Nombre + URL en minutos |
 | **Agregar fuente** | Escritura | Formulario completo |
 
@@ -491,7 +533,7 @@ Campos numéricos / texto:
 - Páginas a seguir: `0` = usa el valor global de Configuración › Prompts.  
 - Dominio de búsqueda: vacío = dominio de la URL.  
 - Palabras guía: además de las derivadas de la ruta.  
-- Términos propios de búsqueda: vacío = términos por tipo de tecnología.
+- Términos propios de búsqueda: vacío = términos por tipo de tecnología (hoja *Criterios de búsqueda*; MT usa todas las categorías). Orden: propios, por tipo y genéricos; rotan a diario.
 
 **Probar búsqueda web** (con la fuente ya guardada): lanza consultas `site:` y muestra resultados **sin** crear señales. Ideal antes de una vigilancia grande.
 
@@ -508,14 +550,56 @@ Campos numéricos / texto:
 
 ### 8.7 Recargar catálogo — qué se conserva
 
-| Se restituye desde D-06 | Se conserva si usted lo editó |
-|---|---|
-| URL, título oficial, adaptador | Prioridad |
-| Nivel de acceso A–E | Nivel de fuente (si ya tenía valor) |
-| Frecuencia / metadatos de catálogo | Ruta de acceso, qué consultar, URLs de entrada |
-| | Flujo de escaneo (`scan_profile`) |
+La recarga corre sola en cada arranque del servidor y con el botón **Recargar catálogo**.
 
-Si al **importar el Excel** en Configuración marca “Sobrescribir lo editado”, ahí sí se pisan los campos de la matriz.
+| Siempre se restituye desde D-06 | Sigue a la matriz vigente… | …salvo que el equipo lo haya editado |
+|---|---|---|
+| URL, título oficial, adaptador | Prioridad, nivel de fuente, tipos de tecnología | Se conserva lo editado |
+| Nivel de acceso A–E | URLs de entrada y de referencia | Se conserva lo editado |
+| Frecuencia / metadatos de catálogo | Ruta de acceso, qué consultar, tipo de material, observaciones, restricciones | Se conserva lo editado |
+| | Flujo de escaneo (`scan_profile`) | Se conserva lo editado |
+
+**Cómo sabe el sistema qué editó el equipo.** Cada vez que alguien guarda **Editar fuente** (o **Aplicar** una prioridad sugerida), el campo cambiado queda marcado como *editado* y la recarga ya no lo pisa. Lo que nadie tocó sigue a la matriz: si la matriz agrega una URL, la fuente la recibe en el siguiente arranque.
+
+En la primera recarga de una base anterior a esta regla, el sistema consulta la **bitácora**: solo cuenta como editado lo que una persona cambió desde el formulario de la fuente. Las URL que el equipo agregó de sitios que la matriz no menciona se conservan junto a las de la matriz.
+
+Para volver a la matriz un campo editado: importe el Excel en Configuración marcando **«Sobrescribir lo editado»** (ver 25.6); eso pisa los campos y borra la marca.
+
+### 8.8 Detectar fuentes con IA (paso a paso)
+
+Para ampliar el inventario con sitios que todavía no se vigilan (agencias regulatorias y de ETS, registros de ensayos, pipelines de fabricantes, redes como EuroScan o i-HTS, portales de noticias).
+
+1. En `/fuentes` pulse **Detectar fuentes con IA** (requiere permiso de edición de fuentes).
+2. (Opcional) Marque **tipos de tecnología**, escriba un **tema** (ej. «terapias génicas») y un **país o región** (ej. «Latinoamérica»).
+3. (Opcional) Marque **Activar la ingesta al dar de alta**; si no, la fuente queda apagada hasta que la verifique.
+4. Pulse **Detectar**. El sistema:
+   - pide a la IA consultas de búsqueda y las lanza en los motores web configurados;
+   - **descarta por dominio** lo que ya existe en el catálogo o en la base (también subdominios: `news.medtronic.com` cuenta como Medtronic);
+   - clasifica cada candidata (nombre, país, bloque, tipos, nivel de acceso A–E, nivel de fuente y por qué sirve);
+   - visita cada una: las que no responden van a «Descartadas porque no respondieron»; las que piden acceso se marcan «acceso restringido».
+5. Revise la lista y pulse **Dar de alta** en cada propuesta útil, o marque varias y **Dar de alta las seleccionadas**.
+6. La fuente nueva queda con prioridad **revisar**, etiqueta `propuesta_ia` y la nota «Propuesta por IA – pendiente de verificación». Ábrala con **Editar**, confirme los datos y la prioridad, y active la ingesta.
+
+Límites por corrida: 2 llamadas a la IA, hasta 6 consultas web y 12 candidatas; máximo 6 corridas por persona cada 10 minutos. Cada corrida y cada alta quedan en la bitácora.
+
+Sin IA disponible, la detección sigue con los resultados de búsqueda filtrados contra el catálogo y clasificados por reglas; el aviso lo indica («IA no disponible…»). Con la búsqueda web apagada, no hay de dónde proponer y el sistema lo dice.
+
+**Nada se crea sin su clic.** La IA propone; la persona decide.
+
+### 8.9 Prioridad sugerida por las señales
+
+Responde a la pregunta: *¿esta fuente aporta lo que su prioridad dice?* Se calcula con las señales del último año:
+
+| Sugerida | Regla |
+|---|---|
+| **Alta** | ≥ 1 tecnología priorizada (priorizada, en evaluación o publicada), o ≥ 2 tecnologías que llegaron a un ciclo, o ≥ 5 señales con cribado ≥ 70 |
+| **Media** | Alguna tecnología en un ciclo, alguna señal con cribado ≥ 70, o cribado promedio ≥ 40 |
+| **Baja** | Produjo señales, pero ninguna de las anteriores |
+| **Sin datos** | No produjo señales en el periodo: no se sugiere nada |
+
+En la tarjeta, la tabla y la ficha aparece **Sugerida: X (motivo)**. Si difiere de la oficial y usted tiene permiso de edición, pulse **Aplicar**: la prioridad oficial cambia, queda marcada como *editada* (la recarga del catálogo la respeta) y el cambio queda en la bitácora con el motivo.
+
+Use la sugerida para resolver las fuentes en «revisar» o «sin asignar» de la matriz, y llevar luego la decisión al Excel institucional.
 
 ---
 
@@ -596,25 +680,37 @@ Las señales/tecnologías **recién capturadas** esperan aquí **sin ciclo**. Us
 | Sin asignar | Aún no están en ningún ciclo |
 | Total capturadas | Universo de la bandeja |
 | Sin clúster / sin tipología | Bloquean el lote |
+| **En varias fuentes** | Señales sin asignar que otra fuente también reporta (ver 10.7) |
 | Listas para asignar | Ya tienen lo mínimo |
+
+**Qué muestra cada fila**
+
+- Nombre de la señal y, debajo, sus **datos de producto** en etiquetas grises: forma farmacéutica, concentración, vía, marca, modelo, fabricante (los que se conozcan).
+- Fuente, fecha y canal; botón **↗** para abrir la fuente original.
+- **En N fuentes** (azul) si otras fuentes reportan la misma tecnología.
+- Columna **Cribado**: el puntaje y, si aplica, el bono de corroboración (ej. `73 +5`).
+
+**Orden de la lista:** cribado + bono de corroboración, de mayor a menor; a igual puntaje, lo más reciente primero.
 
 ### 10.3 Clasificar una señal (paso a paso)
 
 1. Pulse la fila o **Clasificar**.  
-2. Revise título, fuente, resumen, enlace.  
+2. Revise título, fuente, resumen, enlace (botón **↗ Abrir la fuente original**).  
 3. (Recomendado) **Sugerir clasificación**: la IA/reglas proponen clúster, tipología y condición con motivo.  
    - Si no hay evidencia: “Clasifique manualmente”.  
    - Si hay sugerencia: **revísela**; no es decisión final hasta guardar.  
 4. Complete o corrija:
-   - Nombre comercial  
-   - DCI / INN (mejora desduplicación e INVIMA)  
-   - Fabricante  
+   - Nombre comercial
+   - DCI / INN (mejora desduplicación e INVIMA)
+   - Fabricante
+   - **Datos de producto**: forma farmacéutica, concentración y vía de administración (medicamentos); marca y modelo (dispositivos). Vienen pre-llenados cuando la captura los encontró: confírmelos o corríjalos.
    - Indicación  
    - Clúster (obligatorio para asignar)  
    - Tipología (obligatoria para asignar)  
    - Condición (emergente / nueva)  
-   - Fechas regulatorias si las conoce (FDA, EMA, etc.)  
-5. **Guardar**.
+   - Fechas regulatorias si las conoce (FDA, EMA, etc.)
+5. Si la señal está corroborada, el recuadro **Detectada en N fuentes** lista las otras fuentes, el nombre con que la reportan, si coincidió por NCT o por similitud, y un enlace a cada una.
+6. **Guardar**.
 
 ### 10.4 Asignar por lotes
 
@@ -634,7 +730,30 @@ En filtros puede distinguir capturas **proactivas** (vigilancia) y **reactivas**
 |---|---|---|
 | No deja asignar | Falta clúster o tipología | Clasifique primero |
 | “Ya estaban en el ciclo” | Duplicó la asignación | Normal; no crea duplicado de instancia |
-| No ve la señal | Filtro de búsqueda activo | Limpie filtros |
+| No ve la señal | Filtro de búsqueda activo | Limpie filtros (incluida la casilla «Solo detectadas en varias fuentes») |
+
+### 10.7 Misma tecnología en varias fuentes (corroboración)
+
+Cuando la misma tecnología aparece en fuentes distintas (por ejemplo FDA, EMA y Health Canada), la bandeja lo hace visible:
+
+- **Cómo se reconoce:** mismo identificador de ensayo (NCT), o nombre comercial / DCI equivalentes según el **umbral de similitud** de Configuración (el mismo del filtrado de duplicados; por defecto 85). Se ignoran mayúsculas, dosis y presentaciones.
+- **Qué cuenta:** solo fuentes **distintas**. Dos señales de la misma fuente son un duplicado, no una corroboración. Una postulación del canal reactivo cuenta como una fuente más. También cuenta una tecnología que ya está en un ciclo desde otra fuente.
+- **Qué cambia:** cada fuente adicional suma **5 puntos al orden** de la bandeja (máximo 15). Así lo que se repite se revisa primero.
+- **Qué no cambia:** el cribado, el %P y la clasificación. **Repetirse no es importancia clínica**: la priorización oficial sigue siendo P1–P6.
+- **Filtro:** casilla **Solo detectadas en varias fuentes**.
+- **No fusiona nada.** Si son la misma tecnología y quiere un solo registro, use **Filtrado y depuración › Duplicados** (la fusión siempre la confirma una persona).
+
+El cálculo se actualiza solo al abrir la bandeja cuando hubo capturas o cambios.
+
+### 10.8 De dónde salen los datos de producto
+
+En este orden de confianza; lo de abajo solo completa lo que falte:
+
+1. **Conector oficial** (openFDA): forma, vía, concentración, marca y titular tal como los publica la agencia.
+2. **Lectura con IA** de la página: solo si el texto lo dice.
+3. **Reglas sobre el título**: forma, concentración y vía se leen del título y **no** se asignan cuando el título combina varias tecnologías (ej. «A, B y C»); marca (palabra con ® o ™) y modelo (código con números tras «model/modelo») también se buscan en el resumen.
+
+Los valores se muestran en español («Inyectable», «Subcutánea»…). Nunca se pisa lo que un evaluador ya diligenció. Las señales capturadas antes de esta versión se completaron automáticamente una sola vez al actualizar el sistema.
 
 ---
 
@@ -1044,7 +1163,7 @@ Las consultas del grafo no se mezclan con este historial.
 
 | Acción | Efecto |
 |---|---|
-| Cambiar perfil | Cambia permisos en el próximo token |
+| Cambiar perfil | Cambia el perfil **real** de la persona; aplica en el próximo token. Para solo *probar* lo que ve un perfil, use **Ver como** (3.3) |
 | Restablecer contraseña | Nueva temporal + must_change |
 | Desbloquear | Tras intentos fallidos |
 | Desactivar | No entra; sesiones invalidadas |
@@ -1096,12 +1215,32 @@ Sin llave el sistema sigue, con cupos bajos.
 
 #### Importar Excel
 
-1. Seleccione el archivo «Fuentes de información proactiva EH» (`.xlsx`).  
-2. Decida si **sobrescribe** lo editado en el panel.  
-3. **Importar**.  
-4. Revise el resumen: filas, actualizadas, creadas, criterios.  
+1. Seleccione el archivo «Fuentes de información proactiva EH» (`.xlsx`).
+2. Decida si **sobrescribe** lo editado en el panel:
+   - **Sin marcar** (recomendado): actualiza todo lo que el equipo no editó y respeta lo editado (ver 8.7).
+   - **Marcado**: el Excel manda en todos los campos de la matriz y se borran las marcas de edición.
+3. **Importar**.
+4. Revise el resumen: filas, actualizadas, creadas, criterios.
 
 Sin archivo: **Reaplicar matriz cargada** usa el JSON ya empaquetado.
+
+Cómo se leen las URL del Excel: manda el **texto escrito** en la celda (es el listado que valida el equipo en «Cant URL SI EAA»); el hipervínculo oculto de la celda solo se usa si el texto no trae ninguna URL. Las rutas «#/…» de sitios tipo SPA se conservan.
+
+### 25.7 Reprocesar lo ya capturado
+
+Corrige el mapeo de señales viejas **sin volver a la fuente** (usa el crudo guardado). Es para TI o el superadministrador:
+
+- API: `POST /api/ingest/reprocess?target=…&apply=true` (sin `apply=true` solo simula y muestra los cambios).
+- Consola, en `backend/`: `python -m app.reprocess_service --apply --only …`
+
+| Objetivo | Qué corrige |
+|---|---|
+| `fda` | Fecha de aprobación y estado del trámite desde el crudo de openFDA |
+| `pipeline` | Separa filas de pipelines de fabricantes en producto, DCI, indicación y fase |
+| `producto` | Completa forma farmacéutica, concentración, vía, marca y modelo (solo campos vacíos) |
+| `all` | Los tres |
+
+Todo reproceso aplicado queda en la bitácora.
 
 #### Listas desplegables
 
@@ -1165,12 +1304,14 @@ Estos portales **no** muestran la bandeja interna ni datos de ciclos en configur
 
 ### 27.4 Superadministrador (semana típica)
 
-1. Usuarios nuevos / desbloqueos.  
-2. Configuración: IA, prompts, programadas, matriz EH.  
-3. Salud del catálogo y recargas controladas.  
-4. Cierre de ciclo cuando el embudo lo permita.  
-5. Auditoría ante incidentes.  
-6. Verificar que producción no tenga acceso de desarrollo.
+1. Usuarios nuevos / desbloqueos.
+2. Configuración: IA, prompts, programadas, matriz EH.
+3. Revisar **prioridades sugeridas** y **Detectar fuentes con IA** (mensual).
+4. Tras cambiar permisos o pantallas, comprobar con **Ver como** lo que ve cada perfil.  
+5. Salud del catálogo y recargas controladas.
+6. Cierre de ciclo cuando el embudo lo permita.
+7. Auditoría ante incidentes.
+8. Verificar que producción no tenga acceso de desarrollo.
 
 ### 27.5 Revisor externo
 
@@ -1206,7 +1347,7 @@ Su perfil no es clínico (ni superadmin). Pida a quien corresponda o un cambio d
 
 ### 28.4 “Recargué el catálogo y se movió la URL”
 
-Esperado para campos oficiales. Prioridad y flujo deberían permanecer. Si importó Excel con sobrescritura, revise ese flag.
+Esperado para campos oficiales (URL, título, adaptador, nivel de acceso). Lo que el equipo editó desde **Editar fuente** permanece; lo que nadie editó sigue a la matriz vigente (ver 8.7). Si importó Excel con «Sobrescribir lo editado», el Excel mandó en todo.
 
 ### 28.5 “Error interno del servidor”
 
@@ -1226,6 +1367,27 @@ Incidente de seguridad. Pedir `ENVIRONMENT=production`, `SECRET_KEY` fuerte y `c
 ### 28.8 “La IA inventa NCT”
 
 El prompt pide NCT verificables; aun así **verifique** en ClinicalTrials antes de priorizar. No invente identificadores en la ficha.
+
+### 28.9 “Dice ‘En 3 fuentes’ pero no es la misma tecnología”
+
+La coincidencia por nombre es difusa. Abra **Clasificar** y revise el recuadro «Detectada en N fuentes» (dice si coincidió por NCT o por similitud). Si son distintas, no hace falta hacer nada: el bono solo ordena. Si el error se repite, suba el umbral de similitud en Configuración › Gobierno metodológico (afecta también al filtrado de duplicados).
+
+### 28.10 “No aparece la forma farmacéutica o la marca”
+
+El texto de la fuente no la decía, o el título mezcla varias tecnologías (las reglas no adivinan). Complétela al **Clasificar**. Las señales nuevas leídas con IA la traen cuando el sitio la publica.
+
+### 28.11 “Detectar fuentes con IA no propone nada”
+
+1. ¿Está encendida la **búsqueda web** en Configuración › Parámetros de fuentes?
+2. ¿Hay motores en pausa por bloqueo? Reactívelos ahí mismo.
+3. Pruebe un tema más concreto o sin filtro de país.
+4. Si dice «Demasiadas detecciones seguidas», espere unos minutos (máximo 6 cada 10 minutos).
+
+### 28.12 “Agregué una URL en el Excel y la fuente no la tiene”
+
+1. ¿La URL está **escrita** en la celda? El hipervínculo oculto no cuenta si la celda ya trae otra URL.
+2. ¿Se reimportó el Excel o se reinició el servidor después del cambio?
+3. ¿Alguien editó las URL de esa fuente en el panel? Entonces está marcada como editada: agregue la URL en **Editar** o reimporte con «Sobrescribir lo editado».
 
 ---
 
@@ -1259,6 +1421,11 @@ El prompt pide NCT verificables; aun así **verifique** en ClinicalTrials antes 
 | **Staging** | Bandeja de entrada |
 | **Mini-HTA** | Evaluación corta estructurada |
 | **Embudo** | Conversión entre fases del ciclo |
+| **Corroboración** | La misma tecnología reportada por fuentes distintas; suma al orden de la bandeja, no a su importancia |
+| **Datos de producto** | Forma farmacéutica, concentración, vía, marca y modelo de una señal |
+| **Prioridad sugerida** | Prioridad de una fuente calculada con sus señales del último año; la oficial la decide una persona |
+| **Campo editado** | Campo de la matriz que el equipo cambió en el panel; la recarga del catálogo lo respeta |
+| **Ver como** | Vista del sistema con los permisos de otro perfil, solo para el superadministrador |
 
 Los tips (i) de la interfaz usan el mismo lenguaje; si un término no cuadra, abra el tip en pantalla.
 
@@ -1270,10 +1437,18 @@ Los tips (i) de la interfaz usan el mismo lenguaje; si un término no cuadra, ab
 
 Archivo **«FUENTES DE INFORMACION PROACTIVA EH»**:
 
-- Hoja *MATRIZ FI EH*: ~89 filas → mapeadas a códigos del catálogo.  
-- Hoja *Criterios de búsqueda*: 11 categorías de términos.
+- Hoja *MATRIZ FI EH*: 93 filas → mapeadas a códigos del catálogo, con 128 URL de consulta.  
+- Hoja *Criterios de búsqueda*: 11 categorías de términos. Si una categoría viene sin términos (hoy *Medicamentos*), el sistema usa: new drug approval, investigational drug, drug pipeline, new molecular entity, orphan drug, biosimilar.
 
-El catálogo resultante: **95 fuentes** (incluidas noticias).
+En la columna de URL manda el texto escrito: el hipervínculo de la celda solo se usa si el texto no trae URL. Las rutas «#/…» de sitios tipo SPA (ej. AIFA) se conservan.
+
+El catálogo resultante: **97 fuentes** (incluidas noticias), con **141 URL de entrada**: las 128 URL de consulta SI EAA más las URL generales de las filas que no tienen URL de consulta (el recorrido necesita al menos una por fuente).
+
+Para revisar en la matriz institucional (no lo corrige el sistema):
+
+- FDA (fila 29) repite `pma.cfm` en 2.2 y 2.6: declara 9 URL, únicas 8.
+- Health Canada (fila 34) declara 1 URL pero lista 2.
+- La fila *Medicamentos* de «Criterios de búsqueda» no tiene términos.
 
 ### 30.2 Orden de una corrida completa
 
@@ -1300,6 +1475,7 @@ El catálogo resultante: **95 fuentes** (incluidas noticias).
 - Apague búsqueda web en sitios que la prohíben o son de pago.  
 - Use **Probar búsqueda web** antes del barrido mensual.  
 - No marque “sobrescribir” al importar Excel salvo que coordinación lo pida.
+- Revise cada mes las **prioridades sugeridas** y lleve las decisiones al Excel institucional.
 
 ---
 

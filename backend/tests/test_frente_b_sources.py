@@ -109,7 +109,10 @@ def test_export_csv_opens_in_excel(api):
     res = api.get("/api/sources/export")
     assert res.status_code == 200
     assert res.content.startswith(b"\xef\xbb\xbf")
-    assert "Bogotá" in res.content.decode("utf-8-sig")
+    text = res.content.decode("utf-8-sig")
+    assert "Bogotá" in text
+    # Excel en configuracion regional es-CO separa columnas con ';'.
+    assert text.splitlines()[0].startswith("codigo;titulo;url;")
 
 
 def test_catalog_reload_keeps_sources_added_by_the_team(api):
