@@ -1,5 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
-import api, { setToken, getToken, setUnauthorizedHandler, setLastEmail } from "../api/client";
+import api, {
+  setToken,
+  getToken,
+  setUnauthorizedHandler,
+  setLastEmail,
+  getActingRole,
+  setActingRole,
+} from "../api/client";
 
 const AuthContext = createContext(null);
 
@@ -20,6 +27,7 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback((notice = "") => {
     setToken(null);
+    setActingRole("");
     setAccount(null);
     setJustLoggedIn(false);
     setSessionNotice(typeof notice === "string" ? notice : "");
@@ -46,9 +54,13 @@ export function AuthProvider({ children }) {
     if (token) {
       try {
         const { data } = await api.get("/auth/me");
+        // "Ver como" guardado: solo vale si la cuenta real es superadministrador
+        // y el servidor lo acepto; si no, se descarta.
+        if (getActingRole() && !data?.acting_as) setActingRole("");
         setAccount(data);
       } catch {
         setToken(null);
+        setActingRole("");
         setAccount(null);
       }
     }
@@ -60,6 +72,8 @@ export function AuthProvider({ children }) {
   }, [bootstrap]);
 
   const acceptSession = useCallback((data) => {
+    // Un inicio de sesion (o un cambio de contrasena) arranca con el perfil propio.
+    setActingRole("");
     setToken(data.access_token);
     setAccount(data.user);
     setLastEmail(data.user?.email);
@@ -117,6 +131,19 @@ export function AuthProvider({ children }) {
     [acceptSession]
   );
 
+  /**
+   * "Ver como" del superadministrador: el servidor valida y registra el cambio;
+   * desde entonces cada peticion lleva la cabecera X-Acting-Role. Con
+   * "superadmin" o vacio se vuelve al perfil propio.
+   */
+  const actAs = useCallback(async (role) => {
+    const target = role && role !== "superadmin" ? role : "";
+    const { data } = await api.post("/auth/acting-role", { role: target || null });
+    setActingRole(data?.acting_as ? data.role : "");
+    setAccount(data);
+    return data;
+  }, []);
+
   const user = account && !account.must_change_password ? account : null;
   const permissions = useMemo(() => new Set(user?.permissions || []), [user]);
   const can = useCallback((permission) => permissions.has(permission), [permissions]);
@@ -136,6 +163,10 @@ export function AuthProvider({ children }) {
     justLoggedIn,
     clearJustLoggedIn,
     refreshStatus: loadStatus,
+    actAs,
+    /** Perfil real de la cuenta (distinto de `user.role` mientras se "ve como"). */
+    realRole: user?.real_role || user?.role || "",
+    actingAs: Boolean(user?.acting_as),
     can,
     permissions,
     /** Criterios P1 a P6 que este perfil puede calificar. */

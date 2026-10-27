@@ -11,6 +11,7 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from . import product_details
 from .classification import suggest_cluster, suggest_condition, suggest_tech_type
 from .models import Cycle, CycleTechnology, Finding, Technology
 
@@ -115,6 +116,18 @@ def sync_technology_from_finding(
         )
         tech.suggested_cluster_id = cluster_id
         tech.suggested_cluster_reason = reason[:400]
+
+    # RF-003: forma farmaceutica, concentracion, marca, modelo. Lo que trajo la
+    # captura (conector o IA) manda; las reglas solo completan lo que falte.
+    details = product_details.merge(
+        finding.details,
+        product_details.extract(
+            title=finding.title, summary=finding.summary, technology_type=finding.technology_type
+        ),
+    )
+    if details and details != (finding.details or {}):
+        finding.details = details
+    product_details.apply_to_technology(tech, details)
 
     published = _parse_date(finding.published_date)
     if published and tech.phase3_completion_date is None and "iii" in (finding.phase or "").lower():

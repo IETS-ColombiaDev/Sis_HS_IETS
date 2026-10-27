@@ -189,8 +189,47 @@ def permissions_for(role: str | None) -> set[str]:
     return set(ROLE_PERMISSIONS[canonical_role(role)])
 
 
+# --------------------------------------------------------------------------- #
+#  "Ver como": el superadministrador puede operar con los permisos de otro
+#  perfil para verificar que ve y que puede hacer cada uno. El perfil elegido
+#  viaja en la cabecera `X-Acting-Role` y se guarda en un atributo transitorio
+#  del usuario (`acting_role`), nunca en la base: `user.role` sigue siendo el
+#  perfil real. Solo reduce permisos; jamas los amplia.
+# --------------------------------------------------------------------------- #
+ACTING_ROLE_HEADER = "X-Acting-Role"
+
+
+def real_role(user) -> str:
+    """Perfil real de la cuenta, ignorando cualquier "ver como"."""
+    return canonical_role(getattr(user, "role", None))
+
+
+def resolve_acting_role(user, requested: str | None) -> str | None:
+    """Perfil a simular si la peticion es valida; None si debe ignorarse.
+
+    Solo un superadministrador real puede simular, y solo uno de los cinco
+    perfiles. Pedir "superadmin" equivale a no simular.
+    """
+    value = (requested or "").strip().lower()
+    if not value or value not in ROLE_PERMISSIONS or value == SUPERADMIN:
+        return None
+    if real_role(user) != SUPERADMIN:
+        return None
+    return value
+
+
+def effective_role(user) -> str:
+    """Perfil con el que se evaluan los permisos de esta peticion."""
+    acting = resolve_acting_role(user, getattr(user, "acting_role", None))
+    return acting or real_role(user)
+
+
+def is_acting(user) -> bool:
+    return resolve_acting_role(user, getattr(user, "acting_role", None)) is not None
+
+
 def has_permission(user, permission: str) -> bool:
-    return permission in permissions_for(getattr(user, "role", None))
+    return permission in permissions_for(effective_role(user))
 
 
 def can_rate(user, criterion: str) -> bool:
@@ -199,7 +238,7 @@ def can_rate(user, criterion: str) -> bool:
 
 
 def rateable_criteria(user) -> list[str]:
-    perms = permissions_for(getattr(user, "role", None))
+    perms = permissions_for(effective_role(user))
     return [code for code, perm in CRITERION_PERMISSION.items() if perm in perms]
 
 

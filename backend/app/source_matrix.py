@@ -13,7 +13,9 @@ El catalogo lee el JSON generado (app/data/matriz_fuentes_eh.json), asi que en
 produccion no hace falta el Excel. El panel admin puede volver a subirlo.
 
 Regenerar el JSON desde backend/:
-    .\\.venv\\Scripts\\python.exe -m app.source_matrix "..\\FUENTES DE INFORMACION PROACTIVA EH (1).xlsx"
+    .\\.venv\\Scripts\\python.exe -m app.source_matrix "..\\FUENTES DE INFORMACION PROACTIVA EH.xlsx"
+
+El Excel no se versiona (.gitignore): el JSON generado es el que usa el catalogo.
 """
 from __future__ import annotations
 
@@ -82,6 +84,19 @@ TERM_CATEGORY_TECH = {
     "mhealth": "SD",
     "wearables": "SD",
     "medicamentos": "MED",
+}
+
+# Terminos de respaldo para una categoria que la hoja deja sin ejemplos: sin ellos
+# las fuentes MED solo buscarian con los terminos genericos.
+TERM_CATEGORY_DEFAULTS = {
+    "medicamentos": [
+        "new drug approval",
+        "investigational drug",
+        "drug pipeline",
+        "new molecular entity",
+        "orphan drug",
+        "biosimilar",
+    ],
 }
 
 # --------------------------------------------------------------------------- #
@@ -158,6 +173,7 @@ MATRIX_CODE_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     (r"^irct\b", ("FP-CT-13",)),
     (r"^cris\b", ("FP-CT-14",)),
     (r"^cochrane", ("FP-CT-15",)),
+    (r"^synapse", ("FP-CT-16",)),
     (r"^scopus", ("FP-LI-03",)),
     (r"^ieee", ("FP-LI-04",)),
     (r"^embase", ("FP-LI-05",)),
@@ -165,6 +181,7 @@ MATRIX_CODE_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     (r"^medical device netw", ("FP-LI-07",)),
     (r"^medline", ("FP-LI-08",)),
     (r"^ihsi", ("FP-HT-14",)),
+    (r"atc\s*/\s*ddd", ("FP-LI-09",)),
     (r"^medical data", ("FP-NW-01",)),
     (r"^science daily", ("FP-NW-02",)),
     (r"^reuters", ("FP-NW-03",)),
@@ -203,7 +220,10 @@ def clean_text(value) -> str:
 
 
 def clean_url(url: str) -> str:
-    """URL sin parametros de rastreo ni fragmento, con esquema y host en minuscula."""
+    """URL sin parametros de rastreo ni fragmento, con esquema y host en minuscula.
+
+    Un fragmento de ruta SPA ('#/en/risultati?...') es una pagina distinta y se conserva.
+    """
     raw = (url or "").strip().rstrip(".,;:)]")
     if not raw.lower().startswith(("http://", "https://")):
         return ""
@@ -212,27 +232,25 @@ def clean_url(url: str) -> str:
         return ""
     query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k.lower() not in _TRACKING]
     path = parts.path or "/"
-    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, urlencode(query), ""))
-
-
-def _host(url: str) -> str:
-    return (urlsplit(url).netloc or "").lower().removeprefix("www.")
+    fragment = parts.fragment if parts.fragment.startswith("/") else ""
+    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, urlencode(query), fragment))
 
 
 def extract_urls(text: str, link: str = "") -> list[str]:
-    """URLs de una celda (texto + hipervinculo), sin duplicados ni portadas redundantes."""
+    """URLs de una celda, sin duplicados ni portadas redundantes.
+
+    El texto escrito manda (es el listado que valida el equipo, columna 'Cant URL');
+    el hipervinculo de la celda solo se usa cuando el texto no trae ninguna URL.
+    """
     found: list[str] = []
     for match in _URL_RE.findall(text or ""):
         url = clean_url(match)
         if url and url not in found:
             found.append(url)
+    if found:
+        return found
     extra = clean_url(link)
-    if extra and extra not in found:
-        bare = urlsplit(extra).path in {"", "/"} and not urlsplit(extra).query
-        # Un hipervinculo a la portada del mismo sitio no agrega una ruta nueva.
-        if not (bare and any(_host(u) == _host(extra) for u in found)):
-            found.append(extra)
-    return found
+    return [extra] if extra else []
 
 
 def parse_tech_types(raw: str) -> list[str]:
@@ -241,6 +259,9 @@ def parse_tech_types(raw: str) -> list[str]:
         code = token.upper()
         if code == "SAMD":
             code = "SD"
+        elif code == "MD":
+            # Errata de la matriz (fila WHO ATC/DDD): codigos ATC = medicamentos.
+            code = "MED"
         if code in TECH_CODES and code not in out:
             out.append(code)
     return out
@@ -399,6 +420,7 @@ def _parse_terms_sheet(ws) -> list[dict]:
             continue
         terms_raw = clean_text(row[1] if len(row) > 1 else "")
         terms = [t.strip() for t in re.split(r"[,;\n]", terms_raw) if t.strip()]
+        terms = terms or list(TERM_CATEGORY_DEFAULTS.get(fold(category), []))
         out.append(
             {
                 "category": category,

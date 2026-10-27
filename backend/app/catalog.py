@@ -1,7 +1,7 @@
 """Catalogo verificado de fuentes proactivas (RF01 / D-06).
 
 Fuentes de verdad: Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md (53 fuentes)
-y la matriz institucional "FUENTES DE INFORMACION PROACTIVA EH" (89 filas), que
+y la matriz institucional "FUENTES DE INFORMACION PROACTIVA EH" (93 filas), que
 agrega 42 fuentes y aporta a todas nivel de fuente, prioridad, tipos de
 tecnologia, URLs de entrada y ruta de acceso (ver source_matrix). Las taxonomias
 son dato: este modulo se carga, no se enumera en los conectores. Un cambio de
@@ -13,7 +13,7 @@ import re
 
 from .source_matrix import entry_urls_for, fold, profile_fields, rows_by_code
 
-CATALOG_VERSION = "2026-10-06"
+CATALOG_VERSION = "2026-10-23"
 
 # Categorias operativas del inventario (reemplazan las del listado institucional).
 CAT_ENSAYOS = "Registros de ensayos clinicos"
@@ -999,6 +999,16 @@ _MATRIX_NEW: dict[str, dict] = dict(
         _reg("FP-CT-13", "IRCT — Iranian Registry of Clinical Trials", "Iran", aliases=["IRCT"]),
         _reg("FP-CT-14", "CRiS — Clinical Research Information Service (Corea)", "Corea del Sur", aliases=["CRiS"]),
         _reg("FP-CT-15", "Cochrane Library — CENTRAL", "Internacional", sync_frequency="mensual", aliases=["Cochrane", "CENTRAL"]),
+        _reg(
+            "FP-CT-16",
+            "Synapse — Patsnap (medicamentos en investigacion)",
+            "EE. UU.",
+            access_level="E",
+            connector="manual",
+            aliases=["Synapse", "Patsnap"],
+            note="Requiere crear usuario; la version gratuita limita las busquedas: consulta humana.",
+            scan_profile={"web_search": False},
+        ),
         _lit(
             "FP-LI-03",
             "Scopus",
@@ -1023,6 +1033,14 @@ _MATRIX_NEW: dict[str, dict] = dict(
         _lit("FP-LI-06", "PATENTSCOPE — OMPI", "Internacional", entity_type="patentes", sync_frequency="mensual", aliases=["PATENTSCOPE", "WIPO"]),
         _lit("FP-LI-07", "Medical Device Network", "Reino Unido", aliases=["Medical Device Network"]),
         _lit("FP-LI-08", "MedlinePlus — NLM", "EE. UU.", aliases=["MedlinePlus", "Medline"]),
+        _lit(
+            "FP-LI-09",
+            "WHO ATC/DDD Index — nuevos codigos ATC",
+            "Internacional",
+            sync_frequency="trimestral",
+            aliases=["ATC/DDD", "WHOCC"],
+            note="Los nuevos ATC nivel 5 vienen en archivos Excel enlazados desde la pagina de actualizaciones.",
+        ),
         _news("FP-NW-01", "New Scientist — Health (Medical Data)", "Reino Unido", aliases=["New Scientist"]),
         _news("FP-NW-02", "ScienceDaily — Health", "EE. UU.", aliases=["ScienceDaily"]),
         _news(

@@ -20,7 +20,7 @@ from app.ingest.fda import FdaConnector  # noqa: E402
 from app.ingest.file_feed import FileFeedConnector  # noqa: E402
 from app.ingest.health_canada import HealthCanadaConnector  # noqa: E402
 from app.ingest.pcori_hs import PcoriHsConnector  # noqa: E402
-from app.models import Cycle, CycleTechnology, Source, Technology  # noqa: E402
+from app.models import AuditLog, Cycle, CycleTechnology, Source, Technology  # noqa: E402
 
 
 @pytest.fixture()
@@ -33,11 +33,11 @@ def db():
     session.close()
 
 
-def test_catalog_has_ninety_five_unique_codes():
+def test_catalog_has_ninety_seven_unique_codes():
     rows = catalog.CATALOG_SOURCES
     codes = [r["catalog_code"] for r in rows]
-    assert len(rows) == 95
-    assert len(set(codes)) == 95
+    assert len(rows) == 97
+    assert len(set(codes)) == 97
     urls = [catalog_service.normalize_url(r["url"]) for r in rows]
     assert len(set(urls)) == len(urls)
     stats = catalog.catalog_stats()
@@ -45,14 +45,14 @@ def test_catalog_has_ninety_five_unique_codes():
     assert stats["by_level"]["A"] >= 5
     assert stats["by_block"][catalog.CAT_FABRICANTE] == 26
     assert stats["by_block"][catalog.CAT_NOTICIAS] == 15
-    assert stats["from_matrix"] == 95
+    assert stats["from_matrix"] == 97
 
 
 def test_every_matrix_row_maps_to_a_catalog_source():
     from app import source_matrix
 
     matrix = source_matrix.load_matrix()
-    assert len(matrix["rows"]) == 89
+    assert len(matrix["rows"]) == 93
     codes = {r["catalog_code"] for r in catalog.CATALOG_SOURCES}
     for row in matrix["rows"]:
         assert row["codes"], row["name"]
@@ -66,13 +66,57 @@ def test_every_matrix_row_maps_to_a_catalog_source():
 def test_sync_keeps_admin_edits_of_matrix_fields(db):
     catalog_service.sync_catalog(db, triggered_by="test")
     src = db.query(Source).filter(Source.catalog_code == "FP-HT-01").one()
-    src.priority_level = "baja"
-    src.access_path = "ruta editada"
+    # Edicion desde el panel (update_source registra el campo como editado).
+    edit = {"priority_level": "baja", "access_path": "ruta editada"}
+    catalog_service.mark_edited(src, edit)
+    for key, value in edit.items():
+        setattr(src, key, value)
     db.commit()
     catalog_service.sync_catalog(db, triggered_by="test")
     db.refresh(src)
     assert src.priority_level == "baja"
     assert src.access_path == "ruta editada"
+    assert {"priority_level", "access_path"} <= set(src.edited_fields)
+
+
+def test_sync_updates_matrix_urls_that_the_team_did_not_edit(db):
+    # OBS-002: una URL nueva de la matriz debe llegar a una fuente ya cargada.
+    catalog_service.sync_catalog(db, triggered_by="test")
+    src = db.query(Source).filter(Source.catalog_code == "FP-HT-02").one()
+    expected = list(src.entry_urls)
+    src.entry_urls = expected[:1]
+    db.commit()
+    catalog_service.sync_catalog(db, triggered_by="test")
+    db.refresh(src)
+    assert src.entry_urls == expected
+
+
+def test_first_sync_of_legacy_source_keeps_team_values_and_adds_new_urls(db):
+    # Bases anteriores: sin registro de edicion (edited_fields None).
+    catalog_service.sync_catalog(db, triggered_by="test")
+    src = db.query(Source).filter(Source.catalog_code == "FP-HT-02").one()
+    expected = list(src.entry_urls)
+    src.edited_fields = None
+    src.priority_level = "baja" if src.priority_level != "baja" else "media"
+    team_value = src.priority_level
+    # La bitacora generica guarda la edicion hecha desde el panel (PUT /api/sources/{id}).
+    db.add(
+        AuditLog(
+            entity_type="sources", entity_id=str(src.id), action="update",
+            new_value={"priority_level": team_value}, request_path=f"PUT /api/sources/{src.id}",
+        )
+    )
+    # Un cambio de la sincronizacion (sin ruta del panel) no cuenta como edicion.
+    src.material_type = "valor viejo de otra version de la matriz"
+    # Una URL vieja del mismo sitio (sale) y una agregada por el equipo en otro sitio (se queda).
+    src.entry_urls = [expected[0] + "vieja", "https://otro-sitio.example.org/lista"]
+    db.commit()
+    catalog_service.sync_catalog(db, triggered_by="test")
+    db.refresh(src)
+    assert src.priority_level == team_value
+    assert src.entry_urls == expected + ["https://otro-sitio.example.org/lista"]
+    assert src.material_type != "valor viejo de otra version de la matriz"
+    assert set(src.edited_fields) == {"priority_level", "entry_urls"}
 
 
 def test_import_matrix_overwrite_and_create(db):
@@ -80,6 +124,7 @@ def test_import_matrix_overwrite_and_create(db):
 
     catalog_service.sync_catalog(db, triggered_by="test")
     src = db.query(Source).filter(Source.catalog_code == "FP-HT-01").one()
+    catalog_service.mark_edited(src, {"priority_level": "baja"})
     src.priority_level = "baja"
     db.commit()
     parsed = {
@@ -132,7 +177,7 @@ def test_import_is_idempotent_and_retires_legacy(db):
     db.add(Source(title="Sitio principal del IETS", url="https://iets.org.co/", scrape_enabled=True))
     db.commit()
     first = catalog_service.sync_catalog(db, triggered_by="test")
-    assert first["created"] >= 95
+    assert first["created"] >= 97
     second = catalog_service.sync_catalog(db, triggered_by="test")
     assert second["created"] == 0
     assert db.query(Source).filter(Source.catalog_code == "FP-CT-01").count() == 1

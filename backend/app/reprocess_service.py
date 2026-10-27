@@ -12,6 +12,12 @@ la base igual) y auditadas por el listener de la bitacora:
    aprobacion" en tecnologias sin crudo de openFDA que la respalde: la fecha pasa
    al estado del tramite y la aprobacion queda vacia.
 
+3. **Datos de producto (RF-003)**: forma farmaceutica, concentracion, via,
+   marca y modelo de lo capturado antes de que existieran esos campos.
+   `reprocess_product_details` los toma del crudo de openFDA, de
+   `Finding.details` y de las reglas sobre titulo y resumen; solo completa lo
+   vacio, nunca pisa lo que confirmo el evaluador.
+
 2. **Pipelines de fabricantes (rastreo HTML)**: el nombre de la tecnologia era la
    fila completa de la tabla ("AMO959 AMO959 Prostate cancer Oncology: ...").
    `reprocess_pipelines` separa la fila (`ingest.pipeline_rows`) en producto,
@@ -23,6 +29,7 @@ Uso (en backend/):
     python -m app.reprocess_service                 # simulacion, no escribe
     python -m app.reprocess_service --apply         # aplica ambas correcciones
     python -m app.reprocess_service --apply --only fda
+    python -m app.reprocess_service --apply --only producto
 O desde la API: POST /api/ingest/reprocess?target=all&apply=true (superadmin).
 """
 from __future__ import annotations
@@ -34,6 +41,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from . import product_details
 from .audit import record_action
 from .ingest.fda import FdaConnector
 from .ingest.pipeline_rows import ROW_PREFIX, apply_pipeline_fields, is_pipeline_source, parse_row
@@ -158,6 +166,54 @@ def reprocess_pipelines(db: Session, *, apply: bool = False, actor: str = "repro
     return _finish(db, "pipeline", changes, apply=apply, actor=actor)
 
 
+def reprocess_product_details(db: Session, *, apply: bool = False, actor: str = "reproceso") -> dict:
+    """Completa los datos de producto de lo ya capturado (solo campos vacios)."""
+    connector = FdaConnector()
+    from_raw: dict[int, dict] = {}
+    for raw in db.query(RawRecord).filter(RawRecord.connector == "fda").order_by(RawRecord.id).all():
+        payload = raw.payload if isinstance(raw.payload, dict) else None
+        tech = _tech_for_raw(db, raw) if payload else None
+        if tech is None or tech.id in from_raw:
+            continue
+        record = connector._to_record(payload, _dataset_for(payload))
+        if record is not None:
+            from_raw[tech.id] = record.details
+
+    columns = list(product_details.TECH_COLUMNS.values())
+    changes: list[dict] = []
+    techs = db.query(Technology).filter(Technology.merged_into_id.is_(None)).order_by(Technology.id).all()
+    findings = {f.id: f for f in db.query(Finding).filter(Finding.id.in_([t.finding_id for t in techs if t.finding_id]))}
+    for tech in techs:
+        finding = findings.get(tech.finding_id)
+        details = product_details.merge(
+            from_raw.get(tech.id),
+            product_details.merge(
+                finding.details if finding else None,
+                product_details.extract(
+                    title=(finding.title if finding else "") or tech.commercial_name,
+                    summary=(finding.summary if finding else "") or tech.summary,
+                    technology_type=finding.technology_type if finding else "",
+                ),
+            ),
+        )
+        before = {c: getattr(tech, c) or "" for c in columns}
+        product_details.apply_to_technology(tech, details)
+        after = {c: getattr(tech, c) or "" for c in columns}
+        if after != before:
+            changes.append(
+                {
+                    "technology_id": tech.id,
+                    "motivo": "datos_de_producto",
+                    "antes": {k: v for k, v in before.items() if after[k] != v},
+                    "despues": {k: v for k, v in after.items() if before[k] != v},
+                }
+            )
+        if not apply:
+            for column, value in before.items():
+                setattr(tech, column, value)
+    return _finish(db, "producto", changes, apply=apply, actor=actor)
+
+
 def _finish(db: Session, target: str, changes: list[dict], *, apply: bool, actor: str) -> dict:
     if apply and changes:
         record_action(
@@ -179,6 +235,8 @@ def reprocess_all(db: Session, *, apply: bool = False, only: str = "all", actor:
         results.append(reprocess_fda(db, apply=apply, actor=actor))
     if only in ("all", "pipeline"):
         results.append(reprocess_pipelines(db, apply=apply, actor=actor))
+    if only in ("all", "producto"):
+        results.append(reprocess_product_details(db, apply=apply, actor=actor))
     return results
 
 
@@ -192,7 +250,7 @@ def main() -> None:  # pragma: no cover - uso manual
 
     parser = argparse.ArgumentParser(description="Reprocesa desde el crudo los mapeos corregidos (openFDA y pipelines).")
     parser.add_argument("--apply", action="store_true", help="Escribe los cambios. Sin esta bandera solo simula.")
-    parser.add_argument("--only", choices=("all", "fda", "pipeline"), default="all")
+    parser.add_argument("--only", choices=("all", "fda", "pipeline", "producto"), default="all")
     args = parser.parse_args()
     audit.install_listeners()
     db = SessionLocal()

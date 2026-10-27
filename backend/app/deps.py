@@ -63,6 +63,10 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Debe cambiar su contraseña temporal antes de continuar.",
         )
+    # "Ver como": solo un superadministrador real puede simular otro perfil; en
+    # cualquier otro caso la cabecera se ignora (no hay escalamiento posible).
+    # El atributo es transitorio: no es columna y nunca se persiste.
+    user.acting_role = rbac.resolve_acting_role(user, request.headers.get(rbac.ACTING_ROLE_HEADER))
     # El usuario autenticado alimenta la bitacora inmutable de esta peticion.
     audit.set_user_context(user)
     request.state.user = user
@@ -77,7 +81,7 @@ def require_permission(permission: str):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(
-                    f"El perfil '{rbac.role_label(user.role)}' no tiene el permiso "
+                    f"El perfil '{rbac.role_label(rbac.effective_role(user))}' no tiene el permiso "
                     f"requerido ({permission})."
                 ),
             )

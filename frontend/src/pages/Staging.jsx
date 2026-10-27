@@ -11,7 +11,7 @@ import Button from "../components/Button";
 import HintButton from "../components/HintButton";
 import ClampText from "../components/ClampText";
 import Icon from "../components/Icon";
-import { TermLabel } from "../components/InfoTip";
+import InfoTip, { TermLabel } from "../components/InfoTip";
 import Modal from "../components/Modal";
 import SignalOrigin from "../components/SignalOrigin";
 import { Input, Select } from "../components/Field";
@@ -34,6 +34,26 @@ import {
 const PAGE_SIZE = 100;
 const RELIABILITY_LABEL = { confiable: "Confiable", verificar: "Verificar", baja: "Baja confiabilidad" };
 
+/** Datos de producto bajo el nombre de la senal (RF-003): forma, concentracion, marca, modelo. */
+function ProductFacts({ item }) {
+  const facts = [
+    item.dosage_form,
+    item.strength,
+    item.route && `Vía ${item.route.toLowerCase()}`,
+    item.brand && `Marca: ${item.brand}`,
+    item.device_model && `Modelo: ${item.device_model}`,
+    item.manufacturer && `Fabricante: ${item.manufacturer}`,
+  ].filter(Boolean);
+  if (!facts.length) return null;
+  return (
+    <div className="staging-facts" title={GLOSSARY.fa_datos_producto}>
+      {facts.map((fact) => (
+        <span key={fact}>{fact}</span>
+      ))}
+    </div>
+  );
+}
+
 /**
  * Bandeja de entrada del staging (RF04): senales capturadas que aun no
  * pertenecen a ningun ciclo. Antes de arrastrarlas hay que clasificarlas:
@@ -50,8 +70,8 @@ export default function Staging() {
   const [loadingMore, setLoadingMore] = useState(false);
   const firstLoad = useRef(true);
   const [selected, setSelected] = useState(() => new Set());
-  const [filters, setFilters] = useState({ q: "", source_id: "", channel: "" });
-  const [query, setQuery] = useState({ q: "", source_id: "", channel: "" });
+  const [filters, setFilters] = useState({ q: "", source_id: "", channel: "", corroborated: false });
+  const [query, setQuery] = useState({ q: "", source_id: "", channel: "", corroborated: false });
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
@@ -83,6 +103,7 @@ export default function Staging() {
       if (query.q) p.q = query.q;
       if (query.source_id) p.source_id = query.source_id;
       if (query.channel) p.channel = query.channel;
+      if (query.corroborated) p.corroborated = true;
       return p;
     },
     [query]
@@ -281,6 +302,11 @@ export default function Staging() {
         inn_name: editing.inn_name,
         manufacturer: editing.manufacturer,
         indication: editing.indication,
+        dosage_form: editing.dosage_form || "",
+        strength: editing.strength || "",
+        route: editing.route || "",
+        brand: editing.brand || "",
+        device_model: editing.device_model || "",
         cluster_id: editing.cluster_id ? Number(editing.cluster_id) : null,
         tech_type_id: editing.tech_type_id ? Number(editing.tech_type_id) : null,
         condition: editing.condition || null,
@@ -398,6 +424,13 @@ export default function Staging() {
               hint: GLOSSARY.fa_sin_tipologia,
             },
             {
+              label: "En varias fuentes",
+              value: stats.corroborated ?? 0,
+              color: stats.corroborated ? "#0E7490" : undefined,
+              sub: "Corroboradas",
+              hint: GLOSSARY.fa_corroborada,
+            },
+            {
               label: "Listas para asignar",
               value: classifiable.length,
               color: "#059669",
@@ -460,6 +493,15 @@ export default function Staging() {
             <option value="proactiva">Búsqueda proactiva</option>
             <option value="reactiva">Postulación reactiva</option>
           </Select>
+          <label className="staging-check">
+            <input
+              type="checkbox"
+              checked={filters.corroborated}
+              onChange={(e) => setFilters({ ...filters, corroborated: e.target.checked })}
+            />
+            Solo detectadas en varias fuentes
+            <InfoTip text={GLOSSARY.fa_corroborada} label="Qué es una señal corroborada" />
+          </label>
         </div>
       </Card>
 
@@ -543,6 +585,7 @@ export default function Staging() {
                       </td>
                       <td style={{ maxWidth: 520 }}>
                         <ClampText className="staging-name" text={name} lines={2} expandable />
+                        <ProductFacts item={item} />
                         <div className="staging-meta">
                           {item.source_title || "Sin fuente"} ·{" "}
                           {new Date(item.captured_at).toLocaleDateString("es-CO")} ·{" "}
@@ -559,6 +602,14 @@ export default function Staging() {
                               >
                                 <Icon name="external" size={13} />
                               </a>
+                            )}
+                            {item.corroboration_count > 1 && (
+                              <span
+                                className="staging-corro"
+                                title={`También en: ${(item.corroborating || []).map((c) => c.source_title).join(" · ")}`}
+                              >
+                                En {item.corroboration_count} fuentes
+                              </span>
                             )}
                             {RELIABILITY_LABEL[item.reliability_verdict] && (
                               <span
@@ -594,6 +645,14 @@ export default function Staging() {
                       </td>
                       <td>
                         <span className="staging-score">{item.screening_score}</span>
+                        {item.corroboration_bonus > 0 && (
+                          <span
+                            className="staging-bonus"
+                            title={`+${item.corroboration_bonus} al orden por corroboración en ${item.corroboration_count} fuentes`}
+                          >
+                            +{item.corroboration_bonus}
+                          </span>
+                        )}
                       </td>
                       <td>
                         {canWrite && (
@@ -699,6 +758,81 @@ export default function Staging() {
               value={editing.manufacturer || ""}
               onChange={(e) => setEditing({ ...editing, manufacturer: e.target.value })}
             />
+            <fieldset className="staging-product">
+              <legend>
+                <TermLabel tip={GLOSSARY.fa_datos_producto}>Datos de producto</TermLabel>
+              </legend>
+              <div className="form-two-col">
+                <Input
+                  id="stg-dosage-form"
+                  disabled={editing.readOnly}
+                  label="Forma farmacéutica"
+                  placeholder="Ej. tableta, solución inyectable"
+                  value={editing.dosage_form || ""}
+                  onChange={(e) => setEditing({ ...editing, dosage_form: e.target.value })}
+                />
+                <Input
+                  id="stg-strength"
+                  disabled={editing.readOnly}
+                  label="Concentración"
+                  placeholder="Ej. 100 mg, 2,5 mg/ml"
+                  value={editing.strength || ""}
+                  onChange={(e) => setEditing({ ...editing, strength: e.target.value })}
+                />
+                <Input
+                  id="stg-route"
+                  disabled={editing.readOnly}
+                  label="Vía de administración"
+                  placeholder="Ej. oral, intravenosa"
+                  value={editing.route || ""}
+                  onChange={(e) => setEditing({ ...editing, route: e.target.value })}
+                />
+                <Input
+                  id="stg-brand"
+                  disabled={editing.readOnly}
+                  label="Marca"
+                  value={editing.brand || ""}
+                  onChange={(e) => setEditing({ ...editing, brand: e.target.value })}
+                />
+                <Input
+                  id="stg-model"
+                  disabled={editing.readOnly}
+                  label="Modelo (dispositivos)"
+                  value={editing.device_model || ""}
+                  onChange={(e) => setEditing({ ...editing, device_model: e.target.value })}
+                />
+              </div>
+            </fieldset>
+            {editing.corroboration_count > 1 && (
+              <div className="staging-corro-list" role="note">
+                <strong>
+                  <TermLabel tip={GLOSSARY.fa_corroborada}>Detectada en {editing.corroboration_count} fuentes</TermLabel>
+                </strong>
+                <ul>
+                  {(editing.corroborating || []).map((c) => (
+                    <li key={c.technology_id}>
+                      {c.source_title}: {c.name || `Señal #${c.technology_id}`}{" "}
+                      <span className="staging-meta">
+                        ({c.matched_on?.includes("nct") ? "mismo NCT" : `similitud ${Math.round(c.score)} %`})
+                      </span>
+                      {c.url && (
+                        <>
+                          {" "}
+                          <a
+                            href={c.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Abrir la señal en ${c.source_title}`}
+                          >
+                            <Icon name="external" size={12} />
+                          </a>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <Input
               id="stg-indication"
               disabled={editing.readOnly}

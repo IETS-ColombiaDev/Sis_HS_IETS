@@ -20,6 +20,12 @@ class UserOut(BaseModel):
     picture: str
     role: str
     role_label: str = ""
+    # "Ver como" (solo superadministrador): `role`, `role_label`, `permissions`
+    # y `rateable_criteria` describen el perfil efectivo; `real_role` es el de
+    # la cuenta y `acting_as` indica si hay una simulacion activa.
+    real_role: str = ""
+    real_role_label: str = ""
+    acting_as: bool = False
     permissions: list[str] = []
     rateable_criteria: list[str] = []
     is_active: bool
@@ -816,6 +822,16 @@ class TechnologyOut(BaseModel):
     phase3_completion_date: date | None = None
     fda_approval_date: date | None = None
     ema_approval_date: date | None = None
+    # Datos de producto (RF-003).
+    dosage_form: str = ""
+    strength: str = ""
+    route: str = ""
+    brand: str = ""
+    device_model: str = ""
+    # Corroboracion entre fuentes (RF-002): fuentes distintas que la reportan.
+    corroboration_count: int | None = 1
+    corroboration_bonus: int | None = 0
+    corroborating: list[dict] | None = []
     source_channel: str = "proactiva"
     source_id: int | None = None
     source_title: str = ""
@@ -865,6 +881,11 @@ class TechnologyUpdate(BaseModel):
     phase3_completion_date: date | None = None
     fda_approval_date: date | None = None
     ema_approval_date: date | None = None
+    dosage_form: str | None = Field(None, max_length=200)
+    strength: str | None = Field(None, max_length=200)
+    route: str | None = Field(None, max_length=120)
+    brand: str | None = Field(None, max_length=200)
+    device_model: str | None = Field(None, max_length=200)
 
 
 class AssignToCycleIn(BaseModel):
@@ -892,6 +913,8 @@ class StagingStats(BaseModel):
     by_source: list[CountItem] = []
     without_cluster: int = 0
     without_tech_type: int = 0
+    # RF-002: senales sin asignar que otra fuente tambien reporta.
+    corroborated: int = 0
 
 
 # =========================================================================== #

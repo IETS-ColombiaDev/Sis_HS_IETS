@@ -119,17 +119,18 @@ def sync_catalog(db: Session, *, triggered_by: str = "sistema") -> dict:
     updated = 0
     retired = 0
     codes = {row["catalog_code"] for row in CATALOG_SOURCES}
+    edits = human_edits(db)
 
     for data in CATALOG_SOURCES:
         payload = {k: data.get(k) for k in SOURCE_FIELDS if k in data}
         payload["url"] = normalize_url(payload.get("url") or data.get("url") or "")
         existing = _find_match(db, payload)
         if existing is None:
-            row = Source(**payload)
+            row = Source(**payload, edited_fields=[])
             db.add(row)
             created += 1
             continue
-        _apply_catalog_fields(existing, payload)
+        _apply_catalog_fields(existing, payload, edits=edits.get(existing.id))
         existing.retired = False
         updated += 1
 
@@ -208,8 +209,8 @@ def import_matrix(
     """Aplica una matriz EH (Excel ya leido) al inventario.
 
     - Filas con codigo: actualiza nivel, prioridad, tipos, URLs de entrada, ruta
-      de acceso, que consultar y restricciones. Con `overwrite=False` solo
-      completa lo vacio (respeta lo editado en el panel).
+      de acceso, que consultar y restricciones. Con `overwrite=False` respeta
+      lo editado en el panel (`edited_fields`) y actualiza el resto.
     - Filas sin codigo: crea la fuente (rastreo HTML, nivel D) marcada como
       importada de la matriz, para que la recarga del catalogo no la retire.
     - `persist`: guarda la matriz como la empaquetada (la usa el catalogo en el
@@ -219,6 +220,7 @@ def import_matrix(
     from .catalog import FREQ_HOURS
 
     rows = parsed.get("rows") or []
+    edits = human_edits(db)
     updated = created = 0
     touched: list[str] = []
     unmatched: list[str] = []
@@ -230,7 +232,7 @@ def import_matrix(
                 if source is None:
                     continue
                 fields = source_matrix.profile_fields(row, primary=idx == 0)
-                _apply_catalog_fields(source, fields, overwrite_admin=overwrite)
+                _apply_catalog_fields(source, fields, overwrite_admin=overwrite, edits=edits.get(source.id))
                 updated += 1
                 touched.append(code)
             continue
@@ -244,7 +246,7 @@ def import_matrix(
                 break
         fields = source_matrix.profile_fields(row, primary=True)
         if existing is not None:
-            _apply_catalog_fields(existing, fields, overwrite_admin=overwrite)
+            _apply_catalog_fields(existing, fields, overwrite_admin=overwrite, edits=edits.get(existing.id))
             updated += 1
             continue
         if not main:
@@ -326,10 +328,98 @@ def _is_empty(value) -> bool:
     return value is None or value == "" or value == [] or value == {}
 
 
-def _apply_catalog_fields(source: Source, payload: dict, *, overwrite_admin: bool = False) -> None:
+URL_FIELDS = ("entry_urls", "reference_urls")
+
+
+def _url_host(url: str) -> str:
+    return (urlsplit(url or "").netloc or "").lower().removeprefix("www.")
+
+
+def _same(a, b) -> bool:
+    if isinstance(a, list) or isinstance(b, list):
+        return list(a or []) == list(b or [])
+    if isinstance(a, dict) or isinstance(b, dict):
+        return dict(a or {}) == dict(b or {})
+    return (a if a is not None else "") == (b if b is not None else "")
+
+
+def mark_edited(source: Source, data: dict) -> dict:
+    """Registra en `edited_fields` los campos de la matriz que el equipo cambio.
+
+    Devuelve {campo: [antes, despues]} de lo que cambio (para la bitacora). Un
+    campo editado ya no lo pisa la sincronizacion del catalogo; solo la
+    reimportacion de la matriz con "Sobrescribir lo editado".
+    """
+    changes: dict = {}
+    for key, value in data.items():
+        before = getattr(source, key, None)
+        if _same(before, value):
+            continue
+        changes[key] = [before, value]
+    edited = set(source.edited_fields or [])
+    edited |= {k for k in changes if k in ADMIN_FIELDS}
+    if source.edited_fields is not None or edited:
+        source.edited_fields = sorted(edited)
+    return changes
+
+
+# Rutas del panel desde las que una persona edita una fuente (la bitacora
+# generica guarda metodo y ruta de cada cambio).
+EDIT_PATHS = ("PUT /api/sources/", "PATCH /api/sources/")
+EDIT_PATH_SUFFIXES = ("/priority-suggestion/apply",)
+
+
+def human_edits(db: Session) -> dict[int, set[str]]:
+    """Campos de la matriz que una persona cambio desde el panel, segun la bitacora.
+
+    Sirve para la primera sincronizacion de bases anteriores a `edited_fields`:
+    lo que cambio la sincronizacion, la importacion de la matriz o la vigilancia
+    no cuenta como edicion del equipo.
+    """
+    from .models import AuditLog
+
+    out: dict[int, set[str]] = {}
+    rows = db.query(AuditLog.entity_id, AuditLog.new_value, AuditLog.request_path).filter(
+        AuditLog.entity_type == "sources", AuditLog.action == "update"
+    )
+    for entity_id, new_value, path in rows:
+        path = (path or "").split("?")[0]
+        if not (path.startswith(EDIT_PATHS) or path.endswith(EDIT_PATH_SUFFIXES)) or not isinstance(new_value, dict):
+            continue
+        fields = set(new_value) & set(ADMIN_FIELDS)
+        if fields and str(entity_id).isdigit():
+            out.setdefault(int(entity_id), set()).update(fields)
+    return out
+
+
+def _legacy_admin_value(source: Source, key: str, current, incoming, payload: dict, edits: set[str]):
+    """Primera sincronizacion de una fuente sin registro de edicion (`edited_fields` None).
+
+    - Campo que una persona edito en el panel (bitacora): se conserva y se marca.
+    - URLs: las de la matriz vigente mas las de sitios que la matriz no menciona
+      (agregadas por el equipo por otra via); si hubo, el campo queda marcado.
+    - Resto: sigue a la matriz vigente.
+    Devuelve (valor, editado).
+    """
+    if key in edits and not _same(current, incoming):
+        return current, True
+    if key in URL_FIELDS:
+        matrix_hosts = {_url_host(u) for k in URL_FIELDS for u in (payload.get(k) or [])}
+        matrix_hosts.add(_url_host(payload.get("url") or source.url or ""))
+        extras = [u for u in (current or []) if _url_host(u) not in matrix_hosts and u not in (incoming or [])]
+        return list(incoming or []) + extras, bool(extras)
+    return incoming, False
+
+
+def _apply_catalog_fields(
+    source: Source, payload: dict, *, overwrite_admin: bool = False, edits: set[str] | None = None
+) -> None:
     """Actualiza metadatos del catalogo sin pisar el estado operativo de salud.
 
-    Los ADMIN_FIELDS solo se completan si estan vacios, salvo `overwrite_admin`.
+    Los ADMIN_FIELDS siguen a la matriz salvo los que el equipo edito
+    (`edited_fields`); `overwrite_admin` pisa tambien esos y limpia la marca.
+    Una fuente sin registro (`edited_fields` None, bases anteriores) se infiere
+    una vez con `_legacy_admin_value` y `edits` (ver `human_edits`).
     """
     preserve = {
         "health_status",
@@ -345,11 +435,23 @@ def _apply_catalog_fields(source: Source, payload: dict, *, overwrite_admin: boo
         "last_error",
         "last_scraped_at",
     }
+    legacy = source.edited_fields is None
+    edited = set(source.edited_fields or [])
     for key, value in payload.items():
         if key in preserve:
             continue
-        if key in ADMIN_FIELDS and not overwrite_admin and not _is_empty(getattr(source, key, None)):
-            continue
+        if key in ADMIN_FIELDS:
+            current = getattr(source, key, None)
+            if overwrite_admin:
+                edited.discard(key)
+            elif _is_empty(current):
+                edited.discard(key)
+            elif legacy:
+                value, was_edited = _legacy_admin_value(source, key, current, value, payload, edits or set())
+                if was_edited:
+                    edited.add(key)
+            elif key in edited:
+                continue
         if key == "connector_config":
             current = source.connector_config if isinstance(source.connector_config, dict) else {}
             incoming = value if isinstance(value, dict) else {}
@@ -357,3 +459,4 @@ def _apply_catalog_fields(source: Source, payload: dict, *, overwrite_admin: boo
             source.connector_config = merged
             continue
         setattr(source, key, value)
+    source.edited_fields = sorted(edited)

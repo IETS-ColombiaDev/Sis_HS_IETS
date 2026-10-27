@@ -4,7 +4,8 @@ import { useAuth } from "../auth/AuthContext";
 import { useCycle } from "../cycle/CycleContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { aiEnabled, aiLabel } from "../ai/status";
-import { CYCLE_STATUS_LABELS } from "../constants/methodology";
+import { CYCLE_STATUS_LABELS, ROLE_LABELS } from "../constants/methodology";
+import { apiError } from "../api/client";
 import { GLOSSARY } from "../constants/glossary";
 import { NAV, TITLES, fold, sectionFor } from "../constants/navigation";
 import Icon from "./Icon";
@@ -326,22 +327,105 @@ function EnvironmentBanner() {
   );
 }
 
+const ROLE_ORDER = ["superadmin", "evaluador_tecnico", "evaluador_clinico", "tomador_decisiones", "revisor_pares"];
+
+/**
+ * "Ver como" del superadministrador: cambia el perfil efectivo de toda la
+ * aplicación (menús, rutas, botones y permisos del servidor). Devuelve la
+ * función que aplica el cambio y el estado de espera.
+ */
+function useActAs(onDone) {
+  const { actAs } = useAuth();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const run = async (role) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const data = await actAs(role);
+      toast.success(
+        data?.acting_as
+          ? `Viendo el sistema como ${data.role_label}. Sus permisos reales no cambiaron.`
+          : `Volvió a su perfil: ${data?.role_label || ROLE_LABELS.superadmin}.`
+      );
+      onDone?.();
+    } catch (err) {
+      toast.error(apiError(err, "No se pudo cambiar de perfil."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return [run, busy];
+}
+
+/** Aviso permanente mientras el superadministrador ve el sistema como otro perfil. */
+function ActingBanner() {
+  const { user, actingAs } = useAuth();
+  const [restore, busy] = useActAs();
+  if (!actingAs) return null;
+  const realLabel = user?.real_role_label || ROLE_LABELS.superadmin;
+  return (
+    <div className="acting-banner" role="status" aria-live="polite">
+      <Icon name="eye" size={15} />
+      <span className="acting-banner-text">
+        <strong>Viendo como: {user?.role_label}.</strong>{" "}
+        <span className="acting-banner-hint">Menús, pantallas y permisos son los de ese perfil.</span>
+      </span>
+      <button
+        type="button"
+        className="acting-banner-btn"
+        onClick={() => restore("superadmin")}
+        disabled={busy}
+        aria-label={`Volver a mi perfil (${realLabel})`}
+      >
+        {busy ? "Volviendo…" : `Volver a ${realLabel}`}
+      </button>
+    </div>
+  );
+}
+
 function Header({ onToggle, onOpenGuide }) {
-  const { user, logout, status, isAdmin } = useAuth();
+  const { user, logout, status, isAdmin, realRole, actingAs } = useAuth();
   const { updatedAt } = useRealtime();
   const [menuOpen, setMenuOpen] = useState(false);
   const [pwdOpen, setPwdOpen] = useState(false);
   const toast = useToast();
   const location = useLocation();
+  const menuRef = useRef(null);
+  const userBtnRef = useRef(null);
+  const canSwitch = realRole === "superadmin";
+  const [switchTo, switching] = useActAs(() => {
+    setMenuOpen(false);
+    userBtnRef.current?.focus();
+  });
 
   useEffect(() => {
     if (!menuOpen) return undefined;
     const onKey = (ev) => {
-      if (ev.key === "Escape") setMenuOpen(false);
+      if (ev.key === "Escape") {
+        setMenuOpen(false);
+        userBtnRef.current?.focus();
+      }
     };
     document.addEventListener("keydown", onKey);
+    // Al abrir, el foco entra al menú para operarlo con el teclado.
+    menuRef.current?.querySelector('[role^="menuitem"]:not([disabled])')?.focus();
     return () => document.removeEventListener("keydown", onKey);
   }, [menuOpen]);
+
+  // Flechas, Inicio y Fin recorren las opciones del menú (patrón WAI-ARIA).
+  const onMenuKeyDown = (ev) => {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(ev.key)) return;
+    const items = Array.from(menuRef.current?.querySelectorAll('[role^="menuitem"]:not([disabled])') || []);
+    if (!items.length) return;
+    ev.preventDefault();
+    const idx = items.indexOf(document.activeElement);
+    let next = 0;
+    if (ev.key === "End") next = items.length - 1;
+    else if (ev.key === "ArrowDown") next = idx < 0 ? 0 : (idx + 1) % items.length;
+    else if (ev.key === "ArrowUp") next = idx <= 0 ? items.length - 1 : idx - 1;
+    items[next].focus();
+  };
 
   const title = TITLES[location.pathname] || "IETS";
   const section = sectionFor(location.pathname);
@@ -384,16 +468,23 @@ function Header({ onToggle, onOpenGuide }) {
         <div className="hdr-user">
           <button
             type="button"
+            ref={userBtnRef}
             onClick={() => setMenuOpen((v) => !v)}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            aria-label={`Menú de ${user?.name || "usuario"}`}
-            className="hdr-user-btn"
+            aria-label={
+              actingAs
+                ? `Menú de ${user?.name || "usuario"}. Viendo como ${user?.role_label}`
+                : `Menú de ${user?.name || "usuario"}`
+            }
+            className={`hdr-user-btn${actingAs ? " is-acting" : ""}`}
           >
             <SafeAvatar user={user} />
             <div className="user-meta">
               <div className="hdr-user-name">{user?.name}</div>
-              <div className="hdr-user-role">{user?.role_label || user?.role}</div>
+              <div className="hdr-user-role">
+                {actingAs ? `Viendo como: ${user?.role_label}` : user?.role_label || user?.role}
+              </div>
             </div>
             <span className="hdr-caret">
               <Icon name="chevron" size={14} />
@@ -402,7 +493,13 @@ function Header({ onToggle, onOpenGuide }) {
           {menuOpen && (
             <>
               <div className="hdr-menu-veil" onClick={() => setMenuOpen(false)} />
-              <div className="hdr-menu" role="menu">
+              <div
+                className="hdr-menu"
+                role="menu"
+                aria-label="Menú de usuario"
+                ref={menuRef}
+                onKeyDown={onMenuKeyDown}
+              >
                 <div className="hdr-menu-head">
                   <div className="hdr-user-name">{user?.name}</div>
                   <div className="hdr-menu-mail">{user?.email}</div>
@@ -410,7 +507,36 @@ function Header({ onToggle, onOpenGuide }) {
                     {user?.role_label}
                     {user?.rateable_criteria?.length ? ` · califica ${user.rateable_criteria.join(", ")}` : ""}
                   </div>
+                  {actingAs && <div className="hdr-menu-real">Su perfil real: {user?.real_role_label}</div>}
                 </div>
+                {canSwitch && (
+                  <div className="hdr-menu-group" role="group" aria-labelledby="hdr-actas-title">
+                    <div className="hdr-menu-group-title" id="hdr-actas-title">
+                      <Icon name="eye" size={14} />
+                      Ver como (cambiar de perfil)
+                    </div>
+                    {ROLE_ORDER.map((code) => {
+                      const checked = (user?.role || "superadmin") === code;
+                      const label = ROLE_LABELS[code] || code;
+                      return (
+                        <button
+                          key={code}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={checked}
+                          disabled={switching}
+                          className={`user-menu-item hdr-role-item${checked ? " is-current" : ""}`}
+                          onClick={() => (checked ? setMenuOpen(false) : switchTo(code))}
+                        >
+                          <span className="hdr-role-mark" aria-hidden="true">
+                            {checked ? <Icon name="check" size={14} /> : null}
+                          </span>
+                          {code === "superadmin" && actingAs ? `Volver a mi perfil (${label})` : label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 <button
                   type="button"
                   role="menuitem"
@@ -486,8 +612,10 @@ export default function Layout({ children }) {
       <div className="content-shell">
         <EnvironmentBanner />
         <Header onToggle={() => setSidebarOpen((v) => !v)} onOpenGuide={() => setGuideOpen(true)} />
+        <ActingBanner />
         <main id="contenido" tabIndex={-1} className="app-main">
-          <div key={pathname} className="page-enter">
+          {/* Al cambiar de perfil ("ver como") la pantalla se rearma y recarga sus datos. */}
+          <div key={`${pathname}|${user?.role || ""}`} className="page-enter">
             {children}
           </div>
         </main>

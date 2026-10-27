@@ -143,6 +143,10 @@ export const GLOSSARY = {
   fa_sin_cluster: "Señales sin clúster confirmado. No pueden entrar a un ciclo hasta clasificarlas.",
   fa_sin_tipologia: "Señales sin tipología confirmada. No pueden entrar a un ciclo hasta clasificarlas.",
   fa_listas_asignar: "Señales de esta página con clúster y tipología: se pueden asignar ya.",
+  fa_corroborada:
+    "La misma tecnología aparece en otras fuentes (mismo NCT o nombre/DCI equivalente según el umbral de desduplicación). Cada fuente adicional suma 5 puntos al orden de la bandeja, máximo 15. Solo ordena: no cambia el cribado, el %P ni la importancia clínica.",
+  fa_datos_producto:
+    "Datos de producto leídos en la captura (conector, IA o reglas sobre el texto): forma farmacéutica, concentración y vía para medicamentos; marca y modelo para dispositivos. Confírmelos o corríjalos al clasificar.",
   fa_condicion:
     "Condición: emergente (en fase clínica II o III, antes de la aprobación) o nueva (aprobada en agencia de referencia hace 12 meses o menos). Es distinta del horizonte.",
   fa_sugerir:

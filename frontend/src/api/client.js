@@ -28,6 +28,28 @@ export function setLastEmail(email) {
   }
 }
 
+// "Ver como" del superadministrador: el perfil simulado viaja en esta cabecera.
+// El servidor la ignora si la cuenta real no es superadministrador.
+const ACTING_ROLE_KEY = "iets_hs_acting_role";
+export const ACTING_ROLE_HEADER = "X-Acting-Role";
+
+export function getActingRole() {
+  try {
+    return localStorage.getItem(ACTING_ROLE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function setActingRole(role) {
+  try {
+    if (role) localStorage.setItem(ACTING_ROLE_KEY, role);
+    else localStorage.removeItem(ACTING_ROLE_KEY);
+  } catch {
+    /* modo privado */
+  }
+}
+
 const api = axios.create({
   baseURL: "/api",
   headers: { "Content-Type": "application/json" },
@@ -44,6 +66,8 @@ export const SCAN_TIMEOUT = 300000;
 api.interceptors.request.use((config) => {
   const token = getToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  const acting = getActingRole();
+  if (token && acting && !config.headers[ACTING_ROLE_HEADER]) config.headers[ACTING_ROLE_HEADER] = acting;
   // Con el Content-Type JSON por defecto, axios convierte un FormData en JSON y el archivo no llega.
   if (typeof FormData !== "undefined" && config.data instanceof FormData) config.headers.setContentType("multipart/form-data");
   if (typeof Blob !== "undefined" && config.data instanceof Blob) config.headers.setContentType("application/octet-stream");

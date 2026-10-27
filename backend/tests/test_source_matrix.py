@@ -14,7 +14,7 @@ from frente_b_support import api  # noqa: E402,F401  (fixture)
 
 from app import source_matrix, source_profile, web_search  # noqa: E402
 
-EXCEL = Path(__file__).resolve().parents[2] / "FUENTES DE INFORMACION PROACTIVA EH (1).xlsx"
+EXCEL = Path(__file__).resolve().parents[2] / "FUENTES DE INFORMACION PROACTIVA EH.xlsx"
 
 
 # --------------------------------------------------------------------------- #
@@ -35,7 +35,7 @@ def test_parse_helpers():
 def test_excel_parses_all_rows_and_matches_packaged_json():
     parsed = source_matrix.parse_workbook(EXCEL)
     packaged = source_matrix.load_matrix()
-    assert len(parsed["rows"]) == len(packaged["rows"]) == 89
+    assert len(parsed["rows"]) == len(packaged["rows"]) == 93
     assert len(parsed["search_terms"]) == 11
     assert all(r["codes"] for r in parsed["rows"])
     assert [r["codes"] for r in parsed["rows"]] == [r["codes"] for r in packaged["rows"]]
@@ -331,9 +331,31 @@ def test_matrix_import_endpoint(api, monkeypatch):
     monkeypatch.setattr(catalog_service, "import_matrix", fake_import)
     assert api.post("/api/sources/matrix/import", role="revisor_pares").status_code == 403
     res = api.post("/api/sources/matrix/import", data={"overwrite": "false"})
-    assert res.status_code == 200 and seen == {"rows": 89, "overwrite": False, "persist": False}
+    assert res.status_code == 200 and seen == {"rows": 93, "overwrite": False, "persist": False}
     bad = api.post("/api/sources/matrix/import", files={"file": ("x.txt", b"hola", "text/plain")})
     assert bad.status_code == 422
     if EXCEL.exists():
         up = api.post("/api/sources/matrix/import", files={"file": (EXCEL.name, EXCEL.read_bytes(), "application/vnd.ms-excel")})
-        assert up.status_code == 200 and seen["persist"] is True and seen["rows"] == 89
+        assert up.status_code == 200 and seen["persist"] is True and seen["rows"] == 93
+
+
+def test_url_parsing_keeps_spa_routes_and_prefers_written_urls():
+    # AIFA lista dos vistas de la misma SPA; el '#/...' es la ruta, no un ancla.
+    urls = source_matrix.extract_urls(
+        "3. https://medicinali.aifa.gov.it/en/#/en/\n4. https://medicinali.aifa.gov.it/en/#/en/risultati?orfano=true",
+        "https://medicinali.aifa.gov.it/en/",
+    )
+    assert urls == [
+        "https://medicinali.aifa.gov.it/en/#/en/",
+        "https://medicinali.aifa.gov.it/en/#/en/risultati?orfano=true",
+    ]
+    # El hipervinculo de la celda solo cuenta si el texto no trae URLs.
+    assert source_matrix.extract_urls("2. https://a.org/x", "https://a.org/otra") == ["https://a.org/x"]
+    assert source_matrix.extract_urls("ver portal", "https://a.org/otra") == ["https://a.org/otra"]
+
+
+def test_packaged_matrix_loads_128_urls_and_medicine_terms():
+    matrix = source_matrix.load_matrix()
+    assert sum(len(r["consult_urls"]) for r in matrix["rows"]) == 128
+    med = next(t for t in matrix["search_terms"] if t["tech_type"] == "MED")
+    assert med["terms"]

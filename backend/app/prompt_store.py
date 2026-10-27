@@ -64,7 +64,13 @@ Devuelve SOLO un JSON array (maximo {max_items} items). Cada item:
   "horizon": "emergente|transicional|inminente",
   "therapeutic_area": "oncologia|neurologia|cardiologia|enf. raras|endocrinologia|inmunologia|infectologia u otra del texto",
   "phase": "preclinica|I|II|III|IV|autorizada o vacio",
-  "published_date": "fecha del texto o vacio"
+  "published_date": "fecha del texto o vacio",
+  "dosage_form": "forma farmaceutica si es medicamento (tableta, solucion inyectable...) o vacio",
+  "strength": "concentracion o dosis (ej. 100 mg, 2,5 mg/ml) o vacio",
+  "route": "via de administracion (oral, intravenosa, subcutanea...) o vacio",
+  "brand": "marca comercial si consta o vacio",
+  "model": "modelo del dispositivo si consta o vacio",
+  "manufacturer": "fabricante o laboratorio si consta o vacio"
 }
 
 Definiciones de horizonte (use la mas avanzada que el texto soporte):
@@ -75,6 +81,7 @@ Definiciones de horizonte (use la mas avanzada que el texto soporte):
 Incluya: medicamentos, biologicos, terapias avanzadas, vacunas, dispositivos, diagnosticos y salud digital nominados.
 Excluya: navegacion, cookies, 'horizon scanning', el nombre de la agencia, eventos, empleos, boletines sin tecnologia.
 No copie el esquema de ejemplo. No invente identificadores NCT ni tecnologias que no esten en el texto.
+Los datos de producto (forma, concentracion, via, marca, modelo, fabricante) van solo si el texto los dice.
 Si dos menciones son la misma tecnologia, unifique en un item.
 Si no hay senales reales, []."""
 

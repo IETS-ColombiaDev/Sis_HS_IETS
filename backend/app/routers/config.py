@@ -16,7 +16,7 @@ from ..config import settings
 from ..database import get_db
 from ..deps import get_current_user, require_permission
 from ..models import Finding, Source, User
-from ..rbac import P_CONFIG_MANAGE, has_permission, role_label
+from ..rbac import P_CONFIG_MANAGE, effective_role, has_permission, role_label
 from ..schemas import ConfigOut, ConfigUpdate, GeminiTestIn, GeminiTestOut, ScanPromptOut, ScanPromptUpdate, ScanTraceOut
 
 # Valores del .env al importar el modulo (antes de que el arranque los pise con
@@ -483,7 +483,7 @@ def run_schedule_task(
         raise HTTPException(
             status_code=403,
             detail=(
-                f"El perfil '{role_label(user.role)}' no tiene el permiso requerido "
+                f"El perfil '{role_label(effective_role(user))}' no tiene el permiso requerido "
                 f"({meta['permission']}) para ejecutar {meta['label'].lower()}."
             ),
         )

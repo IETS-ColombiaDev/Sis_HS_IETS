@@ -25,7 +25,7 @@ corporativa definida en [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md).
 > Despliegue: [`DEPLOY.md`](DEPLOY.md) · Cumplimiento: [`BACKLOG.md`](BACKLOG.md).
 >
 > **Octubre 2026 — Matriz EH de fuentes.** El inventario se alinea con la matriz
-> «Fuentes de información proactiva EH»: **95 fuentes** en seis bloques (nuevo bloque de
+> «Fuentes de información proactiva EH»: **97 fuentes** en seis bloques (nuevo bloque de
 > revistas y portales de noticias), nivel de fuente, prioridad, tipos de tecnología,
 > ruta de acceso y URLs de entrada editables con listas desplegables. Cada fuente tiene
 > su **flujo de escaneo** (recorrido, enlaces, OCR, IA y búsqueda web) y la IA lanza
@@ -110,7 +110,7 @@ Cuatro conceptos ordenan todo el sistema. Entenderlos evita la mayor parte de la
 | **1. Identificación** | Vigilancia | `/vigilancia` | Conectores API (ClinicalTrials, openFDA, EMA, CTIS, PubMed, PCORI, Health Canada) y HTML con RSS o Google News de respaldo, en cola; vigilancia programada |
 | **Canal reactivo** | Postulación pública | `/postular` | Formulario externo con conflicto de interés; entra a moderación, no al catálogo |
 | **Canal reactivo** | Postulaciones | `/postulaciones` | Cola de aceptación o rechazo; lo aceptado llega a la bandeja como reactivo |
-| **1. Identificación** | Inventario | `/fuentes` | Catálogo D-06 + matriz EH: 95 fuentes con prioridad, nivel de fuente, tipos de tecnología y flujo de escaneo; sonda de salud y cobertura |
+| **1. Identificación** | Inventario | `/fuentes` | Catálogo D-06 + matriz EH: 97 fuentes con prioridad, nivel de fuente, tipos de tecnología y flujo de escaneo; sonda de salud y cobertura |
 | **1. Identificación** | **Bandeja de entrada** | `/bandeja-entrada` | Staging: clasificar señales capturadas y asignarlas por lotes al ciclo |
 | **Transversal** | **Ciclos** | `/ciclos` | Crear, transicionar y cerrar ciclos; embudo de conversión |
 | **Filtrado** | **Filtrado y depuración** | `/filtrado` | Duplicados difusos, verificación de novedad, cruce INVIMA y Listado Único |
@@ -442,7 +442,7 @@ Todo cambio de parámetro queda en la bitácora, con autor, momento y valor ante
 
 ## Inventario de fuentes y matriz EH
 
-El inventario de `/fuentes` combina el catálogo verificado D-06 (URL, adaptador, nivel de acceso A–E) con la matriz **«FUENTES DE INFORMACION PROACTIVA EH»** (hoja *MATRIZ FI EH*, 89 filas, y hoja *Criterios de búsqueda*, 11 categorías). Las 89 filas quedan mapeadas a códigos del catálogo: 47 coinciden con fuentes existentes y 42 son nuevas.
+El inventario de `/fuentes` combina el catálogo verificado D-06 (URL, adaptador, nivel de acceso A–E) con la matriz **«FUENTES DE INFORMACION PROACTIVA EH»** (hoja *MATRIZ FI EH*, 93 filas, y hoja *Criterios de búsqueda*, 11 categorías). Las 93 filas quedan mapeadas a códigos del catálogo (actualización del 23-10-2026: se suman Synapse y WHO ATC/DDD Index). El Excel no se versiona: se procesa a `backend/app/data/matriz_fuentes_eh.json`.
 
 | Bloque | Fuentes |
 |---|:---:|
@@ -515,7 +515,7 @@ En *Configuración › Parámetros de fuentes*, **Importar Excel** lee el archiv
 
 ```powershell
 cd backend
-.\.venv\Scripts\python.exe -m app.source_matrix "..\FUENTES DE INFORMACION PROACTIVA EH (1).xlsx"
+.\.venv\Scripts\python.exe -m app.source_matrix "..\FUENTES DE INFORMACION PROACTIVA EH.xlsx"
 ```
 
 ---

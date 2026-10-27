@@ -835,7 +835,7 @@ def _item_reviews(db, user):
 
 def build_my_work(db: Session, user: User, *, today: date | None = None) -> dict:
     today = today or _today()
-    role = rbac.canonical_role(user.role)
+    role = rbac.effective_role(user)
     cycle = cycle_service.get_active_cycle(db)
     backlog = rating_backlog(db, cycle, user)
     split_cache: dict = {}

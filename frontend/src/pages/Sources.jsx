@@ -75,6 +75,10 @@ const EMPTY = {
   ...matrixFormFrom(null),
 };
 const QUICK_EMPTY = { title: "", url: "", category: "Agencias de HTA y redes de EH" };
+const DISCOVER_EMPTY = { tech_types: [], focus: "", region: "" };
+const DISCOVER_HINT =
+  "La IA busca en la web fuentes de escaneo de horizonte (agencias regulatorias y de ETS, registros de ensayos, pipelines, redes como EuroScan o i-HTS, portales de noticias) que aún no estén en el catálogo. Descarta por dominio las que ya existen y verifica que respondan. No crea nada hasta que usted dé de alta cada propuesta.";
+const SUGGESTED_TONE = { alta: "success", media: "warning", baja: "neutral" };
 
 function healthTone(status) {
   if (status === "verde") return "verde";
@@ -146,6 +150,20 @@ export default function Sources() {
   const [importing, setImporting] = useState(false);
   const [probingAll, setProbingAll] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // Deteccion de fuentes con IA
+  const [discoverOpen, setDiscoverOpen] = useState(false);
+  const [discoverForm, setDiscoverForm] = useState(DISCOVER_EMPTY);
+  const [discovering, setDiscovering] = useState(false);
+  const [discovery, setDiscovery] = useState(null);
+  const [discoverError, setDiscoverError] = useState("");
+  const [acceptingUrl, setAcceptingUrl] = useState("");
+  const [accepted, setAccepted] = useState({});
+  const [selected, setSelected] = useState({});
+  const [enableIngest, setEnableIngest] = useState(false);
+  // Prioridad sugerida por la relevancia de las senales (OBS-001)
+  const [suggestions, setSuggestions] = useState({});
+  const [suggestionRule, setSuggestionRule] = useState("");
+  const [applyingId, setApplyingId] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -170,6 +188,13 @@ export default function Sources() {
       setMeta(data);
     } catch {
       // Sin las listas del servidor se usan las de respaldo.
+    }
+    try {
+      const { data } = await api.get("/sources/priority-suggestions");
+      setSuggestions(Object.fromEntries((data.items || []).map((i) => [i.source_id, i])));
+      setSuggestionRule(data.rule || "");
+    } catch {
+      // La sugerencia es complementaria: sin ella se muestra solo la prioridad oficial.
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -469,6 +494,121 @@ export default function Sources() {
     }
   };
 
+  const openDiscover = () => {
+    setDiscoverError("");
+    setDiscoverOpen(true);
+  };
+
+  const toggleDiscoverTech = (code) => {
+    setDiscoverForm((f) => ({
+      ...f,
+      tech_types: f.tech_types.includes(code) ? f.tech_types.filter((t) => t !== code) : [...f.tech_types, code],
+    }));
+  };
+
+  const runDiscover = async () => {
+    setDiscovering(true);
+    setDiscoverError("");
+    setDiscovery(null);
+    setSelected({});
+    try {
+      const { data } = await api.post(
+        "/sources/discover",
+        { ...discoverForm, focus: discoverForm.focus.trim(), region: discoverForm.region.trim() },
+        { timeout: SCAN_TIMEOUT }
+      );
+      setDiscovery(data);
+      setSelected(Object.fromEntries((data.candidates || []).map((c) => [c.url, true])));
+      const n = (data.candidates || []).length;
+      if (n) toast.success(`${n} fuente(s) candidata(s) que no están en el catálogo`);
+      else toast.warning("No se encontraron fuentes nuevas con ese enfoque");
+    } catch (e) {
+      setDiscoverError(apiError(e, "No se pudo completar la detección de fuentes"));
+    } finally {
+      setDiscovering(false);
+    }
+  };
+
+  /** Da de alta una candidata. Devuelve true si quedo registrada (o ya lo estaba). */
+  const acceptCandidate = async (c, { quiet = false } = {}) => {
+    setAcceptingUrl(c.url);
+    try {
+      const { data } = await api.post("/sources/discover/accept", { ...c, enable_ingest: enableIngest });
+      setAccepted((prev) => ({ ...prev, [c.url]: { title: data.title, existing: false } }));
+      if (!quiet) toast.success(`"${data.title}" dada de alta, pendiente de verificación`);
+      return true;
+    } catch (e) {
+      if (e?.response?.status === 409) {
+        setAccepted((prev) => ({ ...prev, [c.url]: { title: apiError(e, "Ya existe en el catálogo"), existing: true } }));
+      }
+      if (!quiet) toast.error(apiError(e, "No se pudo dar de alta la fuente"));
+      return false;
+    } finally {
+      setAcceptingUrl("");
+    }
+  };
+
+  const acceptSelected = async () => {
+    const pending = (discovery?.candidates || []).filter((c) => selected[c.url] && !accepted[c.url]);
+    let ok = 0;
+    for (const c of pending) {
+      if (await acceptCandidate(c, { quiet: true })) ok += 1;
+    }
+    if (ok) toast.success(`${ok} fuente(s) dada(s) de alta, pendientes de verificación`);
+    if (ok < pending.length) toast.warning(`${pending.length - ok} no se registraron (ya existían o hubo un error)`);
+    load();
+  };
+
+  const applySuggestion = async (s) => {
+    setApplyingId(s.id);
+    try {
+      const { data } = await api.post(`/sources/${s.id}/priority-suggestion/apply`);
+      toast.success(`Prioridad de "${data.title}" actualizada a ${optionLabel(options, "priority_level", data.priority_level)}`);
+      if (detailSource?.id === s.id) setDetailSource(data);
+      load();
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo aplicar la prioridad sugerida"));
+    } finally {
+      setApplyingId(null);
+    }
+  };
+
+  /** Prioridad sugerida por las senales, junto a la oficial. Nunca la reemplaza sola. */
+  const SuggestedPriority = ({ s }) => {
+    const sug = suggestions[s.id];
+    if (!sug) return null;
+    const tip = `${sug.reason}. ${suggestionRule}`.trim();
+    if (!sug.suggested) {
+      return (
+        <span title={tip} aria-label={`Prioridad sugerida: sin datos. ${tip}`}>
+          <Badge tone="neutral">Sugerida: sin datos</Badge>
+        </span>
+      );
+    }
+    const label = optionLabel(options, "priority_level", sug.suggested);
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+        <span title={tip} aria-label={`Prioridad sugerida: ${label}. ${tip}`}>
+          <Badge tone={SUGGESTED_TONE[sug.suggested] || "neutral"}>
+            Sugerida: {label} ({sug.reason})
+          </Badge>
+        </span>
+        {canWrite && sug.differs && (
+          <HintButton
+            size="sm"
+            variant="ghost"
+            hint={`Reemplaza la prioridad oficial (${s.priority_level ? optionLabel(options, "priority_level", s.priority_level) : "sin asignar"}) por ${label}. Queda en la bitácora.`}
+            loading={applyingId === s.id}
+            onClick={() => applySuggestion(s)}
+            aria-label={`Aplicar prioridad sugerida ${label} a ${s.title}`}
+          >
+            Aplicar
+          </HintButton>
+        )}
+      </span>
+    );
+  };
+
   /** Botones de accion por fuente, con el motivo cuando no aplican. */
   const SourceActions = ({ s, compact = false }) => {
     const ingestWhy = !canScan ? noScan : ingestBlocker(s);
@@ -547,7 +687,12 @@ export default function Sources() {
       width: 110,
       label: "Prioridad",
       tip: <InfoTip text={GLOSSARY.fb_prioridad_fuente} label="Qué es la prioridad" />,
-      render: (s) => (s.priority_level ? <MatrixBadges source={{ priority_level: s.priority_level }} options={options} /> : <span className="muted">Sin asignar</span>),
+      render: (s) => (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
+          {s.priority_level ? <MatrixBadges source={{ priority_level: s.priority_level }} options={options} /> : <span className="muted">Sin asignar</span>}
+          <SuggestedPriority s={s} />
+        </div>
+      ),
     },
     { key: "tier", width: 100, label: "Nivel de fuente", tip: <InfoTip text={GLOSSARY.fb_nivel_fuente} label="Qué es el nivel de fuente" />, render: (s) => optionLabel(options, "source_level", s.source_level || "por_definir") },
     { key: "tech", width: 110, label: "Tecnologías", render: (s) => (s.tech_types || []).join(", ") || "—" },
@@ -585,6 +730,9 @@ export default function Sources() {
             </HintButton>
             <HintButton variant="outline" hint={GLOSSARY.fb_recargar_catalogo} disabledHint={noWrite} disabled={!canWrite} onClick={() => setConfirmImport(true)}>
               <Icon name="layers" size={16} /> Recargar catálogo
+            </HintButton>
+            <HintButton variant="outline" hint={DISCOVER_HINT} disabledHint={noWrite} disabled={!canWrite} onClick={openDiscover}>
+              <Icon name="spark" size={16} /> Detectar fuentes con IA
             </HintButton>
             <HintButton variant="secondary" hint={GLOSSARY.fb_alta_rapida} disabledHint={noWrite} disabled={!canWrite} onClick={() => { setQuick(QUICK_EMPTY); setPreview(null); setQuickOpen(true); }}>
               <Icon name="plus" size={16} /> Alta rápida
@@ -737,6 +885,11 @@ export default function Sources() {
                           {s.retired && <span title={GLOSSARY.fb_retirada}><Badge tone="viewer">Retirada</Badge></span>}
                           {!s.retired && !s.scrape_enabled && <span title={GLOSSARY.fb_ingesta}><Badge tone="viewer">Ingesta apagada</Badge></span>}
                         </div>
+                        {suggestions[s.id] && (
+                          <div style={{ marginTop: 6 }}>
+                            <SuggestedPriority s={s} />
+                          </div>
+                        )}
                         <h4>{s.title}</h4>
                         {s.url && (
                           <a href={s.url} target="_blank" rel="noreferrer" className="registry-url">
@@ -853,6 +1006,159 @@ export default function Sources() {
           )}
         </Card>
       )}
+
+      {/* Deteccion de fuentes con IA */}
+      <Modal
+        open={discoverOpen}
+        onClose={() => !discovering && setDiscoverOpen(false)}
+        title="Detectar fuentes con IA"
+        width={860}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDiscoverOpen(false)} disabled={discovering}>Cerrar</Button>
+            {(discovery?.candidates || []).length > 0 && (
+              <Button
+                variant="outline"
+                onClick={acceptSelected}
+                loading={Boolean(acceptingUrl)}
+                disabled={discovering || !(discovery.candidates || []).some((c) => selected[c.url] && !accepted[c.url])}
+              >
+                Dar de alta las seleccionadas
+              </Button>
+            )}
+            <Button onClick={runDiscover} loading={discovering}>
+              <Icon name="spark" size={15} /> {discovery ? "Detectar de nuevo" : "Detectar"}
+            </Button>
+          </>
+        }
+      >
+        <p style={{ fontSize: 13, color: "#64748B", marginTop: 0 }}>{DISCOVER_HINT}</p>
+        <fieldset style={{ border: 0, padding: 0, margin: "0 0 12px" }}>
+          <legend style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Tipos de tecnología (opcional)</legend>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+            {(options.tech_type || []).map((o) => (
+              <label key={o.value} className="catalog-check" title={o.description || o.label}>
+                <input type="checkbox" checked={discoverForm.tech_types.includes(o.value)} onChange={() => toggleDiscoverTech(o.value)} disabled={discovering} />
+                {o.value} · {o.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <div className="fb-grid-2">
+          <Input
+            id="discover-focus"
+            label="Tema o enfoque (opcional)"
+            placeholder="Ej.: terapias génicas, oncología de precisión"
+            maxLength={200}
+            value={discoverForm.focus}
+            disabled={discovering}
+            onChange={(e) => setDiscoverForm({ ...discoverForm, focus: e.target.value })}
+          />
+          <Input
+            id="discover-region"
+            label="País o región (opcional)"
+            placeholder="Ej.: Latinoamérica, Brasil, Europa"
+            maxLength={120}
+            value={discoverForm.region}
+            disabled={discovering}
+            onChange={(e) => setDiscoverForm({ ...discoverForm, region: e.target.value })}
+          />
+        </div>
+        <label className="catalog-check" style={{ marginBottom: 8 }}>
+          <input type="checkbox" checked={enableIngest} onChange={(e) => setEnableIngest(e.target.checked)} />
+          Activar la ingesta al dar de alta (si no, queda apagada hasta verificarla)
+        </label>
+
+        {discoverError && <p className="public-submit-error" role="alert">{discoverError}</p>}
+        {discovering && (
+          <p role="status" aria-live="polite" style={{ fontSize: 13, color: "#475569" }}>
+            Buscando en la web y comparando con el catálogo. Puede tardar uno o dos minutos...
+          </p>
+        )}
+
+        {discovery && !discovering && (
+          <div aria-live="polite">
+            {discovery.message && (
+              <p role="status" style={{ fontSize: 12.5, color: "#92400E", background: "#FFFBEB", padding: "8px 10px", borderRadius: 8 }}>
+                {discovery.message}
+              </p>
+            )}
+            <p style={{ fontSize: 12.5, color: "#64748B" }}>
+              {discovery.queries?.length || 0} consulta(s) {discovery.query_origin === "ia" ? "redactadas por la IA" : "por reglas"}
+              {" · "}{discovery.ai_calls} llamada(s) a la IA (máx. {discovery.limits?.max_ai_calls})
+              {" · "}{(discovery.already_in_catalog || []).length} ya en el catálogo
+              {" · "}{(discovery.discarded || []).length} descartada(s) por no responder
+            </p>
+            {(discovery.candidates || []).length === 0 ? (
+              <EmptyState icon="🔎" title="Sin fuentes nuevas" message="Pruebe con otro tema, otra región u otros tipos de tecnología." />
+            ) : (
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 10 }}>
+                {discovery.candidates.map((c) => {
+                  const done = accepted[c.url];
+                  return (
+                    <li key={c.url} style={{ border: "1px solid #E2E8F0", borderRadius: 10, padding: 12, background: done ? "#F8FAFC" : "#fff" }}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        <input
+                          type="checkbox"
+                          aria-label={`Seleccionar ${c.name}`}
+                          checked={Boolean(selected[c.url]) && !done}
+                          disabled={Boolean(done)}
+                          onChange={(e) => setSelected((prev) => ({ ...prev, [c.url]: e.target.checked }))}
+                          style={{ width: 18, height: 18, marginTop: 2 }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                            <strong>{c.name}</strong>
+                            <Badge tone={c.access_level}>Acceso {c.access_level}</Badge>
+                            <Badge tone="info">{optionLabel(options, "source_level", c.source_level)}</Badge>
+                            {c.origin === "ia" && <span title="Propuesta por el conocimiento de la IA, no por un resultado de búsqueda"><Badge tone="warning">Conocimiento IA</Badge></span>}
+                            {c.reachable?.status >= 400 && <span title={c.reachable.detail}><Badge tone="ambar">Acceso restringido</Badge></span>}
+                          </div>
+                          <a href={c.url} target="_blank" rel="noreferrer" className="registry-url">{c.url.replace(/^https?:\/\//, "").slice(0, 80)}</a>
+                          <p style={{ margin: "4px 0", fontSize: 13 }}>{c.justification || "Sin justificación."}</p>
+                          <p style={{ margin: 0, fontSize: 12, color: "#64748B" }}>
+                            {blockLabel(c.category)} · {c.country || "País sin determinar"} · {(c.tech_types || []).join(", ") || "—"}
+                          </p>
+                        </div>
+                        <div style={{ flex: "0 0 auto" }}>
+                          {done ? (
+                            <Badge tone={done.existing ? "viewer" : "ok"}>{done.existing ? "Ya existe" : "Dada de alta"}</Badge>
+                          ) : (
+                            <Button size="sm" variant="outline" loading={acceptingUrl === c.url} disabled={Boolean(acceptingUrl)} onClick={() => acceptCandidate(c).then((ok) => ok && load())}>
+                              Dar de alta
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      {done?.existing && <p style={{ margin: "6px 0 0 28px", fontSize: 12, color: "#64748B" }}>{done.title}</p>}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {(discovery.already_in_catalog || []).length > 0 && (
+              <details style={{ marginTop: 12 }}>
+                <summary style={{ cursor: "pointer", fontSize: 13 }}>Encontradas que ya están en el catálogo ({discovery.already_in_catalog.length})</summary>
+                <ul style={{ fontSize: 12.5, color: "#475569" }}>
+                  {discovery.already_in_catalog.map((e) => (
+                    <li key={e.url}>{e.url.replace(/^https?:\/\//, "").slice(0, 70)} → {e.source_title || "catálogo D-06"} (coincide por {e.match})</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {(discovery.discarded || []).length > 0 && (
+              <details style={{ marginTop: 8 }}>
+                <summary style={{ cursor: "pointer", fontSize: 13 }}>Descartadas porque no respondieron ({discovery.discarded.length})</summary>
+                <ul style={{ fontSize: 12.5, color: "#475569" }}>
+                  {discovery.discarded.map((d) => (
+                    <li key={d.url}>{d.name} · {d.url.replace(/^https?:\/\//, "").slice(0, 70)} · {d.detail}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {/* Alta rapida */}
       <Modal
@@ -973,7 +1279,7 @@ export default function Sources() {
               <div><dt>Términos</dt><dd>{detailSource.terms_accepted_at ? `Aceptados ${new Date(detailSource.terms_accepted_at).toLocaleDateString()}` : (detailSource.terms_url || "No aplican")}</dd></div>
               {detailSource.last_error && <div><dt>Último error</dt><dd>{detailSource.last_error.slice(0, 300)}</dd></div>}
               <div><dt><TermLabel tip={GLOSSARY.fb_nivel_fuente}>Nivel de fuente</TermLabel></dt><dd>{optionLabel(options, "source_level", detailSource.source_level || "por_definir")}</dd></div>
-              <div><dt><TermLabel tip={GLOSSARY.fb_prioridad_fuente}>Prioridad</TermLabel></dt><dd>{detailSource.priority_level ? optionLabel(options, "priority_level", detailSource.priority_level) : "Sin asignar"}</dd></div>
+              <div><dt><TermLabel tip={GLOSSARY.fb_prioridad_fuente}>Prioridad</TermLabel></dt><dd>{detailSource.priority_level ? optionLabel(options, "priority_level", detailSource.priority_level) : "Sin asignar"}{suggestions[detailSource.id] && <div style={{ marginTop: 4 }}><SuggestedPriority s={detailSource} /></div>}</dd></div>
               <div><dt><TermLabel tip={GLOSSARY.fb_tipos_tecnologia}>Tipos de tecnología</TermLabel></dt><dd>{(detailSource.tech_types || []).map((t) => optionLabel(options, "tech_type", t)).join(", ") || "—"}</dd></div>
               <div><dt>Origen en la matriz</dt><dd>{[detailSource.matrix_ref, detailSource.matrix_origin].filter(Boolean).join(" · ") || "—"}</dd></div>
               <div>
