@@ -5,7 +5,7 @@ RF06 y RF07 (clasificacion obligatoria) y RF08 (asignacion al ciclo activo).
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_
@@ -112,6 +112,14 @@ def _entry_for(db: Session, cycle_id: int, technology_id: int) -> CycleTechnolog
 # --------------------------------------------------------------------------- #
 #  Staging: bandeja de entrada (RF04)
 # --------------------------------------------------------------------------- #
+COLOMBIA_TZ = timezone(timedelta(hours=-5))
+
+
+def _colombia_midnight_utc(day: date) -> datetime:
+    """Medianoche de Colombia de `day`, en UTC: captured_at se guarda en UTC."""
+    return datetime.combine(day, time.min, COLOMBIA_TZ).astimezone(timezone.utc)
+
+
 @router.get("/staging", response_model=list[TechnologyOut])
 def list_staging(
     response: Response,
@@ -121,6 +129,8 @@ def list_staging(
     source_id: int | None = Query(None),
     channel: str | None = Query(None),
     since: datetime | None = Query(None),
+    date_from: date | None = Query(None, description="Capturadas desde este dia (hora Colombia)"),
+    date_to: date | None = Query(None, description="Capturadas hasta este dia, inclusive (hora Colombia)"),
     corroborated: bool | None = Query(None, description="Solo las que otra fuente tambien reporta"),
     limit: int = Query(100, le=500),
     offset: int = Query(0, ge=0),
@@ -139,6 +149,10 @@ def list_staging(
         query = query.filter(Technology.source_channel == channel)
     if since:
         query = query.filter(Technology.captured_at >= since)
+    if date_from:
+        query = query.filter(Technology.captured_at >= _colombia_midnight_utc(date_from))
+    if date_to:
+        query = query.filter(Technology.captured_at < _colombia_midnight_utc(date_to + timedelta(days=1)))
     if q:
         like = f"%{q.lower()}%"
         query = query.filter(

@@ -5,7 +5,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.0.0 · actualizada el 27 de octubre de 2026 (validación del módulo 0) |
+| **Versión del sistema** | 7.0.0 · actualizada el 29 de octubre de 2026 (validación del módulo 0) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
@@ -23,6 +23,7 @@ Ajustes del consolidado de observaciones SI EAA (módulo 0: identificación y ca
 | **Detectar fuentes con IA**: propone sitios que aún no están en el catálogo | [8.8](#88-detectar-fuentes-con-ia-paso-a-paso) |
 | **Ver como otro perfil** (solo superadministrador) | [3.3](#33-ver-como-otro-perfil-solo-superadministrador) |
 | CSV del catálogo legible en Excel (punto y coma, UTF-8) | [8.3](#83-botones-de-la-barra-superior) |
+| **Filtro por fechas en la bandeja** («Desde / Hasta» de captura), agregado el 29 de octubre (RF-04) | [10.5](#105-filtros-y-canales) |
 
 ---
 
@@ -720,9 +721,17 @@ Las señales/tecnologías **recién capturadas** esperan aquí **sin ciclo**. Us
 4. Toast: cuántas se asignaron; las que ya estaban se informan como omitidas.  
 5. Continúe en **Filtrado** (cuando el ciclo esté en ese estado).
 
-### 10.5 Canales
+### 10.5 Filtros y canales
 
-En filtros puede distinguir capturas **proactivas** (vigilancia) y **reactivas** (postulación aceptada).
+La barra de filtros de la bandeja permite combinar:
+
+| Filtro | Qué hace |
+|---|---|
+| Buscar | Texto en el nombre, la DCI o el resumen |
+| Fuente | Solo las señales de una fuente del catálogo |
+| Canal | **Búsqueda proactiva** (vigilancia) o **Postulación reactiva** (postulación aceptada) |
+| **Desde / Hasta** | Rango de fechas de captura, en hora de Colombia; «Hasta» incluye todo ese día |
+| Solo detectadas en varias fuentes | Señales corroboradas (ver 10.7) |
 
 ### 10.6 Errores típicos
 
@@ -730,7 +739,7 @@ En filtros puede distinguir capturas **proactivas** (vigilancia) y **reactivas**
 |---|---|---|
 | No deja asignar | Falta clúster o tipología | Clasifique primero |
 | “Ya estaban en el ciclo” | Duplicó la asignación | Normal; no crea duplicado de instancia |
-| No ve la señal | Filtro de búsqueda activo | Limpie filtros (incluida la casilla «Solo detectadas en varias fuentes») |
+| No ve la señal | Filtro de búsqueda activo | Limpie filtros (incluidas las fechas «Desde / Hasta» y la casilla «Solo detectadas en varias fuentes») |
 
 ### 10.7 Misma tecnología en varias fuentes (corroboración)
 

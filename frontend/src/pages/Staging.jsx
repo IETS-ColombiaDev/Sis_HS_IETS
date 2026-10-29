@@ -70,8 +70,8 @@ export default function Staging() {
   const [loadingMore, setLoadingMore] = useState(false);
   const firstLoad = useRef(true);
   const [selected, setSelected] = useState(() => new Set());
-  const [filters, setFilters] = useState({ q: "", source_id: "", channel: "", corroborated: false });
-  const [query, setQuery] = useState({ q: "", source_id: "", channel: "", corroborated: false });
+  const [filters, setFilters] = useState({ q: "", source_id: "", channel: "", date_from: "", date_to: "", corroborated: false });
+  const [query, setQuery] = useState({ q: "", source_id: "", channel: "", date_from: "", date_to: "", corroborated: false });
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
@@ -103,6 +103,8 @@ export default function Staging() {
       if (query.q) p.q = query.q;
       if (query.source_id) p.source_id = query.source_id;
       if (query.channel) p.channel = query.channel;
+      if (query.date_from) p.date_from = query.date_from;
+      if (query.date_to) p.date_to = query.date_to;
       if (query.corroborated) p.corroborated = true;
       return p;
     },
@@ -493,6 +495,24 @@ export default function Staging() {
             <option value="proactiva">Búsqueda proactiva</option>
             <option value="reactiva">Postulación reactiva</option>
           </Select>
+          <Input
+            type="date"
+            aria-label="Capturadas desde"
+            title="Capturadas desde (fecha)"
+            value={filters.date_from}
+            max={filters.date_to || undefined}
+            onChange={(e) => setFilters({ ...filters, date_from: e.target.value })}
+            style={{ marginBottom: 0 }}
+          />
+          <Input
+            type="date"
+            aria-label="Capturadas hasta"
+            title="Capturadas hasta (fecha, inclusive)"
+            value={filters.date_to}
+            min={filters.date_from || undefined}
+            onChange={(e) => setFilters({ ...filters, date_to: e.target.value })}
+            style={{ marginBottom: 0 }}
+          />
           <label className="staging-check">
             <input
               type="checkbox"
@@ -522,14 +542,14 @@ export default function Staging() {
         <Card>
           <EmptyState
             icon="📥"
-            title={query.q || query.source_id || query.channel ? "Sin resultados" : "La bandeja está vacía"}
+            title={query.q || query.source_id || query.channel || query.date_from || query.date_to ? "Sin resultados" : "La bandeja está vacía"}
             message={
-              query.q || query.source_id || query.channel
-                ? "Ninguna señal sin asignar coincide con los filtros. Limpie la búsqueda o cambie de fuente."
+              query.q || query.source_id || query.channel || query.date_from || query.date_to
+                ? "Ninguna señal sin asignar coincide con los filtros. Limpie la búsqueda, cambie de fuente o amplíe las fechas."
                 : "Ejecute la vigilancia para capturar señales nuevas desde los referentes internacionales."
             }
             action={
-              query.q || query.source_id || query.channel ? (
+              query.q || query.source_id || query.channel || query.date_from || query.date_to ? (
                 <Button variant="secondary" onClick={() => setFilters({ q: "", source_id: "", channel: "" })}>
                   Limpiar filtros
                 </Button>

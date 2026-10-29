@@ -198,3 +198,29 @@ def test_refresh_is_skipped_when_nothing_changed(api):
         _tech(db, "Algo", None, source_channel="reactiva")
         db.commit()
         assert corroboration.refresh(db)["refreshed"] is True
+
+
+# --------------------------------------------------------------------------- #
+#  RF-04 Bandeja: filtro por fecha de captura
+# --------------------------------------------------------------------------- #
+def test_inbox_filters_by_capture_date_in_colombia_time(api):
+    from datetime import datetime, timezone
+
+    sid = api.add_source()
+    with api.db() as db:
+        # 2026-10-10 03:00 UTC = 2026-10-09 22:00 en Colombia.
+        early = _tech(db, "Captura del 9", sid, captured_at=datetime(2026, 10, 10, 3, 0, tzinfo=timezone.utc))
+        mid = _tech(db, "Captura del 15", sid, captured_at=datetime(2026, 10, 15, 15, 0, tzinfo=timezone.utc))
+        late = _tech(db, "Captura del 20", sid, captured_at=datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc))
+        db.commit()
+        ids = (early.id, mid.id, late.id)
+
+    def got(**params):
+        res = api.get("/api/technologies/staging", params=params)
+        assert res.status_code == 200, res.text
+        return {r["id"] for r in res.json()} & set(ids)
+
+    assert got(date_from="2026-10-10", date_to="2026-10-15") == {ids[1]}
+    assert got(date_to="2026-10-09") == {ids[0]}
+    assert got(date_from="2026-10-15") == {ids[1], ids[2]}
+    assert got(date_from="2026-10-01", date_to="2026-10-31", source_id=sid) == set(ids)
