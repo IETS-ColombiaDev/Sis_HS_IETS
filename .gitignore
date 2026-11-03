@@ -29,3 +29,6 @@ Thumbs.db
 
 # Excel de la matriz de fuentes EH: se procesa a backend/app/data/matriz_fuentes_eh.json
 FUENTES DE INFORMACION PROACTIVA EH*.xlsx
+
+# Archivos de bloqueo de Office
+~$*
