@@ -8,12 +8,13 @@
 #   e2e       Playwright (chromium) contra el backend con SQLite temporal
 #   smoke     uvicorn + smoke_test.py --skip-network
 #   docker    build de la imagen (sin push) y validacion de docker-compose.yml
+#   commits   (solo PR) formato de CONTRIBUTING.md: tipo(modulo) y Entrega: En
 # ============================================================================
 name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
   workflow_dispatch:
 
@@ -30,6 +31,36 @@ env:
   PYTEST_VERSION: "9.1.1"
 
 jobs:
+  # ------------------------------------------------------------------------ #
+  commits:
+    name: Formato de commits
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Asunto convencional y pie Entrega
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          tipos='feat|fix|docs|test|refactor|perf|ci|build|chore|revert'
+          fallas=0
+          for sha in $(git rev-list --no-merges "$BASE..$HEAD"); do
+            asunto=$(git log -1 --format=%s "$sha")
+            if ! echo "$asunto" | grep -qE "^($tipos)(\([a-z0-9-]+\))?!?: .{3,72}$"; then
+              echo "::error::$sha asunto fuera de formato: $asunto"; fallas=1
+            fi
+            if ! git log -1 --format=%B "$sha" | grep -qE '^Entrega: E[1-9]$'; then
+              echo "::error::$sha sin pie 'Entrega: En': $asunto"; fallas=1
+            fi
+          done
+          if [ "$fallas" = 1 ]; then
+            echo "Ver CONTRIBUTING.md, seccion Mensajes de commit."; exit 1
+          fi
+
   # ------------------------------------------------------------------------ #
   backend:
     name: Backend (pytest + Alembic)
