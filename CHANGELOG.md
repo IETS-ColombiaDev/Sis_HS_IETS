@@ -2,25 +2,32 @@
 
 Una sección por entrega del cronograma. Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y [versionamiento semántico](https://semver.org/lang/es/). El flujo para producirlas está en [CONTRIBUTING.md](CONTRIBUTING.md).
 
-> Hasta el 29 de octubre de 2026 los commits no seguían una convención (`UT`, `UT_Changes`, `UT_C`...). Las secciones de E4 y E5 se reconstruyeron a partir de las fechas de los commits, de `BACKLOG.md` y de los commits que sí traían descripción. La historia no se reescribe: los identificadores de commit se conservan para auditoría.
+> El 3 de noviembre de 2026 se renombraron los mensajes de los 38 commits anteriores (`UT`, `UT_Changes`, `UT_C`...) al formato de `CONTRIBUTING.md`, con el pie `Entrega:` según el corte en que quedó cada uno. Solo cambiaron los mensajes: contenido, autor y fechas son idénticos. La correspondencia entre identificadores anteriores y nuevos está en [docs/historial-commits.md](docs/historial-commits.md).
 
 ## [Sin publicar] — Entrega 5 · Inteligencia analítica y priorización (05-nov-2026) → `v7.1.0`
 
-Commits `cc7f53b` … `fbaeff2` (19 al 29 de octubre) y los que entren a `develop` hasta el cierre.
+Commits `59448f5` … `dd45b65` (19 al 29 de octubre) y los que entren a `develop` hasta el cierre.
 
 ### Agregado
-- Guía rápida: pantallas «Quién hace qué» y «Cómo se pasan el trabajo», alineadas con `rbac.py` y las transiciones editoriales (`8780cf3`).
-- Tablero estratégico rediseñado: resumen para decidir, embudo con pérdidas por etapa, llegada al mercado por franja, matriz de decisión por cuadrantes, avance de expedientes e impacto presupuestal (`84d4ee4`).
-- Vigilancia: respaldo por RSS de Google News para sitios que bloquean robots; NHS AAC y Cochrane por su RSS oficial (`033dde6`).
+- PDF nativo de fichas técnicas, boletines e informes de evaluación (`59448f5`).
+- Consulta en vivo al dato abierto del INVIMA cuando el índice local no alcanza el umbral (`e1f6cfb`).
+- Guía rápida con diagramas por fase (`6bdd8ae`) y pantallas «Quién hace qué» y «Cómo se pasan el trabajo» (`9bc941a`).
+- Vigilancia: respaldo por RSS de Google News para sitios que bloquean robots; NHS AAC y Cochrane por su RSS oficial (`c01519d`).
+- Tablero estratégico rediseñado: resumen para decidir, embudo con pérdidas por etapa, llegada al mercado por franja, matriz de decisión por cuadrantes, avance de expedientes e impacto presupuestal (`ac0db4d`).
+- Confiabilidad de la tecnología y origen de la señal en la bandeja, migración 0003 (`ebe9b51`).
+- Componentes base de interfaz, asistente de navegación y menú por fases (`a0662df`).
+- Formulario público de postulación y avisos (`7e70f19`).
+- 97 fuentes, corroboración entre fuentes, datos de producto inferidos y reproceso de señales, migración 0004 (`3079e5d`).
+- Bandeja: filtro por fecha de captura en hora de Colombia (`dd45b65`).
 
 ### Cambiado
-- La sonda de fuentes marca en ámbar las URL que ya no existen y deja de suspender la ingesta por deriva de campos opcionales (`033dde6`).
-- Un sitio sin respuesta se omite 12 h y pasa directo al respaldo (antes 3,5 min por corrida) (`033dde6`).
-- Ajustes de escaneo y de interfaz sin descripción en el commit (`cc7f53b`, `b23b3e8`, `f765e60`, `bc98e4c`, `bda167c`, `1a074f9`, `a7276f0`, `fbaeff2`).
+- Conectores EMA, CTIS, FDA y Health Canada corregidos tras la ingesta real del 19 de octubre (`59448f5`).
+- Worker de vigilancia encendido en Render; el escaneo ya no retiene escrituras durante la red (`e1f6cfb`).
+- La sonda de fuentes marca en ámbar las URL que ya no existen y deja de suspender la ingesta por deriva de campos opcionales (`c01519d`).
 
 ### Documentación
-- README actualizado al 20 de octubre (`6bdf70d`).
-- Consolidado de observaciones de la validación de la beta, plan de trabajo a diciembre y cronograma del componente de desarrollo versionados en el repositorio.
+- README del 20 de octubre (`c490fb0`).
+- Consolidado de observaciones de la validación de la beta, plan de trabajo a diciembre y cronograma del componente de desarrollo.
 - Flujo de ramas, convención de commits, plantilla de pull request y estas notas de versión.
 
 ### Integración continua
@@ -28,22 +35,29 @@ Commits `cc7f53b` … `fbaeff2` (19 al 29 de octubre) y los que entren a `develo
 
 ## [7.0.0] — Entrega 4 · Versión beta / producto mínimo viable (16-oct-2026)
 
-Etiqueta `v7.0.0` sobre `2405374` (15-oct-2026), último commit antes de la liberación de la beta. Commits `f9c1eab` … `2405374`.
+Etiqueta `v7.0.0` sobre `d491460` (15-oct-2026), último commit antes de la liberación de la beta. Commits `1d5f81b` … `d491460`.
 
 ### Agregado
-- Despliegue en Render con `render.yaml` sobre la imagen Docker (`590f515`, `ca9346b`).
-- Sincronización de la base con Firestore, `backend/app/firebase_db.py` (`f2946b3`).
-- Copia completa de la base en el navegador del administrador (IndexedDB), con exportación y restauración, para no perder trabajo cuando Render reinicia el disco (`dd57370`, `6e28f1c`).
-- Flujo `keepalive` que mantiene despierto el plan gratuito de Render (`548d54f`).
+- Matriz de fuentes EH, perfiles de fuente y búsqueda web, migración 0002 (`1d5f81b`).
+- MiniMax como proveedor principal de IA y guía de usuario (`d0f0e99`).
+- Despliegue en Render con `render.yaml` sobre la imagen Docker (`5b2f1e7`).
+- Flujo `keepalive` que mantiene despierto el plan gratuito de Render (`bf785a2`).
+- Copia completa de la base en el navegador del administrador (IndexedDB), con exportación y restauración (`9dbfc52`, `0d0efc6`).
+- Guía de bienvenida y validación de requerimientos (`62c03bd`).
+- Persistencia de la base en Firestore y autenticación Firebase (`33cb4fc`).
 
 ### Corregido
-- Bloqueo del ingreso por escrituras concurrentes en SQLite (`d587c93`).
-- Ingreso más rápido: sin consulta a Firestore ni ruido de auditoría en campos de sesión (`d6c18fb`).
-- Ingreso sin credenciales en modo solo lectura y worker de ingesta apagado bajo SQLite (`9eab05e`).
+- Errores 500 registrados con una referencia citable (`bd81b00`).
+- Bloqueos de SQLite: WAL, `busy_timeout` y reintentos (`7d0e5bd`), copia por lotes (`646835b`) e ingreso sin escrituras concurrentes (`9fa380c`).
+- Ingreso más rápido, sin consultar Firestore ni auditar campos de sesión (`ba844fa`).
+- Ingreso sin credenciales en solo lectura (`6ac5f63`).
+- Publicación en Firestore al arrancar y espera más larga en la interfaz (`0921f75`); cuenta de servicio en caché y recargas sin indicador de carga (`d491460`).
 
 ### Conocido
-- `iets_horizonte.db` y su `-wal` llegaron a versionarse en la raíz (`3667ac6`, `fa5719b`).
+- `iets_horizonte.db` y su `-wal` llegaron a versionarse (`a686cc9`, `01e29fe`, `72d8860`).
 
-## Base — Entregas 1 a 3 (28-ago a 23-sep-2026)
+## Base — Prototipo (E0) y entregas 1 a 3 (hasta 23-sep-2026)
 
-Entregas documentales (plan, requerimientos, arquitectura); sin etiqueta de código. En el repositorio quedó la base del sistema `v7.0.0` (fases 0 a 7 de `BACKLOG.md`), commits `12322b3` … `f343a06` (10-jul a 10-sep-2026). La etiqueta `unidadanalitica` apunta a `f343a06`.
+- **E0, prototipo previo al componente** (10-jul-2026): `87e6593`, `30e5b74`.
+- **E2** (2 al 10-sep-2026): ciclos, staging, priorización %P, desduplicación e INVIMA (`0b6a322`); catálogo D-06 y conectores (`48085a9`); Alembic, CI, Docker y versión 7.0.0 (`56f69c1`); `221a862`, `1dc981f`.
+- E1 y E3 son documentales y no tienen commits. La etiqueta `unidadanalitica` apunta a `1dc981f`.

@@ -1,6 +1,6 @@
 # Flujo de trabajo en el repositorio
 
-Aplica la actividad 16 del cronograma (repositorio, estrategia de ramas y versionamiento semántico) y la actividad 21 (integración y despliegue continuos). Rige desde el 3 de noviembre de 2026; la historia anterior se resume por entrega en [CHANGELOG.md](CHANGELOG.md).
+Aplica la actividad 16 del cronograma (repositorio, estrategia de ramas y versionamiento semántico) y la actividad 21 (integración y despliegue continuos). Rige desde el 3 de noviembre de 2026. Los commits anteriores se renombraron a esta convención sin cambiar su contenido; ver [docs/historial-commits.md](docs/historial-commits.md) y, por entrega, [CHANGELOG.md](CHANGELOG.md).
 
 ## Ramas
 
@@ -38,7 +38,8 @@ Entrega: E5
 - **Tipos:** `feat` (funcionalidad), `fix` (defecto), `docs`, `test`, `refactor`, `perf`, `ci`, `build`, `chore`, `revert`.
 - **Módulos sugeridos:** `vigilancia`, `bandeja`, `ciclos`, `filtrado`, `priorizacion`, `evaluacion`, `tablero`, `boletines`, `asistente`, `auth`, `rbac`, `ia`, `fuentes`, `api`, `db`, `deploy`, `repo`.
 - **`Refs:`** los RF o RNF de la [matriz de trazabilidad](BACKLOG.md#matriz-de-trazabilidad-de-requerimientos) que toca. Si no aplica (por ejemplo, `ci` o `chore`), se omite.
-- **`Entrega:`** obligatorio: la entrega del cronograma (E1–E9) a la que aporta el commit.
+- **`Entrega:`** obligatorio: la entrega del cronograma (E1–E9) en cuyo corte queda incluido el commit, es decir, la próxima entrega por fecha. `E0` identifica el prototipo anterior al inicio del componente (25-ago-2026) y no se usa en commits nuevos.
+- **`Actividad:`** opcional: número de la actividad del cronograma, cuando el commit corresponde a una actividad concreta.
 - No se aceptan mensajes como `UT`, `UT_Changes` o `Update`. El CI los rechaza en los pull requests.
 
 Para tener la plantilla en el editor: `git config commit.template .gitmessage`.
