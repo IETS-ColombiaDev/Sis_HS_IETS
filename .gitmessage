@@ -1,0 +1,9 @@
+# <tipo>(<módulo>): <qué cambia, en presente, máx. 72 caracteres>
+#
+# <por qué cambia y qué efecto tiene; opcional>
+#
+# Refs: RFxx
+# Entrega: E5
+#
+# Tipos: feat fix docs test refactor perf ci build chore revert
+# Ver CONTRIBUTING.md
