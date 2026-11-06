@@ -23,6 +23,7 @@ import { Input, Textarea, Select } from "../components/Field";
 import { LoadingBlock } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
 import LinkPreview from "../components/LinkPreview";
+import MatrixImportModal from "../components/MatrixImportModal";
 import SourceMatrixEditor, {
   FALLBACK_OPTIONS,
   MatrixBadges,
@@ -152,6 +153,7 @@ export default function Sources() {
   const [exporting, setExporting] = useState(false);
   // Deteccion de fuentes con IA
   const [discoverOpen, setDiscoverOpen] = useState(false);
+  const [matrixOpen, setMatrixOpen] = useState(false);
   const [discoverForm, setDiscoverForm] = useState(DISCOVER_EMPTY);
   const [discovering, setDiscovering] = useState(false);
   const [discovery, setDiscovery] = useState(null);
@@ -731,6 +733,15 @@ export default function Sources() {
             <HintButton variant="outline" hint={GLOSSARY.fb_recargar_catalogo} disabledHint={noWrite} disabled={!canWrite} onClick={() => setConfirmImport(true)}>
               <Icon name="layers" size={16} /> Recargar catálogo
             </HintButton>
+            <HintButton
+              variant="outline"
+              hint="Importa el Excel «FUENTES DE INFORMACION PROACTIVA EH» o una hoja de Google Sheets, la compara con el inventario y sugiere con IA cómo detectar señales en cada fuente nueva. No guarda nada hasta que usted aplique."
+              disabledHint={noWrite}
+              disabled={!canWrite}
+              onClick={() => setMatrixOpen(true)}
+            >
+              <Icon name="doc" size={16} /> Importar matriz
+            </HintButton>
             <HintButton variant="outline" hint={DISCOVER_HINT} disabledHint={noWrite} disabled={!canWrite} onClick={openDiscover}>
               <Icon name="spark" size={16} /> Detectar fuentes con IA
             </HintButton>
@@ -1008,6 +1019,14 @@ export default function Sources() {
       )}
 
       {/* Deteccion de fuentes con IA */}
+      <MatrixImportModal
+        open={matrixOpen}
+        onClose={() => setMatrixOpen(false)}
+        onApplied={() => load()}
+        connectors={connectors}
+        toast={toast}
+      />
+
       <Modal
         open={discoverOpen}
         onClose={() => !discovering && setDiscoverOpen(false)}

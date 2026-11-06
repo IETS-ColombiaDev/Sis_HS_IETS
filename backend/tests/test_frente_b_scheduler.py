@@ -200,12 +200,14 @@ def test_kick_does_not_block_the_request(monkeypatch):
     # Bug: `kick` corria `tick` dentro del hilo de la peticion.
     started = threading.Event()
 
-    def slow_tick(session, **kw):
+    def slow_lanes(lanes):
         started.set()
         time.sleep(1.0)
-        return []
+        return 0
 
-    monkeypatch.setattr(ingest_service, "tick", slow_tick)
+    monkeypatch.setattr(worker, "_run_lanes", slow_lanes)
+    monkeypatch.setattr(ingest_service, "parallel_jobs", lambda session: 2)
+    monkeypatch.setattr(ingest_service, "next_pending_at", lambda session: None)
     monkeypatch.setattr(scheduler_service, "finalize_scan_runs", lambda session: 0)
     monkeypatch.setattr(worker, "SessionLocal", lambda: _Dummy())
     t0 = time.monotonic()

@@ -148,3 +148,16 @@ def test_google_news_links_are_neutral_and_reading_needs_no_write_permission(h, 
     h.as_role("tomador_decisiones")
     assert h.client.get(f"/api/technologies/{tech.id}/reliability").status_code == 200
     assert h.client.post(f"/api/technologies/{tech.id}/reliability").status_code == 403
+
+
+def test_ai_cannot_inflate_a_weak_signal_nor_hide_failed_checks(h, page, monkeypatch):
+    tech = _fda_signal(h)
+    monkeypatch.setattr(reliability_service, "score_of", lambda checks: 30)
+    answer = json.dumps({"veredicto": "confiable", "puntaje": 95, "resumen": "Todo bien.",
+                         "a_favor": ["x"], "alertas": [], "verificar": []})
+    monkeypatch.setattr(ai_service, "is_enabled", lambda: True)
+    monkeypatch.setattr(ai_service, "generate", lambda prompt, **kw: (answer, "MiniMax-M3"))
+    a = h.client.post(f"/api/technologies/{tech.id}/reliability").json()["assessment"]
+    assert a["score"] == 50 and a["verdict"] == "verificar" and a["ai_capped"] is True
+    assert a["ai_verdict"] == "confiable" and a["ai_score"] == 95
+    assert "solo puede subir" in a["note"]

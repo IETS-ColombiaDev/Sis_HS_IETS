@@ -399,6 +399,15 @@ PARAM_SEED: list[dict] = [
         "description": "Horas que permanece abierto el cortacircuitos de una fuente.",
     },
     {
+        "key": "ingest.parallel_jobs",
+        "value": "3",
+        "value_type": "int",
+        "description": (
+            "Fuentes que el worker rastrea a la vez durante la vigilancia (1 a 8). "
+            "Más acelera la corrida completa; menos reduce la carga del servidor."
+        ),
+    },
+    {
         "key": "ingest.max_records_per_run",
         "value": "50",
         "value_type": "int",

@@ -19,6 +19,11 @@ import { LoadingBlock, Spinner } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
 import { ietsTag } from "../utils/iets";
 import LinkPreview from "../components/LinkPreview";
+import { AccessReport, ScanRunSummary, SourceProgress } from "../components/ScanProgress";
+
+const PROGRESS_POLL_MS = 2500;
+const FILTER_STATUS = { ejecutando: ["ejecutando"], pendiente: ["pendiente"], ok: ["ok", "parcial"], error: ["error"], cancelado: ["cancelado"] };
+const RUN_ORDER = { ejecutando: 0, pendiente: 1, error: 2 };
 
 const JOB_LABELS = {
   pendiente: "Pendiente",
@@ -75,6 +80,11 @@ export default function Scan() {
   const [preview, setPreview] = useState(null);
   const [previewing, setPreviewing] = useState(false);
   const firstLoad = useRef(true);
+  const [progress, setProgress] = useState(null);
+  const [progressFilter, setProgressFilter] = useState("");
+  const [cancelling, setCancelling] = useState(false);
+  const wasActive = useRef(false);
+  const [report, setReport] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -97,25 +107,83 @@ export default function Scan() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const loadProgress = useCallback(async () => {
+    try {
+      const { data } = await api.get("/ingest/progress");
+      setProgress(data);
+      return data;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const loadReport = useCallback(async () => {
+    try {
+      const { data } = await api.get("/ingest/access-report");
+      setReport(data);
+    } catch {
+      /* el informe es complementario: si falla, la pantalla sigue */
+    }
+  }, []);
+
   useEffect(() => {
     load();
-  }, [load, version]);
+    loadProgress();
+    loadReport();
+  }, [load, loadProgress, loadReport, version]);
+
+  // Mientras haya fuentes en cola o en curso, el estado se refresca solo.
+  useEffect(() => {
+    if (!progress?.active) {
+      if (wasActive.current) {
+        wasActive.current = false;
+        const c = progress?.counts || {};
+        toast.info(`Vigilancia terminada: ${(c.ok || 0) + (c.parcial || 0)} fuente(s) ok, ${c.error || 0} con error.`);
+        load();
+        loadReport();
+      }
+      return undefined;
+    }
+    wasActive.current = true;
+    const timer = setInterval(loadProgress, PROGRESS_POLL_MS);
+    // El informe cambia más despacio: cada 15 s basta durante la corrida.
+    const reportTimer = setInterval(loadReport, 15000);
+    return () => {
+      clearInterval(timer);
+      clearInterval(reportTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progress?.active, loadProgress]);
+
+  const progressBySource = useMemo(() => {
+    const out = {};
+    (progress?.sources || []).forEach((row) => {
+      out[row.source_id] = row;
+    });
+    return out;
+  }, [progress]);
 
   const enabled = useMemo(() => sources.filter((s) => s.scrape_enabled && !s.retired && s.catalog_active !== false), [sources]);
   const categories = useMemo(() => [...new Set(enabled.map((s) => s.category).filter(Boolean))].sort(), [enabled]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return enabled.filter((s) => {
+    const wanted = FILTER_STATUS[progressFilter];
+    const rows = enabled.filter((s) => {
       const okCat = !catFilter || s.category === catFilter;
       const okQ =
         !q ||
         (s.title || "").toLowerCase().includes(q) ||
         (s.url || "").toLowerCase().includes(q) ||
         (s.category || "").toLowerCase().includes(q);
-      return okCat && okQ;
+      const okRun = !wanted || wanted.includes(progressBySource[s.id]?.job_status);
+      return okCat && okQ && okRun;
     });
-  }, [enabled, search, catFilter]);
+    if (!progress?.active) return rows;
+    // Durante la corrida, arriba lo que se está rastreando y lo que sigue en cola.
+    const rank = (s) => RUN_ORDER[progressBySource[s.id]?.job_status] ?? 9;
+    return [...rows].sort((a, b) => rank(a) - rank(b));
+  }, [enabled, search, catFilter, progressFilter, progressBySource, progress?.active]);
 
   const visibleLogs = useMemo(() => logs.filter((l) => !logFilter || l.status === logFilter), [logs, logFilter]);
   const totalSignals = enabled.reduce((n, s) => n + (s.findings_count || 0), 0);
@@ -137,13 +205,27 @@ export default function Scan() {
     setRunning(true);
     try {
       const { data } = await api.post("/ingest/run", { source_ids: ids?.length ? ids : [], process_now: false }, { timeout: 60000 });
-      toast.success(`Vigilancia encolada: ${data.queued} fuente(s). El worker las atiende sin bloquear esta pantalla.`);
+      toast.success(`Vigilancia encolada: ${data.queued} fuente(s). Siga el estado de cada una abajo; puede seguir trabajando.`);
       setSelected(new Set());
       load();
+      loadProgress();
     } catch (e) {
       toast.error(apiError(e, "No se pudo ejecutar la vigilancia"));
     } finally {
       setRunning(false);
+    }
+  };
+
+  const cancelRun = async () => {
+    setCancelling(true);
+    try {
+      const { data } = await api.post("/ingest/cancel", {});
+      toast.info(`Se cancelaron ${data.cancelled} fuente(s) en cola. Las que ya corrían terminan su paso actual.`);
+      loadProgress();
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo detener la vigilancia"));
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -164,14 +246,19 @@ export default function Scan() {
   const scanOne = async (s, e) => {
     e?.stopPropagation();
     setScanningId(s.id);
+    // El rastreo de una fuente espera la respuesta: mientras tanto se sondea su estado.
+    const timer = setInterval(loadProgress, PROGRESS_POLL_MS);
     try {
       const { data } = await api.post(`/scan/source/${s.id}`, null, { timeout: SCAN_TIMEOUT });
       if (data.status === "error") toast.error(`${s.title}: ${data.message || "error de ingesta"}`);
       else toast.success(`${s.title}: ${data.items_new} señales nuevas de ${data.items_found}`);
       load();
+      loadProgress();
+      loadReport();
     } catch (err) {
       toast.error(apiError(err, "No se pudo escanear"));
     } finally {
+      clearInterval(timer);
       setScanningId(null);
     }
   };
@@ -249,6 +336,17 @@ export default function Scan() {
           { label: "Último lote nuevo", value: lastNew, sub: "Señales en el último rastreo", color: lastNew > 0 ? "#10B981" : undefined, hint: "Señales nuevas que trajo el rastreo más reciente del registro." },
         ]}
       />
+
+      <ScanRunSummary
+        progress={progress}
+        canScan={canScan}
+        onCancel={cancelRun}
+        cancelling={cancelling}
+        filter={progressFilter}
+        onFilter={setProgressFilter}
+      />
+
+      <AccessReport report={report} onReload={loadReport} />
 
       <div className="fb-schedule-grid" style={{ marginBottom: 16 }}>
         <Card padding={18} className="fb-schedule-card">
@@ -395,7 +493,7 @@ export default function Scan() {
             {filtered.length === 0 ? (
               <EmptyState
                 icon="🌐"
-                message={enabled.length === 0 ? "No hay fuentes con ingesta activa." : "No hay referentes que coincidan con la búsqueda."}
+                message={enabled.length === 0 ? "No hay fuentes con ingesta activa." : "No hay referentes que coincidan con la búsqueda o el filtro de estado."}
                 action={<Button onClick={() => navigate("/fuentes")}>Ir al catálogo de fuentes</Button>}
               />
             ) : (
@@ -435,6 +533,7 @@ export default function Scan() {
                             {s.url.replace(/^https?:\/\//, "").slice(0, 55)}{s.url.length > 58 ? "…" : ""}
                           </a>
                         )}
+                        <SourceProgress row={progressBySource[s.id]} />
                       </div>
                     </div>
                     <div className="source-scan-actions">

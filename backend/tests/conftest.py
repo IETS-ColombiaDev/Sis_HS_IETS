@@ -47,3 +47,15 @@ def _hermetic_invima(monkeypatch):
     monkeypatch.setattr(invima, "_original_live_lookup", invima.live_lookup, raising=False)
     monkeypatch.setattr(invima, "live_lookup", lambda db, term, **kw: 0)
     yield
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_web_search(monkeypatch):
+    """Los buscadores (Yahoo, Bing, DuckDuckGo) no se consultan en red durante las pruebas.
+
+    Una prueba que necesite resultados vuelve a simular `_engine_call`.
+    """
+    from app import web_search
+
+    monkeypatch.setattr(web_search, "_engine_call", lambda engine, query, *, cfg, brave_key: [])
+    monkeypatch.setattr(web_search, "ENGINE_MIN_INTERVAL_S", 0.0)

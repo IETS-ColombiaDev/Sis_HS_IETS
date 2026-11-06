@@ -9,6 +9,7 @@ from __future__ import annotations
 from .base import (
     CanonicalRecord,
     Connector,
+    ConnectorError,
     ConnectorResult,
     clean_text,
     parse_compact_date,
@@ -91,13 +92,29 @@ class ClinicalTrialsConnector(Connector):
         if cursor:
             params["pageToken"] = cursor
 
-        data = request_json(
-            API_URL,
-            params=params,
-            connector_code=self.code,
-            send_user_agent=self.send_user_agent,
-            min_interval=self.min_interval,
-        )
+        try:
+            data = request_json(
+                API_URL,
+                params=params,
+                connector_code=self.code,
+                send_user_agent=self.send_user_agent,
+                min_interval=self.min_interval,
+            )
+        except ConnectorError as exc:
+            # El cursor de una corrida anterior caduca en cuanto cambian los datos
+            # ("The data have probably changed while you were paginating"): sin
+            # este reintento la fuente fallaba en todas las corridas siguientes.
+            if not cursor or "HTTP 400" not in str(exc):
+                raise
+            params.pop("pageToken", None)
+            cursor = ""
+            data = request_json(
+                API_URL,
+                params=params,
+                connector_code=self.code,
+                send_user_agent=self.send_user_agent,
+                min_interval=self.min_interval,
+            )
 
         studies = data.get("studies") or []
         records = [self._to_record(s) for s in studies]

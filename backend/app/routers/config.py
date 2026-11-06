@@ -5,6 +5,8 @@ llaves de fuentes de nivel A.
 """
 from __future__ import annotations
 
+import re
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -339,7 +341,11 @@ def test_web_search(
     if not query:
         raise HTTPException(status_code=422, detail="Escriba una consulta.")
     cfg = source_profile.load_search(db)
-    return web_search.search(query, cfg=cfg, brave_key=source_profile.brave_api_key(db))
+    # Con "site:dominio" la prueba usa la misma regla que el escaneo: un motor
+    # solo cuenta si trae resultados de ese dominio.
+    site = re.search(r"\bsite:([^\s/]+)", query, re.I)
+    domain = site.group(1).lower().removeprefix("www.") if site else ""
+    return web_search.search(query, cfg=cfg, brave_key=source_profile.brave_api_key(db), domain=domain)
 
 
 @router.post("/usage/reset", response_model=ConfigOut)

@@ -190,9 +190,20 @@ def test_circuit_opens_after_repeated_failures(db):
         ingest_service.run_job(db, jobs[0].id)
         db.refresh(source)
     assert source.circuit_open_until is not None
-    jobs = ingest_service.enqueue(db, [source], triggered_by="test")
+    jobs = ingest_service.enqueue(db, [source], triggered_by="test", origin="programado")
     blocked = ingest_service.run_job(db, jobs[0].id)
     assert "Circuito abierto" in blocked.message
+
+
+def test_a_manual_run_tries_a_source_with_an_open_circuit(db):
+    """«Ejecutar vigilancia» es una orden explicita: no la frena el circuito."""
+    from datetime import datetime, timedelta, timezone
+
+    source = _source(db, connector="who_ictrp", connector_config={})
+    source.circuit_open_until = datetime.now(timezone.utc) + timedelta(hours=5)
+    db.commit()
+    job = ingest_service.run_job(db, ingest_service.enqueue(db, [source], triggered_by="test")[0].id)
+    assert "Circuito abierto" not in (job.message or "")
 
 
 def test_a_blocked_html_source_fails_the_job_instead_of_reporting_ok(db, monkeypatch):

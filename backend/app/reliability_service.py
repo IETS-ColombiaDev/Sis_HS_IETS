@@ -244,6 +244,21 @@ def score_of(checks: list[dict]) -> int:
     return max(0, min(100, total))
 
 
+# La IA puede bajar el puntaje sin limite (encontro contradicciones en la pagina),
+# pero solo subirlo hasta este margen sobre lo que los chequeos verifican.
+AI_MAX_RAISE = 20
+
+
+def bounded_score(base: int, ai_score: int | None) -> tuple[int, bool]:
+    """Puntaje final con el dictamen de la IA acotado. Devuelve (puntaje, se_acoto)."""
+    if ai_score is None:
+        return base, False
+    ceiling = min(100, base + AI_MAX_RAISE)
+    if ai_score > ceiling:
+        return ceiling, True
+    return ai_score, False
+
+
 def verdict_of(score: int) -> str:
     if score >= 70:
         return "confiable"
@@ -365,16 +380,28 @@ def assess(db: Session, tech: Technology, *, use_ai: bool = True, check_page: bo
         )
         parsed = _parse_ai(text) if text and not text.startswith("[Error") else None
         if parsed:
+            final, capped = bounded_score(base, parsed["score"])
+            # Las fallas de los chequeos automaticos siempre quedan a la vista: la
+            # IA agrega alertas, no puede ocultar las verificables.
+            merged_alerts = list(dict.fromkeys([*alerts, *parsed["alerts"]]))
             result.update(
-                verdict=parsed["verdict"],
-                score=parsed["score"] if parsed["score"] is not None else base,
+                verdict=verdict_of(final),
+                score=final,
+                ai_verdict=parsed["verdict"],
+                ai_score=parsed["score"],
+                ai_capped=capped,
                 summary=parsed["summary"],
                 pros=parsed["pros"] or pros,
-                alerts=parsed["alerts"],
+                alerts=merged_alerts,
                 to_verify=parsed["to_verify"] or to_verify,
                 ai_used=True,
                 model=model or "",
             )
+            if capped:
+                result["note"] = (
+                    f"La IA propuso {parsed['score']}/100; se limitó a {final} porque solo puede subir "
+                    f"hasta {AI_MAX_RAISE} puntos sobre la base verificable ({base})."
+                )
         else:
             ai_error = "La IA no devolvió un dictamen válido; se muestran solo los chequeos automáticos."
     elif use_ai:
@@ -382,7 +409,7 @@ def assess(db: Session, tech: Technology, *, use_ai: bool = True, check_page: bo
     if not result["summary"]:
         result["summary"] = _auto_summary(result["verdict"], checks)
     result["verdict_label"] = VERDICTS[result["verdict"]]
-    result["note"] = ai_error
+    result["note"] = ai_error or result.get("note", "")
     return result
 
 

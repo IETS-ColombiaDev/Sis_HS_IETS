@@ -156,7 +156,7 @@ def test_search_for_source_filters_foreign_domains(api, monkeypatch):
     monkeypatch.setattr(
         web_search,
         "search",
-        lambda q, cfg, brave_key="": {
+        lambda q, cfg, brave_key="", domain="": {
             "engine": "yahoo",
             "results": [
                 {"url": "https://www.fda.gov/report.pdf", "title": "R", "snippet": ""},

@@ -1194,6 +1194,30 @@ class ConnectorOut(BaseModel):
     requires_url: bool = False
 
 
+class MatrixCreateChoice(BaseModel):
+    key: str
+    title: str | None = None
+    url: str | None = None
+    connector: str | None = None
+    detection: str | None = None
+    access_level: str | None = None
+    enable_ingest: bool | None = None
+    follow_keywords: list[str] | None = None
+    search_terms: list[str] | None = None
+    entry_urls: list[str] | None = None
+    frequency: str | None = None
+    rationale: str | None = None
+    origin: str | None = None
+
+
+class MatrixApplyIn(BaseModel):
+    token: str
+    create: list[MatrixCreateChoice] = []
+    update: list[str] = []
+    overwrite: bool = False
+    persist: bool = True
+
+
 class IngestRunIn(BaseModel):
     source_ids: list[int] = []
     process_now: bool = False

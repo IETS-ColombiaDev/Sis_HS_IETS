@@ -152,10 +152,130 @@ def tick(db: Session, *, limit: int = 4) -> list[IngestJob]:
     return done
 
 
+def claim_next(db: Session) -> int | None:
+    """Reclama el siguiente job vencido (pasa a `ejecutando`) y devuelve su id.
+
+    Varios hilos del worker llaman esto a la vez: el UPDATE condicionado al
+    estado `pendiente` garantiza que cada job lo corra uno solo.
+    """
+    for _ in range(20):
+        now = datetime.now(timezone.utc)
+        job = (
+            db.query(IngestJob.id)
+            .filter(IngestJob.status == "pendiente", IngestJob.scheduled_for <= now)
+            .order_by(IngestJob.scheduled_for.asc(), IngestJob.id.asc())
+            .first()
+        )
+        if job is None:
+            return None
+        claimed = (
+            db.query(IngestJob)
+            .filter(IngestJob.id == job.id, IngestJob.status == "pendiente")
+            .update({IngestJob.status: "ejecutando"}, synchronize_session=False)
+        )
+        db.commit()
+        if claimed:
+            return job.id
+    return None
+
+
+def next_pending_at(db: Session) -> datetime | None:
+    """Fecha del proximo job pendiente (incluye reintentos programados a futuro)."""
+    row = (
+        db.query(IngestJob.scheduled_for)
+        .filter(IngestJob.status == "pendiente")
+        .order_by(IngestJob.scheduled_for.asc())
+        .first()
+    )
+    if row is None or row[0] is None:
+        return None
+    value = row[0]
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+def cancel_pending(db: Session, *, actor: str, source_ids: list[int] | None = None) -> int:
+    """Cancela los jobs que aun no arrancan. Los que estan corriendo terminan solos."""
+    from . import scan_progress
+
+    query = db.query(IngestJob).filter(IngestJob.status == "pendiente")
+    if source_ids:
+        query = query.filter(IngestJob.source_id.in_(source_ids))
+    jobs = query.all()
+    now = datetime.now(timezone.utc)
+    for job in jobs:
+        job.status = "cancelado"
+        job.finished_at = now
+        job.message = f"Cancelado por {actor}."
+        if job.source_id:
+            scan_progress.forget(job.source_id)
+    if jobs:
+        record_action(
+            db,
+            entity_type="ingest_jobs",
+            entity_id="cola",
+            action="ingest_cancel",
+            new_value={"cancelled": len(jobs), "by": actor},
+        )
+        db.commit()
+        bump_state_version(db)
+    return len(jobs)
+
+
+def parallel_jobs(db: Session) -> int:
+    """Fuentes que el worker atiende a la vez (parametro `ingest.parallel_jobs`)."""
+    try:
+        value = int(get_param(db, "ingest.parallel_jobs", 3) or 3)
+    except (TypeError, ValueError):
+        value = 3
+    return max(1, min(value, 8))
+
+
 def run_job(db: Session, job_id: int) -> IngestJob:
+    """Ejecuta un job y deja su etapa en `scan_progress` para la pantalla de vigilancia."""
+    from . import scan_progress
+
     job = db.get(IngestJob, job_id)
     if job is None:
         raise ValueError(f"job {job_id} no existe")
+    source_id = job.source_id
+    if source_id is None:
+        return _run_job(db, job)
+    scan_progress.start(source_id, job.id, connector=job.connector or "")
+    token = scan_progress.bind(source_id)
+    try:
+        job = _run_job(db, job)
+    except Exception as exc:  # noqa: BLE001
+        scan_progress.finish(source_id, ok=False, detail=f"{type(exc).__name__}: {exc}"[:240])
+        raise
+    finally:
+        scan_progress.unbind(token)
+    _report_final(scan_progress, source_id, job)
+    if job.status != "pendiente":
+        # Los reintentos aun pendientes no cuentan: el informe guarda el desenlace.
+        scan_progress.persist(db, source_id, job)
+    return job
+
+
+def _report_final(scan_progress, source_id: int, job: IngestJob) -> None:
+    if job.status in ("ok", "parcial"):
+        detail = f"+{job.items_new} nuevas de {job.items_found} detectadas"
+        if job.status == "parcial":
+            detail += " (parcial)"
+        scan_progress.finish(source_id, ok=True, detail=detail, items_found=job.items_found, items_new=job.items_new)
+    elif job.status == "pendiente":
+        when = job.scheduled_for.strftime("%H:%M") if job.scheduled_for else "pronto"
+        scan_progress.finish(
+            source_id,
+            ok=False,
+            final_stage="en_cola",
+            detail=f"Falló: {job.message} · reintento {job.attempts + 1}/{job.max_attempts or 3} a las {when} UTC"[:240],
+        )
+    else:
+        scan_progress.finish(source_id, ok=False, detail=(job.message or "Error")[:240])
+
+
+def _run_job(db: Session, job: IngestJob) -> IngestJob:
+    from . import scan_progress
 
     job.status = "ejecutando"
     job.attempts = (job.attempts or 0) + 1
@@ -168,7 +288,9 @@ def run_job(db: Session, job_id: int) -> IngestJob:
         return _fail(db, job, "La fuente asociada ya no existe.", retry=False)
 
     now = datetime.now(timezone.utc)
-    if _circuit_is_open(source, now):
+    # El circuito protege la vigilancia programada de insistir sobre un sitio
+    # caido. Una corrida manual es una orden explicita: se intenta igual.
+    if _circuit_is_open(source, now) and (job.origin or "") != "manual":
         return _fail(
             db,
             job,
@@ -181,6 +303,7 @@ def run_job(db: Session, job_id: int) -> IngestJob:
     if (source.access_level or "").upper() in GOVERNOR_LEVELS and source.catalog_code:
         from .probe_service import probe_source
 
+        scan_progress.stage("sonda", "Verificando la salud de la fuente antes de ingerir")
         probe = probe_source(db, source)
         if probe.get("status") in {"ambar", "rojo"}:
             return _fail(
@@ -203,6 +326,8 @@ def run_job(db: Session, job_id: int) -> IngestJob:
         _open_circuit(db, source, hours=1, error=str(exc))
         return _fail(db, job, str(exc), retry=True)
     except ConnectorError as exc:
+        if not used_html:
+            scan_progress.attempt(source.url or "", "error", str(exc)[:160], route="api")
         _trip_failure(db, source, str(exc))
         return _fail(db, job, str(exc), retry=True)
     except Exception as exc:  # noqa: BLE001
@@ -397,11 +522,24 @@ def _run_adapter(
     if adapter is None:
         raise ConnectorError(f"No hay adaptador registrado para '{connector_code}'.")
 
+    from . import scan_progress
+
     max_records = int(get_param(db, "ingest.max_records_per_run", 50) or 50)
+    scan_progress.stage("conectando", f"Consultando la API ({adapter.label or connector_code})")
     result = adapter.fetch(config=source.connector_config or {}, url=source.url or "")
+    scan_progress.attempt(source.url or "", "ok", f"{len(result.records)} registro(s)", route="api")
+    scan_progress.accessed("api", 200, f"API respondió: {len(result.records)} registro(s)")
+    scan_progress.note("search", enabled=False, reason="Fuente con API: los registros llegan estructurados, no se busca en la web")
+    scan_progress.note("ai", used=False, reason="Registros estructurados de la API: se mapean campo a campo, sin IA")
+    scan_progress.stage("guardando", f"Guardando hasta {min(len(result.records), max_records)} registro(s)")
+    cfg = dict(source.connector_config or {})
     if result.next_cursor:
-        cfg = dict(source.connector_config or {})
         cfg["pageToken"] = result.next_cursor
+        source.connector_config = cfg
+    elif "pageToken" in cfg:
+        # Ultima pagina (o cursor caducado y reiniciado): la proxima corrida
+        # vuelve a empezar por lo mas reciente.
+        cfg.pop("pageToken")
         source.connector_config = cfg
     if result.schema_signature and not source.schema_signature:
         source.schema_signature = result.schema_signature

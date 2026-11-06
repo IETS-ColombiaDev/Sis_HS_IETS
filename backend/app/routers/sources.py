@@ -17,7 +17,7 @@ from ..deps import get_current_user, require_permission
 from ..events import bump_state_version
 from ..models import Finding, IngestJob, RawRecord, Source, Technology, User
 from ..rbac import P_SCAN_RUN, P_SOURCE_WRITE
-from ..schemas import SourceCreate, SourceOut, SourceQuickCreate, SourceUpdate
+from ..schemas import MatrixApplyIn, SourceCreate, SourceOut, SourceQuickCreate, SourceUpdate
 
 router = APIRouter(prefix="/api/sources", tags=["sources"])
 
@@ -235,6 +235,76 @@ async def import_matrix_file(
     summary = catalog_service.import_matrix(
         db, parsed, overwrite=overwrite, persist=persist, triggered_by=user.email
     )
+    bump_state_version(db)
+    return summary
+
+
+@router.post("/matrix/compare")
+async def compare_matrix(
+    file: UploadFile | None = File(None),
+    sheet_url: str = Form(""),
+    use_ai: bool = Form(True),
+    check_reach: bool = Form(True),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_SOURCE_WRITE)),
+):
+    """Lee la matriz EH (Excel subido o Google Sheets por URL) y la compara con el inventario.
+
+    No escribe nada: devuelve filas nuevas (con la deteccion sugerida por reglas
+    y por IA), fuentes con cambios, sin cambios y ausentes, mas un `token` para
+    aplicar la seleccion con /matrix/apply.
+    """
+    from starlette.concurrency import run_in_threadpool
+
+    from .. import source_import, source_matrix
+
+    if file is not None and file.filename:
+        if not file.filename.lower().endswith((".xlsx", ".xlsm")):
+            raise HTTPException(status_code=422, detail="Suba el Excel de la matriz en formato .xlsx.")
+        content = await file.read(MAX_MATRIX_BYTES + 1)
+        if len(content) > MAX_MATRIX_BYTES:
+            raise HTTPException(status_code=413, detail="El Excel supera 10 MB.")
+        origin = f"Excel {file.filename}"[:200]
+    elif sheet_url.strip():
+        try:
+            content = await run_in_threadpool(source_import.fetch_google_sheet, sheet_url.strip())
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        origin = "Google Sheets"
+    else:
+        raise HTTPException(status_code=422, detail="Suba el Excel de la matriz o pegue la URL de Google Sheets.")
+    try:
+        parsed = await run_in_threadpool(source_matrix.parse_workbook, content)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return await run_in_threadpool(
+        source_import.compare, db, parsed, origin=origin, ai=use_ai, check_reach=check_reach
+    )
+
+
+@router.post("/matrix/apply")
+def apply_matrix_comparison(
+    payload: MatrixApplyIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_SOURCE_WRITE)),
+):
+    """Crea las fuentes nuevas y actualiza las que cambiaron, segun lo elegido en la comparacion."""
+    from .. import source_import
+
+    if not payload.create and not payload.update:
+        raise HTTPException(status_code=422, detail="Elija al menos una fuente para crear o actualizar.")
+    try:
+        summary = source_import.apply(
+            db,
+            payload.token,
+            create=[c.model_dump(exclude_none=True) for c in payload.create],
+            update=[str(k) for k in payload.update],
+            overwrite=payload.overwrite,
+            persist=payload.persist,
+            actor=user.email,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=410, detail=str(exc)) from exc
     bump_state_version(db)
     return summary
 

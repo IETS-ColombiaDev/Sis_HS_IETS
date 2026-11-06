@@ -21,6 +21,7 @@ from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 from sqlalchemy.orm import Session
 
 from .models import Finding, ScrapeLog, Source
+from .scan_progress import ACCESS_VIA_LABELS
 from .priority import compute_screening_score
 from .technology_service import sync_technology_from_finding
 
@@ -456,7 +457,7 @@ def crawl_site(
     `max_pages` limita los enlaces seguidos; las URLs de entrada y los
     resultados de busqueda tienen su propio tope.
     """
-    from . import prompt_store
+    from . import prompt_store, scan_progress
 
     max_pages = max(1, int(max_pages or prompt_store.max_pages()))
     max_chars = max(1000, int(max_chars or prompt_store.max_chars()))
@@ -470,6 +471,10 @@ def crawl_site(
 
     def note(action: str, url: str = "", status: str = "", ms: int = 0, detail: str = "") -> None:
         steps.append({"action": action, "url": url, "status": status, "ms": ms, "detail": detail})
+        if action in {"entrada_matriz", "busqueda", "ficha", "paginacion", "entrada"} and url:
+            scan_progress.page_visited(url, status, planned=planned[0])
+
+    planned = [max_pages + len(entry_urls or [])]
 
     def add_page(
         url: str,
@@ -488,6 +493,7 @@ def crawl_site(
         return payload
 
     def visit_child(url: str, *, role: str) -> tuple[int, str, str]:
+        scan_progress.stage("recorriendo", f"Abriendo {role.replace('_', ' ')}: {url[:120]}")
         started = time.perf_counter()
         try:
             status, ctype, text, raw = fetch_url(url, timeout=child_timeout)
@@ -711,10 +717,85 @@ def fallback_urls(source: Source, entry_urls: list[str] | None = None) -> list[s
     return out
 
 
+def access_route(source: Source, landing_url: str, entry_urls: list[str] | None = None) -> str:
+    """Por donde se obtuvo el contenido: sitio, ruta de la matriz, RSS oficial o Google News."""
+    if _normalize_url(landing_url or "") == _normalize_url(source.url or ""):
+        return "sitio"
+    if is_news_feed_url(landing_url) and not is_news_feed_url(source.url or ""):
+        return "google_news"
+    for feeds in FEED_FALLBACKS.values():
+        if landing_url in feeds:
+            return "rss_oficial"
+    if landing_url in (entry_urls or []):
+        return "ruta_matriz"
+    return "sitio"
+
+
+_XML_PROLOG = re.compile(r"^(\ufeff|\s+|<\?[^>]*\?>|<!--.*?-->|<!DOCTYPE[^>]*>)+", re.S | re.I)
+_FEED_ROOT = re.compile(r"^<(rss|feed|rdf:rdf)\b", re.I)
+_XML_ROOT = re.compile(r"^<([a-z_][\w:.-]*)", re.I)
+
+
+def _strip_prolog(text: str) -> str:
+    return _XML_PROLOG.sub("", (text or "")[:6000], count=1)
+
+
 def is_feed(text: str) -> bool:
-    """Canal RSS o Atom (revistas cuyo sitio bloquea robots pero publican feed)."""
-    head = (text or "").lstrip()[:600].lower()
-    return "<rss" in head or "<feed" in head or "<rdf:rdf" in head
+    """Canal RSS o Atom (revistas cuyo sitio bloquea robots pero publican feed).
+
+    Mira la raiz del documento, no solo los primeros caracteres: una hoja de
+    estilos o comentarios largos antes de <rss> hacian que el canal se leyera
+    como HTML y el XML terminara como senal.
+    """
+    return bool(_FEED_ROOT.match(_strip_prolog(text)))
+
+
+def is_plain_xml(text: str) -> bool:
+    """XML que no es canal ni pagina (sitemap, respuesta de API): no se lee como HTML."""
+    body = (text or "").lstrip().lstrip("﻿").lstrip()
+    if not body.startswith("<?xml"):
+        return False
+    root = _XML_ROOT.match(_strip_prolog(body))
+    name = (root.group(1).lower() if root else "")
+    return bool(name) and name not in {"html", "rss", "feed", "rdf:rdf"}
+
+
+# Noticias del dominio que no son senales de tecnologia: empleos, resultados
+# financieros, inversionistas, paginas de acceso. Pesan en el respaldo de Google
+# News, que trae todo lo publicado en el dominio.
+_NEWS_NOISE = re.compile(
+    r"\b(jobs?|careers?|hiring|vacante|empleo|internship|salary|"
+    r"earnings|quarter(ly)?|q[1-4]\b|fiscal (year|20\d\d)|financial results|ebitda|revenue|dividend|"
+    r"stock|shares|investor|webcast|conference call|annual report|guidance for 20|"
+    r"user verification|verification portal|log ?in|sign ?in|registration$|privacy|cookie|"
+    r"obituar|sponsor(ed)?|podcast|newsletter|crossword|horoscope|medication guide|prescribing information)\b",
+    re.I,
+)
+# Titulos de ofertas de empleo: un cargo, a veces con la ciudad ("... - Erie, PA").
+_JOB_TITLE = re.compile(
+    r"\b(director|manager|specialist|scientist|associate|analyst|coordinator|representative|engineer|"
+    r"technician|intern|liaison|head of|vice president)\b|\s-\s[A-Z][\w .]+,\s?[A-Z]{2}$",
+    re.I,
+)
+_NEWS_EVENT = re.compile(r"\b(approv|trial|phase|fda|ema|launch|data|results|study|vaccine candidate)", re.I)
+
+
+def news_item_relevant(title: str, summary: str = "") -> bool:
+    """True si un item de canal de noticias parece una senal de tecnologia sanitaria."""
+    blob = f"{title} {summary}"
+    if not title or _NEWS_NOISE.search(title):
+        return False
+    if _JOB_TITLE.search(title) and not _NEWS_EVENT.search(title):
+        return False
+    if _BLOCK.search(title):
+        return False
+    return bool(
+        _HS_RELEVANCE.search(blob)
+        or _TYPE_MEDICAMENTO.search(blob)
+        or _TYPE_DISPOSITIVO.search(blob)
+        or _TYPE_DIGITAL.search(blob)
+        or _DRUG_SUFFIX.search(blob)
+    )
 
 
 def feed_items(xml: str) -> list[dict]:
@@ -726,6 +807,11 @@ def feed_items(xml: str) -> list[dict]:
     items = []
     for node in soup.find_all(["item", "entry"]):
         title = _clean(html_lib.unescape(node.title.get_text(" ", strip=True))) if node.title else ""
+        publisher = node.find("source")
+        publisher_name = _clean(publisher.get_text(" ", strip=True)) if publisher is not None else ""
+        if publisher_name and title.endswith(f" - {publisher_name}"):
+            # Google News agrega " - Medio" al titulo; el medio va aparte.
+            title = title[: -len(publisher_name) - 3].strip()
         link = ""
         link_tag = node.find("link")
         if link_tag is not None:
@@ -743,9 +829,12 @@ def feed_items(xml: str) -> list[dict]:
     return items
 
 
-def _feed_candidates(source: Source, xml: str) -> list[dict]:
+def _feed_candidates(source: Source, xml: str, *, only_relevant: bool = False) -> list[dict]:
     findings = []
-    for item in feed_items(xml)[:MAX_ITEMS_PER_SOURCE]:
+    items = feed_items(xml)
+    if only_relevant:
+        items = [i for i in items if news_item_relevant(i["title"], i["summary"])]
+    for item in items[:MAX_ITEMS_PER_SOURCE]:
         blob = f"{item['title']} {item['summary']}"
         findings.append(
             {
@@ -764,13 +853,15 @@ def _feed_candidates(source: Source, xml: str) -> list[dict]:
     return findings
 
 
-def extract_candidates(source: Source, html: str) -> list[dict]:
+def extract_candidates(source: Source, html: str, *, only_relevant: bool = False) -> list[dict]:
     if html and len(html) > MAX_HTML_CHARS:
         html = html[:MAX_HTML_CHARS]
     if is_feed(html):
-        feed = _feed_candidates(source, html)
-        if feed:
-            return feed
+        # Un canal se lee solo como canal. Si viene vacio no hay senales: leerlo
+        # como HTML convertia el titulo del canal (o su XML) en una senal.
+        return _feed_candidates(source, html, only_relevant=only_relevant)
+    if is_plain_xml(html):
+        return []
     soup = BeautifulSoup(html, "lxml")
 
     for tag in soup(["script", "style", "noscript", "nav", "header", "footer"]):
@@ -912,6 +1003,39 @@ def _first_paragraph(soup: BeautifulSoup) -> str:
 # --------------------------------------------------------------------------- #
 #  Extraccion robusta de contenido (trafilatura / pypdf)
 # --------------------------------------------------------------------------- #
+def feed_crawl(landing_url: str, xml: str, *, only_relevant: bool = False) -> dict:
+    """Corpus de texto limpio de un canal, con la forma de `crawl_site`.
+
+    Asi la IA lee titulos y resumenes, no el XML, y no se recorren enlaces del
+    canal (en Google News son redirecciones por JavaScript).
+    """
+    items = feed_items(xml)
+    if only_relevant:
+        items = [i for i in items if news_item_relevant(i["title"], i["summary"])]
+    lines = [
+        f"- {i['title']} ({i['published_date']}) | {i['url']}\n  {i['summary'][:400]}"
+        for i in items[:MAX_ITEMS_PER_SOURCE]
+    ]
+    combined = f"## Canal: {landing_url}\n" + "\n".join(lines) if lines else ""
+    return {
+        "landing_url": landing_url,
+        "pages": [{"url": landing_url, "title": "Canal RSS", "text": combined, "html": "", "role": "entrada"}] if combined else [],
+        "pages_visited": 1,
+        "combined": combined,
+        "by_url": {},
+        "steps": [
+            {
+                "action": "canal",
+                "url": landing_url,
+                "status": "ok" if items else "vacio",
+                "ms": 0,
+                "detail": f"{len(items)} item(s) pertinentes del canal" if only_relevant else f"{len(items)} item(s) del canal",
+            }
+        ],
+        "search_results": [],
+    }
+
+
 def extract_main_text(html: str, url: str = "") -> str:
     """Extrae el contenido principal (articulo) de una pagina con trafilatura."""
     if html and is_feed(html):
@@ -991,12 +1115,19 @@ def _enrich_with_ai(
     sobre todo enlaces de navegacion. `keep_heuristic(item)` conserva los que
     si son datos estructurados (filas de pipeline). Si la IA falla, quedan todos.
     """
+    from . import scan_progress
+
     try:
         from . import ai_service, ai_web
 
         web_on = allow_ai and ai_service.web_assist_enabled()
         ocr_on = allow_ocr and ai_service.ocr_enabled()
         if not web_on and not ocr_on:
+            if not ai_service.web_assist_enabled() and not ai_service.ocr_enabled():
+                reason = "IA apagada o sin configurar en Configuración › IA: solo extracción por reglas"
+            else:
+                reason = "IA y OCR apagados en el flujo de esta fuente: solo extracción por reglas"
+            scan_progress.note("ai", used=False, reason=reason, final=len(findings_data))
             if isinstance(crawl, dict) and not (allow_ai and allow_ocr):
                 crawl.setdefault("steps", []).append(
                     {"action": "ia", "status": "omitido", "ms": 0, "detail": "IA y OCR apagados en el flujo de esta fuente"}
@@ -1004,6 +1135,11 @@ def _enrich_with_ai(
             return findings_data
         t0 = time.perf_counter()
         report: dict = {}
+        pages = len((crawl or {}).get("pages") or []) or 1
+        scan_progress.stage(
+            "extrayendo",
+            f"IA leyendo {pages} página(s) para extraer señales" + (" con OCR" if ocr_on else ""),
+        )
         extra = ai_web.extract_from_page(
             source_title=source_title,
             source_url=source_url,
@@ -1019,6 +1155,21 @@ def _enrich_with_ai(
         replaced = ai_decides and report.get("answered") and web_on
         kept = [d for d in findings_data if keep_heuristic and keep_heuristic(d)] if replaced else findings_data
         dropped = len(findings_data) - len(kept)
+        ungrounded = report.get("ungrounded") or []
+        scan_progress.note(
+            "ai",
+            used=True,
+            ocr=bool(ocr_on),
+            answered=bool(report.get("answered")),
+            returned=int(report.get("returned") or 0),
+            kept=len(extra),
+            ungrounded=len(ungrounded),
+            with_evidence=int(report.get("with_evidence") or 0),
+            ungrounded_titles=ungrounded[:5],
+            heuristic_candidates=len(findings_data),
+            heuristic_replaced=dropped,
+            ms=int((time.perf_counter() - t0) * 1000),
+        )
         if isinstance(crawl, dict):
             crawl.setdefault("steps", []).append(
                 {
@@ -1026,14 +1177,16 @@ def _enrich_with_ai(
                     "status": "ok" if extra else "sin_senales",
                     "ms": int((time.perf_counter() - t0) * 1000),
                     "detail": (f"{len(extra)} senales estructuradas" if extra else "sin senales nuevas")
-                    + (f"; {dropped} enlace(s) heuristico(s) descartados" if dropped else ""),
+                    + (f"; {dropped} enlace(s) heuristico(s) descartados" if dropped else "")
+                    + (f"; {len(ungrounded)} de la IA descartadas por no estar en el texto visitado" if ungrounded else ""),
                 }
             )
         if replaced:
             return ai_web.merge_findings(kept, extra) if extra else kept
         if extra:
             return ai_web.merge_findings(findings_data, extra)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        scan_progress.note("ai", used=True, error=f"{type(exc).__name__}: {str(exc)[:120]}", final=len(findings_data))
         return findings_data
     return findings_data
 
@@ -1041,6 +1194,29 @@ def _enrich_with_ai(
 # --------------------------------------------------------------------------- #
 #  Orquestacion
 # --------------------------------------------------------------------------- #
+def _add_search_snippets(db: Session, source: Source, profile: dict, context: str, crawl: dict) -> dict:
+    """Suma al corpus los resultados de la busqueda web del dominio (sin visitarlos)."""
+    from . import web_search
+
+    try:
+        search = web_search.search_for_source(db, source, profile, context=context)
+    except Exception as exc:  # noqa: BLE001
+        crawl.setdefault("steps", []).append(
+            {"action": "busqueda", "url": "", "status": "error", "ms": 0, "detail": type(exc).__name__}
+        )
+        return crawl
+    crawl["steps"] = list(search.get("steps") or []) + list(crawl.get("steps") or [])
+    crawl["search_results"] = search.get("results") or []
+    if crawl["search_results"]:
+        lines = [
+            f"- {r.get('title') or r.get('url')} | {r.get('url')} | {(r.get('snippet') or '')[:300]}"
+            for r in crawl["search_results"]
+        ]
+        block = "## Resultados de busqueda web en el dominio\n" + "\n".join(lines)
+        crawl["combined"] = "\n\n".join(p for p in (crawl.get("combined") or "", block) if p)
+    return crawl
+
+
 def _crawl_with_profile(db: Session, source: Source, landing_url: str, html: str, profile: dict, context: str) -> dict:
     """Recorrido segun las casillas del flujo de la fuente (recorrer, seguir enlaces, busqueda web)."""
     from . import source_profile, web_search
@@ -1086,6 +1262,8 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
     steps: list[dict] = []
     from . import source_profile
 
+    from . import scan_progress
+
     profile = source_profile.effective_profile(source)
     options = source_profile.load_options(db)
     context = source_profile.source_context(source, options)
@@ -1121,19 +1299,38 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
         )
 
     def download(url: str, action: str) -> tuple[int, str, str, bytes]:
+        verb = "Accediendo a" if action == "descarga" else "Probando ruta de respaldo"
+        scan_progress.stage("conectando", f"{verb} {url[:140]}")
         t0 = time.perf_counter()
         result = fetch_url(url)
         code, ctype = result[0], result[1]
+        status = "ok" if 0 < code < 400 else (f"http_{code}" if code else "sin_conexion")
         steps.append(
             {
                 "action": action,
                 "url": url,
-                "status": "ok" if 0 < code < 400 else (f"http_{code}" if code else "sin_conexion"),
+                "status": status,
                 "ms": int((time.perf_counter() - t0) * 1000),
                 "detail": ctype or "",
             }
         )
+        route = "sitio" if action == "descarga" else access_route(source, url, profile["entry_urls"])
+        scan_progress.attempt(url, status, ctype or "", route=route)
         return result
+
+    def failure_message(prefix: str) -> str:
+        """Cada ruta probada y su resultado: el informe dice por que no se pudo entrar."""
+        tried = []
+        for step in steps:
+            if step["action"] not in ("descarga", "respaldo"):
+                continue
+            route = "sitio" if step["action"] == "descarga" else access_route(source, step["url"], profile["entry_urls"])
+            label = {"sitio": "sitio", "ruta_matriz": "ruta de la matriz", "rss_oficial": "RSS oficial", "google_news": "Google News"}.get(route, route)
+            status = step["status"].replace("http_", "HTTP ").replace("sin_conexion", "sin respuesta").replace(
+                "omitida_sin_respuesta_reciente", "omitido (no respondió en una corrida reciente)"
+            )
+            tried.append(f"{label}: {status}")
+        return f"{prefix} Rutas probadas: {'; '.join(tried)}." if tried else prefix
 
     try:
         landing_url = source.url
@@ -1142,6 +1339,7 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             # (hasta 3 minutos) frenaba la vigilancia. Se va directo al respaldo.
             status_code, content_type, text, raw = 0, "", "", b""
             steps.append({"action": "descarga", "url": source.url, "status": "omitida_sin_respuesta_reciente", "ms": 0, "detail": ""})
+            scan_progress.attempt(source.url, "omitida", "No respondió en una corrida reciente (12 h)", route="sitio")
         else:
             status_code, content_type, text, raw = download(source.url, "descarga")
         if not (0 < status_code < 400):
@@ -1156,7 +1354,7 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                     break
         if status_code == 0:
             log.status = "error"
-            log.message = "No se pudo conectar con la fuente tras los reintentos."
+            log.message = failure_message("No se pudo entrar a la fuente.")[:500]
             log.finished_at = datetime.now(timezone.utc)
             source.last_scraped_at = datetime.now(timezone.utc)
             finish_trace(ok=False)
@@ -1165,7 +1363,7 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             return log
         if status_code >= 400:
             log.status = "error"
-            log.message = f"HTTP {status_code} al acceder a la fuente."
+            log.message = failure_message(f"No se pudo entrar a la fuente (HTTP {status_code}).")[:500]
             log.finished_at = datetime.now(timezone.utc)
             source.last_scraped_at = datetime.now(timezone.utc)
             finish_trace(ok=False)
@@ -1174,6 +1372,12 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             return log
 
         is_pdf = "pdf" in content_type or landing_url.lower().endswith(".pdf")
+        via = access_route(source, landing_url, profile["entry_urls"])
+        if is_pdf:
+            via_detail = f"Documento PDF descargado (HTTP {status_code})"
+        else:
+            via_detail = f"{ACCESS_VIA_LABELS.get(via, via)} · HTTP {status_code}"
+        scan_progress.accessed("pdf" if is_pdf else via, status_code, via_detail)
         crawl = None
         if is_pdf or "octet-stream" in content_type or not text:
             # Documento (PDF / binario): extraer texto real con pypdf cuando sea posible.
@@ -1212,26 +1416,50 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             if landing_url != source.url:
                 target = _PreviewSource(landing_url)
                 target.title, target.description = source.title, source.description
-            findings_data = extract_candidates(target, text)
+            scan_progress.stage("extrayendo", "Identificando candidatos en la página principal")
+            # El respaldo de Google News trae todo lo publicado en el dominio
+            # (empleos, resultados financieros): solo quedan los items pertinentes.
+            news_fallback = via == "google_news"
+            findings_data = extract_candidates(target, text, only_relevant=news_fallback)
             crawl = None
-            # Los enlaces de Google News son redirecciones por JavaScript: rastrearlos
-            # solo gasta tiempo. Titulo, resumen y fecha del canal bastan como senal.
-            if not is_pipeline_source(source) and not is_news_feed_url(landing_url):
+            if news_fallback:
+                # Los enlaces de Google News son redirecciones por JavaScript: no se
+                # rastrean. La IA lee titulos y resumenes del canal, no su XML.
+                crawl = feed_crawl(landing_url, text, only_relevant=True)
+                # El sitio bloquea al robot, pero los buscadores lo tienen indexado:
+                # los fragmentos de resultados del dominio tambien entran al corpus.
+                crawl = _add_search_snippets(db, source, profile, context, crawl)
+            elif not is_pipeline_source(source) and not is_news_feed_url(landing_url):
                 crawl = _crawl_with_profile(db, source, landing_url, text, profile, context)
                 findings_data = apply_crawled_text(findings_data, crawl)
-            findings_data = _enrich_with_ai(
-                findings_data,
-                source_title=source.title,
-                source_url=landing_url,
-                html=text,
-                crawl=crawl,
-                allow_ai=profile["ai"],
-                allow_ocr=profile["ocr"],
-                source_context=context,
-                ai_decides=True,
-                keep_heuristic=_is_pipeline_row if is_pipeline_source(source) else None,
-            )
+            elif is_pipeline_source(source):
+                scan_progress.note(
+                    "search",
+                    enabled=False,
+                    reason="Fuente de pipeline: se lee la tabla del fabricante en la página principal, sin recorrido ni búsqueda web",
+                )
+            # Un canal de Google News sin items pertinentes no tiene nada que leer.
+            if news_fallback and not (crawl or {}).get("combined"):
+                scan_progress.note("ai", used=False, reason="El respaldo de Google News no trajo ítems pertinentes: nada que leer", final=0)
+            if not news_fallback or (crawl or {}).get("combined"):
+                findings_data = _enrich_with_ai(
+                    findings_data,
+                    source_title=source.title,
+                    source_url=landing_url,
+                    html=text,
+                    crawl=crawl,
+                    allow_ai=profile["ai"],
+                    allow_ocr=profile["ocr"],
+                    source_context=context,
+                    ai_decides=True,
+                    keep_heuristic=_is_pipeline_row if is_pipeline_source(source) else None,
+                )
 
+        scan_progress.stage(
+            "guardando",
+            f"Deduplicando y guardando {len(findings_data)} candidato(s)",
+            items_found=len(findings_data),
+        )
         new_count = 0
         new_findings: list[Finding] = []
         pipeline_parts: dict[int, tuple[str, dict]] = {}
@@ -1302,10 +1530,15 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
 
         log.items_found = len(findings_data)
         log.items_new = new_count
-        log.status = "ok" if findings_data else "parcial"
+        # Si el sitio no se pudo leer y las senales vienen de un respaldo, la
+        # corrida queda parcial: la fuente en si no se consulto.
+        fallback_note = ""
+        if via in ("google_news", "rss_oficial"):
+            fallback_note = f" Vía {ACCESS_VIA_LABELS[via]}."
+        log.status = "ok" if findings_data and via != "google_news" else "parcial"
         visited = f" {crawl.get('pages_visited', 1)} página(s) visitadas." if crawl else ""
         elapsed = int((time.perf_counter() - started) * 1000)
-        log.message = f"{len(findings_data)} items detectados, {new_count} nuevos.{visited} {elapsed} ms."
+        log.message = f"{len(findings_data)} items detectados, {new_count} nuevos.{visited}{fallback_note} {elapsed} ms."
         source.last_scraped_at = datetime.now(timezone.utc)
         finish_trace(ok=bool(findings_data), items_found=len(findings_data), items_new=new_count)
     except httpx.HTTPError as exc:

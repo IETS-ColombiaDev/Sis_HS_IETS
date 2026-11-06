@@ -61,9 +61,21 @@ def cooldown_status() -> dict[str, int]:
         return {k: int(v - now) for k, v in _cooldown.items() if v > now}
 
 
+_strikes: dict[str, int] = {}
+
+
 def _cool(engine: str, minutes: int) -> None:
+    """Pausa el motor. Escalonada: 2, 4, 8... minutos hasta el tope configurado."""
     with _lock:
-        _cooldown[engine] = time.time() + max(1, minutes) * 60
+        strikes = _strikes.get(engine, 0) + 1
+        _strikes[engine] = strikes
+        wait = min(max(1, minutes), 2 ** strikes)
+        _cooldown[engine] = time.time() + wait * 60
+
+
+def _clear_strikes(engine: str) -> None:
+    with _lock:
+        _strikes.pop(engine, None)
 
 
 def _is_cooling(engine: str) -> bool:
@@ -74,6 +86,7 @@ def _is_cooling(engine: str) -> bool:
 def reset_cooldowns() -> None:
     with _lock:
         _cooldown.clear()
+        _strikes.clear()
 
 
 # --------------------------------------------------------------------------- #
@@ -207,6 +220,25 @@ def parse_bing(html: str) -> list[dict]:
     return out
 
 
+# Ritmo minimo entre consultas al mismo motor, compartido por todos los carriles
+# del worker: tres fuentes en paralelo disparaban Yahoo hasta bloquearlo y la
+# busqueda quedaba en pausa el resto de la corrida.
+ENGINE_MIN_INTERVAL_S = 3.0
+_last_call: dict[str, float] = {}
+_pace_lock = threading.Lock()
+
+
+def _pace(engine: str, interval: float) -> None:
+    if interval <= 0:
+        return
+    with _pace_lock:
+        now = time.monotonic()
+        wait = _last_call.get(engine, 0.0) + interval - now
+        _last_call[engine] = max(now, _last_call.get(engine, 0.0) + interval)
+    if wait > 0:
+        time.sleep(wait)
+
+
 def _engine_call(engine: str, query: str, *, cfg: dict, brave_key: str) -> list[dict]:
     timeout = float(cfg.get("timeout") or 15)
     count = int(cfg.get("max_results") or 6)
@@ -219,7 +251,10 @@ def _engine_call(engine: str, query: str, *, cfg: dict, brave_key: str) -> list[
             _fetch("https://lite.duckduckgo.com/lite/", params={"q": query}, timeout=timeout, method="POST").text
         )
     if engine == "bing":
-        return parse_bing(_fetch("https://www.bing.com/search", params={"q": query}, timeout=timeout).text)
+        # Con Accept-Language es-CO, Bing ignora "site:" y devuelve portadas ajenas;
+        # pedido en en-US respeta el operador.
+        params = {"q": query, "setlang": "en-US", "cc": "US", "form": "QBLH"}
+        return parse_bing(_fetch("https://www.bing.com/search", params=params, timeout=timeout).text)
     if engine == "brave_api":
         if not brave_key:
             raise EngineBlocked("sin llave configurada")
@@ -241,13 +276,20 @@ def _engine_call(engine: str, query: str, *, cfg: dict, brave_key: str) -> list[
     raise EngineBlocked("motor desconocido")
 
 
-def search(query: str, *, cfg: dict, brave_key: str = "") -> dict:
-    """Ejecuta una consulta probando los motores en cascada. Nunca lanza."""
+def search(query: str, *, cfg: dict, brave_key: str = "", domain: str = "") -> dict:
+    """Ejecuta una consulta probando los motores en cascada. Nunca lanza.
+
+    Con `domain`, un motor solo cuenta como exito si trae resultados de ese
+    dominio: Bing suele ignorar `site:` y devolver portadas ajenas, y antes eso
+    cortaba la cascada con cero resultados utiles.
+    """
     attempts: list[dict] = []
+    fallback: dict | None = None
     for engine in cfg.get("engines") or source_profile.DEFAULT_SEARCH["engines"]:
         if _is_cooling(engine):
             attempts.append({"engine": engine, "status": "enfriamiento", "ms": 0, "detail": "motor en pausa tras un bloqueo"})
             continue
+        _pace(engine, float(cfg.get("engine_min_interval_s", ENGINE_MIN_INTERVAL_S) or 0))
         started = time.perf_counter()
         try:
             rows = _engine_call(engine, query, cfg=cfg, brave_key=brave_key)
@@ -263,9 +305,24 @@ def search(query: str, *, cfg: dict, brave_key: str = "") -> dict:
             attempts.append({"engine": engine, "status": "error", "ms": _ms(started), "detail": str(exc)[:120]})
             continue
         clean = [r for r in rows if (r.get("url") or "").lower().startswith(("http://", "https://"))]
-        attempts.append({"engine": engine, "status": "ok", "ms": _ms(started), "detail": f"{len(clean)} resultado(s)"})
-        if clean:
+        useful = [r for r in clean if in_domain(r["url"], domain)] if domain else clean
+        if clean and not useful:
+            attempts.append(
+                {"engine": engine, "status": "fuera_de_dominio", "ms": _ms(started),
+                 "detail": f"{len(clean)} resultado(s), ninguno de {domain}"}
+            )
+            fallback = fallback or {"engine": engine, "results": clean}
+            continue
+        _clear_strikes(engine)
+        if not clean:
+            # Respondio sin filas: no es un exito, se prueba el siguiente motor.
+            attempts.append({"engine": engine, "status": "sin_resultados", "ms": _ms(started), "detail": "0 resultado(s)"})
+            continue
+        attempts.append({"engine": engine, "status": "ok", "ms": _ms(started), "detail": f"{len(useful)} resultado(s)"})
+        if useful:
             return {"engine": engine, "results": clean, "attempts": attempts}
+    if fallback:
+        return {**fallback, "attempts": attempts}
     return {"engine": "", "results": [], "attempts": attempts}
 
 
@@ -319,9 +376,35 @@ def rule_queries(source, profile: dict, cfg: dict, *, today: date | None = None)
     return list(dict.fromkeys(queries))
 
 
+MAX_QUERY_WORDS = 7
+
+
+def _first_alternative(match: re.Match) -> str:
+    return re.split(r"\s+OR\s+", match.group(1), maxsplit=1)[0]
+
+
+def simplify_query(text: str) -> str:
+    """Consulta que un buscador HTML si responde.
+
+    La IA redactaba consultas booleanas largas ("(a OR b OR c) (d OR e)") y
+    Yahoo/Bing devolvian cero filas. Se deja la primera alternativa de cada grupo,
+    sin parentesis ni OR, y a lo sumo `MAX_QUERY_WORDS` palabras.
+    """
+    q = re.sub(r"\s+", " ", str(text or "")).strip()
+    for _ in range(3):
+        q = re.sub(r"\(([^()]*)\)", _first_alternative, q)
+    q = re.split(r"\s+OR\s+", q, maxsplit=1)[0]
+    q = q.replace("(", " ").replace(")", " ")
+    filetype = " filetype:pdf" if re.search(r"\bfiletype:pdf\b", q, re.I) else ""
+    q = re.sub(r"\b(filetype|inurl|intitle):\S+", "", q, flags=re.I)
+    words = [w for w in q.split() if w.strip('"')]
+    return (" ".join(words[:MAX_QUERY_WORDS]).strip() + filetype).strip()
+
+
 def _sanitize_query(text: str, domain: str) -> str:
     q = re.sub(r"\s+", " ", str(text or "")).strip().strip('"')
     q = re.sub(r"\bsite:\S+", "", q).strip()
+    q = simplify_query(q)
     if not q:
         return ""
     return f"site:{domain} {q}"[:MAX_QUERY_CHARS]
@@ -346,8 +429,9 @@ def ai_queries(source, profile: dict, cfg: dict, context: str = "") -> list[str]
         f"Redacta hasta {n} consultas para un buscador web que encuentren, DENTRO de {domain}, "
         "paginas o documentos (PDF, informes, fichas, listados de aprobacion, ensayos) sobre "
         "tecnologias sanitarias nuevas o emergentes. Usa el idioma del sitio. "
-        f"Cada consulta empieza con site:{domain}. Puedes usar filetype:pdf. "
-        "Responde SOLO un JSON array de strings."
+        f"Cada consulta empieza con site:{domain} seguida de 2 a 5 palabras clave. "
+        "No uses OR, parentesis ni frases largas entre comillas: los buscadores devuelven cero resultados. "
+        "Puedes usar filetype:pdf en una sola consulta. Responde SOLO un JSON array de strings."
     )
     try:
         text, _model = ai_service.generate(
@@ -381,18 +465,25 @@ def search_for_source(db, source, profile: dict | None = None, *, context: str =
     cfg = source_profile.load_search(db)
     profile = profile or source_profile.effective_profile(source)
     out = {"enabled": False, "domain": "", "queries": [], "query_origin": "", "results": [], "steps": []}
+    from . import scan_progress
+
     if not cfg.get("enabled"):
         out["steps"].append({"action": "busqueda", "url": "", "status": "omitido", "ms": 0, "detail": "Búsqueda web apagada en Parámetros de fuentes"})
+        scan_progress.note("search", enabled=False, reason="Búsqueda web apagada en Parámetros de fuentes")
         return out
     if not profile.get("web_search"):
         out["steps"].append({"action": "busqueda", "url": "", "status": "omitido", "ms": 0, "detail": "Búsqueda web apagada en el flujo de esta fuente"})
+        scan_progress.note("search", enabled=False, reason="Búsqueda web apagada en el flujo de esta fuente")
         return out
     domain = search_domain(source, profile)
     out.update({"enabled": True, "domain": domain})
     if not domain:
         out["steps"].append({"action": "busqueda", "url": "", "status": "omitido", "ms": 0, "detail": "La fuente no tiene dominio"})
         return out
+    from . import scan_progress
+
     started = time.perf_counter()
+    scan_progress.stage("buscando", f"Redactando consultas de búsqueda para {domain}")
     queries = ai_queries(source, profile, cfg, context=context)
     origin = "ia" if queries else "reglas"
     if not queries:
@@ -412,7 +503,8 @@ def search_for_source(db, source, profile: dict | None = None, *, context: str =
         if idx and pause:
             time.sleep(pause)
         t0 = time.perf_counter()
-        res = search(query, cfg=cfg, brave_key=brave_key)
+        scan_progress.stage("buscando", f"Consulta {idx + 1}/{len(queries)}: {query[:120]}")
+        res = search(query, cfg=cfg, brave_key=brave_key, domain=domain if cfg.get("same_domain_only") else "")
         kept = 0
         for row in res["results"]:
             url = (row.get("url") or "").split("#")[0]
@@ -446,6 +538,19 @@ def search_for_source(db, source, profile: dict | None = None, *, context: str =
         )
     if cfg.get("prefer_documents"):
         out["results"].sort(key=lambda r: 0 if is_document_url(r["url"]) else 1)
+    engines_used = sorted({r["engine"] for r in out["results"] if r.get("engine")})
+    tried = [st["detail"].split(" · ", 1)[-1] for st in out["steps"][1:]]
+    scan_progress.note(
+        "search",
+        enabled=True,
+        domain=domain,
+        query_origin=origin,
+        queries=queries[:8],
+        results=len(out["results"]),
+        engines=engines_used,
+        engine_attempts=tried[:8],
+        urls=[r["url"] for r in out["results"][:8]],
+    )
     return out
 
 

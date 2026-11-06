@@ -232,7 +232,7 @@ def test_scraper_splits_pipeline_rows_at_capture(db, monkeypatch):
     monkeypatch.setattr(
         scraper,
         "extract_candidates",
-        lambda src, html: [{"title": row, "url": source.url, "summary": "tabla", "raw_content": "", "technology": row,
+        lambda src, html, **kw: [{"title": row, "url": source.url, "summary": "tabla", "raw_content": "", "technology": row,
                             "technology_type": "medicamento", "horizon": "", "phase": "", "therapeutic_area": "oncologia",
                             "published_date": ""}],
     )

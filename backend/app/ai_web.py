@@ -174,6 +174,89 @@ def _drop_invented_nct(item: dict, source_text: str) -> dict:
     return item
 
 
+# Palabras que no distinguen una tecnologia (no sirven para comprobar que la
+# senal esta en el texto visitado).
+_STOP = {
+    "with", "from", "that", "this", "for", "and", "the", "new", "para", "como", "con", "los", "las", "del",
+    "una", "uno", "que", "por", "entre", "sobre", "study", "trial", "phase", "fase", "ensayo", "estudio",
+    "treatment", "tratamiento", "patients", "pacientes", "therapy", "terapia", "device", "dispositivo",
+    "drug", "medicamento", "approval", "aprobacion", "clinical", "clinico", "clinica", "health", "salud",
+    "cancer", "disease", "enfermedad", "technology", "tecnologia", "results", "resultados", "data", "datos",
+}
+_TOKEN = re.compile(r"[a-z0-9][a-z0-9\-]{3,}")
+
+
+def _tokens(text: str) -> list[str]:
+    from .source_matrix import fold
+
+    return [t for t in _TOKEN.findall(fold(text)) if t not in _STOP and not t.isdigit()]
+
+
+EVIDENCE_INSTRUCTION = (
+    "\n\nREGLA DE EVIDENCIA (obligatoria): agrega a cada senal el campo \"evidencia\" con una cita "
+    "textual corta (de 5 a 30 palabras) copiada tal cual del CONTENIDO, en su idioma original, que "
+    "respalde la senal. No la traduzcas ni la resumas. Si no puedes citar el contenido, no incluyas la senal."
+)
+
+
+def evidence_found(evidence: str, source_text: str) -> bool:
+    """True si la cita de la IA esta en el texto visitado (tolera espacios, tildes y puntuacion)."""
+    from .source_matrix import fold
+
+    quote = re.sub(r"[^a-z0-9 ]+", " ", fold(evidence))
+    quote = re.sub(r"\s+", " ", quote).strip()
+    if len(quote) < 12:
+        return False
+    hay = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]+", " ", fold(source_text)))
+    if quote in hay:
+        return True
+    words = [w for w in quote.split() if len(w) >= 4]
+    return bool(words) and sum(1 for w in words if w in hay) / len(words) >= 0.85
+
+
+def is_grounded(item: dict, source_text: str, evidence: str = "") -> bool:
+    """True si la senal de la IA se puede rastrear en el texto que el sistema visito.
+
+    Basta con que aparezca el nombre de la tecnologia, un codigo/marca del titulo
+    (p. ej. ELREXFIO, PF-07220060) o la mitad de las palabras distintivas del
+    titulo. La IA puede traducir el titulo al espanol: por eso tambien cuenta el
+    nombre de la tecnologia y el resumen, que suelen conservar el nombre propio.
+    """
+    from .source_matrix import fold
+
+    if not source_text:
+        return True  # solo OCR de imagenes: no hay texto con que comparar
+    if evidence:
+        # Con cita, la cita decide: una cita que no esta en el texto es inventada.
+        return evidence_found(evidence, source_text)
+    hay = fold(source_text)
+    tech = _tokens(item.get("technology") or "")
+    title = _tokens(item.get("title") or "")
+    summary = _tokens(item.get("summary") or "")
+    if tech and sum(1 for t in tech if t in hay) / len(tech) >= 0.5:
+        return True
+    if title and sum(1 for t in title if t in hay) / len(title) >= 0.5:
+        return True
+    distinctive = {t for t in tech + title + summary if len(t) >= 6 or any(ch.isdigit() for ch in t)}
+    hits = sum(1 for t in distinctive if t in hay)
+    return hits >= 2 or (hits >= 1 and len(distinctive) <= 2)
+
+
+def _real_url(url: str, source_url: str, source_text: str) -> str:
+    """La URL que da la IA solo se conserva si estaba en el texto visitado o es del mismo sitio."""
+    from urllib.parse import urlsplit
+
+    if not url or url == source_url:
+        return source_url
+    if source_text and url in source_text:
+        return url
+    host = (urlsplit(url).hostname or "").removeprefix("www.")
+    base = (urlsplit(source_url).hostname or "").removeprefix("www.")
+    if host and base and (host == base or host.endswith("." + base) or base.endswith("." + host)):
+        return url
+    return source_url
+
+
 def _normalize_item(item: dict, source_url: str, source_title: str, source_text: str = "") -> dict | None:
     s = _scraper()
     title = s._clean(str(item.get("title") or item.get("technology") or ""))
@@ -192,6 +275,7 @@ def _normalize_item(item: dict, source_url: str, source_title: str, source_text:
     url = str(item.get("url") or source_url).strip()[:1020]
     if not url.lower().startswith(("http://", "https://")):
         url = source_url
+    url = _real_url(url, source_url, source_text)
     out = {
         "title": title[:590],
         "url": url,
@@ -265,21 +349,39 @@ def _loads_payload(text: str) -> list:
     return _decode_payload(text) or []
 
 
-def _parse_items(text: str, source_url: str, source_title: str, source_text: str = "") -> list[dict]:
+def _parse_items(
+    text: str, source_url: str, source_title: str, source_text: str = "", report: dict | None = None
+) -> list[dict]:
     if not text or text.startswith("[Error"):
         return []
     rows = _loads_payload(text)
     if not isinstance(rows, list):
         return []
     out: list[dict] = []
+    dropped: list[str] = []
+    cited = 0
     for row in rows:
         if not isinstance(row, dict):
             continue
         item = _normalize_item(row, source_url, source_title, source_text)
+        evidence = re.sub(r"\s+", " ", str(row.get("evidencia") or row.get("evidence") or "")).strip()[:400]
+        if item and not is_grounded(item, source_text, evidence):
+            # La IA devolvio algo que no esta en lo que el sistema leyo: no se inventa.
+            dropped.append(item["title"][:120])
+            continue
         if item:
+            if evidence:
+                cited += 1
+                # La cita queda en el crudo de la senal: el equipo ve de donde salio.
+                item["raw_content"] = f"Cita de la fuente: «{evidence}»\n{item['raw_content']}"[:5000]
             out.append(item)
         if len(out) >= MAX_AI_ITEMS:
             break
+    if report is not None:
+        report["returned"] = sum(1 for r in rows if isinstance(r, dict))
+        report["kept"] = len(out)
+        report["ungrounded"] = dropped[:10]
+        report["with_evidence"] = cited
     return out
 
 
@@ -363,6 +465,8 @@ def extract_from_page(
         ocr_note=ocr_note,
         max_items=MAX_AI_ITEMS,
     )
+    if main_text:
+        prompt += EVIDENCE_INSTRUCTION
 
     try:
         text, _model = ai_service.generate(
@@ -377,7 +481,7 @@ def extract_from_page(
         return []
     if report is not None and text and not text.startswith("[Error"):
         report["answered"] = _decode_payload(text) is not None
-    return _parse_items(text, source_url, source_title, source_text=main_text)
+    return _parse_items(text, source_url, source_title, source_text=main_text, report=report)
 
 
 def merge_findings(base: list[dict], extra: list[dict]) -> list[dict]:
