@@ -55,7 +55,7 @@ export default function FindingDetailModal({
 
         <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
           {finding.url && (
-            <a href={finding.url} target="_blank" rel="noreferrer">
+            <a href={finding.link || finding.url} target="_blank" rel="noopener noreferrer" title={finding.url}>
               <Button variant="secondary" size="sm"><Icon name="external" size={14} /> Enlace original</Button>
             </a>
           )}

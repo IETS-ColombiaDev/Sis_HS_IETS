@@ -89,6 +89,17 @@ def signal_url(db: Session, tech: Technology) -> str:
     return ""
 
 
+def signal_link(db: Session, tech: Technology) -> str:
+    """URL para «Abrir fuente original»: la de la senal con el resaltado de su cita."""
+    from . import evidence_locator
+
+    url = signal_url(db, tech)
+    finding = db.get(Finding, tech.finding_id) if tech.finding_id else None
+    if not finding:
+        return url
+    return evidence_locator.signal_link(url, finding.raw_content, finding.technology or tech.commercial_name or "")
+
+
 def _check(key: str, label: str, ok: bool | None, detail: str, weight: int) -> dict:
     """ok=True suma, False resta, None es neutro (no aplica o no se pudo comprobar)."""
     return {"key": key, "label": label, "ok": ok, "detail": detail, "weight": weight}

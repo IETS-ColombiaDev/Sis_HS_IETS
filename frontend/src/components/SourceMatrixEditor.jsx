@@ -11,12 +11,6 @@ export const FALLBACK_OPTIONS = {
     { value: "terciaria", label: "Terciaria" },
     { value: "por_definir", label: "Por definir" },
   ],
-  priority_level: [
-    { value: "alta", label: "Alta", rank: 1 },
-    { value: "media", label: "Media", rank: 2 },
-    { value: "revisar", label: "Revisar pertinencia", rank: 3 },
-    { value: "baja", label: "Baja", rank: 4 },
-  ],
   tech_type: [
     { value: "MED", label: "Medicamentos" },
     { value: "DM", label: "Dispositivos médicos" },
@@ -48,7 +42,6 @@ const FLOW_SWITCHES = [
   { key: "web_search", label: "Búsqueda web impulsada por IA", tip: "fb_flujo_busqueda" },
 ];
 
-export const PRIORITY_TONES = { alta: "alto", media: "medio", baja: "bajo", revisar: "info" };
 export const LEVEL_TONES = { primaria: "ok", secundaria: "D", terciaria: "digital", por_definir: "default" };
 
 export function optionLabel(options, list, value) {
@@ -68,7 +61,6 @@ export function matrixFormFrom(source) {
   const flow = { ...DEFAULT_FLOW, ...(s.scan_profile || {}) };
   return {
     source_level: s.source_level || "por_definir",
-    priority_level: s.priority_level || "",
     tech_types: s.tech_types || [],
     matrix_origin: s.matrix_origin || "",
     matrix_ref: s.matrix_ref || "",
@@ -96,7 +88,6 @@ export function matrixPayload(form) {
   return {
     payload: {
       source_level: form.source_level,
-      priority_level: form.priority_level,
       tech_types: form.tech_types,
       matrix_origin: form.matrix_origin,
       entry_urls: entry,
@@ -137,15 +128,11 @@ export default function SourceMatrixEditor({ form, setForm, options, webSearchOn
 
   return (
     <>
-      <SectionTitle tip={GLOSSARY.fb_matriz_eh}>Matriz EH · priorización</SectionTitle>
+      <SectionTitle tip={GLOSSARY.fb_matriz_eh}>Matriz EH</SectionTitle>
       {form.matrix_ref && <p className="source-section-note">Origen en la matriz: {form.matrix_ref}</p>}
       <div className="fb-grid-2">
         <Select id="source-tier" label="Nivel de fuente" hint={GLOSSARY.fb_nivel_fuente} value={form.source_level} onChange={(e) => set({ source_level: e.target.value })}>
           {(opts.source_level || []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </Select>
-        <Select id="source-priority" label="Nivel de priorización" hint={GLOSSARY.fb_prioridad_fuente} value={form.priority_level} onChange={(e) => set({ priority_level: e.target.value })}>
-          <option value="">Sin asignar</option>
-          {(opts.priority_level || []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </Select>
         <Select id="source-origin" label="Origen (matriz)" hint={GLOSSARY.fb_origen_matriz} value={form.matrix_origin} onChange={(e) => set({ matrix_origin: e.target.value })}>
           <option value="">Sin origen</option>
@@ -204,11 +191,6 @@ export function MatrixBadges({ source, options }) {
   const opts = options || FALLBACK_OPTIONS;
   return (
     <>
-      {source.priority_level && (
-        <span title={GLOSSARY.fb_prioridad_fuente}>
-          <Badge tone={PRIORITY_TONES[source.priority_level] || "info"}>Prioridad {optionLabel(opts, "priority_level", source.priority_level)}</Badge>
-        </span>
-      )}
       {source.source_level && source.source_level !== "por_definir" && (
         <span title={GLOSSARY.fb_nivel_fuente}>
           <Badge tone={LEVEL_TONES[source.source_level] || "default"}>{optionLabel(opts, "source_level", source.source_level)}</Badge>

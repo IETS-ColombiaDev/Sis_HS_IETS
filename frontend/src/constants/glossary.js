@@ -243,11 +243,9 @@ export const GLOSSARY = {
   fb_nivel:
     "Nivel de acceso según el contrato de datos de la fuente: A = API estable, B = feed o descarga oficial, C = página estructurada, D = página que solo confirma, E = curaduría humana. Una fuente D o E nunca sobreescribe un dato que ya trajo una A o B.",
   fb_matriz_eh:
-    "Datos de la matriz 'Fuentes de información proactiva EH' (hoja MATRIZ FI EH): priorización, nivel de fuente, tipos de tecnología, ruta de acceso y qué consultar. Guían a la IA y al recorrido. Las listas se editan en Configuración › Parámetros de fuentes.",
+    "Datos de la matriz 'Fuentes de información proactiva EH' (hoja MATRIZ FI EH): nivel de fuente, tipos de tecnología, ruta de acceso y qué consultar. Guían a la IA y al recorrido. Las listas se editan en Configuración › Parámetros de fuentes.",
   fb_nivel_fuente:
     "Primaria: produce la evidencia o el dato original (registro de ensayos, fabricante, agencia que aprueba). Secundaria: resume o evalúa fuentes primarias (agencias HTA, revistas). Terciaria: compila o difunde (portales, redes de EH).",
-  fb_prioridad_fuente:
-    "Aplicabilidad de la fuente para el escaneo de horizonte según la matriz EH. Las de prioridad alta se encolan y escanean primero, y la IA da más peso a lo que encuentra en ellas.",
   fb_origen_matriz:
     "Cómo llegó la fuente a la matriz (por ejemplo DOC_TEC = documento técnico, PROP = propuesta del equipo). La lista se edita en Parámetros de fuentes.",
   fb_tipos_tecnologia:

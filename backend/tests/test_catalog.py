@@ -58,7 +58,8 @@ def test_every_matrix_row_maps_to_a_catalog_source():
         assert row["codes"], row["name"]
         assert set(row["codes"]) <= codes, row["name"]
     pcori = next(r for r in catalog.CATALOG_SOURCES if r["catalog_code"] == "FP-HT-01")
-    assert pcori["priority_level"] in {"alta", "media", "baja", "revisar", ""}
+    # La prioridad de la matriz era un comentario interno: no pasa al catalogo.
+    assert "priority_level" not in pcori
     assert pcori["source_level"] in {"primaria", "secundaria", "terciaria", "por_definir"}
     assert pcori["matrix_ref"].startswith("MATRIZ FI EH fila")
 
@@ -67,16 +68,16 @@ def test_sync_keeps_admin_edits_of_matrix_fields(db):
     catalog_service.sync_catalog(db, triggered_by="test")
     src = db.query(Source).filter(Source.catalog_code == "FP-HT-01").one()
     # Edicion desde el panel (update_source registra el campo como editado).
-    edit = {"priority_level": "baja", "access_path": "ruta editada"}
+    edit = {"source_level": "por_definir", "access_path": "ruta editada"}
     catalog_service.mark_edited(src, edit)
     for key, value in edit.items():
         setattr(src, key, value)
     db.commit()
     catalog_service.sync_catalog(db, triggered_by="test")
     db.refresh(src)
-    assert src.priority_level == "baja"
+    assert src.source_level == "por_definir"
     assert src.access_path == "ruta editada"
-    assert {"priority_level", "access_path"} <= set(src.edited_fields)
+    assert {"source_level", "access_path"} <= set(src.edited_fields)
 
 
 def test_sync_updates_matrix_urls_that_the_team_did_not_edit(db):
@@ -97,13 +98,13 @@ def test_first_sync_of_legacy_source_keeps_team_values_and_adds_new_urls(db):
     src = db.query(Source).filter(Source.catalog_code == "FP-HT-02").one()
     expected = list(src.entry_urls)
     src.edited_fields = None
-    src.priority_level = "baja" if src.priority_level != "baja" else "media"
-    team_value = src.priority_level
+    src.source_level = "por_definir" if src.source_level != "por_definir" else "terciaria"
+    team_value = src.source_level
     # La bitacora generica guarda la edicion hecha desde el panel (PUT /api/sources/{id}).
     db.add(
         AuditLog(
             entity_type="sources", entity_id=str(src.id), action="update",
-            new_value={"priority_level": team_value}, request_path=f"PUT /api/sources/{src.id}",
+            new_value={"source_level": team_value}, request_path=f"PUT /api/sources/{src.id}",
         )
     )
     # Un cambio de la sincronizacion (sin ruta del panel) no cuenta como edicion.
@@ -113,10 +114,10 @@ def test_first_sync_of_legacy_source_keeps_team_values_and_adds_new_urls(db):
     db.commit()
     catalog_service.sync_catalog(db, triggered_by="test")
     db.refresh(src)
-    assert src.priority_level == team_value
+    assert src.source_level == team_value
     assert src.entry_urls == expected + ["https://otro-sitio.example.org/lista"]
     assert src.material_type != "valor viejo de otra version de la matriz"
-    assert set(src.edited_fields) == {"priority_level", "entry_urls"}
+    assert set(src.edited_fields) == {"source_level", "entry_urls"}
 
 
 def test_import_matrix_overwrite_and_create(db):
@@ -124,16 +125,16 @@ def test_import_matrix_overwrite_and_create(db):
 
     catalog_service.sync_catalog(db, triggered_by="test")
     src = db.query(Source).filter(Source.catalog_code == "FP-HT-01").one()
-    catalog_service.mark_edited(src, {"priority_level": "baja"})
-    src.priority_level = "baja"
+    catalog_service.mark_edited(src, {"source_level": "por_definir"})
+    src.source_level = "por_definir"
     db.commit()
     parsed = {
         "sheet": "MATRIZ FI EH",
         "rows": [
-            {**next(r for r in source_matrix.load_matrix()["rows"] if "FP-HT-01" in r["codes"]), "priority_level": "alta"},
+            {**next(r for r in source_matrix.load_matrix()["rows"] if "FP-HT-01" in r["codes"]), "source_level": "terciaria"},
             {
                 "excel_row": 999, "matrix_ref": "MATRIZ FI EH fila 999", "codes": [], "name": "Portal nuevo de prueba",
-                "entity_label": "Revista / portal de noticias", "source_level": "secundaria", "priority_level": "media",
+                "entity_label": "Revista / portal de noticias", "source_level": "secundaria",
                 "tech_types": ["DM"], "consult_urls": ["https://portal-prueba.example.org/salud"], "methodology_urls": [],
                 "origin": "", "country": "", "frequency": "semanal", "language": "Ingles",
             },
@@ -142,11 +143,11 @@ def test_import_matrix_overwrite_and_create(db):
     }
     keep = catalog_service.import_matrix(db, parsed, overwrite=False, persist=False)
     db.refresh(src)
-    assert src.priority_level == "baja"
+    assert src.source_level == "por_definir"
     assert keep["created"] == 1
     summary = catalog_service.import_matrix(db, parsed, overwrite=True, persist=False)
     db.refresh(src)
-    assert src.priority_level == "alta"
+    assert src.source_level == "terciaria"
     assert summary["created"] == 0 and summary["updated"] == 2
     new = db.query(Source).filter(Source.title == "Portal nuevo de prueba").one()
     assert new.category == catalog.CAT_NOTICIAS

@@ -21,10 +21,6 @@ EXCEL = Path(__file__).resolve().parents[2] / "FUENTES DE INFORMACION PROACTIVA 
 #  Parser
 # --------------------------------------------------------------------------- #
 def test_parse_helpers():
-    assert source_matrix.parse_priority("Alta aplicabilidad para EH") == "alta"
-    assert source_matrix.parse_priority("Revisar pertinencia") == "revisar"
-    assert source_matrix.parse_priority("No permite acceso sin registro") == "revisar"
-    assert source_matrix.parse_priority("") == ""
     assert source_matrix.parse_source_level("Fuente primaria") == "primaria"
     assert source_matrix.parse_source_level("Secundaria") == "secundaria"
     assert "SD" in source_matrix.parse_tech_types("SaMD, dispositivos médicos")
@@ -71,11 +67,6 @@ def test_effective_profile_derives_keywords_from_access_path():
     assert prof["entry_urls"] == ["https://www.medscape.com/news"]
 
 
-def test_priority_rank_orders_alta_first():
-    ranks = [source_profile.priority_rank(p) for p in ("alta", "media", "", "revisar", "baja")]
-    assert ranks == sorted(ranks)
-
-
 def test_save_options_validates(api):
     with api.db() as db:
         with pytest.raises(ValueError):
@@ -91,7 +82,6 @@ def test_save_options_validates(api):
             {"priority_level": [{"value": "Muy urgente", "label": "Urgente", "rank": 1}, {"value": "alta", "label": "Alta", "rank": 2}]},
         )
         assert out["priority_level"][0]["value"] == "muy_urgente"
-        assert source_profile.priority_rank("muy_urgente", out) < source_profile.priority_rank("alta", out)
 
 
 # --------------------------------------------------------------------------- #
@@ -266,7 +256,8 @@ def test_scrape_source_uses_entry_url_fallback_and_profile(api, monkeypatch):
     assert "https://site.test/pipeline" in visited
     assert calls["allow_ocr"] is False and calls["allow_ai"] is True
     assert calls["source_url"] == "https://site.test/pipeline"
-    assert "Prioridad" in calls["source_context"] or "prioridad" in calls["source_context"].lower()
+    # La prioridad de la matriz era un comentario interno: no llega a la IA.
+    assert "prioridad" not in calls["source_context"].lower()
 
 
 # --------------------------------------------------------------------------- #
@@ -295,7 +286,7 @@ def test_source_options_endpoint_and_dropdown_validation(api):
     assert out["tech_types"] == ["DM", "IA"]
     assert out["scan_profile"]["ocr"] is False and out["scan_profile"]["max_pages"] == 3
     assert out["scan_profile"]["web_search"] is True
-    listed = api.get("/api/sources?priority_level=alta&tech_type=IA").json()
+    listed = api.get("/api/sources?tech_type=IA").json()
     assert [s["id"] for s in listed] == [sid]
     assert api.put(f"/api/sources/{sid}", role="revisor_pares", json={"priority_level": "baja"}).status_code == 403
 

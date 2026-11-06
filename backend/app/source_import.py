@@ -46,7 +46,6 @@ _GSHEET = re.compile(r"^https://docs\.google\.com/spreadsheets/d/(e/)?([A-Za-z0-
 # Campos que la matriz aporta a una fuente, con su etiqueta en la interfaz.
 DIFF_FIELDS = {
     "source_level": "Nivel de fuente",
-    "priority_level": "Prioridad",
     "tech_types": "Tipos de tecnología",
     "entry_urls": "URLs de entrada",
     "reference_urls": "URLs de referencia",
@@ -231,7 +230,6 @@ def compare(db: Session, parsed: dict, *, origin: str, ai: bool = True, check_re
             "country": row.get("country") or "",
             "tech_types": row.get("tech_types") or [],
             "source_level": row.get("source_level") or "",
-            "priority_level": row.get("priority_level") or "",
             "frequency": row.get("frequency") or "",
             "codes": row.get("codes") or [],
         }

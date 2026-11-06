@@ -63,7 +63,7 @@ def _to_out(db: Session, tech: Technology, entry: CycleTechnology | None = None)
     payload = tech.raw_payload if isinstance(tech.raw_payload, dict) else {}
     out.has_raw = bool(payload)
     out.raw_origin = str(payload.get("origin") or "")
-    out.signal_url = reliability_service.signal_url(db, tech)
+    out.signal_url = reliability_service.signal_link(db, tech)
     verdict = tech.reliability if isinstance(tech.reliability, dict) else {}
     out.reliability_verdict = str(verdict.get("verdict") or "")
     out.reliability_score = verdict.get("score") if isinstance(verdict.get("score"), int) else None
@@ -499,7 +499,7 @@ def get_reliability(
     """Ultimo dictamen guardado (o null) y la URL de la senal para abrirla."""
     tech = _get(db, technology_id)
     return {
-        "url": reliability_service.signal_url(db, tech),
+        "url": reliability_service.signal_link(db, tech),
         "assessment": tech.reliability if isinstance(tech.reliability, dict) else None,
     }
 
@@ -520,7 +520,7 @@ def assess_reliability(
     result["assessed_by"] = user.email
     tech.reliability = result
     db.commit()
-    return {"url": result["url"], "assessment": result}
+    return {"url": reliability_service.signal_link(db, tech), "assessment": result}
 
 
 # --------------------------------------------------------------------------- #

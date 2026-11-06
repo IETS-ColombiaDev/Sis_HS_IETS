@@ -1,18 +1,17 @@
-"""Deteccion de fuentes con IA y prioridad sugerida por senales (OBS-001).
+"""Deteccion de fuentes con IA.
+
+La prioridad de fuentes (sugerida por senales) se retiro: era un comentario interno.
 
 Nada sale a internet ni llama a un proveedor de IA: buscador, IA y verificacion
 de alcance se sustituyen con monkeypatch.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
-
 import pytest
 from frente_b_support import api  # noqa: F401  (fixture)
 
 from app import ai_service, source_discovery, web_search
-from app import source_signal_priority as ssp
-from app.models import AuditLog, Cycle, CycleTechnology, Finding, Source, Technology
+from app.models import AuditLog
 
 
 @pytest.fixture(autouse=True)
@@ -147,7 +146,8 @@ def test_accept_discovered_source_marks_it_and_blocks_domain_duplicates(api):
     body = res.json()
     assert body["catalog_note"].startswith("Propuesta por IA")
     assert body["tags"] == "propuesta_ia" and body["verification_status"] == "agregada_localmente"
-    assert body["priority_level"] == "revisar" and body["scrape_enabled"] is False
+    # Sin prioridad de fuente: era un comentario interno de la matriz.
+    assert body["priority_level"] == "" and body["scrape_enabled"] is False
     assert body["tech_types"] == ["MED", "DM"] and body["access_level"] == "C"
     assert body["entry_urls"] == ["https://www.local-hta.org/alertas"]
     # Mismo dominio con otra ruta: duplicado por dominio, no solo por URL exacta.
@@ -157,73 +157,3 @@ def test_accept_discovered_source_marks_it_and_blocks_domain_duplicates(api):
     assert catalog_dup.status_code == 409
     with api.db() as db:
         assert db.query(AuditLog).filter(AuditLog.action == "ai_source_accepted").count() == 1
-
-
-# --------------------------------------------------------------------------- #
-#  Prioridad sugerida
-# --------------------------------------------------------------------------- #
-@pytest.mark.parametrize(
-    ("stats", "level"),
-    [
-        ({"signals": 0}, ""),
-        ({"signals": 3, "prioritized": 1}, "alta"),
-        ({"signals": 3, "in_cycle": 2}, "alta"),
-        ({"signals": 9, "high_score": 5}, "alta"),
-        ({"signals": 3, "in_cycle": 1}, "media"),
-        ({"signals": 3, "high_score": 1}, "media"),
-        ({"signals": 3, "avg_score": 45}, "media"),
-        ({"signals": 3, "avg_score": 20}, "baja"),
-    ],
-)
-def test_suggested_priority_rule(stats, level):
-    assert ssp.classify(stats)[0] == level
-
-
-def _seed_signals(api):
-    rich = api.add_source(title="Rica", url="https://rica.example.org", priority_level="baja")
-    weak = api.add_source(title="Debil", url="https://debil.example.org", priority_level="alta")
-    quiet = api.add_source(title="Callada", url="https://callada.example.org")
-    old_only = api.add_source(title="Antigua", url="https://antigua.example.org")
-    now = datetime.now(timezone.utc)
-    with api.db() as db:
-        cycle = Cycle(code="C-test", year=2026, opened_on=date.today(), data_cutoff_on=date.today())
-        db.add(cycle)
-        db.flush()
-        f1 = Finding(source_id=rich, title="A", content_hash="a", screening_score=80)
-        db.add_all([f1, Finding(source_id=rich, title="B", content_hash="b", screening_score=30)])
-        db.add(Finding(source_id=weak, title="C", content_hash="c", screening_score=10))
-        db.add(Finding(source_id=old_only, title="D", content_hash="d", screening_score=95, created_at=now - timedelta(days=800)))
-        db.flush()
-        # Tecnologia sin source_id: se atribuye por su senal de origen.
-        tech = Technology(commercial_name="T1", finding_id=f1.id)
-        db.add(tech)
-        db.flush()
-        db.add(CycleTechnology(cycle_id=cycle.id, technology_id=tech.id, status="priorizada"))
-        db.commit()
-    return rich, weak, quiet, old_only
-
-
-def test_priority_suggestions_endpoint_and_apply(api):
-    rich, weak, quiet, old_only = _seed_signals(api)
-    res = api.get("/api/sources/priority-suggestions", role="tomador_decisiones")
-    assert res.status_code == 200
-    data = res.json()
-    assert "Alta" in data["rule"]
-    items = {i["source_id"]: i for i in data["items"]}
-    assert items[rich]["suggested"] == "alta" and items[rich]["differs"] is True
-    assert items[rich]["stats"]["in_cycle"] == 1 and items[rich]["stats"]["high_score"] == 1
-    assert items[weak]["suggested"] == "baja"
-    assert items[quiet]["suggested"] == "" and items[quiet]["label"] == "Sin datos"
-    assert items[old_only]["suggested"] == ""  # fuera de la ventana de 365 dias
-
-    assert api.post(f"/api/sources/{rich}/priority-suggestion/apply", role="tomador_decisiones").status_code == 403
-    applied = api.post(f"/api/sources/{rich}/priority-suggestion/apply")
-    assert applied.status_code == 200 and applied.json()["priority_level"] == "alta"
-    assert api.post(f"/api/sources/{quiet}/priority-suggestion/apply").status_code == 409
-    with api.db() as db:
-        log = db.query(AuditLog).filter(AuditLog.action == "priority_suggestion_applied").one()
-        assert log.old_value == {"priority_level": "baja"} and log.new_value["priority_level"] == "alta"
-        # La recarga del catalogo no la revierte: queda marcada como editada.
-        assert "priority_level" in (db.get(Source, rich).edited_fields or [])
-        # La oficial de las demas no se toca.
-        assert db.get(Source, weak).priority_level == "alta"

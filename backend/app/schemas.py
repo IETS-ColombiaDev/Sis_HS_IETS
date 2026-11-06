@@ -287,6 +287,7 @@ class FindingOut(FindingBase):
     source_category: str = ""
     source_url: str = ""
     raw_content: str = ""
+    link: str = ""  # url + resaltado de la cita: abre la pagina sobre el texto de la senal
     created_at: datetime
     updated_at: datetime
     recommendations_count: int = 0

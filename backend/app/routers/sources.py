@@ -156,7 +156,6 @@ def list_sources(
     category: str | None = Query(None),
     q: str | None = Query(None),
     source_level: str | None = Query(None),
-    priority_level: str | None = Query(None),
     tech_type: str | None = Query(None),
 ):
     query = db.query(Source)
@@ -164,9 +163,6 @@ def list_sources(
         query = query.filter(Source.category == category)
     if source_level:
         query = query.filter(Source.source_level == source_level)
-    if priority_level is not None and priority_level != "":
-        value = "" if priority_level == "sin_asignar" else priority_level
-        query = query.filter(func.coalesce(Source.priority_level, "") == value)
     if q:
         like = f"%{q.lower()}%"
         query = query.filter(
@@ -346,7 +342,7 @@ def export_sources(
     buf = io.StringIO()
     writer = csv.writer(buf, delimiter=";", lineterminator="\r\n")
     writer.writerow([
-        "codigo", "titulo", "url", "bloque", "nivel_acceso", "nivel_fuente", "prioridad",
+        "codigo", "titulo", "url", "bloque", "nivel_acceso", "nivel_fuente",
         "tipos_tecnologia", "conector", "frecuencia", "salud", "vigilada", "hallazgos", "pais",
         "verificacion", "retirada", "ref_matriz", "urls_entrada", "ruta_acceso", "que_consultar",
         "restricciones", "flujo",
@@ -362,7 +358,6 @@ def export_sources(
             s.category,
             s.access_level,
             s.source_level or "",
-            s.priority_level or "",
             ", ".join(s.tech_types or []),
             s.connector,
             s.sync_frequency,
@@ -384,73 +379,6 @@ def export_sources(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="fuentes_iets.csv"'},
     )
-
-
-# --------------------------------------------------------------------------- #
-#  Prioridad sugerida por la relevancia de las senales (OBS-001)
-# --------------------------------------------------------------------------- #
-@router.get("/priority-suggestions")
-def priority_suggestions(
-    days: int = Query(365, ge=30, le=1825),
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """Prioridad sugerida por fuente segun sus senales. No toca la prioridad oficial."""
-    from .. import source_signal_priority as ssp
-
-    rows = ssp.compute(db, days=days)
-    return {"window_days": days, "rule": ssp.RULE_TEXT, "items": list(rows.values())}
-
-
-@router.post("/{source_id}/priority-suggestion/apply", response_model=SourceOut)
-def apply_priority_suggestion(
-    source_id: int,
-    days: int = Query(365, ge=30, le=1825),
-    db: Session = Depends(get_db),
-    user: User = Depends(require_permission(P_SOURCE_WRITE)),
-):
-    """Copia la prioridad sugerida (recalculada en el servidor) a la oficial y lo deja en la bitacora."""
-    from .. import audit
-    from .. import source_signal_priority as ssp
-
-    source = db.get(Source, source_id)
-    if not source:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fuente no encontrada")
-    row = ssp.compute(db, days=days, source_ids=[source_id]).get(source_id)
-    level = (row or {}).get("suggested") or ""
-    if not level:
-        raise HTTPException(
-            status_code=409,
-            detail="La fuente no tiene señales en la ventana: no hay prioridad sugerida que aplicar.",
-        )
-    allowed = source_profile.option_values(source_profile.load_options(db), "priority_level")
-    if level not in allowed:
-        raise HTTPException(
-            status_code=422,
-            detail=f"La prioridad '{level}' no está en la lista de Parámetros de fuentes.",
-        )
-    old = source.priority_level or ""
-    if old != level:
-        # Antes de asignar: la sincronizacion del catalogo no debe revertirla.
-        mark_edited(source, {"priority_level": level})
-        source.priority_level = level
-        audit.record_action(
-            db,
-            entity_type="sources",
-            entity_id=source.id,
-            action="priority_suggestion_applied",
-            old_value={"priority_level": old},
-            new_value={
-                "priority_level": level,
-                "reason": row["reason"],
-                "window_days": days,
-                "stats": row["stats"],
-            },
-        )
-        db.commit()
-        db.refresh(source)
-        bump_state_version(db)
-    return _to_out(db, source)
 
 
 # --------------------------------------------------------------------------- #
@@ -547,7 +475,6 @@ def accept_discovered_source(
         tags=sd.AI_MARK_TAG,
         catalog_note=note[:2000],
         source_level=cand["source_level"],
-        priority_level="revisar",
         tech_types=[t for t in cand["tech_types"] if t in allowed_tech],
         entry_urls=[cand["entry_url"]] if cand["entry_url"] else [],
         verification_status=LOCAL_SOURCE_MARK,

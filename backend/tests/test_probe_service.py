@@ -94,7 +94,10 @@ def test_an_empty_news_feed_does_not_count_as_fallback(db, monkeypatch):
     src = _source(db)
     empty = "<?xml version='1.0'?><rss><channel></channel></rss>"
     monkeypatch.setattr(ingest_base, "tls_get", _fake_get({"news.google.com": (200, empty), "thelancet": (403, "")}))
-    assert probe_service.probe_source(db, src)["status"] == "rojo"
+    detail = probe_service.probe_source(db, src)
+    assert detail["status"] == "rojo"
+    # Ni el sitio ni Google News: no es un simple bloqueo, la direccion probablemente esta obsoleta.
+    assert "dejó de publicar" in detail["message"] and "anti-robot" not in detail["message"]
 
 
 def test_a_manual_source_behind_login_is_online(db, monkeypatch):

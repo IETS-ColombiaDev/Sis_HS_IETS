@@ -1166,7 +1166,6 @@ def catalog_stats() -> dict:
         "by_level": levels,
         "by_block": {cat: sum(1 for r in rows if r["category"] == cat) for cat in CATEGORIES},
         "by_source_level": _count(rows, "source_level"),
-        "by_priority": _count(rows, "priority_level"),
         "from_matrix": sum(1 for r in rows if r.get("matrix_ref")),
         "active": sum(1 for r in rows if r.get("catalog_active")),
         "contrast": sum(1 for r in rows if r.get("is_contrast")),

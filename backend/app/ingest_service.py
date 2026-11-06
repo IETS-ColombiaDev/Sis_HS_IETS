@@ -40,16 +40,10 @@ def enqueue(
 ) -> list[IngestJob]:
     """Crea un job por fuente. No ejecuta nada: eso lo hace `tick` o `run_job`.
 
-    Los jobs se crean en orden de prioridad de la matriz EH (alta primero) y,
-    como `tick` atiende por fecha e id, las fuentes prioritarias corren antes.
+    Los jobs se crean en orden alfabetico. La prioridad de la matriz EH era un
+    comentario interno: no ordena ni filtra la vigilancia.
     """
-    from . import source_profile
-
-    options = source_profile.load_options(db)
-    ordered = sorted(
-        sources,
-        key=lambda s: (source_profile.priority_rank(getattr(s, "priority_level", "") or "", options), s.title or ""),
-    )
+    ordered = sorted(sources, key=lambda s: (s.title or "").lower())
     jobs: list[IngestJob] = []
     now = datetime.now(timezone.utc)
     for source in ordered:

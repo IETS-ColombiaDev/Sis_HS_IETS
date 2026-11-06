@@ -186,6 +186,13 @@ class Finding(Base):
         back_populates="finding", cascade="all, delete-orphan"
     )
 
+    @property
+    def link(self) -> str:
+        """URL precisa de la senal con el resaltado de su cita (ver evidence_locator)."""
+        from .evidence_locator import signal_link
+
+        return signal_link(self.url or "", self.raw_content or "", self.technology or "")
+
 
 class Recommendation(Base):
     """Recomendacion de adopcion para Colombia (generada por Gemini o manual)."""

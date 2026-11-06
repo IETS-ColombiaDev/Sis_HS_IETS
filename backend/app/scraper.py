@@ -192,6 +192,42 @@ def _hash(*parts: str) -> str:
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()[:32]
 
 
+def _is_general_url(url: str, *bases: str) -> bool:
+    """True si la URL es la portada de la fuente (o vacia): no lleva a la senal."""
+    if not url:
+        return True
+    key = _normalize_url(url)
+    if any(b and key == _normalize_url(b) for b in bases):
+        return True
+    return urlparse(url).path in ("", "/")
+
+
+def _upgrade_general_url(db: Session, source: Source, landing_url: str, data: dict) -> bool:
+    """Una senal ya guardada con la URL general recibe la URL exacta de esta corrida.
+
+    Evita duplicarla (la huella incluye la URL) y corrige las capturas viejas
+    que apuntaban a la portada de la fuente.
+    """
+    new_url = data.get("url") or ""
+    if _is_general_url(new_url, landing_url, source.url):
+        return False
+    title = (data.get("title") or "").strip()
+    if not title:
+        return False
+    for old in db.query(Finding).filter(Finding.source_id == source.id, Finding.title == title).all():
+        if not _is_general_url(old.url, landing_url, source.url):
+            continue
+        old.url = new_url[:1020]
+        if data.get("raw_content") and "Cita de la fuente:" in data["raw_content"]:
+            old.raw_content = data["raw_content"]
+        from .models import Technology
+
+        for tech in db.query(Technology).filter(Technology.finding_id == old.id).all():
+            tech.url = old.url
+        return True
+    return False
+
+
 def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip())
 
@@ -1288,7 +1324,6 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                 "ai": ai_service.web_assist_enabled() and profile["ai"],
                 "ocr": ai_service.ocr_enabled() and profile["ocr"],
                 "web_search": bool((crawl or {}).get("search_results")),
-                "priority": source.priority_level or "",
                 "source_level": source.source_level or "",
                 "message": log.message,
                 "steps": extra,
@@ -1461,6 +1496,7 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             items_found=len(findings_data),
         )
         new_count = 0
+        relinked = 0
         new_findings: list[Finding] = []
         pipeline_parts: dict[int, tuple[str, dict]] = {}
         from .ingest.pipeline_rows import (
@@ -1483,6 +1519,9 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                 .first()
             )
             if exists:
+                continue
+            if not pipeline and _upgrade_general_url(db, source, landing_url, data):
+                relinked += 1
                 continue
             parsed = parse_row(row) if pipeline else None
             if parsed:
@@ -1538,7 +1577,8 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
         log.status = "ok" if findings_data and via != "google_news" else "parcial"
         visited = f" {crawl.get('pages_visited', 1)} página(s) visitadas." if crawl else ""
         elapsed = int((time.perf_counter() - started) * 1000)
-        log.message = f"{len(findings_data)} items detectados, {new_count} nuevos.{visited}{fallback_note} {elapsed} ms."
+        relinked_note = f" {relinked} con enlace corregido a la página exacta." if relinked else ""
+        log.message = f"{len(findings_data)} items detectados, {new_count} nuevos.{relinked_note}{visited}{fallback_note} {elapsed} ms."
         source.last_scraped_at = datetime.now(timezone.utc)
         finish_trace(ok=bool(findings_data), items_found=len(findings_data), items_new=new_count)
     except httpx.HTTPError as exc:

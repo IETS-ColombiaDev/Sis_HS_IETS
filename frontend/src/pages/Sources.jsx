@@ -79,7 +79,6 @@ const QUICK_EMPTY = { title: "", url: "", category: "Agencias de HTA y redes de 
 const DISCOVER_EMPTY = { tech_types: [], focus: "", region: "" };
 const DISCOVER_HINT =
   "La IA busca en la web fuentes de escaneo de horizonte (agencias regulatorias y de ETS, registros de ensayos, pipelines, redes como EuroScan o i-HTS, portales de noticias) que aún no estén en el catálogo. Descarta por dominio las que ya existen y verifica que respondan. No crea nada hasta que usted dé de alta cada propuesta.";
-const SUGGESTED_TONE = { alta: "success", media: "warning", baja: "neutral" };
 
 function healthTone(status) {
   if (status === "verde") return "verde";
@@ -122,7 +121,6 @@ export default function Sources() {
   const [blockFilter, setBlockFilter] = useState("");
   const [levelFilter, setLevelFilter] = useState("");
   const [healthFilter, setHealthFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
   const [tierFilter, setTierFilter] = useState("");
   const [techFilter, setTechFilter] = useState("");
   const [meta, setMeta] = useState({ options: FALLBACK_OPTIONS, web_search: { enabled: true } });
@@ -162,10 +160,6 @@ export default function Sources() {
   const [accepted, setAccepted] = useState({});
   const [selected, setSelected] = useState({});
   const [enableIngest, setEnableIngest] = useState(false);
-  // Prioridad sugerida por la relevancia de las senales (OBS-001)
-  const [suggestions, setSuggestions] = useState({});
-  const [suggestionRule, setSuggestionRule] = useState("");
-  const [applyingId, setApplyingId] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -191,13 +185,6 @@ export default function Sources() {
     } catch {
       // Sin las listas del servidor se usan las de respaldo.
     }
-    try {
-      const { data } = await api.get("/sources/priority-suggestions");
-      setSuggestions(Object.fromEntries((data.items || []).map((i) => [i.source_id, i])));
-      setSuggestionRule(data.rule || "");
-    } catch {
-      // La sugerencia es complementaria: sin ella se muestra solo la prioridad oficial.
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -207,10 +194,6 @@ export default function Sources() {
 
   const connectorByCode = useMemo(() => Object.fromEntries(connectors.map((c) => [c.code, c])), [connectors]);
   const options = meta.options || FALLBACK_OPTIONS;
-  const priorityRank = useMemo(() => {
-    const map = Object.fromEntries((options.priority_level || []).map((o) => [o.value, o.rank ?? 50]));
-    return (p) => (p ? map[p] ?? 50 : 3);
-  }, [options]);
   const active = useMemo(() => sources.filter((s) => !s.retired && s.catalog_active !== false), [sources]);
   const retired = useMemo(() => sources.filter((s) => s.retired), [sources]);
 
@@ -221,7 +204,6 @@ export default function Sources() {
       const okBlock = !blockFilter || s.category === blockFilter;
       const okLevel = !levelFilter || s.access_level === levelFilter;
       const okHealth = !healthFilter || (s.health_status || "sin_sonda") === healthFilter;
-      const okPriority = !priorityFilter || (priorityFilter === "sin_asignar" ? !s.priority_level : s.priority_level === priorityFilter);
       const okTier = !tierFilter || (s.source_level || "por_definir") === tierFilter;
       const okTech = !techFilter || (s.tech_types || []).includes(techFilter);
       const okSearch =
@@ -230,16 +212,15 @@ export default function Sources() {
           .join(" ")
           .toLowerCase()
           .includes(q);
-      return okBlock && okLevel && okHealth && okPriority && okTier && okTech && okSearch;
-    }).sort((a, b) => priorityRank(a.priority_level) - priorityRank(b.priority_level) || (a.title || "").localeCompare(b.title || ""));
-  }, [sources, active, showRetired, search, blockFilter, levelFilter, healthFilter, priorityFilter, tierFilter, techFilter, priorityRank]);
-  const anyFilter = search || blockFilter || levelFilter || healthFilter || priorityFilter || tierFilter || techFilter;
+      return okBlock && okLevel && okHealth && okTier && okTech && okSearch;
+    }).sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+  }, [sources, active, showRetired, search, blockFilter, levelFilter, healthFilter, tierFilter, techFilter]);
+  const anyFilter = search || blockFilter || levelFilter || healthFilter || tierFilter || techFilter;
   const clearFilters = () => {
     setSearch("");
     setBlockFilter("");
     setLevelFilter("");
     setHealthFilter("");
-    setPriorityFilter("");
     setTierFilter("");
     setTechFilter("");
   };
@@ -261,7 +242,6 @@ export default function Sources() {
       vigiladas: active.filter((s) => s.scrape_enabled).length,
       contrast: active.filter((s) => s.is_contrast).length,
       governors: active.filter((s) => s.access_level === "A" || s.access_level === "B").length,
-      alta: active.filter((s) => s.priority_level === "alta").length,
       primarias: active.filter((s) => s.source_level === "primaria").length,
       buscables: active.filter((s) => s.scrape_enabled && s.scan_profile?.web_search !== false).length,
     }),
@@ -561,56 +541,6 @@ export default function Sources() {
     load();
   };
 
-  const applySuggestion = async (s) => {
-    setApplyingId(s.id);
-    try {
-      const { data } = await api.post(`/sources/${s.id}/priority-suggestion/apply`);
-      toast.success(`Prioridad de "${data.title}" actualizada a ${optionLabel(options, "priority_level", data.priority_level)}`);
-      if (detailSource?.id === s.id) setDetailSource(data);
-      load();
-    } catch (e) {
-      toast.error(apiError(e, "No se pudo aplicar la prioridad sugerida"));
-    } finally {
-      setApplyingId(null);
-    }
-  };
-
-  /** Prioridad sugerida por las senales, junto a la oficial. Nunca la reemplaza sola. */
-  const SuggestedPriority = ({ s }) => {
-    const sug = suggestions[s.id];
-    if (!sug) return null;
-    const tip = `${sug.reason}. ${suggestionRule}`.trim();
-    if (!sug.suggested) {
-      return (
-        <span title={tip} aria-label={`Prioridad sugerida: sin datos. ${tip}`}>
-          <Badge tone="neutral">Sugerida: sin datos</Badge>
-        </span>
-      );
-    }
-    const label = optionLabel(options, "priority_level", sug.suggested);
-    return (
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-        <span title={tip} aria-label={`Prioridad sugerida: ${label}. ${tip}`}>
-          <Badge tone={SUGGESTED_TONE[sug.suggested] || "neutral"}>
-            Sugerida: {label} ({sug.reason})
-          </Badge>
-        </span>
-        {canWrite && sug.differs && (
-          <HintButton
-            size="sm"
-            variant="ghost"
-            hint={`Reemplaza la prioridad oficial (${s.priority_level ? optionLabel(options, "priority_level", s.priority_level) : "sin asignar"}) por ${label}. Queda en la bitácora.`}
-            loading={applyingId === s.id}
-            onClick={() => applySuggestion(s)}
-            aria-label={`Aplicar prioridad sugerida ${label} a ${s.title}`}
-          >
-            Aplicar
-          </HintButton>
-        )}
-      </span>
-    );
-  };
-
   /** Botones de accion por fuente, con el motivo cuando no aplican. */
   const SourceActions = ({ s, compact = false }) => {
     const ingestWhy = !canScan ? noScan : ingestBlocker(s);
@@ -684,18 +614,6 @@ export default function Sources() {
       ),
     },
     { key: "level", width: 80, label: "Acceso", tip: <InfoTip text={GLOSSARY.fb_nivel} label="Qué es el nivel de acceso" />, render: (s) => <Badge tone={s.access_level}>{s.access_level || "—"}</Badge> },
-    {
-      key: "priority",
-      width: 110,
-      label: "Prioridad",
-      tip: <InfoTip text={GLOSSARY.fb_prioridad_fuente} label="Qué es la prioridad" />,
-      render: (s) => (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
-          {s.priority_level ? <MatrixBadges source={{ priority_level: s.priority_level }} options={options} /> : <span className="muted">Sin asignar</span>}
-          <SuggestedPriority s={s} />
-        </div>
-      ),
-    },
     { key: "tier", width: 100, label: "Nivel de fuente", tip: <InfoTip text={GLOSSARY.fb_nivel_fuente} label="Qué es el nivel de fuente" />, render: (s) => optionLabel(options, "source_level", s.source_level || "por_definir") },
     { key: "tech", width: 110, label: "Tecnologías", render: (s) => (s.tech_types || []).join(", ") || "—" },
     { key: "connector", width: 120, label: "Adaptador", tip: <InfoTip text={GLOSSARY.fb_adaptador} label="Qué es el adaptador" />, render: (s) => s.connector || "html" },
@@ -780,7 +698,7 @@ export default function Sources() {
           { label: "Contrato A/B", value: stats.governors, sub: "Sostienen el pipeline", hint: GLOSSARY.fb_nivel },
           { label: "Ingesta activa", value: stats.vigiladas, hint: GLOSSARY.fb_ingesta },
           { label: "Fuentes de contraste", value: stats.contrast, sub: "Control de cobertura", hint: GLOSSARY.fb_contraste },
-          { label: "Prioridad alta", value: stats.alta, sub: `${stats.primarias} fuentes primarias`, hint: GLOSSARY.fb_prioridad_fuente },
+          { label: "Fuentes primarias", value: stats.primarias, hint: GLOSSARY.fb_nivel_fuente },
           { label: "Con búsqueda web", value: stats.buscables, sub: meta.web_search?.enabled === false ? "Apagada en Parámetros de fuentes" : "IA + motores en el dominio", hint: GLOSSARY.fb_flujo_busqueda },
         ]}
       />
@@ -819,13 +737,6 @@ export default function Sources() {
                 {LEVELS.map((l) => (
                   <option key={l.value} value={l.value}>Acceso {l.value}</option>
                 ))}
-              </select>
-              <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="filter-select" aria-label="Filtrar por prioridad">
-                <option value="">Toda prioridad</option>
-                {(options.priority_level || []).map((o) => (
-                  <option key={o.value} value={o.value}>Prioridad {o.label}</option>
-                ))}
-                <option value="sin_asignar">Sin prioridad asignada</option>
               </select>
               <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)} className="filter-select" aria-label="Filtrar por nivel de fuente">
                 <option value="">Primaria, secundaria...</option>
@@ -896,11 +807,6 @@ export default function Sources() {
                           {s.retired && <span title={GLOSSARY.fb_retirada}><Badge tone="viewer">Retirada</Badge></span>}
                           {!s.retired && !s.scrape_enabled && <span title={GLOSSARY.fb_ingesta}><Badge tone="viewer">Ingesta apagada</Badge></span>}
                         </div>
-                        {suggestions[s.id] && (
-                          <div style={{ marginTop: 6 }}>
-                            <SuggestedPriority s={s} />
-                          </div>
-                        )}
                         <h4>{s.title}</h4>
                         {s.url && (
                           <a href={s.url} target="_blank" rel="noreferrer" className="registry-url">
@@ -1225,7 +1131,7 @@ export default function Sources() {
         {editing?.catalog_code && (
           <p style={{ fontSize: 12.5, color: "#92400E", background: "#FFFBEB", padding: "8px 10px", borderRadius: 8, marginTop: 0 }}>
             Fuente del catálogo D-06 ({editing.catalog_code}). Recargar el catálogo restituye sus datos oficiales; la
-            priorización, la ruta de acceso y el flujo que edite aquí se conservan.
+            nivel de fuente, la ruta de acceso y el flujo que edite aquí se conservan.
           </p>
         )}
         <Input id="source-title" label="Nombre" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
@@ -1298,7 +1204,6 @@ export default function Sources() {
               <div><dt>Términos</dt><dd>{detailSource.terms_accepted_at ? `Aceptados ${new Date(detailSource.terms_accepted_at).toLocaleDateString()}` : (detailSource.terms_url || "No aplican")}</dd></div>
               {detailSource.last_error && <div><dt>Último error</dt><dd>{detailSource.last_error.slice(0, 300)}</dd></div>}
               <div><dt><TermLabel tip={GLOSSARY.fb_nivel_fuente}>Nivel de fuente</TermLabel></dt><dd>{optionLabel(options, "source_level", detailSource.source_level || "por_definir")}</dd></div>
-              <div><dt><TermLabel tip={GLOSSARY.fb_prioridad_fuente}>Prioridad</TermLabel></dt><dd>{detailSource.priority_level ? optionLabel(options, "priority_level", detailSource.priority_level) : "Sin asignar"}{suggestions[detailSource.id] && <div style={{ marginTop: 4 }}><SuggestedPriority s={detailSource} /></div>}</dd></div>
               <div><dt><TermLabel tip={GLOSSARY.fb_tipos_tecnologia}>Tipos de tecnología</TermLabel></dt><dd>{(detailSource.tech_types || []).map((t) => optionLabel(options, "tech_type", t)).join(", ") || "—"}</dd></div>
               <div><dt>Origen en la matriz</dt><dd>{[detailSource.matrix_ref, detailSource.matrix_origin].filter(Boolean).join(" · ") || "—"}</dd></div>
               <div>

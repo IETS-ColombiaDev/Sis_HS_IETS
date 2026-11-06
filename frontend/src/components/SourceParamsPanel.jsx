@@ -10,7 +10,6 @@ import { LoadingBlock } from "./Spinner";
 import { TermLabel } from "./InfoTip";
 
 const LISTS = [
-  { key: "priority_level", title: "Nivel de priorización", tip: GLOSSARY.fb_prioridad_fuente, rank: true, hint: "Orden = rango: 1 se escanea primero." },
   { key: "source_level", title: "Nivel de fuente (primaria, secundaria...)", tip: GLOSSARY.fb_nivel_fuente },
   { key: "tech_type", title: "Tipos de tecnología", tip: GLOSSARY.fb_tipos_tecnologia, hint: "Código en mayúscula (MED, DM, IA...)." },
   { key: "matrix_origin", title: "Origen en la matriz", tip: GLOSSARY.fb_origen_matriz },
@@ -252,7 +251,7 @@ export default function SourceParamsPanel({ toast }) {
       <Card>
         <SectionTitle hint={GLOSSARY.fb_importar_matriz}>Matriz EH (Excel)</SectionTitle>
         <p style={{ fontSize: 13, color: "#64748B", marginTop: -6 }}>
-          Cargue el Excel «Fuentes de información proactiva EH» para actualizar nivel de fuente, priorización, tipos de
+          Cargue el Excel «Fuentes de información proactiva EH» para actualizar nivel de fuente, tipos de
           tecnología, URLs de entrada, ruta de acceso, qué consultar y los criterios de búsqueda.
         </p>
         <div className="fb-toolbar" style={{ alignItems: "center" }}>

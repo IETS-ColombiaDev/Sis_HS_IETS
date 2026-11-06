@@ -50,7 +50,6 @@ function NewRow({ row, choice, onChange, connectors, labels }) {
             {row.entity_label && <Badge>{row.entity_label}</Badge>}
             {row.country && <span>{row.country}</span>}
             {row.tech_types?.length > 0 && <span>{row.tech_types.join(" · ")}</span>}
-            {row.priority_level && <Badge tone={row.priority_level === "alta" ? "success" : "viewer"}>Prioridad {row.priority_level}</Badge>}
             {row.excel_row ? <span>Fila {row.excel_row}</span> : null}
             {reach && (
               <Badge tone={reach.ok && reach.status < 400 ? "success" : reach.ok ? "warning" : "danger"}>

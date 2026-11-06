@@ -278,22 +278,6 @@ def parse_source_level(raw: str) -> str:
     return "por_definir"
 
 
-def parse_priority(observations: str) -> str:
-    """Prioridad declarada en Observaciones (columna L). Vacio si la matriz no la fija."""
-    text = fold(observations)
-    if not text:
-        return ""
-    if re.search(r"\balta aplicabilidad", text):
-        return "alta"
-    if re.search(r"\bmedia aplicabilidad", text):
-        return "media"
-    if re.search(r"\bbaja aplicabilidad", text):
-        return "baja"
-    if re.search(r"(revisar|verificar) pertinencia|no permite acceso", text):
-        return "revisar"
-    return ""
-
-
 def parse_frequency(raw: str) -> str:
     text = fold(raw)
     if text.startswith("diari"):
@@ -399,7 +383,6 @@ def normalize_row(raw: dict, links: dict | None = None, *, excel_row: int = 0, n
         "access_path": clean_text(raw.get("access_path")),
         "consult_info": clean_text(raw.get("consult_info")),
         "observations": observations,
-        "priority_level": parse_priority(observations),
         "publication_structure": clean_text(raw.get("publication_structure")),
         "format": clean_text(raw.get("format")),
         "frequency": parse_frequency(raw.get("frequency_raw", "")),
@@ -489,7 +472,6 @@ def profile_fields(row: dict, *, primary: bool = True) -> dict:
     """Campos del modelo Source que aporta una fila de la matriz."""
     fields = {
         "source_level": row.get("source_level") or "por_definir",
-        "priority_level": row.get("priority_level") or "",
         "tech_types": list(row.get("tech_types") or []),
         "matrix_ref": row.get("matrix_ref") or "",
         "matrix_origin": row.get("origin") or "",

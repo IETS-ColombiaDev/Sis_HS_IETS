@@ -193,13 +193,6 @@ def option_label(options: dict, name: str, value: str) -> str:
     return value or ""
 
 
-def priority_rank(level: str, options: dict | None = None) -> int:
-    for o in (options or DEFAULT_OPTIONS).get("priority_level") or []:
-        if o["value"] == (level or ""):
-            return int(o.get("rank") or UNRANKED_PRIORITY)
-    return UNRANKED_PRIORITY
-
-
 # --------------------------------------------------------------------------- #
 #  Flujo por fuente
 # --------------------------------------------------------------------------- #
@@ -300,13 +293,10 @@ def source_context(source, options: dict | None = None) -> str:
     opts = options or DEFAULT_OPTIONS
     lines: list[str] = []
     level = getattr(source, "source_level", "") or ""
-    priority = getattr(source, "priority_level", "") or ""
     techs = [t for t in (getattr(source, "tech_types", None) or []) if t]
     meta = []
     if level:
         meta.append(f"Nivel de fuente: {option_label(opts, 'source_level', level)}")
-    if priority:
-        meta.append(f"Prioridad EH: {option_label(opts, 'priority_level', priority)}")
     if techs:
         meta.append("Tipos de tecnologia: " + ", ".join(option_label(opts, "tech_type", t) for t in techs))
     if meta:

@@ -16,7 +16,7 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 
-from . import ai_service, product_details, prompt_store
+from . import ai_service, evidence_locator, product_details, prompt_store
 
 MAX_AI_ITEMS = 18
 MAX_IMAGES = 3
@@ -192,6 +192,8 @@ def _tokens(text: str) -> list[str]:
     return [t for t in _TOKEN.findall(fold(text)) if t not in _STOP and not t.isdigit()]
 
 
+CITE_PREFIX = "Cita de la fuente: "
+
 EVIDENCE_INSTRUCTION = (
     "\n\nREGLA DE EVIDENCIA (obligatoria): agrega a cada senal el campo \"evidencia\" con una cita "
     "textual corta (de 5 a 30 palabras) copiada tal cual del CONTENIDO, en su idioma original, que "
@@ -243,17 +245,24 @@ def is_grounded(item: dict, source_text: str, evidence: str = "") -> bool:
 
 
 def _real_url(url: str, source_url: str, source_text: str) -> str:
-    """La URL que da la IA solo se conserva si estaba en el texto visitado o es del mismo sitio."""
-    from urllib.parse import urlsplit
+    """La URL que da la IA solo se conserva si el sistema la visito o la leyo en el texto.
 
+    Una URL del mismo sitio que no aparece en el corpus es una suposicion de la
+    IA (suele dar 404): se reemplaza y luego `evidence_locator` busca la pagina
+    real donde esta la cita.
+    """
     if not url or url == source_url:
         return source_url
     if source_text and url in source_text:
         return url
-    host = (urlsplit(url).hostname or "").removeprefix("www.")
-    base = (urlsplit(source_url).hostname or "").removeprefix("www.")
-    if host and base and (host == base or host.endswith("." + base) or base.endswith("." + host)):
-        return url
+    if not source_text:
+        # Solo OCR o PDF sin texto: no hay con que comparar; se acepta la del mismo sitio.
+        from urllib.parse import urlsplit
+
+        host = (urlsplit(url).hostname or "").removeprefix("www.")
+        base = (urlsplit(source_url).hostname or "").removeprefix("www.")
+        if host and base and (host == base or host.endswith("." + base) or base.endswith("." + host)):
+            return url
     return source_url
 
 
@@ -360,6 +369,7 @@ def _parse_items(
     out: list[dict] = []
     dropped: list[str] = []
     cited = 0
+    located = 0
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -370,10 +380,22 @@ def _parse_items(
             dropped.append(item["title"][:120])
             continue
         if item:
+            quote = evidence
+            if source_text:
+                # La URL precisa: la pagina o el item del corpus donde esta la cita
+                # (o el nombre), no la portada de la fuente.
+                spot = evidence_locator.locate(
+                    source_text, source_url, evidence, hints=(item.get("technology") or "", item.get("title") or "")
+                )
+                if spot["url"]:
+                    item["url"] = spot["url"]
+                    located += 1
+                if spot["how"] == "cita" and spot["quote"]:
+                    quote = spot["quote"]  # el texto tal cual esta en la pagina
             if evidence:
                 cited += 1
                 # La cita queda en el crudo de la senal: el equipo ve de donde salio.
-                item["raw_content"] = f"Cita de la fuente: «{evidence}»\n{item['raw_content']}"[:5000]
+                item["raw_content"] = f"{CITE_PREFIX}«{quote}»\n{item['raw_content']}"[:5000]
             out.append(item)
         if len(out) >= MAX_AI_ITEMS:
             break
@@ -382,6 +404,7 @@ def _parse_items(
         report["kept"] = len(out)
         report["ungrounded"] = dropped[:10]
         report["with_evidence"] = cited
+        report["located"] = located
     return out
 
 

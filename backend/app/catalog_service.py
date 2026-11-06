@@ -62,7 +62,6 @@ SOURCE_FIELDS = (
     "retired",
 ) + (
     "source_level",
-    "priority_level",
     "tech_types",
     "matrix_ref",
     "matrix_origin",
@@ -81,7 +80,6 @@ SOURCE_FIELDS = (
 # con la matriz hay que reimportarla de forma explicita (import_matrix).
 ADMIN_FIELDS = (
     "source_level",
-    "priority_level",
     "tech_types",
     "matrix_ref",
     "matrix_origin",

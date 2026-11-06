@@ -82,9 +82,10 @@ def probe_source(db: Session, source: Source, *, persist: bool = True) -> dict:
             _store(db, source, "verde", detail, persist)
             return detail
         detail["http_status"] = resp.status_code
+        notes: list = []
         if resp.status_code != expect_status and connector == "html":
             # Igual que el escaner: si la portada bloquea, vale la ruta de respaldo.
-            alt = _working_fallback(source, headers, expect_status)
+            alt = _working_fallback(source, headers, expect_status, notes)
             if alt:
                 if resp.status_code in (404, 410):
                     # La direccion ya no existe: se sigue escaneando, pero hay que corregirla.
@@ -111,7 +112,13 @@ def probe_source(db: Session, source: Source, *, persist: bool = True) -> dict:
             return detail
         if resp.status_code != expect_status:
             detail["message"] = f"HTTP {resp.status_code} (se esperaba {expect_status})."
-            if resp.status_code in (202, 401, 403, 429) and (source.connector or "html") in {"html", "manual"}:
+            if "news_empty" in notes:
+                # Ni el sitio ni Google News: lo mas probable es que la direccion este obsoleta.
+                detail["message"] += (
+                    " Tampoco hay nada publicado del dominio en Google News en los últimos 90 días: "
+                    "la fuente probablemente cambió de dirección o dejó de publicar. Revise y actualice la URL."
+                )
+            elif resp.status_code in (202, 401, 403, 429) and (source.connector or "html") in {"html", "manual"}:
                 detail["message"] += (
                     " El sitio bloquea el acceso automatico (proteccion anti-robot): registre sus "
                     "senales con la carga manual de la bandeja de entrada o agregue una ruta "
@@ -181,10 +188,14 @@ def probe_source(db: Session, source: Source, *, persist: bool = True) -> dict:
         return detail
 
 
-def _working_fallback(source: Source, headers: dict, expect_status: int) -> str:
-    """Primera ruta de respaldo que responde (y, si es un canal, trae items)."""
+def _working_fallback(source: Source, headers: dict, expect_status: int, notes: list | None = None) -> str:
+    """Primera ruta de respaldo que responde (y, si es un canal, trae items).
+
+    En `notes` deja "news_empty" si Google News no tiene nada del dominio en la
+    ventana: senal de que la fuente cambio de direccion o dejo de publicar.
+    """
     from .ingest.base import tls_get
-    from .scraper import fallback_urls, feed_items, is_feed
+    from .scraper import fallback_urls, feed_items, is_feed, is_news_feed_url
 
     for alt in fallback_urls(source, getattr(source, "entry_urls", None) or []):
         try:
@@ -194,6 +205,8 @@ def _working_fallback(source: Source, headers: dict, expect_status: int) -> str:
         if alt_resp.status_code != expect_status:
             continue
         if is_feed(alt_resp.text) and not feed_items(alt_resp.text):
+            if notes is not None and is_news_feed_url(alt):
+                notes.append("news_empty")
             continue
         return alt
     return ""
