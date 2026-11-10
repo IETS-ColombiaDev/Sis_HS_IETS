@@ -26,6 +26,60 @@ const TABS = [
   { key: "", label: "Todas" },
 ];
 
+const submissionName = (row) => row.commercial_name || row.inn_name || `Postulación #${row.id}`;
+
+const show = (value) => (value && String(value).trim() ? value : "—");
+
+function SubmissionFields({ row }) {
+  const links = row.evidence_links || [];
+  return (
+    <div style={{ fontSize: 13.5, color: "#334155" }} data-testid={`submission-fields-${row.id}`}>
+      <p style={{ fontSize: 13, fontWeight: 600, margin: "4px 0" }}>Datos obligatorios</p>
+      <p style={{ margin: "0 0 8px" }}>
+        <strong>Nombre comercial:</strong> {show(row.commercial_name)}
+        <br />
+        <strong>DCI:</strong> {show(row.inn_name)}
+        <br />
+        <strong>Indicación propuesta:</strong> {show(row.indication)}
+      </p>
+      <p style={{ fontSize: 13, fontWeight: 600, margin: "4px 0" }}>Fuente de información</p>
+      {links.length ? (
+        <ul style={{ fontSize: 13, overflowWrap: "anywhere", margin: "0 0 8px" }}>
+          {links.map((lk) => (
+            <li key={lk}>
+              <a href={lk} target="_blank" rel="noreferrer">{lk}</a>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p style={{ margin: "0 0 8px" }}>—</p>
+      )}
+      <p style={{ fontSize: 13, fontWeight: 600, margin: "4px 0" }}>Información complementaria</p>
+      <p style={{ margin: "0 0 8px" }}>
+        <strong>Fabricante o desarrollador:</strong> {show(row.manufacturer)}
+        <br />
+        <strong>Fase de desarrollo:</strong> {show(row.development_phase)}
+        <br />
+        <strong>Mecanismo de acción:</strong> {show(row.mechanism)}
+      </p>
+      <p style={{ fontSize: 13, fontWeight: 600, margin: "4px 0" }}>Quien postula</p>
+      <p style={{ margin: "0 0 8px" }}>
+        <strong>Nombre:</strong> {show(row.submitter_name)}
+        <br />
+        <strong>Correo:</strong> {show(row.submitter_email)}
+        <br />
+        <strong>Organización:</strong> {show(row.submitter_org)}
+        <br />
+        <strong>Recibida:</strong> {row.created_at ? new Date(row.created_at).toLocaleString() : "—"}
+      </p>
+      <p style={{ fontSize: 13, background: row.has_conflict ? "#FEF3C7" : "#F1F5F9", padding: 10, borderRadius: 8 }}>
+        <strong>Conflicto de interés:</strong>{" "}
+        {row.has_conflict ? show(row.conflict_statement) : "No declara conflicto (declaración firmada)."}
+      </p>
+    </div>
+  );
+}
+
 export default function Submissions() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -156,7 +210,7 @@ export default function Submissions() {
       ) : (
         <div className="merge-list">
           {rows.map((row) => (
-            <Card key={row.id} title={row.commercial_name} hint={`${row.inn_name} · ${row.submitter_org || row.submitter_email}`}>
+            <Card key={row.id} title={submissionName(row)} hint={`${row.inn_name || "—"} · ${row.submitter_org || row.submitter_email}`}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }} data-testid={`submission-${row.id}`}>
                 <span title={GLOSSARY.fb_estado_postulacion}><Badge tone={TONE[row.status] || "neutral"}>{STATUS_LABEL[row.status] || row.status}</Badge></span>
                 {row.has_conflict ? (
@@ -165,13 +219,7 @@ export default function Submissions() {
                   <span title={GLOSSARY.coi}><Badge tone="viewer">Sin conflicto declarado</Badge></span>
                 )}
               </div>
-              <p style={{ fontSize: 14, color: "#475569" }}>{row.indication}</p>
-              <p style={{ fontSize: 13, color: "#64748B" }}>
-                {row.development_phase} · {row.submitter_name} · {new Date(row.created_at).toLocaleString()}
-              </p>
-              {row.conflict_statement && (
-                <p style={{ fontSize: 13, background: "#FEF3C7", padding: 10, borderRadius: 8 }}>{row.conflict_statement}</p>
-              )}
+              <SubmissionFields row={row} />
               {row.status !== "recibida" && (
                 <p style={{ fontSize: 12.5, color: "#64748B" }}>
                   {row.status === "aceptada" ? "Aceptada" : "Rechazada"} por {row.reviewed_by || "—"}
@@ -199,7 +247,7 @@ export default function Submissions() {
       <Modal
         open={Boolean(current)}
         onClose={() => setCurrent(null)}
-        title={current ? `Revisar ${current.commercial_name}` : ""}
+        title={current ? `Revisar ${submissionName(current)}` : ""}
         width={640}
         footer={
           <>
@@ -222,28 +270,7 @@ export default function Submissions() {
       >
         {current && (
           <>
-            <p style={{ fontSize: 14 }}>
-              <strong>DCI:</strong> {current.inn_name}
-              <br />
-              <strong>Fabricante:</strong> {current.manufacturer}
-              <br />
-              <strong>Mecanismo:</strong> {current.mechanism}
-              <br />
-              <strong>Quien postula:</strong> {current.submitter_name} ({current.submitter_email}){current.submitter_org ? ` · ${current.submitter_org}` : ""}
-            </p>
-            {current.has_conflict && (
-              <p style={{ fontSize: 13, background: "#FEF3C7", padding: 10, borderRadius: 8 }}>
-                <strong>Conflicto declarado:</strong> {current.conflict_statement}
-              </p>
-            )}
-            <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Evidencia</p>
-            <ul style={{ fontSize: 13, overflowWrap: "anywhere" }}>
-              {(current.evidence_links || []).map((lk) => (
-                <li key={lk}>
-                  <a href={lk} target="_blank" rel="noreferrer">{lk}</a>
-                </li>
-              ))}
-            </ul>
+            <SubmissionFields row={current} />
             <Textarea id="submission-note" label="Nota de revisión (obligatoria si rechaza)" value={note} onChange={(e) => setNote(e.target.value)} />
           </>
         )}

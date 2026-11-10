@@ -1302,17 +1302,18 @@ class RawPreviewOut(BaseModel):
 
 
 class SubmissionPublicIn(BaseModel):
-    commercial_name: str
-    inn_name: str
-    mechanism: str
-    manufacturer: str
+    # RF02 - Requerimiento replanteado por pruebas del equipo metodológico (nov 2026)
+    commercial_name: str = ""
+    inn_name: str = ""
+    mechanism: str = ""
+    manufacturer: str = ""
     indication: str
-    development_phase: str
+    development_phase: str = ""
     evidence_links: list[str] = []
     has_conflict: bool = False
     conflict_statement: str = ""
     coi_accepted: bool = False
-    submitter_name: str
+    submitter_name: str = ""
     submitter_email: str
     submitter_org: str = ""
     recaptcha_token: str = ""

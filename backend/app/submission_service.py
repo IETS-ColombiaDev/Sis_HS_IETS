@@ -28,26 +28,24 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 def create_submission(db: Session, data: dict, *, ip: str = "", captcha: str = "") -> Submission:
     commercial = (data.get("commercial_name") or "").strip()
     inn = (data.get("inn_name") or "").strip()
-    if not commercial or not inn:
-        raise SubmissionRuleError("El nombre comercial y la DCI son obligatorios.")
-    if not (data.get("mechanism") or "").strip():
-        raise SubmissionRuleError("El mecanismo de acción es obligatorio.")
-    if not (data.get("manufacturer") or "").strip():
-        raise SubmissionRuleError("El fabricante o desarrollador es obligatorio.")
+    if not commercial and not inn:
+        raise SubmissionRuleError(
+            "La tecnología reportada es obligatoria (nombre comercial o DCI)."
+        )
     if not (data.get("indication") or "").strip():
-        raise SubmissionRuleError("La indicación es obligatoria.")
-    if not (data.get("development_phase") or "").strip():
-        raise SubmissionRuleError("La fase de desarrollo es obligatoria.")
+        raise SubmissionRuleError("La indicación propuesta es obligatoria.")
     links = data.get("evidence_links") or []
     if not isinstance(links, list) or not [lk for lk in links if str(lk).strip()]:
-        raise SubmissionRuleError("Debe adjuntar al menos un enlace a evidencia.")
+        raise SubmissionRuleError(
+            "La fuente de información es obligatoria: adjunte al menos un enlace."
+        )
     bad = [str(lk).strip() for lk in links if str(lk).strip() and not str(lk).strip().lower().startswith(("http://", "https://"))]
     if bad:
         raise SubmissionRuleError(
             f"Los enlaces a evidencia deben iniciar con http:// o https:// (revise: {bad[0][:80]})."
         )
-    if not (data.get("submitter_name") or "").strip() or not (data.get("submitter_email") or "").strip():
-        raise SubmissionRuleError("Nombre y correo de quien postula son obligatorios.")
+    if not (data.get("submitter_email") or "").strip():
+        raise SubmissionRuleError("El correo de quien postula es obligatorio.")
     if not EMAIL_RE.match((data.get("submitter_email") or "").strip()):
         raise SubmissionRuleError("El correo de quien postula no es válido.")
 
@@ -101,14 +99,16 @@ def accept_submission(db: Session, submission: Submission, *, reviewer: str, not
     if submission.status != "recibida":
         raise SubmissionRuleError("Solo se aceptan postulaciones en estado recibida.")
 
+    name = submission.commercial_name or submission.inn_name
+
     score = compute_screening_score(
         horizon="",
         technology_type="",
         phase=submission.development_phase,
         therapeutic_area=submission.indication,
         summary=submission.mechanism,
-        technology=submission.commercial_name,
-        title=submission.commercial_name,
+        technology=name,
+        title=name,
     )
     tech = Technology(
         commercial_name=submission.commercial_name,
@@ -140,22 +140,22 @@ def accept_submission(db: Session, submission: Submission, *, reviewer: str, not
     tech.condition = suggest_condition(
         phase=submission.development_phase,
         summary=submission.mechanism,
-        title=submission.commercial_name,
+        title=name,
         horizon="",
     )
     type_id, _ = suggest_tech_type(
         db,
         legacy_type="",
-        title=submission.commercial_name,
+        title=name,
         summary=submission.mechanism,
-        technology=submission.commercial_name,
+        technology=name,
     )
     tech.tech_type_id = type_id
     cluster_id, reason = suggest_cluster(
         db,
         indication=submission.indication,
         summary=submission.mechanism,
-        title=submission.commercial_name,
+        title=name,
     )
     tech.suggested_cluster_id = cluster_id
     tech.suggested_cluster_reason = (reason or "")[:400]
