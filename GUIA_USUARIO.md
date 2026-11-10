@@ -773,7 +773,9 @@ Los valores se muestran en español («Inyectable», «Subcutánea»…). Nunca 
 ### 11.1 Flujo externo
 
 1. La persona entra a `/postular`.  
-2. Llena datos de la tecnología y declara **conflicto de interés**.  
+2. Llena los **3 campos obligatorios**: **Tecnología reportada** (nombre comercial o DCI), **Indicación propuesta** y **Fuente de información** (al menos un enlace `http://` o `https://`). También son obligatorios su **correo** y la firma de la declaración de **conflicto de interés**.  
+   Fabricante, fase de desarrollo, mecanismo de acción, nombre y organización son **Información complementaria** opcional: si no tiene el dato, puede escribir «No disponible».  
+   > Requerimiento replanteado por pruebas del equipo metodológico (nov 2026).  
 3. Envía (reCAPTCHA si está activo; si no, modo degradado con tope por IP).  
 4. Estado: **recibida**.
 
@@ -781,7 +783,7 @@ Los valores se muestran en español («Inyectable», «Subcutánea»…). Nunca 
 
 1. Abra Postulaciones.  
 2. Filtre por “recibida”.  
-3. Lea el contenido y el COI.  
+3. Lea el contenido y el COI. La tarjeta y la ventana de revisión muestran todos los campos que diligenció la persona; los vacíos aparecen como «—».  
 4. **Aceptar** → la tecnología entra a la bandeja como **reactiva** (aún debe clasificarse/asignarse).  
 5. **Rechazar** → escriba el motivo; queda en bitácora.
 
