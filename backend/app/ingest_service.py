@@ -21,7 +21,7 @@ from .events import bump_state_version
 from .ingest.base import CanonicalRecord, ConnectorError, RateLimited, SchemaChanged
 from .methodology import get_param
 from .models import Finding, IngestJob, RawRecord, ScrapeLog, Source, Technology
-from .priority import compute_screening_score
+from .priority import compute_screening_score, screening_weights
 from .technology_service import sync_technology_from_finding
 
 log = logging.getLogger(__name__)
@@ -215,13 +215,130 @@ def cancel_pending(db: Session, *, actor: str, source_ids: list[int] | None = No
     return len(jobs)
 
 
+def max_parallel() -> int:
+    """Tope de carriles que admite la maquina (INGEST_MAX_PARALLEL; 3, o 1 en Render).
+
+    En Render gratuito (0,1 CPU y 512 MB) varios rastreos a la vez agotan la
+    memoria y el proceso se reinicia: alli se fija en 1 (render.yaml).
+    """
+    import os
+
+    # Render define RENDER=true en sus contenedores: sin variable explicita, uno a la vez.
+    default = "1" if os.environ.get("RENDER") else "3"
+    try:
+        return max(1, min(int(os.environ.get("INGEST_MAX_PARALLEL", default) or default), 8))
+    except ValueError:
+        return int(default)
+
+
 def parallel_jobs(db: Session) -> int:
-    """Fuentes que el worker atiende a la vez (parametro `ingest.parallel_jobs`)."""
+    """Fuentes que el worker atiende a la vez (parametro `ingest.parallel_jobs`, con el tope de la maquina)."""
     try:
         value = int(get_param(db, "ingest.parallel_jobs", 3) or 3)
     except (TypeError, ValueError):
         value = 3
-    return max(1, min(value, 8))
+    return max(1, min(value, 8, max_parallel()))
+
+
+JOB_TIMEOUT_DEFAULT_MIN = 20
+
+
+def job_timeout_seconds(db: Session) -> float:
+    """Tiempo maximo por fuente (parametro `ingest.job_timeout_minutes`, minimo 2 min)."""
+    try:
+        minutes = float(get_param(db, "ingest.job_timeout_minutes", JOB_TIMEOUT_DEFAULT_MIN) or JOB_TIMEOUT_DEFAULT_MIN)
+    except (TypeError, ValueError):
+        minutes = JOB_TIMEOUT_DEFAULT_MIN
+    return max(2.0, minutes) * 60.0
+
+
+def run_job_guarded(job_id: int, timeout_s: float) -> str:
+    """Corre un job en su propio hilo y sesion con tiempo maximo.
+
+    Devuelve "ok" (termino, con el desenlace que sea) o "timeout". Sin este tope,
+    una sola fuente colgada (una pagina que no cierra la conexion, un proveedor de
+    IA que no responde) retenia el carril para siempre y la corrida quedaba
+    detenida en la fuente N. Al agotarse el tiempo se cierra el job con error, el
+    hilo recibe la senal de corte en su siguiente paso y la cola sigue.
+    """
+    import threading
+
+    from . import scan_progress
+    from .database import SessionLocal
+
+    abort = threading.Event()
+    done = threading.Event()
+
+    def target() -> None:
+        db = SessionLocal()
+        token = scan_progress.arm(abort)
+        try:
+            run_job(db, job_id)
+        except scan_progress.JobAborted:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            log.exception("Job de ingesta %s", job_id)
+        finally:
+            scan_progress.disarm(token)
+            db.close()
+            done.set()
+
+    worker = threading.Thread(target=target, name=f"ingest-job-{job_id}", daemon=True)
+    worker.start()
+    if done.wait(timeout_s):
+        return "ok"
+    abort.set()
+
+    def close_job() -> bool:
+        db = SessionLocal()
+        try:
+            _expire_job(db, job_id, timeout_s)
+            return True
+        except Exception:  # noqa: BLE001 - p. ej. SQLite ocupado por el hilo que se esta soltando
+            log.warning("No se pudo cerrar por tiempo el job %s; se reintenta", job_id, exc_info=True)
+            db.rollback()
+            return False
+        finally:
+            db.close()
+
+    closed = close_job()
+    # Margen para que el hilo suelte la fuente antes de tomar la siguiente.
+    done.wait(30)
+    if not closed:
+        close_job()
+    return "timeout"
+
+
+def _expire_job(db: Session, job_id: int, timeout_s: float) -> None:
+    from . import scan_progress
+
+    job = db.get(IngestJob, job_id)
+    if job is None or job.status != "ejecutando":
+        return
+    minutes = int(round(timeout_s / 60))
+    live = scan_progress.get(job.source_id) if job.source_id else None
+    where = ""
+    if live and live.get("stage"):
+        label = scan_progress.STAGE_LABELS.get(live["stage"], live["stage"]).lower()
+        where = f" (iba en: {label}{' · ' + live['detail'][:90] if live.get('detail') else ''})"
+    job.status = "error"
+    job.finished_at = datetime.now(timezone.utc)
+    job.message = (
+        f"Tiempo máximo agotado: la fuente superó {minutes} min{where}. La vigilancia siguió con la "
+        "siguiente. Ajuste el tope en Configuración › Gobierno metodológico (ingest.job_timeout_minutes)."
+    )[:2000]
+    record_action(
+        db,
+        entity_type="ingest_jobs",
+        entity_id=str(job.id),
+        action="ingest_timeout",
+        new_value={"source_id": job.source_id, "minutes": minutes},
+    )
+    db.commit()
+    if job.source_id:
+        scan_progress.finish(job.source_id, ok=False, detail=job.message[:240])
+        scan_progress.persist(db, job.source_id, job)
+    bump_state_version(db)
 
 
 def run_job(db: Session, job_id: int) -> IngestJob:
@@ -329,6 +446,8 @@ def _run_job(db: Session, job: IngestJob) -> IngestJob:
         _trip_failure(db, source, str(exc))
         return _fail(db, job, f"{type(exc).__name__}: {exc}", retry=True)
 
+    # Cerrado por tiempo mientras terminaba: el desenlace ya lo escribio el worker.
+    scan_progress.check_abort()
     _clear_circuit(source)
     source.last_scraped_at = datetime.now(timezone.utc)
     source.last_ok_at = source.last_scraped_at
@@ -428,6 +547,7 @@ def persist_record(
         summary=record.summary,
         technology=record.commercial_name,
         title=record.title,
+        weights=screening_weights(db),
     )
     finding = Finding(
         source_id=source.id,
@@ -636,6 +756,10 @@ def _clear_circuit(source: Source) -> None:
 
 
 def _fail(db: Session, job: IngestJob, message: str, *, retry: bool) -> IngestJob:
+    from . import scan_progress
+
+    # Si el worker ya cerro el job por tiempo, este hilo no reescribe su desenlace.
+    scan_progress.check_abort()
     job.message = message
     job.finished_at = datetime.now(timezone.utc)
     max_attempts = job.max_attempts or 3

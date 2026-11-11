@@ -30,7 +30,7 @@ from ..models import (
     Technology,
     User,
 )
-from ..priority import SCREENING_QUEUE_THRESHOLD
+from ..priority import screening_threshold
 from ..rbac import rateable_criteria
 from ..schemas import CountItem, DashboardStats, FindingOut, ScrapeLogOut, WorkbenchStats
 
@@ -149,7 +149,7 @@ def get_workbench(db: Session = Depends(get_db), user: User = Depends(get_curren
     prioritized = db.query(func.count(Finding.id)).filter(Finding.status == "priorizado").scalar() or 0
     high_priority = (
         db.query(func.count(Finding.id))
-        .filter(Finding.screening_score >= SCREENING_QUEUE_THRESHOLD)
+        .filter(Finding.screening_score >= screening_threshold(db))
         .scalar()
         or 0
     )

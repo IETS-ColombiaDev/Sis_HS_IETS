@@ -89,63 +89,68 @@ def segments(corpus: str, default_url: str) -> list[dict]:
     return out
 
 
-def _exact_slice(needle_norm: str, seg_text: str) -> str:
-    """El tramo original del segmento que coincide con la cita normalizada, o ''."""
-    hay, idx = _norm_with_map(seg_text)
-    pos = hay.find(needle_norm)
-    if pos < 0:
-        return ""
-    end = pos + len(needle_norm) - 1
-    return seg_text[idx[pos] : idx[end] + 1].strip()
+class Index:
+    """Corpus partido en bloques y normalizado una sola vez.
 
+    Normalizar caracter a caracter es lo caro: con 20 senales por pagina se hacia
+    20 veces sobre el mismo texto (segundos de CPU en Render).
+    """
 
-def _word_score(needle_norm: str, seg_norm: str) -> float:
-    words = [w for w in needle_norm.split() if len(w) >= 4]
-    if not words:
-        return 0.0
-    have = set(seg_norm.split())
-    return sum(1 for w in words if w in have) / len(words)
+    def __init__(self, corpus: str, default_url: str):
+        landing = (default_url or "").rstrip("/")
+        segs = segments(corpus, default_url)
+        # Ficha o item especifico antes que la pagina de entrada.
+        segs.sort(key=lambda seg: 1 if seg["url"].rstrip("/") == landing else 0)
+        for seg in segs:
+            seg["norm"], seg["idx"] = _norm_with_map(seg["text"])
+            seg["words"] = set(seg["norm"].split())
+        self.segs = segs
+
+    def exact(self, needle_norm: str) -> tuple[dict, str] | None:
+        for seg in self.segs:
+            pos = seg["norm"].find(needle_norm)
+            if pos >= 0:
+                idx = seg["idx"]
+                end = pos + len(needle_norm) - 1
+                return seg, seg["text"][idx[pos] : idx[end] + 1].strip()
+        return None
+
+    def locate(self, evidence: str = "", hints: tuple[str, ...] = ()) -> dict:
+        """Donde esta la senal: {"url", "quote", "kind", "how"}; url vacia si no se encontro.
+
+        Prioridad: la cita exacta; luego la cita aproximada (>=85 % de palabras);
+        luego el nombre de la tecnologia o el titulo tal cual. Entre varios bloques
+        que coinciden gana el mas especifico (una ficha antes que la portada).
+        """
+        none = {"url": "", "quote": "", "kind": "", "how": ""}
+        if not self.segs:
+            return none
+        needle = norm(evidence)
+        if len(needle) >= MIN_QUOTE_CHARS:
+            hit = self.exact(needle)
+            if hit:
+                return {"url": hit[0]["url"], "quote": hit[1], "kind": hit[0]["kind"], "how": "cita"}
+            words = [w for w in needle.split() if len(w) >= 4]
+            best, best_score = None, 0.0
+            for seg in self.segs if words else []:
+                score = sum(1 for w in words if w in seg["words"]) / len(words)
+                if score > best_score:
+                    best, best_score = seg, score
+            if best is not None and best_score >= 0.85:
+                return {"url": best["url"], "quote": "", "kind": best["kind"], "how": "cita_aproximada"}
+        for hint in hints:
+            h = norm(hint)
+            if len(h) < 6:
+                continue
+            hit = self.exact(h)
+            if hit:
+                return {"url": hit[0]["url"], "quote": hit[1], "kind": hit[0]["kind"], "how": "nombre"}
+        return none
 
 
 def locate(corpus: str, default_url: str, evidence: str = "", hints: tuple[str, ...] = ()) -> dict:
-    """Donde esta la senal: {"url", "quote", "kind", "how"}; url vacia si no se encontro.
-
-    Prioridad: la cita exacta; luego la cita aproximada (>=85 % de palabras);
-    luego el nombre de la tecnologia o el titulo tal cual. Entre varios bloques
-    que coinciden gana el mas especifico (una ficha antes que la portada).
-    """
-    segs = segments(corpus, default_url)
-    if not segs:
-        return {"url": "", "quote": "", "kind": "", "how": ""}
-    landing = (default_url or "").rstrip("/")
-
-    def rank(seg: dict) -> int:
-        # Ficha o item especifico (0) antes que la pagina de entrada (1).
-        return 1 if seg["url"].rstrip("/") == landing else 0
-
-    ordered = sorted(segs, key=rank)
-    needle = norm(evidence)
-    if len(needle) >= MIN_QUOTE_CHARS:
-        for seg in ordered:
-            exact = _exact_slice(needle, seg["text"])
-            if exact:
-                return {"url": seg["url"], "quote": exact, "kind": seg["kind"], "how": "cita"}
-        best, best_score = None, 0.0
-        for seg in ordered:
-            score = _word_score(needle, norm(seg["text"]))
-            if score > best_score:
-                best, best_score = seg, score
-        if best is not None and best_score >= 0.85:
-            return {"url": best["url"], "quote": "", "kind": best["kind"], "how": "cita_aproximada"}
-    for hint in hints:
-        h = norm(hint)
-        if len(h) < 6:
-            continue
-        for seg in ordered:
-            exact = _exact_slice(h, seg["text"])
-            if exact:
-                return {"url": seg["url"], "quote": exact, "kind": seg["kind"], "how": "nombre"}
-    return {"url": "", "quote": "", "kind": "", "how": ""}
+    """Atajo para una sola consulta (ver `Index.locate`)."""
+    return Index(corpus, default_url).locate(evidence, hints)
 
 
 def _enc(text: str) -> str:

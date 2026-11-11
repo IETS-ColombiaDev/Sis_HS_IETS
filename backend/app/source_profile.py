@@ -24,7 +24,8 @@ OPTIONS_KEY = "cfg.sources.options"
 SEARCH_KEY = "cfg.sources.web_search"
 BRAVE_KEY = "cfg.sources.brave_api_key"
 
-OPTION_LISTS = ("source_level", "priority_level", "tech_type", "matrix_origin")
+# La priorizacion de fuentes se retiro (era un comentario interno de la matriz).
+OPTION_LISTS = ("source_level", "tech_type", "matrix_origin")
 
 DEFAULT_OPTIONS: dict[str, list[dict]] = {
     "source_level": [
@@ -32,12 +33,6 @@ DEFAULT_OPTIONS: dict[str, list[dict]] = {
         {"value": "secundaria", "label": "Secundaria", "description": "Reporta o analiza tecnologías de otros (agencias regulatorias, revistas, noticias)."},
         {"value": "terciaria", "label": "Terciaria", "description": "Sintetiza o evalúa (agencias HTA, redes de EH, buscadores de literatura)."},
         {"value": "por_definir", "label": "Por definir", "description": "La matriz pide revisar el nivel de la fuente."},
-    ],
-    "priority_level": [
-        {"value": "alta", "label": "Alta", "rank": 1, "description": "Alta aplicabilidad para el proyecto de Escaneo de Horizonte."},
-        {"value": "media", "label": "Media", "rank": 2, "description": "Aplicabilidad media: complementa, no gobierna."},
-        {"value": "revisar", "label": "Revisar pertinencia", "rank": 3, "description": "La matriz pide verificar pertinencia, acceso o enlaces."},
-        {"value": "baja", "label": "Baja", "rank": 4, "description": "Baja aplicabilidad para el EH."},
     ],
     "tech_type": [
         {"value": "MED", "label": "Medicamentos", "description": "Medicamentos, biológicos, terapias avanzadas y vacunas."},
@@ -52,7 +47,6 @@ DEFAULT_OPTIONS: dict[str, list[dict]] = {
         {"value": "AGREGADA", "label": "Agregada a la matriz", "description": "Fuente añadida después de la verificación inicial."},
     ],
 }
-UNRANKED_PRIORITY = 3  # sin prioridad asignada: junto a "revisar"
 
 DEFAULT_SCAN_PROFILE: dict = {
     "crawl": True,          # recorrer URLs de entrada y fichas internas
@@ -151,12 +145,6 @@ def _clean_option(name: str, item: dict, index: int) -> dict:
     if not label:
         raise ValueError(f"La opción '{value}' necesita una etiqueta visible.")
     clean = {"value": value, "label": label[:80], "description": str(item.get("description") or "").strip()[:300]}
-    if name == "priority_level":
-        try:
-            rank = int(item.get("rank") or index + 1)
-        except (TypeError, ValueError):
-            rank = index + 1
-        clean["rank"] = max(1, min(99, rank))
     return clean
 
 

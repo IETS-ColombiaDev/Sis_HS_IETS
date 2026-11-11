@@ -4,6 +4,7 @@ import Button from "./Button";
 import HintButton from "./HintButton";
 import Icon from "./Icon";
 import { Card } from "./Card";
+import { elapsedSince, formatClock, formatDuration, formatRange } from "../scan/format";
 
 /**
  * Estado en vivo de la vigilancia: barra global y, por fuente, en qué paso va
@@ -98,7 +99,15 @@ export function SourceProgress({ row }) {
           {running && <span className="pulse-dot" aria-hidden="true" />} {row.stage_label}
         </Badge>
         {row.attempts > 1 && <span className="source-progress-meta">intento {row.attempts}/{row.max_attempts}</span>}
-        {running && row.started_at && <span className="source-progress-meta">{elapsed(row.started_at)}</span>}
+        {running && row.started_at && (
+          <span className="source-progress-meta">
+            {elapsed(row.started_at)}
+            {row.typical_seconds ? ` · suele tardar ${formatDuration(row.typical_seconds)}` : ""}
+          </span>
+        )}
+        {row.stage === "en_cola" && row.typical_seconds ? (
+          <span className="source-progress-meta">suele tardar {formatDuration(row.typical_seconds)}</span>
+        ) : null}
       </div>
       <div className="source-progress-facts">
         <span title="¿El sistema ya entró a la fuente?">
@@ -376,21 +385,42 @@ export function AccessReport({ report, onReload }) {
   );
 }
 
-/** Resumen de la corrida: barra, conteos, carriles y botón para detener. */
-export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter, onFilter }) {
+/** Resumen de la corrida: avance, tiempos, qué está haciendo ahora y cómo se estima. */
+export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter, onFilter, lastFetch }) {
   if (!progress || !progress.total) return null;
   const c = progress.counts || {};
-  const finished = (c.ok || 0) + (c.parcial || 0) + (c.error || 0) + (c.cancelado || 0);
+  const done = (c.ok || 0) + (c.parcial || 0);
+  const failed = c.error || 0;
+  const cancelled = c.cancelado || 0;
+  const running = c.ejecutando || 0;
+  const queued = c.pendiente || 0;
+  const finished = done + failed + cancelled;
   const pct = progress.total ? Math.round((finished / progress.total) * 100) : 0;
+  const seg = (n) => `${(n / progress.total) * 100}%`;
+  const eta = progress.eta;
+  const rows = progress.sources || [];
+  const now = rows.filter((r) => r.job_status === "ejecutando");
+  const next = rows
+    .filter((r) => r.job_status === "pendiente")
+    .sort((a, b) => new Date(a.scheduled_for || 0) - new Date(b.scheduled_for || 0) || a.job_id - b.job_id)
+    .slice(0, 3);
+  const retryWait =
+    progress.active && running === 0 && queued > 0 && next.every((r) => r.scheduled_for && new Date(r.scheduled_for).getTime() > Date.now());
+  const stale = progress.active && lastFetch && Date.now() - lastFetch > 60000;
   const chips = [
-    { key: "ejecutando", label: "En curso", value: c.ejecutando || 0, tone: "info" },
-    { key: "pendiente", label: "En cola", value: c.pendiente || 0, tone: "viewer" },
-    { key: "ok", label: "Terminadas", value: (c.ok || 0) + (c.parcial || 0), tone: "success" },
-    { key: "error", label: "Con error", value: c.error || 0, tone: "danger" },
-    { key: "cancelado", label: "Canceladas", value: c.cancelado || 0, tone: "viewer" },
+    { key: "ejecutando", label: "En curso", value: running, tone: "info" },
+    { key: "pendiente", label: "En cola", value: queued, tone: "viewer" },
+    { key: "ok", label: "Terminadas", value: done, tone: "success" },
+    { key: "error", label: "Con error", value: failed, tone: "danger" },
+    { key: "cancelado", label: "Canceladas", value: cancelled, tone: "viewer" },
   ];
   return (
-    <Card padding={16} className="scan-run-summary" style={{ marginBottom: 16 }}>
+    <Card
+      padding={18}
+      className={`scan-run-summary${progress.active ? " scan-run-summary--active" : ""}`}
+      style={{ marginBottom: 16 }}
+      data-testid="scan-run-summary"
+    >
       <div className="scan-run-head">
         <div>
           <div className="scan-run-title">
@@ -399,12 +429,13 @@ export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter
                 <span className="pulse-dot" aria-hidden="true" /> Vigilancia en curso
               </>
             ) : (
-              "Última vigilancia (12 h)"
+              "Última vigilancia (últimas 12 h)"
             )}
           </div>
           <div className="scan-run-sub">
-            {finished} de {progress.total} fuente(s) procesadas · {progress.parallel} a la vez
-            {!progress.worker_running && progress.active ? " · procesando sin worker regular (se atiende desde esta corrida)" : ""}
+            {progress.active
+              ? "Corre en el servidor: puede cambiar de módulo o de pestaña, o cerrar el navegador. Sigue sola y le avisamos al terminar."
+              : `${finished} de ${progress.total} fuente(s) procesadas: ${done} terminadas${failed ? `, ${failed} con error` : ""}${cancelled ? `, ${cancelled} canceladas` : ""}.`}
           </div>
         </div>
         {progress.active && canScan && (
@@ -419,9 +450,114 @@ export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter
           </HintButton>
         )}
       </div>
-      <div className="scan-run-bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-        <span style={{ width: `${pct}%` }} />
+
+      {progress.active && (
+        <div className="scan-kpis" role="group" aria-label="Avance de la vigilancia">
+          <div className="scan-kpi">
+            <span className="scan-kpi-label">Avance</span>
+            <strong className="scan-kpi-value">
+              {finished} de {progress.total}
+            </strong>
+            <span className="scan-kpi-sub">
+              {pct} % · {done} ok{failed ? ` · ${failed} con error` : ""}
+            </span>
+          </div>
+          {eta && (
+            <>
+              <div className="scan-kpi">
+                <span className="scan-kpi-label">Transcurrido</span>
+                <strong className="scan-kpi-value">{formatDuration(eta.elapsed_seconds)}</strong>
+                <span className="scan-kpi-sub">Inició {formatClock(eta.run_started_at)}</span>
+              </div>
+              <div className="scan-kpi scan-kpi--accent">
+                <span className="scan-kpi-label">Tiempo restante</span>
+                <strong className="scan-kpi-value">~{formatDuration(eta.eta_seconds)}</strong>
+                <span className="scan-kpi-sub">entre {formatRange(eta.eta_low_seconds, eta.eta_high_seconds)}</span>
+              </div>
+              <div className="scan-kpi">
+                <span className="scan-kpi-label">Fin estimado</span>
+                <strong className="scan-kpi-value">{formatClock(eta.eta_at)}</strong>
+                <span className="scan-kpi-sub">{progress.parallel} fuente(s) a la vez</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      <div
+        className="scan-run-bar scan-run-bar--stack"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`${pct} % de las fuentes procesadas`}
+      >
+        <span className="seg-ok" style={{ width: seg(done) }} />
+        <span className="seg-error" style={{ width: seg(failed + cancelled) }} />
+        <span className="seg-running" style={{ width: seg(running) }} />
       </div>
+
+      {progress.active && (
+        <div className="scan-now">
+          {stale && (
+            <p className="scan-warn" role="status">
+              <Icon name="info" size={14} /> Sin respuesta del servidor hace {formatDuration((Date.now() - lastFetch) / 1000)}. Si se
+              reinició, la vigilancia se reanuda sola donde quedó.
+            </p>
+          )}
+          {!progress.worker_running && (
+            <p className="scan-warn" role="status">
+              <Icon name="info" size={14} /> El worker regular no está en marcha en este servidor: la cola se atiende desde la
+              corrida que la lanzó.
+            </p>
+          )}
+          {retryWait && (
+            <p className="scan-note">
+              <Icon name="clock" size={14} /> Esperando reintentos: la próxima fuente se vuelve a intentar a las{" "}
+              {formatClock(next[0]?.scheduled_for)}.
+            </p>
+          )}
+          {now.map((r) => {
+            const took = elapsedSince(r.started_at);
+            const quiet = r.updated_at ? elapsedSince(r.updated_at) : null;
+            return (
+              <div key={r.source_id} className="scan-now-row">
+                <span className="scan-now-tag">Ahora</span>
+                <strong>{r.source_title}</strong>
+                <span className="muted">
+                  {r.stage_label}
+                  {took != null ? ` · lleva ${formatDuration(took)}` : ""}
+                  {r.typical_seconds ? ` · suele tardar ${formatDuration(r.typical_seconds)}` : ""}
+                  {quiet != null && quiet > 180 ? ` · sin novedades hace ${formatDuration(quiet)}` : ""}
+                </span>
+              </div>
+            );
+          })}
+          {next.length > 0 && (
+            <div className="scan-now-row">
+              <span className="scan-now-tag scan-now-tag--next">Siguen</span>
+              <span className="muted">
+                {next.map((r) => r.source_title).join(" · ")}
+                {queued > next.length ? ` y ${queued - next.length} más` : ""}
+              </span>
+            </div>
+          )}
+          {eta && (
+            <details className="scan-eta-basis">
+              <summary>¿Cómo se calcula el tiempo?</summary>
+              <p>
+                Cada fuente se estima con el promedio de sus 3 últimas corridas en este servidor y se ajusta a la velocidad
+                real de esta corrida. Luego se reparte la cola entre {progress.parallel} carril(es) en el orden en que el
+                servidor la atenderá, incluidos los reintentos programados. El rango va de lo que la fuente tarda en sus
+                corridas rápidas a lo que tarda en las lentas.
+                Ninguna fuente pasa de {progress.job_timeout_minutes} min: si los supera, se cierra con error y la corrida sigue.
+              </p>
+              <p className="muted">{eta.basis}</p>
+            </details>
+          )}
+        </div>
+      )}
+
       <div className="scan-run-chips">
         {chips.map((chip) => (
           <button
@@ -441,6 +577,51 @@ export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter
         )}
       </div>
     </Card>
+  );
+}
+
+/** Barra flotante: la vigilancia a la vista desde cualquier módulo. */
+export function ScanDock({ progress, onOpen }) {
+  const [collapsed, setCollapsed] = useState(false);
+  if (!progress?.active || !progress.total) return null;
+  const c = progress.counts || {};
+  const finished = (c.ok || 0) + (c.parcial || 0) + (c.error || 0) + (c.cancelado || 0);
+  const pct = Math.round((finished / progress.total) * 100);
+  const eta = progress.eta;
+  const current = (progress.sources || []).find((r) => r.job_status === "ejecutando");
+  if (collapsed) {
+    return (
+      <button type="button" className="scan-dock scan-dock--mini" onClick={() => setCollapsed(false)} aria-label="Mostrar el avance de la vigilancia">
+        <span className="pulse-dot" aria-hidden="true" /> {finished}/{progress.total}
+        {eta ? ` · ~${formatDuration(eta.eta_seconds)}` : ""}
+      </button>
+    );
+  }
+  return (
+    <div className="scan-dock" role="status" aria-live="polite" data-testid="scan-dock">
+      <div className="scan-dock-head">
+        <span className="pulse-dot" aria-hidden="true" />
+        <strong>Vigilancia en curso</strong>
+        <button type="button" className="scan-dock-x" onClick={() => setCollapsed(true)} aria-label="Minimizar">
+          <Icon name="x" size={13} />
+        </button>
+      </div>
+      <div className="scan-run-bar" aria-hidden="true">
+        <span style={{ width: `${pct}%` }} />
+      </div>
+      <div className="scan-dock-line">
+        {finished} de {progress.total} fuentes · {pct} %
+      </div>
+      {eta && (
+        <div className="scan-dock-line">
+          Faltan ~{formatDuration(eta.eta_seconds)} · termina ~{formatClock(eta.eta_at)}
+        </div>
+      )}
+      {current && <div className="scan-dock-line muted">Ahora: {current.source_title}</div>}
+      <button type="button" className="scan-log-link" onClick={onOpen}>
+        Ver el detalle en Vigilancia →
+      </button>
+    </div>
   );
 }
 

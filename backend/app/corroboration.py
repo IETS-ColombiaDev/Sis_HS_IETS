@@ -38,8 +38,22 @@ STAGING_STATUS = "capturada_no_asignada"
 FINGERPRINT_KEY = "corroboration.fingerprint"
 
 
-def bonus_for(count: int) -> int:
-    return min(BONUS_MAX, BONUS_PER_SOURCE * max(0, count - 1))
+def bonus_params(db: Session | None = None) -> tuple[int, int]:
+    """(puntos por fuente adicional, tope): parametros `corroboration.*` o los de fabrica."""
+    if db is None:
+        return BONUS_PER_SOURCE, BONUS_MAX
+    from .methodology import get_param
+
+    try:
+        per = int(get_param(db, "corroboration.bonus_per_source", BONUS_PER_SOURCE))
+        top = int(get_param(db, "corroboration.bonus_max", BONUS_MAX))
+    except (TypeError, ValueError):
+        return BONUS_PER_SOURCE, BONUS_MAX
+    return max(0, per), max(0, top)
+
+
+def bonus_for(count: int, per_source: int = BONUS_PER_SOURCE, maximum: int = BONUS_MAX) -> int:
+    return min(maximum, per_source * max(0, count - 1))
 
 
 def _origin_key(tech: Technology) -> str:
@@ -63,7 +77,8 @@ def _fingerprint(db: Session) -> str:
             func.count(Technology.merged_into_id),
         ).one()
     )
-    return f"{count}|{last.isoformat() if last else ''}|{merged}|{dedup.threshold(db)}"
+    per, top = bonus_params(db)
+    return f"{count}|{last.isoformat() if last else ''}|{merged}|{dedup.threshold(db)}|{per}|{top}"
 
 
 def refresh(db: Session, *, force: bool = False) -> dict:
@@ -76,6 +91,7 @@ def refresh(db: Session, *, force: bool = False) -> dict:
         return {"refreshed": False, "staging": 0, "corroborated": 0}
 
     minimum = dedup.threshold(db)
+    per_source, bonus_max = bonus_params(db)
     # Una pagina de bloqueo capturada por error ("Comprobando tu navegador") no es
     # una tecnologia: no corrobora ni se corrobora.
     live = [
@@ -131,8 +147,9 @@ def refresh(db: Session, *, force: bool = False) -> dict:
         listing = sorted(matches.values(), key=lambda m: (-m["score"], m["source_title"]))
         if tech.corroboration_count != count:
             tech.corroboration_count = count
-        if tech.corroboration_bonus != bonus_for(count):
-            tech.corroboration_bonus = bonus_for(count)
+        bonus = bonus_for(count, per_source, bonus_max)
+        if tech.corroboration_bonus != bonus:
+            tech.corroboration_bonus = bonus
         if (tech.corroborating or []) != listing:
             tech.corroborating = listing or None
         if count > 1:

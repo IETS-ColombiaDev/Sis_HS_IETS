@@ -216,6 +216,11 @@ def update_param(
         if row.value_type == "int":
             value = str(int(number))
     row.value = value
+    if key.startswith("screening."):
+        # Los pesos del cribado ordenan toda la bandeja: se recalcula ya, no en el proximo arranque.
+        from ..priority import rescore_all
+
+        rescore_all(db)
     db.commit()
     db.refresh(row)
     bump_state_version(db)

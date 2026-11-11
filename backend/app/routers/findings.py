@@ -10,7 +10,7 @@ from ..database import get_db
 from ..deps import get_current_user, require_permission
 from ..events import bump_state_version
 from ..models import CycleTechnology, Finding, Note, RawRecord, Recommendation, Source, Technology, User
-from ..priority import SCREENING_QUEUE_THRESHOLD, compute_screening_score
+from ..priority import compute_screening_score, screening_threshold, screening_weights
 from ..rbac import P_TECHNOLOGY_WRITE
 from ..schemas import FindingCreate, FindingOut, FindingUpdate
 from ..technology_service import sync_technology_from_finding
@@ -18,7 +18,7 @@ from ..technology_service import sync_technology_from_finding
 router = APIRouter(prefix="/api/findings", tags=["findings"])
 
 
-def _apply_screening(finding: Finding) -> None:
+def _apply_screening(finding: Finding, db: Session | None = None) -> None:
     finding.screening_score = compute_screening_score(
         horizon=finding.horizon,
         technology_type=finding.technology_type,
@@ -27,6 +27,7 @@ def _apply_screening(finding: Finding) -> None:
         summary=finding.summary,
         technology=finding.technology,
         title=finding.title,
+        weights=screening_weights(db),
     )
 
 
@@ -107,14 +108,15 @@ def findings_stats(
     by_status = dict(
         base.with_entities(Finding.status, func.count(Finding.id)).group_by(Finding.status).all()
     )
+    threshold = screening_threshold(db)
     return {
         "total": sum(by_status.values()),
         "by_status": {k or "sin_estado": v for k, v in by_status.items()},
-        "high_priority": base.filter(Finding.screening_score >= SCREENING_QUEUE_THRESHOLD)
+        "high_priority": base.filter(Finding.screening_score >= threshold)
         .with_entities(func.count(Finding.id))
         .scalar()
         or 0,
-        "threshold": SCREENING_QUEUE_THRESHOLD,
+        "threshold": threshold,
     }
 
 
@@ -160,7 +162,7 @@ def create_finding(
     data = payload.model_dump()
     content_hash = _hash(data["title"], data.get("url", ""))
     finding = Finding(content_hash=content_hash, **data)
-    _apply_screening(finding)
+    _apply_screening(finding, db)
     db.add(finding)
     db.commit()
     db.refresh(finding)
@@ -185,7 +187,7 @@ def update_finding(
         raise HTTPException(status_code=422, detail="El título de la señal no puede quedar vacío.")
     for key, value in data.items():
         setattr(finding, key, value)
-    _apply_screening(finding)
+    _apply_screening(finding, db)
     db.commit()
     db.refresh(finding)
     sync_technology_from_finding(db, finding, captured_by=user.email, commit=True)
@@ -212,7 +214,7 @@ def enhance_finding_ai(
         val = updates.get(key)
         if val is not None and str(val).strip():
             setattr(finding, key, str(val)[:1000] if key == "summary" else str(val)[:390])
-    _apply_screening(finding)
+    _apply_screening(finding, db)
     db.commit()
     db.refresh(finding)
     sync_technology_from_finding(db, finding, captured_by=user.email, commit=True)

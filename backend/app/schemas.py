@@ -241,6 +241,11 @@ class SourceOut(SourceBase):
     last_probe_at: datetime | None = None
     last_probe_detail: dict | None = None
     next_review_due: datetime | None = None
+    # Procedencia de la URL frente a la matriz EH (catalog_service.url_provenance).
+    url_origin: str = ""
+    url_origin_label: str = ""
+    matrix_url: str = ""
+    url_note: str = ""
 
 
 # --------------------------------------------------------------------------- #

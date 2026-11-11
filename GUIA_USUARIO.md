@@ -19,7 +19,10 @@ Ajustes del consolidado de observaciones SI EAA (módulo 0: identificación y ca
 | **Misma tecnología en varias fuentes**: la bandeja la marca «En N fuentes» y la sube en el orden, sin tocar el cribado ni el %P (RF-002) | [10.7](#107-misma-tecnología-en-varias-fuentes-corroboración) |
 | **Datos de producto**: forma farmacéutica, concentración, vía, marca y modelo en cada señal (RF-003) | [10.3](#103-clasificar-una-señal-paso-a-paso) y [10.8](#108-de-dónde-salen-los-datos-de-producto) |
 | **Matriz EH vigente**: 93 filas, 128 URL de consulta; las fuentes ya cargadas reciben las URL nuevas sin perder lo editado (OBS-002) | [8.7](#87-recargar-catálogo--qué-se-conserva) y [30.1](#301-origen) |
-| **Prioridad sugerida** por el rendimiento real de cada fuente (OBS-001) | [4.4](#44-prioridad-de-la-fuente) y [8.9](#89-prioridad-sugerida-por-las-señales) |
+| **Sin priorización de fuentes**: era un comentario interno de la matriz; ya no ordena la cola ni pesa en la IA (06-11-2026) | [4.4](#44-la-fuente-ya-no-se-prioriza) |
+| **URL original de la matriz** en cada fuente web, con etiqueta cuando se usa otra (06-11-2026) | [8.9](#89-url-original-de-la-matriz-y-etiquetas) |
+| **Vigilancia que no se detiene**: tiempo máximo por fuente, avance en cualquier pantalla y tiempo estimado de fin (06-11-2026) | [9.3](#93-vigilancia-masiva) y [9.8](#98-tiempo-estimado-cómo-se-calcula) |
+| **Cribado parametrizable** con explicación de dónde sale cada valor (06-11-2026) | [25.1](#251-gobierno-metodológico) |
 | **Detectar fuentes con IA**: propone sitios que aún no están en el catálogo | [8.8](#88-detectar-fuentes-con-ia-paso-a-paso) |
 | **Ver como otro perfil** (solo superadministrador) | [3.3](#33-ver-como-otro-perfil-solo-superadministrador) |
 | CSV del catálogo legible en Excel (punto y coma, UTF-8) | [8.3](#83-botones-de-la-barra-superior) |
@@ -243,18 +246,9 @@ Indica **cómo** se obtiene el dato, no qué tan importante es la fuente. A y B 
 | **Terciaria** | Compila o difunde (portales, redes) |
 | **Por definir** | Aún no clasificada en la matriz |
 
-### 4.4 Prioridad de la fuente
+### 4.4 La fuente ya no se prioriza
 
-Aplicabilidad para el escaneo (columna de observaciones de la matriz):
-
-- **Alta** — se encola y escanea primero; más peso en el prompt de la IA.
-- **Media / Baja**
-- **Revisar** — pertinencia dudosa o acceso restringido.
-- **Sin asignar** — la matriz no fijó prioridad.
-
-Se lee del texto «Alta / Media / Baja aplicabilidad» o «Revisar / verificar pertinencia» de Observaciones. Califica la **fuente**, no cada señal: la relevancia de la señal la ordena el screening_score y la decide el %P.
-
-**Prioridad sugerida.** Junto a la prioridad oficial, el catálogo muestra una **sugerida** calculada con lo que la fuente realmente aportó en el último año (señales con cribado alto, tecnologías que llegaron a un ciclo o se priorizaron). Es un apoyo para reclasificar: el sistema nunca cambia la oficial solo; una persona pulsa **Aplicar** (ver 8.9).
+La columna de prioridad de la matriz (alta, media, revisar) era un comentario interno del equipo y **no se usa**: la cola atiende las fuentes por orden alfabético, la IA no recibe ninguna prioridad y el catálogo no la muestra. Lo que distingue a una fuente es su **nivel** (primaria, secundaria, terciaria) y su **nivel de acceso** (A a E). La relevancia de cada señal la ordena el cribado y la decide el %P.
 
 ### 4.5 %P vs screening_score
 
@@ -453,7 +447,7 @@ Listado en tarjetas o tabla. Filtros:
 - Salud (verde / ámbar / rojo / sin sonda)  
 - Contraste / Retirada / Ingesta apagada
 - Chips: Recorrido · OCR · IA · Búsqueda web (tachados = apagados)
-- **Sugerida: Alta / Media / Baja (motivo)** — prioridad sugerida por las señales; botón **Aplicar** si difiere de la oficial (ver 8.9)
+- **Etiqueta de URL** — «URL original de la matriz» o, si se usa otra, por qué (ver 8.9)
 
 #### Salud de fuentes
 
@@ -504,12 +498,11 @@ Tecnologías que aparecen en fuentes de **contraste** y no están en el ciclo. C
 - Configuración JSON del conector (solo si sabe qué poner; vacío = `{}`).
 - Casilla **Ingesta activa**.
 
-#### Matriz EH · priorización
+#### Matriz EH
 
 | Campo | Qué poner |
 |---|---|
 | Nivel de fuente | Primaria / secundaria / terciaria / por definir |
-| Nivel de priorización | Alta / media / baja / revisar / sin asignar |
 | Origen | Según lista (DOC_TEC, etc.) |
 | Tipo de material | Informes, alertas, bases… |
 | Tipos de tecnología | Marque uno o varios códigos |
@@ -587,20 +580,20 @@ Sin IA disponible, la detección sigue con los resultados de búsqueda filtrados
 
 **Nada se crea sin su clic.** La IA propone; la persona decide.
 
-### 8.9 Prioridad sugerida por las señales
+### 8.9 URL original de la matriz y etiquetas
 
-Responde a la pregunta: *¿esta fuente aporta lo que su prioridad dice?* Se calcula con las señales del último año:
+La URL principal de cada fuente web es la **original de la matriz EH** (Excel «FUENTES DE INFORMACIÓN PROACTIVA EH»): la primera URL de consulta de su fila. El rastreo entra primero por ahí y luego recorre las demás URL de la fila. Debajo de la URL, cada tarjeta y la ficha muestran una etiqueta:
 
-| Sugerida | Regla |
+| Etiqueta | Qué significa |
 |---|---|
-| **Alta** | ≥ 1 tecnología priorizada (priorizada, en evaluación o publicada), o ≥ 2 tecnologías que llegaron a un ciclo, o ≥ 5 señales con cribado ≥ 70 |
-| **Media** | Alguna tecnología en un ciclo, alguna señal con cribado ≥ 70, o cribado promedio ≥ 40 |
-| **Baja** | Produjo señales, pero ninguna de las anteriores |
-| **Sin datos** | No produjo señales en el periodo: no se sugiere nada |
+| **URL original de la matriz** | Es la URL que reporta el Excel |
+| **API oficial (distinta a la matriz)** | ClinicalTrials.gov, openFDA, Health Canada, PubMed, CTIS: se consultan por su API, que entrega datos estructurados. La ficha muestra la URL que reporta la matriz |
+| **URL ajustada (la de la matriz no sirve)** | La URL del Excel no responde o está vacía; la ficha dice por qué (hoy solo EuroScan, que opera como i-HTS) |
+| **Página específica (distinta a la matriz)** | Fuente que comparte fila con otra y usa su propia página |
+| **URL distinta a la matriz** | Alguien cambió la URL; la ficha muestra la original para comparar |
+| **Propuesta por IA** / **Registrada por el equipo** | No está en la matriz |
 
-En la tarjeta, la tabla y la ficha aparece **Sugerida: X (motivo)**. Si difiere de la oficial y usted tiene permiso de edición, pulse **Aplicar**: la prioridad oficial cambia, queda marcada como *editada* (la recarga del catálogo la respeta) y el cambio queda en la bitácora con el motivo.
-
-Use la sugerida para resolver las fuentes en «revisar» o «sin asignar» de la matriz, y llevar luego la decisión al Excel institucional.
+El indicador **URL original de la matriz** del catálogo cuenta cuántas fuentes usan la del Excel y cuántas otra. Si una URL del Excel deja de funcionar, corríjala en el Excel y reimporte la matriz.
 
 ---
 
@@ -623,7 +616,7 @@ Poner fuentes en la **cola de ingesta**, ejecutarlas y ver el resultado (cuánta
 
 1. Confirme que las fuentes deseadas tienen **ingesta activa** y no están retiradas.  
 2. Lance la vigilancia masiva / programada según botones de la pantalla.  
-3. Las fuentes se atienden en orden de **prioridad alta primero**.  
+3. Las fuentes se atienden por orden alfabético (no hay prioridad de fuentes). La corrida **vive en el servidor**: puede cambiar de módulo o de pestaña, o cerrar el navegador, y sigue. Mientras corre, una **barra flotante** en cualquier pantalla y el título de la pestaña del navegador muestran el avance y el tiempo restante; al terminar aparece un aviso.  
 4. Observe la cola:
    - **pendiente** — espera turno  
    - **ejecutando** — en curso  
@@ -631,7 +624,9 @@ Poner fuentes en la **cola de ingesta**, ejecutarlas y ver el resultado (cuánta
    - **parcial** — trajo algo o visitó, con matices  
    - **error** — falló; se reintenta hasta 3 veces  
 
-Un error en una fuente **no detiene** las demás.
+Un error en una fuente **no detiene** las demás. Ninguna fuente puede tardar más del **tiempo máximo por fuente** (20 min de fábrica, parámetro `ingest.job_timeout_minutes`): si lo supera, se cierra con error «Tiempo máximo agotado» y la corrida sigue con la siguiente.
+
+El resumen de arriba muestra: **Avance** (fuentes procesadas de esta corrida), **Transcurrido**, **Tiempo restante** (con su rango), **Fin estimado** (hora), qué fuente se está rastreando **ahora** (cuánto lleva y cuánto suele tardar) y cuáles **siguen**.
 
 ### 9.4 Vigilancia de una sola fuente
 
@@ -654,6 +649,21 @@ Detalle de pasos: Configuración › Integración con IA › bitácora de entrad
 ### 9.6 Circuito abierto
 
 Si una fuente falla muchas veces seguidas, el sistema la **pausa horas** (“circuito abierto”) para no castigar un sitio caído. El tip en pantalla lo explica. Cuando pase el tiempo, vuelva a intentar o revise la URL.
+
+### 9.8 Tiempo estimado: cómo se calcula
+
+1. **Por fuente.** Cada fuente se estima con el promedio de sus 3 últimas corridas en ese mismo servidor (una API tarda segundos; un sitio con muchas páginas y lectura con IA, minutos). Sin historial, usa lo observado en la corrida.
+2. **Velocidad de hoy.** Lo que tardaron las fuentes ya terminadas frente a lo habitual ajusta el resto (si hoy va el doble de lento, el tiempo restante crece).
+3. **Cola real.** Se reparte el trabajo entre los carriles en el orden en que el servidor lo atenderá, incluidos los reintentos programados.
+
+El **rango** sale de la variación de cada fuente. Medido sobre 4 corridas reales: con historial, el error típico fue del 11 % y el fin real cayó dentro del rango; con fuentes nuevas o URL recién cambiadas, el error típico fue de 25 a 33 % y se corrige a medida que terminan fuentes. «¿Cómo se calcula el tiempo?», en el resumen, muestra cuántas fuentes tienen historial y la velocidad medida.
+
+### 9.9 Si la vigilancia parece detenida
+
+- **Sin respuesta del servidor**: el aviso amarillo lo dice. Si el servidor se reinició, al volver retoma las fuentes que quedaron a medias.
+- **Esperando reintentos**: una fuente falló y se reintenta a la hora indicada.
+- **Una fuente «sin novedades hace X min»**: se cerrará sola al llegar al tiempo máximo por fuente.
+- En el servidor de Render (plan gratuito), mientras haya fuentes en cola, el propio servicio se mantiene despierto, aunque nadie tenga la página abierta.
 
 ### 9.7 Vista previa de URL
 
@@ -1189,7 +1199,9 @@ No deje un solo superadmin sin respaldo institucional.
 ### 25.1 Gobierno metodológico
 
 - CRUD de **clústeres** y **tipologías** (código estable; palabras clave).  
-- Parámetros en caliente: cuota de ciclos, umbrales %P, similitud de duplicados, INVIMA, TTM, alertas, días del token del revisor, etc.  
+- Parámetros en caliente, **agrupados por módulo**: cribado de la bandeja, corroboración, vigilancia (fuentes a la vez, tiempo máximo por fuente, cortacircuitos), ciclos, priorización, filtrado, evaluación, time-to-market y alertas.
+- Cada parámetro dice **qué hace** y **de dónde sale su valor**: la especificación técnica SI EAA, una decisión de la coordinación metodológica (las abiertas, como D-02, D-07, D-09 y D-10, se marcan) o un valor técnico del sistema.
+- **Cribado**: los puntos de cada regla (horizonte, tipo, hito regulatorio o ensayo, área, resumen, tecnología identificada), las palabras clave y el umbral de «cribado alto». El recuadro «Cómo se calcula hoy» muestra la fórmula con los valores vigentes. Al guardar un peso, se recalcula de inmediato el cribado de todas las señales.
 
 Cada cambio queda en bitácora. Los ciclos **cerrados** no recalculan el pasado.
 
@@ -1432,7 +1444,8 @@ El texto de la fuente no la decía, o el título mezcla varias tecnologías (las
 | **Embudo** | Conversión entre fases del ciclo |
 | **Corroboración** | La misma tecnología reportada por fuentes distintas; suma al orden de la bandeja, no a su importancia |
 | **Datos de producto** | Forma farmacéutica, concentración, vía, marca y modelo de una señal |
-| **Prioridad sugerida** | Prioridad de una fuente calculada con sus señales del último año; la oficial la decide una persona |
+| **URL original de la matriz** | La primera URL de consulta de la fila de la fuente en el Excel; si se usa otra, la fuente lo dice en una etiqueta |
+| **Tiempo máximo por fuente** | Tope de minutos de una fuente en la vigilancia; al superarlo se cierra con error y la corrida sigue |
 | **Campo editado** | Campo de la matriz que el equipo cambió en el panel; la recarga del catálogo lo respeta |
 | **Ver como** | Vista del sistema con los permisos de otro perfil, solo para el superadministrador |
 

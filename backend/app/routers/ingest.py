@@ -1,6 +1,7 @@
 """Cola de ingesta, sonda de salud, cobertura e importacion del catalogo."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -27,6 +28,8 @@ from ..schemas import (
     SourceProbeOut,
 )
 from ..worker import kick
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ingest", tags=["ingest"])
 
@@ -117,9 +120,9 @@ def ingest_progress(
     se accedio y cuantas senales lleva. La pantalla lo consulta cada pocos segundos
     mientras haya trabajo pendiente.
     """
-    from .. import scan_progress
-    from ..ingest_service import parallel_jobs
-    from ..worker import is_running
+    from .. import scan_eta, scan_progress
+    from ..ingest_service import job_timeout_seconds, parallel_jobs
+    from ..worker import is_running, keepalive_url
 
     since = datetime.now(timezone.utc) - timedelta(hours=PROGRESS_WINDOW_HOURS)
     rows = (
@@ -136,6 +139,17 @@ def ingest_progress(
     for job in db.query(IngestJob).filter(IngestJob.status.in_(("pendiente", "ejecutando"))).all():
         if job.source_id and (job.source_id not in latest or latest[job.source_id].id < job.id):
             latest[job.source_id] = job
+
+    # Con una corrida activa, el avance cuenta SOLO esa corrida: mezclar las fuentes
+    # de una corrida anterior (ultimas 12 h) mostraba "77 de 87" en una de 14.
+    running_now = [j for j in latest.values() if j.status in ("pendiente", "ejecutando")]
+    if running_now:
+        run_start = min(_utc(j.created_at) or datetime.now(timezone.utc) for j in running_now) - timedelta(seconds=5)
+        latest = {
+            sid: j
+            for sid, j in latest.items()
+            if j.status in ("pendiente", "ejecutando") or (_utc(j.created_at) and _utc(j.created_at) >= run_start)
+        }
 
     titles = {
         s.id: s.title
@@ -190,12 +204,32 @@ def ingest_progress(
                 "ai": (mem or {}).get("ai") or {},
             }
         )
+    lanes = parallel_jobs(db)
+    timeout_s = job_timeout_seconds(db)
+    eta = None
+    try:
+        eta = scan_eta.estimate(db, list(latest.values()), lanes=lanes, timeout_s=timeout_s)
+    except Exception:  # noqa: BLE001 - la estimacion es complementaria
+        log.exception("Estimacion de la vigilancia")
+    try:
+        typical = scan_eta.expected_seconds(
+            db, [r["source_id"] for r in out if r["job_status"] in ("pendiente", "ejecutando")]
+        )
+    except Exception:  # noqa: BLE001 - complementario: nunca tumba el avance
+        log.exception("Duracion tipica de las fuentes")
+        typical = {}
+    for row in out:
+        row["typical_seconds"] = typical.get(row["source_id"])
     order = {"ejecutando": 0, "pendiente": 1, "error": 2, "parcial": 3, "ok": 4, "cancelado": 5}
     out.sort(key=lambda r: (order.get(r["job_status"], 9), r["source_title"].lower()))
     return {
         "active": counts["pendiente"] + counts["ejecutando"] > 0,
         "worker_running": is_running(),
-        "parallel": parallel_jobs(db),
+        "parallel": lanes,
+        "job_timeout_minutes": int(timeout_s // 60),
+        "keepalive": bool(keepalive_url()),
+        "server_time": datetime.now(timezone.utc).isoformat(),
+        "eta": eta,
         "counts": counts,
         "total": len(out),
         "sources": out,

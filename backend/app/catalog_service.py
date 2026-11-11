@@ -11,7 +11,14 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from sqlalchemy.orm import Session
 
 from .audit import record_action
-from .catalog import CATALOG_SOURCES, CATALOG_VERSION, catalog_stats
+from .catalog import (
+    CATALOG_SOURCES,
+    CATALOG_VERSION,
+    MATRIX_URL_EXCEPTIONS,
+    WEB_CONNECTORS,
+    catalog_stats,
+    matrix_urls,
+)
 from .models import Source
 
 TRACKING_PARAMS = {
@@ -458,3 +465,63 @@ def _apply_catalog_fields(
             continue
         setattr(source, key, value)
     source.edited_fields = sorted(edited)
+
+
+# --------------------------------------------------------------------------- #
+#  Procedencia de la URL principal (etiqueta en el catalogo y en la vigilancia)
+# --------------------------------------------------------------------------- #
+URL_ORIGIN_LABELS = {
+    "matriz": "URL original de la matriz",
+    "api": "API oficial (distinta a la matriz)",
+    "sub_fuente": "Página específica (distinta a la matriz)",
+    "ajustada": "URL ajustada (la de la matriz no sirve)",
+    "distinta": "URL distinta a la matriz",
+    "ia": "Propuesta por IA (no está en la matriz)",
+    "equipo": "Registrada por el equipo (no está en la matriz)",
+    "sin_matriz": "No está en la matriz",
+}
+
+
+def url_provenance(source: Source) -> dict:
+    """De donde sale la URL principal de la fuente frente a la matriz EH (Excel).
+
+    Devuelve {origin, label, matrix_url, note}. `matrix_url` es la URL original que
+    reporta la matriz para la fila de la fuente; `note` explica la diferencia.
+    """
+    from . import source_matrix
+    from .source_discovery import AI_MARK_TAG
+
+    url = source.url or ""
+    hit = source_matrix.rows_by_code().get((source.catalog_code or "").strip())
+    if hit is None:
+        if AI_MARK_TAG in (source.tags or ""):
+            origin, note = "ia", "La propuso la IA con «Detectar fuentes con IA»; no figura en la matriz EH."
+        elif (source.verification_status or "") in {LOCAL_SOURCE_MARK, MATRIX_IMPORT_MARK}:
+            origin, note = "equipo", "La registró el equipo en el catálogo; no figura en la matriz EH."
+        else:
+            origin, note = "sin_matriz", "Viene del catálogo verificado D-06; no figura en la matriz EH."
+        return {"origin": origin, "label": URL_ORIGIN_LABELS[origin], "matrix_url": "", "note": note}
+
+    row, primary = hit
+    listed = matrix_urls(row)
+    original = (source_matrix.entry_urls_for(row) or listed or [""])[0]
+    ref = row.get("matrix_ref") or "matriz EH"
+    keys = {normalize_url(u).replace("://www.", "://") for u in listed}
+    if normalize_url(url).replace("://www.", "://") in keys:
+        origin, note = "matriz", f"Es la URL que reporta la {ref}."
+    elif (source.connector or "") not in WEB_CONNECTORS:
+        origin = "api"
+        note = (
+            f"Se consulta por la API oficial ({_url_host(url) or url}), que entrega datos estructurados; "
+            f"la {ref} reporta {original}."
+        )
+    elif not primary:
+        origin = "sub_fuente"
+        note = f"Comparte la {ref} con otra fuente y usa su página específica; la matriz reporta {original}."
+    elif source.catalog_code in MATRIX_URL_EXCEPTIONS:
+        origin, note = "ajustada", MATRIX_URL_EXCEPTIONS[source.catalog_code]
+    else:
+        origin = "distinta"
+        note = f"La URL en uso no es la original de la {ref} ({original})."
+    return {"origin": origin, "label": URL_ORIGIN_LABELS[origin], "matrix_url": original, "note": note}
+

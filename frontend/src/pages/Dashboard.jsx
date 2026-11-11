@@ -13,7 +13,8 @@ import { LoadingBlock } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
 import ClampText from "../components/ClampText";
 import { ScreeningScore } from "../components/TriageBoard";
-import { IETS_PHASES, SCREENING_QUEUE_THRESHOLD } from "../constants/methodology";
+import { IETS_PHASES } from "../constants/methodology";
+import { useScreeningThreshold } from "../scan/useScreeningThreshold";
 import { GLOSSARY } from "../constants/glossary";
 import InfoTip from "../components/InfoTip";
 import "./dashboards.css";
@@ -23,7 +24,7 @@ import "./dashboards.css";
 const KPI_HELP = {
   bandeja:
     "Qué mide: señales capturadas que aún no se asignan a ningún ciclo. Cómo se calcula: tecnologías en estado 'capturada / no asignada'.",
-  cribado: `Qué mide: señales de la cola de cribado con puntaje alto. Cómo se calcula: señales con puntaje de cribado de ${SCREENING_QUEUE_THRESHOLD} o más (0 a 100). Es una ayuda para ordenar, no el %P oficial.`,
+  cribado: `Qué mide: señales de la cola de cribado con puntaje alto. Cómo se calcula: señales con puntaje de cribado igual o mayor al umbral de Configuración › Cribado (0 a 100). Es una ayuda para ordenar, no el %P oficial.`,
   calificar:
     "Qué mide: su trabajo pendiente en la matriz oficial. Cómo se calcula: tecnologías del ciclo activo aptas para priorización y no congeladas a las que les falta al menos uno de los criterios que su perfil califica.",
   priorizadas:
@@ -90,6 +91,7 @@ function WorkCard({ item }) {
 }
 
 export default function Dashboard() {
+  const screeningThreshold = useScreeningThreshold();
   const [wb, setWb] = useState(null);
   const [work, setWork] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -242,7 +244,7 @@ export default function Dashboard() {
           <KPICard label="En bandeja de entrada" hint={KPI_HELP.bandeja} value={wb.staging_unassigned} icon={<Icon name="inbox" />} accent="#6366F1" sub="Sin asignar a ciclo" />
         )}
         {isEditor && (
-          <KPICard label="Cribado alto" hint={KPI_HELP.cribado} value={wb.high_priority} icon={<Icon name="pulse" />} accent="#EF4444" sub={`Puntaje de ${SCREENING_QUEUE_THRESHOLD} o más`} />
+          <KPICard label="Cribado alto" hint={KPI_HELP.cribado} value={wb.high_priority} icon={<Icon name="pulse" />} accent="#EF4444" sub={`Puntaje de ${screeningThreshold} o más`} />
         )}
         {hasCriteria && (
           <KPICard label="Me toca calificar" hint={KPI_HELP.calificar} value={wb.cycle_pending_for_me} icon={<Icon name="layers" />} accent="#3B82F6" sub={`Criterios ${work.my_criteria.join(", ")}`} />

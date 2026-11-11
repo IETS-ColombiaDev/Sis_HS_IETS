@@ -14,6 +14,8 @@ import { Input, Textarea } from "./Field";
 import { LoadingBlock } from "./Spinner";
 import { PERM } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
+import { forgetScreeningThreshold } from "../scan/useScreeningThreshold";
+import { PARAM_GROUPS, PARAM_INFO as PARAM_INFO_ORDER, paramInfo } from "../constants/paramInfo";
 
 const EMPTY_ITEM = { code: "", name: "", description: "", keywords: "", sort_order: 0 };
 
@@ -37,6 +39,7 @@ export default function MethodologyPanel() {
   const [criteria, setCriteria] = useState([]);
   const [draft, setDraft] = useState({});
   const [savingKey, setSavingKey] = useState("");
+  const [paramQuery, setParamQuery] = useState("");
   const [itemModal, setItemModal] = useState(null); // { kind, item|null }
   const [itemForm, setItemForm] = useState(EMPTY_ITEM);
   const [itemError, setItemError] = useState("");
@@ -79,7 +82,12 @@ export default function MethodologyPanel() {
     try {
       const { data } = await api.put(`/methodology/params/${param.key}`, { value });
       setParams((prev) => prev.map((p) => (p.key === data.key ? data : p)));
-      toast.success(`${param.key} actualizado a ${data.value}`);
+      if (param.key === "screening.queue_threshold") forgetScreeningThreshold();
+      toast.success(
+        param.key.startsWith("screening.")
+          ? `${paramInfo(param.key).title || param.key}: ${data.value}. Se recalculó el cribado de todas las señales.`
+          : `${paramInfo(param.key).title || param.key} actualizado a ${data.value}`
+      );
     } catch (e) {
       toast.error(apiError(e, "No se pudo guardar el parámetro"));
       setDraft((d) => ({ ...d, [param.key]: param.value }));
@@ -171,6 +179,31 @@ export default function MethodologyPanel() {
     [params, draft]
   );
 
+  const savedValues = useMemo(() => Object.fromEntries(params.map((p) => [p.key, p.value])), [params]);
+
+  // Parámetros agrupados por módulo, con búsqueda por nombre, explicación u origen.
+  const groupedParams = useMemo(() => {
+    const q = paramQuery.trim().toLowerCase();
+    const match = (p) => {
+      if (!q) return true;
+      const info = paramInfo(p.key);
+      return [p.key, p.description, info.title, info.help, info.origin].some((t) => (t || "").toLowerCase().includes(q));
+    };
+    const byGroup = {};
+    params.filter(match).forEach((p) => {
+      const g = paramInfo(p.key).group;
+      (byGroup[g] = byGroup[g] || []).push(p);
+    });
+    const order = Object.keys(PARAM_INFO_ORDER);
+    return PARAM_GROUPS.filter((g) => byGroup[g.id]?.length).map((g) => {
+      const items = byGroup[g.id].sort((a, b) => (order.indexOf(a.key) + 1 || 999) - (order.indexOf(b.key) + 1 || 999));
+      // Si todo el grupo comparte el mismo origen, se explica una vez arriba y no en cada fila.
+      const origins = [...new Set(items.map((p) => paramInfo(p.key).origin).filter(Boolean))];
+      const shared = origins.length === 1 && items.length > 1 ? origins[0] : "";
+      return { ...g, items, sharedOrigin: shared };
+    });
+  }, [params, paramQuery]);
+
   if (loading) return <LoadingBlock label="Cargando parámetros metodológicos..." />;
 
   return (
@@ -180,62 +213,84 @@ export default function MethodologyPanel() {
           right={<Badge tone={editable ? "info" : "default"}>{editable ? "Editable" : "Solo lectura"}</Badge>}
         >
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <Icon name="sliders" size={18} /> Parámetros metodológicos
+            <Icon name="sliders" size={18} /> Parámetros del sistema
           </span>
         </SectionTitle>
 
-        <p style={{ fontSize: 13, color: "#64748B", marginTop: -6, marginBottom: 16 }}>
-          Umbrales que gobiernan cálculos oficiales. Se aplican de inmediato a los ciclos abiertos;
-          los ciclos cerrados conservan congelado el resultado que obtuvieron bajo los valores anteriores.
-          Cada cambio queda registrado en la bitácora con autor y valor previo.
+        <p style={{ fontSize: 13, color: "#64748B", marginTop: -6, marginBottom: 12 }}>
+          Todo umbral, peso o tope que gobierna un cálculo se ajusta aquí, sin desplegar. Cada parámetro dice qué hace y{" "}
+          <strong>de dónde sale su valor</strong>: la especificación técnica SI EAA, una decisión de la coordinación
+          metodológica (las abiertas se marcan) o un valor técnico del sistema. Los cambios se aplican de inmediato; los
+          ciclos cerrados conservan el resultado que obtuvieron. Cada cambio queda en la bitácora con autor y valor previo.
         </p>
 
-        <div style={{ display: "grid", gap: 12 }}>
-          {params.map((p) => (
-            <div
-              key={p.key}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) 120px auto",
-                gap: 12,
-                alignItems: "center",
-                padding: "10px 12px",
-                background: dirty.includes(p.key) ? "#FFFBEB" : "#F8FAFC",
-                border: `1px solid ${dirty.includes(p.key) ? "#FDE68A" : "#E2E8F0"}`,
-                borderRadius: 8,
-              }}
-            >
-              <div style={{ minWidth: 0 }}>
-                {/* Lo que significa va primero; la clave tecnica queda como referencia. */}
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600, color: "#0F172A" }}>
-                  {p.description || p.key}
-                  <InfoTip text={GLOSSARY.fb_param} label={`Qué es ${p.key}`} />
-                  {dirty.includes(p.key) && <span className="param-dirty">Sin guardar</span>}
-                </div>
-                <code style={{ fontSize: 11.5, color: "#64748B" }}>{p.key}</code>
-              </div>
-              <Input
-                aria-label={`Valor de ${p.key}`}
-                value={draft[p.key] ?? ""}
-                onChange={(e) => setDraft((d) => ({ ...d, [p.key]: e.target.value }))}
-                disabled={!editable}
-                inputMode={p.value_type === "int" ? "numeric" : "text"}
-                style={{ marginBottom: 0, textAlign: "center", fontWeight: 700 }}
-              />
-              <HintButton
-                size="sm"
-                variant="secondary"
-                onClick={() => saveParam(p)}
-                loading={savingKey === p.key}
-                disabled={!editable || !dirty.includes(p.key)}
-                hint="Guardar el nuevo valor. Queda en la bitácora."
-                disabledHint={!editable ? "Solo el superadministrador cambia parámetros (permiso catalog:write)." : "Cambie el valor para poder guardarlo."}
-              >
-                Guardar
-              </HintButton>
-            </div>
-          ))}
+        <div className="param-filter">
+          <Input
+            aria-label="Buscar parámetro"
+            placeholder="Buscar parámetro (p. ej. cribado, fuente, ciclo)…"
+            value={paramQuery}
+            onChange={(e) => setParamQuery(e.target.value)}
+            style={{ marginBottom: 0 }}
+          />
         </div>
+
+        {groupedParams.map((group) => (
+          <section key={group.id} className="param-group" aria-labelledby={`param-group-${group.id}`}>
+            <h4 id={`param-group-${group.id}`} className="param-group-title">
+              <Icon name={group.icon} size={16} /> {group.title}
+            </h4>
+            {group.intro && <p className="param-group-intro">{group.intro}</p>}
+            {group.sharedOrigin && (
+              <p className="param-group-origin">
+                <strong>De dónde salen estos valores:</strong> {group.sharedOrigin}
+              </p>
+            )}
+            {group.id === "screening" && <ScreeningFormula values={draft} saved={savedValues} />}
+            <div style={{ display: "grid", gap: 10 }}>
+              {group.items.map((p) => {
+                const info = paramInfo(p.key);
+                const isDirty = dirty.includes(p.key);
+                return (
+                  <div key={p.key} className={`param-row${isDirty ? " param-row--dirty" : ""}`}>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="param-row-title">
+                        {info.title || p.description || p.key}
+                        {isDirty && <span className="param-dirty">Sin guardar</span>}
+                      </div>
+                      {(info.help || (info.title && p.description)) && <p className="param-row-help">{info.help || p.description}</p>}
+                      {info.origin && info.origin !== group.sharedOrigin && (
+                        <p className="param-row-origin">
+                          <strong>De dónde sale:</strong> {info.origin}
+                        </p>
+                      )}
+                      <code className="param-row-key">{p.key}</code>
+                    </div>
+                    <Input
+                      aria-label={`Valor de ${info.title || p.key}`}
+                      value={draft[p.key] ?? ""}
+                      onChange={(e) => setDraft((d) => ({ ...d, [p.key]: e.target.value }))}
+                      disabled={!editable}
+                      inputMode={p.value_type === "int" ? "numeric" : "text"}
+                      style={{ marginBottom: 0, textAlign: info.text ? "left" : "center", fontWeight: info.text ? 500 : 700 }}
+                    />
+                    <HintButton
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => saveParam(p)}
+                      loading={savingKey === p.key}
+                      disabled={!editable || !isDirty}
+                      hint="Guardar el nuevo valor. Queda en la bitácora."
+                      disabledHint={!editable ? "Solo el superadministrador cambia parámetros (permiso catalog:write)." : "Cambie el valor para poder guardarlo."}
+                    >
+                      Guardar
+                    </HintButton>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+        {groupedParams.length === 0 && <p className="muted">Ningún parámetro coincide con la búsqueda.</p>}
       </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }} className="dash-grid">
@@ -412,3 +467,41 @@ function CatalogCard({ title, hint, items, editable, onToggle, onCreate, onEdit,
     </Card>
   );
 }
+
+
+/** Fórmula del cribado con los valores vigentes (y los que se están editando). */
+function ScreeningFormula({ values, saved }) {
+  const v = (k) => values[`screening.${k}`] ?? saved[`screening.${k}`] ?? "";
+  const n = (k) => Number(v(k)) || 0;
+  const horizon = Math.max(n("points_inminente"), n("points_transicional"), n("points_emergente"));
+  const max = horizon + n("points_tech_type") + Math.max(n("points_regulatory"), n("points_trial")) + n("points_area") + n("points_summary") + n("points_identified");
+  const rows = [
+    ["Horizonte", `inminente +${v("points_inminente")} · transicional +${v("points_transicional")} · emergente +${v("points_emergente")}`],
+    ["Tipo de tecnología", `+${v("points_tech_type")} si es ${v("tech_types").split(",").map((t) => t.trim()).filter(Boolean).join(", ")}`],
+    ["Madurez", `+${v("points_regulatory")} si menciona hito regulatorio o fase III; si no, +${v("points_trial")} si menciona fase II o ensayo`],
+    ["Área terapéutica", `+${v("points_area")} si la tiene`],
+    ["Resumen", `+${v("points_summary")} si tiene ${v("summary_min_chars")} caracteres o más`],
+    ["Tecnología identificada", `+${v("points_identified")} si está aparte del título`],
+  ];
+  return (
+    <div className="screening-formula" data-testid="screening-formula">
+      <div className="screening-formula-head">
+        <strong>Cómo se calcula hoy</strong>
+        <span className="muted">
+          Máximo alcanzable: {Math.min(100, max)} de 100{max > 100 ? ` (las reglas suman ${max}; se corta en 100)` : ""} · destaque desde {v("queue_threshold")}
+        </span>
+      </div>
+      <ul>
+        {rows.map(([label, text]) => (
+          <li key={label}>
+            <strong>{label}:</strong> {text}
+          </li>
+        ))}
+      </ul>
+      <p className="muted" style={{ margin: 0 }}>
+        En la bandeja el orden suma además el bono de corroboración. El cribado no es el %P: la priorización oficial es la matriz P1–P6.
+      </p>
+    </div>
+  );
+}
+

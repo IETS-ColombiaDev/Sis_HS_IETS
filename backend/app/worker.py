@@ -35,6 +35,12 @@ _drain_lock = threading.Lock()
 KICK_MAX_SECONDS = 3 * 3600
 # Espera maxima entre revisiones cuando solo quedan reintentos a futuro.
 RETRY_POLL_SECONDS = 30
+# Render gratuito duerme el servicio tras 15 min sin trafico ENTRANTE: el trabajo
+# del worker no cuenta. Si el usuario cierra la pestana a mitad de la vigilancia,
+# el proceso se suspendia y la corrida quedaba congelada en la fuente N. Mientras
+# haya cola, el propio servicio se visita por su URL publica cada 4 min.
+KEEPALIVE_SECONDS = 240
+_keepalive_thread: threading.Thread | None = None
 
 
 def _force_worker_on_sqlite() -> bool:
@@ -61,6 +67,63 @@ def start_worker() -> None:
     _thread = threading.Thread(target=_loop, name="ingest-worker", daemon=True)
     _thread.start()
     log.info("Worker de ingesta en marcha.")
+    _start_keepalive()
+
+
+def keepalive_url() -> str:
+    """URL publica a visitar (KEEPALIVE_URL o RENDER_EXTERNAL_URL, que Render define solo)."""
+    base = (os.environ.get("KEEPALIVE_URL") or os.environ.get("RENDER_EXTERNAL_URL") or "").strip().rstrip("/")
+    return f"{base}/api/health" if base.startswith("http") else ""
+
+
+def _keepalive_always() -> bool:
+    return os.environ.get("KEEPALIVE_ALWAYS", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def has_pending_work() -> bool:
+    from .models import IngestJob
+
+    if draining():
+        return True
+    db = SessionLocal()
+    try:
+        return (
+            db.query(IngestJob.id).filter(IngestJob.status.in_(("pendiente", "ejecutando"))).first()
+            is not None
+        )
+    except Exception:  # noqa: BLE001
+        return False
+    finally:
+        db.close()
+
+
+def keepalive_tick() -> bool:
+    """Una visita a la URL publica si hay trabajo (o KEEPALIVE_ALWAYS). True si la hizo."""
+    url = keepalive_url()
+    if not url or not (_keepalive_always() or has_pending_work()):
+        return False
+    try:
+        import httpx
+
+        httpx.get(url, timeout=20.0, headers={"User-Agent": "sis-hs-iets-keepalive"})
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log.debug("Keep-alive sin respuesta: %s", exc)
+        return False
+
+
+def _start_keepalive() -> None:
+    global _keepalive_thread
+    if not keepalive_url() or (_keepalive_thread and _keepalive_thread.is_alive()):
+        return
+
+    def loop() -> None:
+        while not _stop.wait(KEEPALIVE_SECONDS):
+            keepalive_tick()
+
+    _keepalive_thread = threading.Thread(target=loop, name="ingest-keepalive", daemon=True)
+    _keepalive_thread.start()
+    log.info("Keep-alive activo mientras haya vigilancia en cola: %s", keepalive_url())
 
 
 def stop_worker() -> None:
@@ -69,6 +132,11 @@ def stop_worker() -> None:
 
 def is_running() -> bool:
     return bool(_thread and _thread.is_alive())
+
+
+def draining() -> bool:
+    """True mientras un drenaje de la cola esta en curso (hay vigilancia corriendo)."""
+    return _drain_lock.locked()
 
 
 def kick() -> None:
@@ -127,7 +195,7 @@ def _run_lanes(lanes: int) -> int:
     """Corre `lanes` hilos que toman jobs vencidos hasta que no quede ninguno."""
 
     def lane() -> int:
-        from .ingest_service import claim_next, run_job
+        from .ingest_service import claim_next, job_timeout_seconds, run_job_guarded
 
         count = 0
         while not _stop.is_set():
@@ -136,7 +204,10 @@ def _run_lanes(lanes: int) -> int:
                 job_id = claim_next(db)
                 if job_id is None:
                     return count
-                run_job(db, job_id)
+                timeout_s = job_timeout_seconds(db)
+                db.close()
+                # Cada fuente corre con tiempo maximo: una colgada no detiene la corrida.
+                run_job_guarded(job_id, timeout_s)
                 count += 1
             except Exception:  # noqa: BLE001
                 log.exception("Carril del worker de ingesta")
@@ -160,12 +231,13 @@ def _kick_run() -> None:
 
 def run_once() -> None:
     """Una vuelta completa del worker. Se expone para pruebas y diagnostico."""
-    from .ingest_service import recover_stale
+    from .ingest_service import job_timeout_seconds, recover_stale
     from .scheduler_service import finalize_scan_runs, run_due_tasks
 
     db = SessionLocal()
     try:
-        recover_stale(db)
+        # Un job vivo nunca pasa de su tiempo maximo: solo es huerfano si lo supero con margen.
+        recover_stale(db, minutes=max(30, int(job_timeout_seconds(db) // 60) + 10))
         run_due_tasks(db)
     finally:
         db.close()

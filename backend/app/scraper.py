@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from .models import Finding, ScrapeLog, Source
 from .scan_progress import ACCESS_VIA_LABELS
-from .priority import compute_screening_score
+from .priority import compute_screening_score, screening_weights
 from .technology_service import sync_technology_from_finding
 
 try:  # extraccion robusta de contenido principal de paginas web
@@ -1285,7 +1285,8 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
     """Ejecuta el escaneo de una fuente y persiste hallazgos nuevos."""
     log = ScrapeLog(
         source_id=source.id,
-        status="ok",
+        # "ejecutando" hasta que termine: si la fuente se corta por tiempo, no queda un "ok" falso.
+        status="ejecutando",
         triggered_by=triggered_by,
         started_at=datetime.now(timezone.utc),
     )
@@ -1507,6 +1508,9 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             structured_summary,
         )
 
+        # Si la vigilancia ya cerro esta fuente por tiempo, no se guarda nada mas.
+        scan_progress.check_abort()
+        weights = screening_weights(db)
         pipeline = is_pipeline_source(source)
         for data in findings_data:
             row = data["title"]
@@ -1549,6 +1553,7 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                 summary=finding.summary,
                 technology=finding.technology,
                 title=finding.title,
+                weights=weights,
             )
             db.add(finding)
             new_findings.append(finding)
@@ -1581,6 +1586,17 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
         log.message = f"{len(findings_data)} items detectados, {new_count} nuevos.{relinked_note}{visited}{fallback_note} {elapsed} ms."
         source.last_scraped_at = datetime.now(timezone.utc)
         finish_trace(ok=bool(findings_data), items_found=len(findings_data), items_new=new_count)
+    except scan_progress.JobAborted:
+        # Cortada por el tiempo maximo por fuente: se cierra el registro y se suelta el hilo.
+        db.rollback()
+        log.status = "error"
+        log.message = "Tiempo máximo por fuente agotado: la vigilancia siguió con la siguiente."
+        log.finished_at = datetime.now(timezone.utc)
+        try:
+            db.commit()
+        except Exception:  # noqa: BLE001
+            db.rollback()
+        raise
     except httpx.HTTPError as exc:
         log.status = "error"
         log.message = f"Error de red: {exc}"[:500]

@@ -111,7 +111,7 @@ def test_connection(api_key: str | None = None) -> dict:
         chosen = _pick_model(models, _runtime_model)
         # Prueba real de generacion (barata) para validar el token de extremo a extremo.
         model = genai.GenerativeModel(chosen)
-        resp = model.generate_content("Responde solo con: OK")
+        resp = model.generate_content("Responde solo con: OK", request_options={"timeout": 30})
         txt = (getattr(resp, "text", "") or "").strip()
         if not txt:
             return {"ok": False, "message": "El modelo no devolvió contenido. Verifique cuotas/permisos.", "model": chosen}
@@ -190,6 +190,9 @@ def current_model() -> str:
     return detect_model() or ""
 
 
+GENERATE_TIMEOUT_S = 90
+
+
 def _generate(prompt: str, system: str | None = None, temperature: float = 0.4) -> tuple[str, str]:
     """Genera texto. Devuelve (texto, modelo_usado)."""
     model_name = detect_model()
@@ -202,7 +205,8 @@ def _generate(prompt: str, system: str | None = None, temperature: float = 0.4) 
             system_instruction=system or None,
             generation_config={"temperature": temperature},
         )
-        resp = model.generate_content(prompt)
+        # Sin timeout la libreria puede esperar indefinidamente y colgar la vigilancia.
+        resp = model.generate_content(prompt, request_options={"timeout": GENERATE_TIMEOUT_S})
         text = (getattr(resp, "text", "") or "").strip()
         return (text, model_name)
     except Exception as exc:  # noqa: BLE001
