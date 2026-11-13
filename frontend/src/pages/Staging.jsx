@@ -14,7 +14,7 @@ import Icon from "../components/Icon";
 import InfoTip, { TermLabel } from "../components/InfoTip";
 import Modal from "../components/Modal";
 import SignalOrigin from "../components/SignalOrigin";
-import { Input, Select } from "../components/Field";
+import { Input, Select, Textarea } from "../components/Field";
 import EmptyState from "../components/EmptyState";
 import { LoadingBlock } from "../components/Spinner";
 import PhaseGuide, { ModuleStatsRow } from "../components/PhaseGuide";
@@ -77,6 +77,9 @@ export default function Staging() {
   const [suggesting, setSuggesting] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [result, setResult] = useState(null);
+  const [view, setView] = useState("pendientes");
+  const [discardIds, setDiscardIds] = useState(null);
+  const [discardReason, setDiscardReason] = useState("");
 
   const { can } = useAuth();
   const { cycle, cycleId, isClosed, isHistoric, reload: reloadCycles, setCycleId } = useCycle();
@@ -100,6 +103,7 @@ export default function Staging() {
   const params = useCallback(
     (offset) => {
       const p = { limit: PAGE_SIZE, offset };
+      if (view === "descartadas") p.view = "descartadas";
       if (query.q) p.q = query.q;
       if (query.source_id) p.source_id = query.source_id;
       if (query.channel) p.channel = query.channel;
@@ -108,7 +112,7 @@ export default function Staging() {
       if (query.corroborated) p.corroborated = true;
       return p;
     },
-    [query]
+    [query, view]
   );
 
   const load = useCallback(async () => {
@@ -331,6 +335,52 @@ export default function Staging() {
     }
   };
 
+  const changeView = (next) => {
+    setView(next);
+    setSelected(new Set());
+  };
+
+  const openDiscard = (ids) => {
+    setDiscardReason("");
+    setDiscardIds(ids);
+  };
+
+  const discardReasonOk = discardReason.trim().length >= 5;
+
+  const doDiscard = async () => {
+    setSaving(true);
+    try {
+      const { data } = await api.post("/technologies/staging/discard", {
+        technology_ids: discardIds,
+        reason: discardReason.trim(),
+      });
+      setDiscardIds(null);
+      setSelected(new Set());
+      await load();
+      if (data.affected) toast.success(`${data.affected} señal(es) descartadas como tecnología ya conocida.`);
+      if (data.rejected?.length) toast.info(data.rejected.join(" "));
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo descartar"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const doRestore = async (ids) => {
+    setSaving(true);
+    try {
+      const { data } = await api.post("/technologies/staging/restore", { technology_ids: ids });
+      setSelected(new Set());
+      await load();
+      if (data.affected) toast.success(`${data.affected} señal(es) restauradas a la bandeja.`);
+      if (data.rejected?.length) toast.info(data.rejected.join(" "));
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo restaurar"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const doAssign = async () => {
     setSaving(true);
     try {
@@ -379,7 +429,29 @@ export default function Staging() {
             <Button variant="secondary" onClick={() => navigate("/postulaciones")}>
               <Icon name="note" size={16} /> Postulaciones
             </Button>
-            {canAssign && (
+            {canAssign && view === "pendientes" && (
+              <Button
+                variant="secondary"
+                onClick={() => openDiscard([...selected])}
+                disabled={selected.size === 0}
+                title="Descartar las señales seleccionadas: tecnología ya conocida"
+                data-testid="staging-discard-batch"
+              >
+                <Icon name="x" size={16} /> Descartar {selected.size || ""}
+              </Button>
+            )}
+            {canAssign && view === "descartadas" && (
+              <Button
+                variant="secondary"
+                onClick={() => doRestore([...selected])}
+                disabled={selected.size === 0}
+                loading={saving}
+                data-testid="staging-restore-batch"
+              >
+                Restaurar {selected.size || ""}
+              </Button>
+            )}
+            {canAssign && view === "pendientes" && (
               <HintButton
                 onClick={() => setAssignOpen(true)}
                 disabled={Boolean(assignBlock)}
@@ -431,6 +503,13 @@ export default function Staging() {
               color: stats.corroborated ? "#0E7490" : undefined,
               sub: "Corroboradas",
               hint: GLOSSARY.fa_corroborada,
+            },
+            {
+              label: "Descartadas",
+              value: stats.discarded ?? 0,
+              color: stats.discarded ? "#64748B" : undefined,
+              sub: "Tecnología ya conocida",
+              hint: "Señales descartadas desde la bandeja. Siguen contando en Total capturadas y se pueden restaurar.",
             },
             {
               label: "Listas para asignar",
@@ -538,7 +617,30 @@ export default function Staging() {
         </Card>
       )}
 
-      {items.length === 0 ? (
+      <div className="screening-tabs" role="tablist">
+        {[
+          { key: "pendientes", label: "Pendientes" },
+          { key: "descartadas", label: "Descartadas" },
+        ].map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={view === t.key}
+            className={`screening-tab${view === t.key ? " is-active" : ""}`}
+            onClick={() => changeView(t.key)}
+            data-testid={`staging-tab-${t.key}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {items.length === 0 && view === "descartadas" ? (
+        <Card>
+          <EmptyState icon="🗂️" title="Sin descartadas" message="No hay señales descartadas desde la bandeja." />
+        </Card>
+      ) : items.length === 0 ? (
         <Card>
           <EmptyState
             icon="📥"
@@ -675,9 +777,31 @@ export default function Staging() {
                         )}
                       </td>
                       <td>
-                        {canWrite && (
+                        {canWrite && view === "pendientes" && (
                           <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>
                             {ready ? "Editar" : "Clasificar"}
+                          </Button>
+                        )}
+                        {canAssign && view === "pendientes" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openDiscard([item.id])}
+                            title="Descartar: tecnología ya conocida"
+                            data-testid={`staging-discard-${item.id}`}
+                          >
+                            Descartar
+                          </Button>
+                        )}
+                        {canAssign && view === "descartadas" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => doRestore([item.id])}
+                            disabled={saving}
+                            data-testid={`staging-restore-${item.id}`}
+                          >
+                            Restaurar
                           </Button>
                         )}
                       </td>
@@ -689,7 +813,7 @@ export default function Staging() {
           </div>
           <div className="fa-pager">
             <span data-testid="staging-count">
-              Mostrando {items.length} de {total} señal(es) sin asignar
+              Mostrando {items.length} de {total} señal(es) {view === "descartadas" ? "descartadas" : "sin asignar"}
               {selected.size ? ` · ${selected.size} seleccionada(s)` : ""}
             </span>
             {items.length < total && (
@@ -958,6 +1082,43 @@ export default function Staging() {
             </p>
           </>
         )}
+      </Modal>
+
+      <Modal
+        open={Boolean(discardIds)}
+        onClose={() => setDiscardIds(null)}
+        title="Descartar: tecnología ya conocida"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDiscardIds(null)}>
+              Cancelar
+            </Button>
+            <HintButton
+              onClick={doDiscard}
+              loading={saving}
+              disabled={!discardReasonOk}
+              disabledHint="El motivo es obligatorio (mínimo 5 caracteres)."
+              data-testid="staging-discard-confirm"
+            >
+              Descartar {discardIds?.length || ""}
+            </HintButton>
+          </>
+        }
+      >
+        <p style={{ fontSize: 14, color: "#475569" }}>
+          {discardIds?.length || 0} señal(es) saldrán de la bandeja. No se borran: quedan en la pestaña
+          «Descartadas» y el motivo se registra en la bitácora.
+        </p>
+        <Textarea
+          label="Motivo"
+          required
+          rows={3}
+          maxLength={1000}
+          value={discardReason}
+          onChange={(e) => setDiscardReason(e.target.value)}
+          placeholder="Ej.: ya evaluada en el ciclo 2025; duplicado de la señal #123"
+          data-testid="staging-discard-reason"
+        />
       </Modal>
 
       <Modal
