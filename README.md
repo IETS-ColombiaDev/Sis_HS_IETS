@@ -431,58 +431,92 @@ El sistema orquesta el ciclo de vida metodológico en seis fases interconectadas
 
 ```mermaid
 flowchart TD
-    %% Fuentes de Entrada
-    subgraph Fuentes["1. Entrada y Captura de Señales"]
-        F1["Fuentes Proactivas (97 referentes)<br/>FDA, EMA, ClinicalTrials, RSS, Web"] -->|Conectores / Scraper| SC["backend/app/scraper.py<br/>backend/app/ingest/*"]
-        F2["Postulación Ciudadana Reactiva<br/>/postular"] -->|reCAPTCHA + COI| SUB["backend/app/routers/submissions.py"]
+    %% 1. Fuentes de Entrada
+    subgraph S1 ["1. Entrada y Captura de Senales"]
+        F1["Fuentes Proactivas: 97 referentes (FDA, EMA, ClinicalTrials, Web)"]
+        F2["Postulacion Ciudadana Reactiva: formulario /postular"]
+        SC["Captura: scraper.py y conectores en app/ingest/"]
+        SUB["Recepcion: submissions.py (con reCAPTCHA y COI)"]
+        F1 --> SC
+        F2 --> SUB
     end
 
-    %% Ingesta y Staging
-    subgraph Ingesta["2. Ingesta, Extracción y Bandeja de Entrada"]
-        SC -->|Crea Finding| STG["Bandeja de Entrada (Staging)<br/>backend/app/routers/technologies.py"]
-        SUB -->|Aceptación de moderador| STG
-        STG -->|Extracción de dosis/vía/marca| DET["backend/app/product_details.py"]
-        STG -->|Detección multifuente| CORR["backend/app/corroboration.py"]
-        STG -->|Sugerencia Clúster / Tipo| CLAS["backend/app/classification.py"]
-        STG -->|Asignar a Ciclo Activo| TEC["Entidad Technology + CycleTechnology<br/>backend/app/technology_service.py"]
+    %% 2. Ingesta y Staging
+    subgraph S2 ["2. Ingesta, Extraccion y Bandeja de Entrada"]
+        STG["Bandeja de Entrada: Staging (technologies.py)"]
+        DET["Extraccion de Dosis y Forma: product_details.py"]
+        CORR["Corroboracion Multifuente: corroboration.py"]
+        CLAS["Sugerencia de Cluster y Tipo: classification.py"]
+        TEC["Creacion de Tecnologia: technology_service.py"]
+        
+        SC -->|"Crea registro Finding"| STG
+        SUB -->|"Aprobacion por moderador"| STG
+        STG --> DET
+        STG --> CORR
+        STG --> CLAS
+        STG -->|"Asignar a Ciclo Activo"| TEC
     end
 
-    %% Filtrado y Novedad
-    subgraph Filtrado["3. Filtrado, Desduplicación e INVIMA"]
-        TEC -->|Envío a depuración| SCR["/filtrado<br/>backend/app/routers/screening.py"]
-        SCR -->|Similitud difusa RapidFuzz| DEDUP["backend/app/dedup.py<br/>MergeProposal"]
-        SCR -->|Cruce Socrata / Local| INV["backend/app/invima.py<br/>InvimaRecord"]
-        SCR -->|Normalización ATC/CIE-10| NORM["backend/app/normalization.py"]
-        SCR -->|Declaración de Novedad| NOV["NoveltyAssessment (Compuerta)"]
-        NOV -->|Aprobadas| LST["Listado Único por Clúster"]
+    %% 3. Filtrado y Novedad
+    subgraph S3 ["3. Filtrado, Desduplicacion e INVIMA"]
+        SCR["Modulo de Filtrado: screening.py"]
+        DEDUP["Desduplicacion Difusa: dedup.py (RapidFuzz)"]
+        INV["Cruce Regulatorio: invima.py (Socrata y Local)"]
+        NORM["Normalizacion de Codigos: normalization.py"]
+        NOV["Compuerta de Novedad: NoveltyAssessment"]
+        LST["Listado Unico por Cluster"]
+
+        TEC -->|"Enviar a filtrado"| SCR
+        SCR --> DEDUP
+        SCR --> INV
+        SCR --> NORM
+        SCR -->|"Validar novedad"| NOV
+        NOV -->|"Aprobadas"| LST
     end
 
-    %% Priorización Oficial
-    subgraph Priorizacion["4. Priorización Metodológica Oficial %P"]
-        LST -->|Pasan compuerta| PRI["/priorizacion<br/>backend/app/routers/priority.py"]
-        PRI -->|Evaluador Técnico P1, P5, P6| PE["backend/app/priority_engine.py"]
-        PRI -->|Evaluador Clínico P2, P3, P4| PE
-        PE -->|Cálculo %P = (Suma/6)*100| DEC{Clasificación %P}
-        DEC -->|%P >= 60%| P_ALTA["Priorizada"]
-        DEC -->|33% <= %P < 60%| P_MED["Bajo Vigilancia"]
-        DEC -->|%P < 33%| P_BAJ["No Priorizada"]
+    %% 4. Priorizacion Oficial
+    subgraph S4 ["4. Priorizacion Metodologica Oficial %P"]
+        PRI["Bandeja de Calificacion: priority.py"]
+        PE["Motor de Priorizacion: priority_engine.py"]
+        DEC{"Clasificacion segun %P"}
+        P_ALTA["Priorizada (%P >= 60%)"]
+        P_MED["Bajo Vigilancia (33% <= %P < 60%)"]
+        P_BAJ["No Priorizada (%P < 33%)"]
+
+        LST -->|"Pasan compuerta"| PRI
+        PRI -->|"Evaluador Tecnico (P1, P5, P6)"| PE
+        PRI -->|"Evaluador Clinico (P2, P3, P4)"| PE
+        PE -->|"Formula: (Suma / 6) * 100"| DEC
+        DEC --> P_ALTA
+        DEC --> P_MED
+        DEC --> P_BAJ
     end
 
-    %% Evaluación y Revisión
-    subgraph Evaluacion["5. Evaluación Temprana y Revisión por Pares"]
-        P_ALTA -->|Crear expediente| EVA["/evaluacion<br/>backend/app/routers/evaluation.py"]
-        EVA -->|Invitación con Token JWT| REV["Portal Revisor /revisar/:token<br/>backend/app/routers/review_portal.py"]
-        REV -->|Firma obligatoria COI| COI["Declaración COI en AuditLog"]
-        REV -->|Dictamen y comentarios| EVA
+    %% 5. Evaluacion y Revision
+    subgraph S5 ["5. Evaluacion Temprana y Revision por Pares"]
+        EVA["Expediente de Evaluacion: evaluation.py"]
+        REV["Portal de Revision: review_portal.py"]
+        COI["Declaracion Obligatoria COI (audit.py)"]
+
+        P_ALTA -->|"Crear expediente"| EVA
+        EVA -->|"Invitacion con token JWT temporal"| REV
+        REV -->|"Firma obligatoria"| COI
+        COI -->|"Emision de observaciones y dictamen"| EVA
     end
 
-    %% Diseminación y Gobernanza
-    subgraph Diseminacion["6. Diseminación, Salida y Cierre"]
-        EVA -->|Aprobación en Comité| PUB["Expediente Aprobado"]
-        PUB -->|Exportación ReportLab| PDF["PDF Nativo Institucional<br/>backend/app/pdf_export.py"]
-        PUB -->|Consolidación de Ciclo| BOL["Boletines y Paquete ZIP"]
-        PUB -->|Consulta pública| EXT["Catálogo Público /expedientes<br/>backend/app/routers/public_catalog.py"]
-        PUB -->|Gobernanza| STRAT["Tablero Estratégico y Grafo<br/>backend/app/routers/strategy.py"]
+    %% 6. Diseminacion y Gobernanza
+    subgraph S6 ["6. Diseminacion, Salida y Cierre"]
+        PUB["Expediente Aprobado por Comite"]
+        PDF["Generacion PDF Nativo: pdf_export.py"]
+        BOL["Boletines y Paquetes ZIP del Ciclo"]
+        EXT["Catalogo Ciudadano: public_catalog.py"]
+        STRAT["Tablero y Grafo: strategy.py"]
+
+        EVA -->|"Aprobacion final"| PUB
+        PUB --> PDF
+        PUB --> BOL
+        PUB --> EXT
+        PUB --> STRAT
     end
 ```
 
