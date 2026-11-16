@@ -608,7 +608,17 @@ export default function Staging() {
                         <ProductFacts item={item} />
                         <div className="staging-meta">
                           {item.source_title || "Sin fuente"} ·{" "}
-                          {new Date(item.captured_at).toLocaleDateString("es-CO")} ·{" "}
+                          {/* captured_at se guarda en UTC; con SQLite llega sin zona. */}
+                          {new Date(
+                            /[zZ]|[+-]\d{2}:?\d{2}$/.test(item.captured_at)
+                              ? item.captured_at
+                              : `${item.captured_at}Z`,
+                          ).toLocaleString("es-CO", {
+                            timeZone: "America/Bogota",
+                            dateStyle: "short",
+                            timeStyle: "short",
+                          })}{" "}
+                          ·{" "}
                           {item.source_channel === "reactiva" ? "Reactiva" : "Proactiva"}
                           <span className="staging-links">
                             {item.signal_url && (
