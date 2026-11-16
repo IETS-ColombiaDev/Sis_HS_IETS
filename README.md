@@ -18,7 +18,8 @@ Inspirado en el modelo operativo del [NIHR Innovation Observatory](https://io.ni
 8. [Flujo de la aplicación](#flujo-de-la-aplicación)
 9. [Conceptos clave y metodología operativa](#conceptos-clave-y-metodología-operativa)
 10. [Perfiles y matriz de permisos (RBAC)](#perfiles-y-matriz-de-permisos-rbac)
-11. [Documentación relacionada](#documentación-relacionada)
+11. [Desarrollo y contribución](#desarrollo-y-contribución)
+12. [Documentación relacionada](#documentación-relacionada)
 
 ---
 
@@ -186,7 +187,8 @@ El archivo de configuración principal se ubica en `backend/.env`. Copie `backen
 | `FIREBASE_PROJECT_ID` | `sistema-permisos-iets` | Proyecto GCP/Firebase para directorio RRHH y persistencia Firestore. |
 | `FIREBASE_SERVICE_ACCOUNT_KEY`| *Vacío* | JSON con las credenciales de la cuenta de servicio de Google Cloud. |
 | `FIREBASE_SERVICE_ACCOUNT_FILE`| *Vacío* | Ruta en disco al archivo JSON de la cuenta de servicio. |
-| `FIREBASE_DB_ENABLED` | `true` | Habilita la replicación de instantáneas comprimidas de la base de datos en Firestore. |
+| `FIREBASE_RRHH_ENV_FILE` | *Sin definir* | Si no hay llave ni archivo, el backend busca la cuenta de servicio en `../RRHH/frontend/.env.local`. Definida y vacía apaga esa búsqueda. |
+| `FIREBASE_DB_ENABLED` | `true` | Replica instantáneas comprimidas de la base en Firestore y, al arrancar, restaura desde allí si la base local está vacía o atrasada. Solo opera con SQLite y con cuenta de servicio; sin credenciales queda apagada sin error. En local use `false`. |
 | `FIREBASE_DB_DATABASE` | `hs-iets` | Base de datos específica de Firestore para Escaneo de Horizonte (no usar la base `(default)`). |
 | `FIREBASE_DB_COLLECTION` | `hs_iets_db` | Colección donde se almacenan los snapshots. En desarrollo se añade el sufijo `_dev`. |
 | `FIREBASE_DB_SHARE_WITH_PRODUCTION` | `false` | Permite que entornos no productivos accedan a la colección de producción (solo soporte). |
@@ -322,7 +324,7 @@ cd frontend
 npm run build
 npx playwright test
 ```
-*Ejecuta escenarios en navegadores reales cubriendo navegación, autenticación, flujos por perfil de usuario, evaluación y validación responsive.*
+*Ejecuta escenarios en navegadores reales cubriendo navegación, autenticación, flujos por perfil de usuario, evaluación y validación responsive. En GitHub Actions no corre en los PR: corre cada noche sobre `develop` y a demanda (ver [Desarrollo y contribución](#desarrollo-y-contribución)).*
 
 #### Suite de regresión API (Smoke Test)
 ```powershell
@@ -413,7 +415,9 @@ Sis_HS_IETS/
 │   ├── package.json                # Manifiesto de paquetes de Node.js
 │   └── vite.config.js              # Configuración de empaquetado de Vite
 ├── deploy/                         # Scripts de aprovisionamiento, Caddyfile y configs de despliegue
-├── .github/workflows/ci.yml        # Flujo de Integración Continua en GitHub Actions
+├── .github/
+│   ├── workflows/                  # CI en GitHub Actions (PR a develop y main, push a main, E2E nocturna, keepalive)
+│   └── pull_request_template.md    # Plantilla de los pull requests
 ├── Dockerfile                      # Construcción multi-etapa (Node + Python + Runtime)
 ├── docker-compose.yml              # Orquestación de contenedores (API, Worker, Postgres, Caddy)
 ├── start.ps1                       # Script de arranque rápido de desarrollo en Windows
@@ -582,6 +586,94 @@ El sistema implementa 5 perfiles definidos en `backend/app/rbac.py`:
 | **Evaluador Clínico** | `evaluador_clinico` | Calificación de criterios clínicos de priorización (P2, P3 y P4) y redacción de expedientes de evaluación. |
 | **Tomador de Decisiones**| `tomador_decisiones` | Acceso analítico a tableros ejecutivos, gráficos de gobernanza, capas de impacto presupuestal y reportes. |
 | **Revisor Externo** | `revisor_externo` | Perfil transitorio activado exclusivamente mediante token firmado para revisión técnica de un expediente con COI previo. |
+
+---
+
+## Desarrollo y contribución
+
+### Flujo de ramas
+
+```
+<nombre>_<tipo>_<tarea> ──PR──► develop ──PR──► main ──► Render (producción)
+                                   ▲                ▲
+                                   └──PR── main ◄───┴──PR── hotfix/<descripcion>
+```
+
+| Rama | Para qué | Cómo entra |
+|---|---|---|
+| `main` | Producción. Render despliega cada fusión (`autoDeploy`) | Solo PR desde `develop` o `hotfix/*` |
+| `develop` | Integración. Aún no hay *staging*: se prueba en local | Solo PR desde ramas personales (o desde `main` tras un hotfix) |
+| `<nombre>_<tipo>_<tarea>` | Una tarea (RF, RNF u observación del consolidado) | Se crea desde `develop` |
+| `hotfix/<descripcion>` | Falla en producción que no puede esperar | Se crea desde `main` |
+
+Nadie hace `push` directo ni `force push` a `main` ni a `develop`. Todos los PR se fusionan con **Create a merge commit** (no *squash* ni *rebase*), para que `develop` y `main` compartan historia.
+
+**Hotfix:** PR `hotfix/<descripcion>` → `main` (mismos checks y aprobaciones que un paso a producción). Al fusionarlo, abra de inmediato un PR **`main` → `develop`** (`chore(hotfix): pasa <descripcion> a develop`); sin eso, el siguiente PR `develop` → `main` queda bloqueado por estar desactualizado.
+
+**Paso a producción:** pruebe `develop` en local con Docker (abajo), abra el PR `develop` → `main`, diligencie la sección *Paso a producción* de la [plantilla](.github/pull_request_template.md) y espere el visto bueno del equipo de pruebas.
+
+### Nombres de rama y commits
+
+- **Rama:** `<nombre>_<tipo>_<tarea>`, en minúscula y sin tildes. Ej.: `valery_feat_rf02`, `valery_fix_integracion`, `valery_chore_ci_flujo`. Los hotfix usan `hotfix/<descripcion>`.
+- **Commit y título del PR:** `<tipo>(<tarea>): descripción`, en español, en presente, sin punto final, máximo 72 caracteres. Ej.: `feat(rf02): postulación con tres campos obligatorios`. El cuerpo, opcional, explica el porqué.
+- **Tipos:** `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `ci`, `build`, `chore`, `revert`.
+- No se aceptan mensajes como `UT`, `UT_Changes`, `Update` o `[fix] ...`.
+
+### Aprobaciones y checks
+
+| PR | Checks obligatorios | Aprobación |
+|---|---|---|
+| Rama personal → `develop` | `ci / backend`, `ci / postgres`, `ci / frontend` | 1 del equipo de desarrollo, distinta del autor |
+| `develop` o `hotfix/*` → `main` | Los anteriores más `ci / docker`, `ci / smoke` y `rama-origen` | Visto bueno del equipo de pruebas (comentario en el PR o acta enlazada) **y** 1 aprobación en GitHub |
+| `main` → `develop` (tras hotfix) | Los de `develop` | 1 del equipo de desarrollo |
+
+En ambas ramas el PR debe estar al día con la rama destino (*Update branch*). En `main`, además, un commit nuevo descarta las aprobaciones anteriores; en `develop` no.
+
+Un check que no aplica (por ejemplo, `ci / frontend` en un cambio solo de `backend/`) queda *skipped* y cuenta como aprobado. Los workflows están en `.github/workflows/`:
+
+| Workflow | Cuándo | Qué corre |
+|---|---|---|
+| `pr-develop.yml` | PR a `develop` | backend (pytest + Alembic), migraciones en PostgreSQL 15, build del frontend |
+| `pr-main.yml` | PR a `main` | Lo anterior, imagen Docker, smoke test y rama de origen |
+| `push-main.yml` | Push a `main` | pytest y build del frontend: red de seguridad mientras no estén activos los rulesets |
+| `e2e.yml` | Cada noche sobre `develop` y a demanda (*Actions → E2E (Playwright) → Run workflow*) | Playwright. No bloquea PR; revise la última corrida antes de un paso a producción |
+| `keepalive.yml` | Cada 10 min | Mantiene despierto el servicio gratuito de Render |
+
+### Prueba local con Docker Compose y PostgreSQL
+
+1. `cp deploy/.env.production.example deploy/.env.production` (ignorado por git) y ajuste para local:
+
+   ```ini
+   ENVIRONMENT=development
+   ALLOW_DEV_LOGIN=true
+   SECRET_KEY=<python -c "import secrets; print(secrets.token_urlsafe(48))">
+   POSTGRES_PASSWORD=iets_local
+   CORS_ORIGINS=http://127.0.0.1:8000,http://localhost:8000
+   SEED_OFFICIAL_CYCLES=true
+   FIREBASE_DB_ENABLED=false
+   ```
+
+   `FIREBASE_DB_ENABLED=false` es obligatorio en local: garantiza que ninguna corrida lea ni escriba copias de la base en Firestore.
+
+2. Levante la pila y espere a que `db`, `api` y `worker` estén `healthy` (la `api` aplica las migraciones al arrancar):
+
+   ```bash
+   docker compose --env-file deploy/.env.production up -d --build
+   docker compose --env-file deploy/.env.production ps
+   ```
+
+3. Verifique `curl http://127.0.0.1:8000/api/health`, ingrese en http://127.0.0.1:8000 con el acceso de desarrollo y corra la regresión desde `backend/`:
+
+   ```bash
+   .venv/bin/python smoke_test.py --base http://127.0.0.1:8000 --skip-network
+   ```
+
+4. Apague con `docker compose --env-file deploy/.env.production down` (agregue `-v` solo para borrar la base).
+
+### Pendientes
+
+- **Ambiente de *staging* en Render** (sin presupuesto aún). Cuando exista, `develop` desplegará allí y el equipo de pruebas validará en esa URL en lugar de en local.
+- **Aprobación directa del equipo de pruebas en GitHub.** Hoy su visto bueno es un comentario en el PR o un acta. Cuando tengan cuentas en la organización, se creará el equipo `pruebas` y se agregará como revisor obligatorio en el ruleset de `main`.
 
 ---
 

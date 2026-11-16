@@ -1,0 +1,24 @@
+# PR a develop: backend (pytest + Alembic), migraciones en PostgreSQL y
+# build del frontend, en paralelo y filtrados por ruta. Ver _checks.yml.
+# Checks obligatorios en el ruleset de develop:
+#   ci / backend   ci / postgres   ci / frontend
+name: PR a develop
+
+on:
+  pull_request:
+    branches: [develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  ci:
+    name: ci
+    uses: ./.github/workflows/_checks.yml
+    with:
+      release: false

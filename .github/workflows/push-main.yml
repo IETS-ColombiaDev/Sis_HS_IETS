@@ -1,0 +1,67 @@
+# Red de seguridad liviana en cada push a main (que despliega a Render):
+# pytest del backend y build del frontend, en paralelo. Sirve mientras los
+# rulesets no esten activos y todavia se pueda empujar directo a main.
+# No es un check obligatorio: los PR ya pasan por pr-main.yml.
+name: Push a main
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "24"
+  PYTEST_VERSION: "9.1.1"
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      ENVIRONMENT: testing
+      INGEST_WORKER_ENABLED: "false"
+      SECRET_KEY: ci-push-main-secret-key-not-for-production-0123456789
+      DATABASE_URL: sqlite:///./ci_pytest.db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Dependencias
+        run: pip install -r requirements.txt "pytest==${PYTEST_VERSION}"
+      - name: Pruebas unitarias
+        run: python -m pytest -q
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build

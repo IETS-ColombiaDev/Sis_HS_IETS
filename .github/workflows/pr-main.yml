@@ -1,0 +1,42 @@
+# PR a main (lo que se fusiona aqui despliega a produccion en Render):
+# lo mismo que en develop, mas la imagen Docker, el smoke test y la regla de
+# origen (solo develop o hotfix/*). Todo en paralelo. Ver _checks.yml.
+# Checks obligatorios en el ruleset de main:
+#   rama-origen   ci / backend   ci / postgres   ci / frontend
+#   ci / docker   ci / smoke
+name: PR a main
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  rama-origen:
+    name: rama-origen
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Solo develop o hotfix/* pueden entrar a main
+        env:
+          ORIGEN: ${{ github.head_ref }}
+        run: |
+          case "$ORIGEN" in
+            develop|hotfix/*) echo "Rama de origen permitida: $ORIGEN" ;;
+            *)
+              echo "::error::A main solo entran PR desde develop o hotfix/*; este viene de '$ORIGEN'. Abra el PR contra develop (ver README, seccion Desarrollo y contribucion)."
+              exit 1 ;;
+          esac
+
+  ci:
+    name: ci
+    uses: ./.github/workflows/_checks.yml
+    with:
+      release: true

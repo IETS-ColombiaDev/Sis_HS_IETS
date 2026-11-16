@@ -1,28 +1,33 @@
 # ============================================================================
-#  CI del Sistema de Escaneo de Horizonte del IETS (fase 0, P0-2)
+#  Verificaciones compartidas (workflow reutilizable)
 # ============================================================================
-# En cada push a main y en cada pull request:
-#   backend   pytest + alembic upgrade/check sobre SQLite vacia
-#   postgres  migraciones Alembic reales contra PostgreSQL 15 (vacia y heredada)
-#   frontend  npm ci + npm run build (publica dist como artefacto)
-#   e2e       Playwright (chromium) contra el backend con SQLite temporal
-#   smoke     uvicorn + smoke_test.py --skip-network
-#   docker    build de la imagen (sin push) y validacion de docker-compose.yml
+# Lo llaman pr-develop.yml (release: false) y pr-main.yml (release: true).
+# No se dispara solo. Los nombres de los checks quedan como "ci / <job>",
+# que son los que se marcan como obligatorios en los rulesets.
+#
+#   cambios   decide que jobs corren segun las rutas tocadas en el PR
+#   backend   pytest + Alembic (upgrade, check, downgrade) sobre SQLite
+#   postgres  migraciones reales contra PostgreSQL 15 (vacia y heredada)
+#   frontend  npm ci + npm run build
+#   docker    (solo release) build de la imagen y validacion de compose
+#   smoke     (solo release) uvicorn + SPA compilada + smoke_test.py
+#
+# Un job que no corre por el filtro de rutas queda "skipped", y GitHub cuenta
+# un check skipped como aprobado: el ruleset no se queda esperando.
 # ============================================================================
-name: CI
+name: checks
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-  workflow_dispatch:
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  workflow_call:
+    inputs:
+      release:
+        description: "true en los PR a main: agrega docker y smoke"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+  pull-requests: read
 
 env:
   PYTHON_VERSION: "3.12"
@@ -31,10 +36,42 @@ env:
 
 jobs:
   # ------------------------------------------------------------------------ #
-  backend:
-    name: Backend (pytest + Alembic)
+  cambios:
+    name: cambios
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 3
+    outputs:
+      backend: ${{ steps.filtro.outputs.backend }}
+      frontend: ${{ steps.filtro.outputs.frontend }}
+      app: ${{ steps.filtro.outputs.app }}
+    steps:
+      # En pull_request el filtro usa la API de GitHub: no necesita checkout.
+      - uses: dorny/paths-filter@v3
+        id: filtro
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/**'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/**'
+            app:
+              - 'backend/**'
+              - 'frontend/**'
+              - 'Dockerfile'
+              - '.dockerignore'
+              - 'docker-compose.yml'
+              - 'deploy/**'
+              - '.github/workflows/**'
+
+  # ------------------------------------------------------------------------ #
+  backend:
+    name: backend
+    needs: cambios
+    if: needs.cambios.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: backend
@@ -51,9 +88,7 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - name: Dependencias
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt "pytest==${PYTEST_VERSION}"
+        run: pip install -r requirements.txt "pytest==${PYTEST_VERSION}"
       - name: Pruebas unitarias
         run: python -m pytest -q
       - name: Alembic sobre SQLite vacia (upgrade, deriva y downgrade)
@@ -65,9 +100,11 @@ jobs:
 
   # ------------------------------------------------------------------------ #
   postgres:
-    name: Migraciones en PostgreSQL 15
+    name: postgres
+    needs: cambios
+    if: needs.cambios.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 8
     defaults:
       run:
         working-directory: backend
@@ -98,9 +135,7 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - name: Dependencias
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
       - name: Base vacia -> created, luego current (idempotente)
         env:
           DATABASE_URL: ${{ env.PG_BASE }}/iets_ci
@@ -144,9 +179,11 @@ jobs:
 
   # ------------------------------------------------------------------------ #
   frontend:
-    name: Frontend (build)
+    name: frontend
+    needs: cambios
+    if: needs.cambios.outputs.frontend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 6
     defaults:
       run:
         working-directory: frontend
@@ -159,118 +196,14 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --no-audit --no-fund
       - run: npm run build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist
-          retention-days: 3
-
-  # ------------------------------------------------------------------------ #
-  e2e:
-    name: E2E (Playwright)
-    runs-on: ubuntu-latest
-    needs: frontend
-    timeout-minutes: 30
-    env:
-      # playwright.config.js, modo autocontenido: levanta uvicorn en ../backend
-      # con SQLite temporal, dev-login y sin worker de ingesta.
-      E2E_CHANNEL: chromium
-      E2E_PYTHON: python
-      ADMIN_EMAILS: admin@iets.org.co
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - name: Dependencias del backend
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: Dependencias del frontend
-        working-directory: frontend
-        run: npm ci --no-audit --no-fund
-      - uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist
-      - name: Navegador
-        working-directory: frontend
-        run: npx playwright install --with-deps chromium
-      - name: Pruebas E2E
-        working-directory: frontend
-        run: npx playwright test
-      - name: Reporte de Playwright
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-report
-          path: |
-            frontend/e2e-report
-            frontend/test-results
-          retention-days: 7
-
-  # ------------------------------------------------------------------------ #
-  smoke:
-    name: Regresion de extremo a extremo (smoke_test)
-    runs-on: ubuntu-latest
-    needs: frontend
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: backend
-    env:
-      ENVIRONMENT: development
-      ALLOW_DEV_LOGIN: "true"
-      ADMIN_EMAILS: admin@iets.org.co
-      INGEST_WORKER_ENABLED: "false"
-      SECRET_KEY: ci-smoke-secret-key-not-for-production-0123456789
-      DATABASE_URL: sqlite:///./ci_smoke.db
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - name: Dependencias
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist
-      - name: Migrar y levantar la API
-        run: |
-          python -m app.migrations
-          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > uvicorn.log 2>&1 &
-          for i in $(seq 1 90); do
-            if curl -fsS http://127.0.0.1:8000/api/health; then echo; exit 0; fi
-            sleep 2
-          done
-          echo "La API no respondio en /api/health"; cat uvicorn.log; exit 1
-      - name: La SPA se sirve desde dist
-        run: |
-          curl -fsS http://127.0.0.1:8000/ > index.html
-          grep -qi 'id="root"' index.html
-      - name: smoke_test.py
-        run: python smoke_test.py --base http://127.0.0.1:8000 --skip-network
-      - name: Log de uvicorn
-        if: always()
-        run: cat uvicorn.log || true
 
   # ------------------------------------------------------------------------ #
   docker:
-    name: Imagen Docker (build sin push)
+    name: docker
+    needs: cambios
+    if: inputs.release && needs.cambios.outputs.app == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - name: Validar docker-compose.yml
@@ -302,3 +235,62 @@ jobs:
           docker run --rm -e SECRET_KEY=ci-docker-secret-key-not-for-production-0123456789 \
             iets-horizonte:ci python -m app.cli check-config
           docker run --rm iets-horizonte:ci test -f /app/frontend/dist/index.html
+
+  # ------------------------------------------------------------------------ #
+  # Compila el frontend por su cuenta (en vez de esperar al job frontend) para
+  # correr en paralelo con todo lo demas.
+  smoke:
+    name: smoke
+    needs: cambios
+    if: inputs.release && needs.cambios.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      ENVIRONMENT: development
+      ALLOW_DEV_LOGIN: "true"
+      ADMIN_EMAILS: admin@iets.org.co
+      INGEST_WORKER_ENABLED: "false"
+      SECRET_KEY: ci-smoke-secret-key-not-for-production-0123456789
+      DATABASE_URL: sqlite:///./ci_smoke.db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Dependencias del backend
+        working-directory: backend
+        run: pip install -r requirements.txt
+      - name: Compilar el frontend
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Migrar y levantar la API
+        working-directory: backend
+        run: |
+          python -m app.migrations
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > uvicorn.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8000/api/health; then echo; exit 0; fi
+            sleep 2
+          done
+          echo "La API no respondio en /api/health"; cat uvicorn.log; exit 1
+      - name: La SPA se sirve desde dist
+        working-directory: backend
+        run: |
+          curl -fsS http://127.0.0.1:8000/ > index.html
+          grep -qi 'id="root"' index.html
+      - name: smoke_test.py
+        working-directory: backend
+        run: python smoke_test.py --base http://127.0.0.1:8000 --skip-network
+      - name: Log de uvicorn
+        if: always()
+        working-directory: backend
+        run: cat uvicorn.log || true

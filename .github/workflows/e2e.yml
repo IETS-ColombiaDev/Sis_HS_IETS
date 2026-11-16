@@ -1,0 +1,74 @@
+# E2E con Playwright. Fuera de los PR (no bloquea fusiones):
+#   - Manual: Actions > E2E (Playwright) > Run workflow, eligiendo la rama.
+#   - Nocturna: todos los dias a las 02:00 de Bogota (07:00 UTC) sobre develop.
+# playwright.config.js levanta uvicorn con SQLite temporal y sirve frontend/dist.
+# DEBUG=pw:webserver muestra en el log el arranque de uvicorn, que es donde se
+# quedaban colgadas las corridas anteriores (30 min hasta cancelarse).
+name: E2E (Playwright)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 7 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "24"
+
+jobs:
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      E2E_CHANNEL: chromium
+      E2E_PYTHON: python
+      ADMIN_EMAILS: admin@iets.org.co
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # La corrida programada usa el archivo de main (rama por defecto),
+          # pero prueba develop, que es lo proximo a salir.
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Dependencias del backend
+        run: pip install -r backend/requirements.txt
+      - name: Dependencias y build del frontend
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Navegador
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Pruebas E2E
+        working-directory: frontend
+        env:
+          DEBUG: pw:webserver
+        run: npx playwright test
+      - name: Reporte de Playwright
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            frontend/e2e-report
+            frontend/test-results
+          if-no-files-found: ignore
+          retention-days: 7

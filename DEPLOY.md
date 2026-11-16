@@ -356,18 +356,18 @@ Para una instalación de un solo servidor con SQLite (sin Docker ni PostgreSQL):
 
 ## Integración continua
 
-`.github/workflows/ci.yml` corre en cada push a `main` y en cada pull request:
+Los jobs viven en `.github/workflows/_checks.yml` y los llaman `pr-develop.yml` (PR a `develop`: `backend`, `postgres`, `frontend`) y `pr-main.yml` (PR a `main`: los anteriores más `docker`, `smoke` y `rama-origen`). `push-main.yml` corre `pytest` y el build en cada push a `main`, y la E2E corre aparte en `e2e.yml` (nocturna sobre `develop` y a demanda). Flujo de ramas, checks obligatorios y aprobaciones: README, sección *Desarrollo y contribución*.
 
 | Job | Qué verifica |
 |---|---|
 | `backend` | `pytest` completo; `alembic upgrade head`, `alembic check` (deriva), `downgrade base` y `upgrade` de nuevo sobre SQLite vacía |
 | `postgres` | Con un servicio `postgres:15`: base vacía (`created` → `current`), base heredada creada con `create_all` (`stamped`), `alembic check` e índices GIN `pg_trgm` presentes |
-| `frontend` | `npm ci` + `npm run build`; publica `dist` como artefacto |
-| `e2e` | `npx playwright install --with-deps chromium` y `npx playwright test` con `E2E_CHANNEL=chromium` (modo autocontenido de `playwright.config.js`: uvicorn con SQLite temporal sirviendo `dist`) |
-| `smoke` | Migra, levanta uvicorn con SQLite temporal y ejecuta `smoke_test.py --skip-network` |
+| `frontend` | `npm ci` + `npm run build` |
+| `e2e` (`e2e.yml`) | `npx playwright install --with-deps chromium` y `npx playwright test` con `E2E_CHANNEL=chromium` y `DEBUG=pw:webserver` (modo autocontenido de `playwright.config.js`: uvicorn con SQLite temporal sirviendo `dist`); límite de 15 min y reporte siempre |
+| `smoke` | Compila el frontend, migra, levanta uvicorn con SQLite temporal y ejecuta `smoke_test.py --skip-network` |
 | `docker` | Valida `docker-compose.yml` (`config`), construye la imagen sin publicarla y comprueba que rechaza una `SECRET_KEY` insegura, que corre como UID 10001 y que incluye `dist` |
 
-Proteja la rama `main` exigiendo que estos jobs pasen antes de fusionar (criterio de aceptación de la fase 0).
+Los rulesets de `develop` y `main` exigen estos checks (con el nombre `ci / <job>`) antes de fusionar (criterio de aceptación de la fase 0).
 
 ## Limitaciones conocidas
 
