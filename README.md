@@ -608,14 +608,14 @@ El sistema implementa 5 perfiles definidos en `backend/app/rbac.py`:
 
 Nadie hace `push` directo ni `force push` a `main` ni a `develop`. Todos los PR se fusionan con **Create a merge commit** (no *squash* ni *rebase*), para que `develop` y `main` compartan historia.
 
-**Hotfix:** PR `hotfix/<descripcion>` → `main` (mismos checks y aprobaciones que un paso a producción). Al fusionarlo, abra de inmediato un PR **`main` → `develop`** (`chore(hotfix): pasa <descripcion> a develop`); sin eso, el siguiente PR `develop` → `main` queda bloqueado por estar desactualizado.
+**Hotfix:** PR `hotfix/<descripcion>` → `main` (mismos checks y aprobaciones que un paso a producción). Al fusionarlo, abra de inmediato un PR **`main` → `develop`** (`chore: pasa hotfix <descripcion> a develop`); sin eso, el siguiente PR `develop` → `main` queda bloqueado por estar desactualizado.
 
 **Paso a producción:** pruebe `develop` en local con Docker (abajo), abra el PR `develop` → `main`, diligencie la sección *Paso a producción* de la [plantilla](.github/pull_request_template.md) y espere el visto bueno del equipo de pruebas.
 
 ### Nombres de rama y commits
 
 - **Rama:** `<nombre>_<tipo>_<tarea>`, en minúscula y sin tildes. Ej.: `valery_feat_rf02`, `valery_fix_integracion`, `valery_chore_ci_flujo`. Los hotfix usan `hotfix/<descripcion>`.
-- **Commit y título del PR:** `<tipo>(<tarea>): descripción`, en español, en presente, sin punto final, máximo 72 caracteres. Ej.: `feat(rf02): postulación con tres campos obligatorios`. El cuerpo, opcional, explica el porqué.
+- **Commit y título del PR:** `<tipo>: descripción`, sin paréntesis después del tipo, en español, en presente, sin punto final, máximo 72 caracteres. Ej.: `feat: postulación con tres campos obligatorios (RF-02)`. El RF, RNF u observación puede ir al final de la descripción o en el cuerpo, que es opcional y explica el porqué.
 - **Tipos:** `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `ci`, `build`, `chore`, `revert`.
 - No se aceptan mensajes como `UT`, `UT_Changes`, `Update` o `[fix] ...`.
 

@@ -1,5 +1,5 @@
 <!--
-Título del PR con el mismo formato del commit: <tipo>(<tarea>): descripción
+Título del PR con el mismo formato del commit: <tipo>: descripción
 Rama personal -> develop.  develop o hotfix/* -> main.
 Ver README.md, sección "Desarrollo y contribución".
 -->
@@ -39,7 +39,7 @@ Ver README.md, sección "Desarrollo y contribución".
 
 ## Checklist
 
-- [ ] La rama sigue el formato `<nombre>_<tipo>_<tarea>` y los commits `<tipo>(<tarea>): descripción`
+- [ ] La rama sigue el formato `<nombre>_<tipo>_<tarea>` y los commits `<tipo>: descripción`
 - [ ] El CI está en verde
 - [ ] Pruebas nuevas o ajustadas en `backend/tests` (o justifico por qué no aplica)
 - [ ] Migración de Alembic incluida si cambia el modelo de datos
