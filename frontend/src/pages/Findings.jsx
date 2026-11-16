@@ -20,7 +20,7 @@ import { Input, Textarea, Select } from "../components/Field";
 import Modal from "../components/Modal";
 import { LoadingBlock } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
-import { PERM, SCREENING_QUEUE_THRESHOLD } from "../constants/methodology";
+import { PERM } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
 
 const HORIZONS = ["emergente", "transicional", "inminente"];
@@ -251,7 +251,7 @@ export default function Findings() {
         step="priorizacion"
         title="Señales capturadas"
         titleHint={GLOSSARY.senal}
-        purpose={`Cola de cribado: revise, siga o descarte lo que trae la vigilancia. El puntaje de cribado (destaque desde ${SCREENING_QUEUE_THRESHOLD}) solo ordena la cola; la priorización oficial es la matriz P1-P6 del ciclo.`}
+        purpose={`Cola de cribado: revise, siga o descarte lo que trae la vigilancia. El puntaje de cribado (destaque desde ${stats?.threshold ?? 70}) solo ordena la cola; la priorización oficial es la matriz P1-P6 del ciclo.`}
         actions={
           <div className="fb-toolbar">
             <Button variant="secondary" onClick={() => navigate("/bandeja-entrada")}>
@@ -291,7 +291,7 @@ export default function Findings() {
           { label: "Nuevas", value: counts.nuevo || 0, color: counts.nuevo ? "#6366F1" : undefined, hint: "Señales que nadie ha revisado todavía.", testId: "findings-kpi-nuevas" },
           { label: "En revisión", value: counts.revisado || 0, hint: "Señales ya leídas por el equipo, pendientes de decidir si se siguen." },
           { label: "A seguir", value: counts.priorizado || 0, color: "#10B981", hint: "Marcadas para seguimiento (estado 'priorizado'). No es la priorización oficial P1-P6." },
-          { label: "Cribado alto", value: stats?.high_priority || 0, sub: `>= ${SCREENING_QUEUE_THRESHOLD}`, color: "#EF4444", hint: GLOSSARY.fb_cribado },
+          { label: "Cribado alto", value: stats?.high_priority || 0, sub: `>= ${stats?.threshold ?? 70}`, color: "#EF4444", hint: GLOSSARY.fb_cribado },
         ]}
       />
 

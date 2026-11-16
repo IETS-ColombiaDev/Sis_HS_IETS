@@ -70,18 +70,20 @@ def test_effective_profile_derives_keywords_from_access_path():
 def test_save_options_validates(api):
     with api.db() as db:
         with pytest.raises(ValueError):
-            source_profile.save_options(db, {"priority_level": [{"value": "¡!", "label": "X"}]})
+            source_profile.save_options(db, {"source_level": [{"value": "¡!", "label": "X"}]})
         with pytest.raises(ValueError):
-            source_profile.save_options(db, {"priority_level": []})
+            source_profile.save_options(db, {"source_level": []})
         with pytest.raises(ValueError):
-            source_profile.save_options(db, {"priority_level": [{"value": "alta", "label": ""}]})
+            source_profile.save_options(db, {"source_level": [{"value": "primaria", "label": ""}]})
         with pytest.raises(ValueError):
             source_profile.save_options(db, {"tech_type": [{"value": "DM", "label": "a"}, {"value": "dm", "label": "b"}]})
         out = source_profile.save_options(
             db,
-            {"priority_level": [{"value": "Muy urgente", "label": "Urgente", "rank": 1}, {"value": "alta", "label": "Alta", "rank": 2}]},
+            {"source_level": [{"value": "Muy cercana", "label": "Muy cercana"}, {"value": "primaria", "label": "Primaria"}]},
         )
-        assert out["priority_level"][0]["value"] == "muy_urgente"
+        assert out["source_level"][0]["value"] == "muy_cercana"
+        # La priorizacion de fuentes se retiro: ya no es una lista editable.
+        assert "priority_level" not in out
 
 
 # --------------------------------------------------------------------------- #
@@ -244,7 +246,6 @@ def test_scrape_source_uses_entry_url_fallback_and_profile(api, monkeypatch):
         url="https://site.test/caida",
         connector="html",
         connector_config={},
-        priority_level="alta",
         entry_urls=["https://site.test/pipeline"],
         scan_profile={"web_search": False, "ocr": False, "max_pages": 1},
     )
@@ -265,10 +266,9 @@ def test_scrape_source_uses_entry_url_fallback_and_profile(api, monkeypatch):
 # --------------------------------------------------------------------------- #
 def test_source_options_endpoint_and_dropdown_validation(api):
     body = api.get("/api/sources/options", role="evaluador_tecnico").json()
-    values = {o["value"] for o in body["options"]["priority_level"]}
-    assert {"alta", "media", "baja", "revisar"} <= values
+    assert "priority_level" not in body["options"]
     sid = api.add_source(connector="html", connector_config={})
-    assert api.put(f"/api/sources/{sid}", json={"priority_level": "altisima"}).status_code == 422
+    assert api.put(f"/api/sources/{sid}", json={"source_level": "altisima"}).status_code == 422
     assert api.put(f"/api/sources/{sid}", json={"tech_types": ["XX"]}).status_code == 422
     assert api.put(f"/api/sources/{sid}", json={"entry_urls": ["ftp://x"]}).status_code == 422
     ok = api.put(
@@ -294,11 +294,12 @@ def test_source_options_endpoint_and_dropdown_validation(api):
 def test_config_source_options_and_web_search_rbac(api):
     assert api.get("/api/config/source-options", role="evaluador_tecnico").status_code == 403
     opts = api.get("/api/config/source-options").json()
-    opts["priority_level"].append({"value": "urgente", "label": "Urgente", "rank": 1})
+    assert "priority_level" not in opts
+    opts["source_level"].append({"value": "cuaternaria", "label": "Cuaternaria"})
     assert api.put("/api/config/source-options", json=opts).status_code == 200
-    assert "urgente" in {o["value"] for o in api.get("/api/sources/options").json()["options"]["priority_level"]}
+    assert "cuaternaria" in {o["value"] for o in api.get("/api/sources/options").json()["options"]["source_level"]}
     reset = api.post("/api/config/source-options/reset").json()
-    assert "urgente" not in {o["value"] for o in reset["priority_level"]}
+    assert "cuaternaria" not in {o["value"] for o in reset["source_level"]}
 
     cfg = api.get("/api/config/web-search").json()
     assert cfg["engines"] and cfg["terms_by_category"]

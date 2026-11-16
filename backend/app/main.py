@@ -102,28 +102,12 @@ def load_runtime_config() -> None:
 
 
 def backfill_screening_scores() -> None:
-    """Recalcula el puntaje de cribado en senales existentes (idempotente)."""
-    from .models import Finding
-    from .priority import compute_screening_score
+    """Recalcula el puntaje de cribado con los pesos vigentes (idempotente)."""
+    from .priority import rescore_all
 
     db = SessionLocal()
     try:
-        rows = db.query(Finding).all()
-        changed = False
-        for f in rows:
-            score = compute_screening_score(
-                horizon=f.horizon,
-                technology_type=f.technology_type,
-                phase=f.phase,
-                therapeutic_area=f.therapeutic_area,
-                summary=f.summary,
-                technology=f.technology,
-                title=f.title,
-            )
-            if f.screening_score != score:
-                f.screening_score = score
-                changed = True
-        if changed:
+        if rescore_all(db):
             db.commit()
     finally:
         db.close()
@@ -210,6 +194,34 @@ def _truthy_env(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _recover_orphan_jobs() -> None:
+    """Al arrancar un proceso unico con SQLite, ningun job puede estar corriendo.
+
+    Los que quedaron `ejecutando` son de un proceso que murio (despliegue, falta
+    de memoria): vuelven a la cola ya, no tras 30 minutos. Sin esto la pantalla
+    mostraba «Vigilancia en curso» con 0 procesadas hasta que vencia ese plazo.
+    """
+    from .database import IS_SQLITE
+
+    try:
+        single = int(os.environ.get("WEB_CONCURRENCY", "1") or 1) <= 1
+    except ValueError:
+        single = False
+    if not (IS_SQLITE and single):
+        return
+    from .ingest_service import recover_stale
+
+    db = SessionLocal()
+    try:
+        n = recover_stale(db, minutes=0)
+        if n:
+            log.warning("%s job(s) huerfano(s) de un proceso anterior volvieron a la cola.", n)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("No se pudieron recuperar los jobs huerfanos: %s", exc)
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     assert_safe_configuration()
@@ -246,7 +258,12 @@ async def lifespan(app: FastAPI):
             "FIREBASE_SERVICE_ACCOUNT_KEY ausente: la base SQLite no se persistira en Firestore."
         )
     try:
-        provisioned = firebase_db.ensure_database(probe_write=False)
+        # Con FIREBASE_DB_ENABLED=false (servidores locales y de prueba) no se toca
+        # Firestore en absoluto, ni siquiera para verificar o crear la base.
+        if getattr(settings, "firebase_db_enabled", True):
+            provisioned = firebase_db.ensure_database(probe_write=False)
+        else:
+            provisioned = {"ok": False, "reason": "deshabilitado"}
         if provisioned.get("ok"):
             log.info(
                 "Base Firestore lista: %s/%s (creada=%s).",
@@ -254,7 +271,7 @@ async def lifespan(app: FastAPI):
                 provisioned.get("database"),
                 provisioned.get("created"),
             )
-        elif provisioned.get("reason") not in {"pytest", "sin_credenciales"}:
+        elif provisioned.get("reason") not in {"pytest", "sin_credenciales", "deshabilitado"}:
             log.warning("No se pudo preparar Firestore hs-iets: %s", provisioned)
     except Exception as exc:  # noqa: BLE001
         log.warning("No se pudo crear/verificar la base Firestore hs-iets: %s", exc)
@@ -294,6 +311,7 @@ async def lifespan(app: FastAPI):
             log.warning("No se pudo publicar la base en Firestore al arrancar: %s", exc)
 
     threading.Thread(target=_boot_push, name="firebase-boot-push", daemon=True).start()
+    _recover_orphan_jobs()
     start_worker()
     yield
     firebase_db.flush_on_shutdown()

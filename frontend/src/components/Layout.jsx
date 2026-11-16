@@ -18,6 +18,8 @@ import OnboardingGuide, { ONBOARDING_KEY } from "./OnboardingGuide";
 import NavAssistant from "./NavAssistant";
 import { useToast } from "./Toast";
 import { useBackup } from "../backup/BackupContext";
+import { ScanDock } from "./ScanProgress";
+import { useScan } from "../scan/ScanContext";
 import "./layout.css";
 
 function Sidebar({ open, onClose }) {
@@ -588,6 +590,8 @@ export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const scan = useScan();
 
   useEffect(() => {
     if (!user || !justLoggedIn) return;
@@ -621,6 +625,7 @@ export default function Layout({ children }) {
         </main>
       </div>
       <NavAssistant onOpenGuide={() => setGuideOpen(true)} />
+      {pathname !== "/vigilancia" && <ScanDock progress={scan.progress} onOpen={() => navigate("/vigilancia")} />}
       {guideOpen ? <OnboardingGuide open onClose={closeGuide} /> : null}
     </div>
   );

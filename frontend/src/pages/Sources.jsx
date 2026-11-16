@@ -23,6 +23,7 @@ import { Input, Textarea, Select } from "../components/Field";
 import { LoadingBlock } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
 import LinkPreview from "../components/LinkPreview";
+import { UrlOriginTag } from "../components/UrlOrigin";
 import MatrixImportModal from "../components/MatrixImportModal";
 import SourceMatrixEditor, {
   FALLBACK_OPTIONS,
@@ -243,6 +244,8 @@ export default function Sources() {
       contrast: active.filter((s) => s.is_contrast).length,
       governors: active.filter((s) => s.access_level === "A" || s.access_level === "B").length,
       primarias: active.filter((s) => s.source_level === "primaria").length,
+      urlMatriz: active.filter((s) => s.url_origin === "matriz").length,
+      urlDistinta: active.filter((s) => s.url_origin && s.url_origin !== "matriz").length,
       buscables: active.filter((s) => s.scrape_enabled && s.scan_profile?.web_search !== false).length,
     }),
     [active]
@@ -699,6 +702,12 @@ export default function Sources() {
           { label: "Ingesta activa", value: stats.vigiladas, hint: GLOSSARY.fb_ingesta },
           { label: "Fuentes de contraste", value: stats.contrast, sub: "Control de cobertura", hint: GLOSSARY.fb_contraste },
           { label: "Fuentes primarias", value: stats.primarias, hint: GLOSSARY.fb_nivel_fuente },
+          {
+            label: "URL original de la matriz",
+            value: stats.urlMatriz,
+            sub: stats.urlDistinta ? `${stats.urlDistinta} con otra URL (ver etiqueta)` : "Todas usan la URL del Excel",
+            hint: "Fuentes cuya URL principal es la que reporta la matriz EH (Excel). Las demás llevan una etiqueta que dice por qué usan otra: API oficial, página específica o URL de la matriz que no responde.",
+          },
           { label: "Con búsqueda web", value: stats.buscables, sub: meta.web_search?.enabled === false ? "Apagada en Parámetros de fuentes" : "IA + motores en el dominio", hint: GLOSSARY.fb_flujo_busqueda },
         ]}
       />
@@ -813,6 +822,7 @@ export default function Sources() {
                             {s.url.replace(/^https?:\/\//, "").slice(0, 56)}
                           </a>
                         )}
+                        <UrlOriginTag source={s} />
                         <p>{s.description?.slice(0, 140) || "Sin descripción."}</p>
                         <div className="registry-card-stats">
                           <span title={GLOSSARY.fb_adaptador}>{s.connector}</span>
@@ -1240,6 +1250,17 @@ export default function Sources() {
               </div>
             )}
             {detailSource.catalog_note && <p className="catalog-note">{detailSource.catalog_note}</p>}
+            <div className="url-origin-detail">
+              <strong>URL principal:</strong>{" "}
+              {detailSource.url ? <a href={detailSource.url} target="_blank" rel="noreferrer">{detailSource.url}</a> : "—"}
+              <UrlOriginTag source={detailSource} detailed />
+              {detailSource.matrix_url && detailSource.url_origin !== "matriz" && (
+                <p style={{ margin: "4px 0 0" }}>
+                  <strong>URL original de la matriz:</strong>{" "}
+                  <a href={detailSource.matrix_url} target="_blank" rel="noreferrer">{detailSource.matrix_url}</a>
+                </p>
+              )}
+            </div>
             <div className="fb-toolbar" style={{ marginBottom: 8 }}>
               {detailSource.url && (
                 <a href={detailSource.url} target="_blank" rel="noreferrer">

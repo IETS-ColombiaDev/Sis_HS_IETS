@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # --------------------------------------------------------------------------- #
@@ -241,6 +241,11 @@ class SourceOut(SourceBase):
     last_probe_at: datetime | None = None
     last_probe_detail: dict | None = None
     next_review_due: datetime | None = None
+    # Procedencia de la URL frente a la matriz EH (catalog_service.url_provenance).
+    url_origin: str = ""
+    url_origin_label: str = ""
+    matrix_url: str = ""
+    url_note: str = ""
 
 
 # --------------------------------------------------------------------------- #
@@ -902,6 +907,29 @@ class AssignToCycleOut(BaseModel):
     rejected: list[str] = []
 
 
+class StagingDiscardIn(BaseModel):
+
+    technology_ids: list[int] = Field(min_length=1)
+    reason: str = Field(min_length=5, max_length=1000)
+
+    @field_validator("reason")
+    @classmethod
+    def _reason_not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) < 5:
+            raise ValueError("El motivo del descarte es obligatorio (mínimo 5 caracteres).")
+        return value
+
+
+class StagingRestoreIn(BaseModel):
+    technology_ids: list[int] = Field(min_length=1)
+
+
+class StagingBatchOut(BaseModel):
+    affected: int
+    rejected: list[str] = []
+
+
 class ExclusionIn(BaseModel):
     reason_code: str
     note: str = ""
@@ -916,6 +944,7 @@ class StagingStats(BaseModel):
     without_tech_type: int = 0
     # RF-002: senales sin asignar que otra fuente tambien reporta.
     corroborated: int = 0
+    discarded: int = 0
 
 
 # =========================================================================== #
@@ -1302,17 +1331,18 @@ class RawPreviewOut(BaseModel):
 
 
 class SubmissionPublicIn(BaseModel):
-    commercial_name: str
-    inn_name: str
-    mechanism: str
-    manufacturer: str
+    # RF02 - Requerimiento replanteado por pruebas del equipo metodológico (nov 2026)
+    commercial_name: str = ""
+    inn_name: str = ""
+    mechanism: str = ""
+    manufacturer: str = ""
     indication: str
-    development_phase: str
+    development_phase: str = ""
     evidence_links: list[str] = []
     has_conflict: bool = False
     conflict_statement: str = ""
     coi_accepted: bool = False
-    submitter_name: str
+    submitter_name: str = ""
     submitter_email: str
     submitter_org: str = ""
     recaptcha_token: str = ""

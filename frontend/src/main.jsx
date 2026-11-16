@@ -10,6 +10,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import { RealtimeProvider } from "./realtime/RealtimeContext";
 import { ToastProvider } from "./components/Toast";
 import { BackupProvider } from "./backup/BackupContext";
+import { ScanProvider } from "./scan/ScanContext";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -18,7 +19,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <AuthProvider>
           <RealtimeProvider>
             <BackupProvider>
-              <App />
+              <ScanProvider>
+                <App />
+              </ScanProvider>
             </BackupProvider>
           </RealtimeProvider>
         </AuthProvider>

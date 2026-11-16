@@ -11,8 +11,10 @@ Vive en memoria porque el worker corre en el mismo proceso que la API. Si el
 proceso se reinicia se pierde el detalle, no el estado: el job sigue en la base
 y `recover_stale` lo devuelve a la cola.
 
-Las funciones de este modulo nunca lanzan: un fallo al informar el progreso no
-puede tumbar una corrida.
+Las funciones de este modulo nunca lanzan por un fallo propio: un error al
+informar el progreso no puede tumbar una corrida. La unica excepcion es
+deliberada: si el worker cerro el job por tiempo, `stage`, `attempt` y
+`page_visited` lanzan `JobAborted` para que el hilo suelte la fuente.
 """
 from __future__ import annotations
 
@@ -60,7 +62,34 @@ ACCESS_VIA_LABELS = {
 _lock = threading.Lock()
 _state: dict[int, dict] = {}
 _current: contextvars.ContextVar[int | None] = contextvars.ContextVar("scan_progress_source", default=None)
+# Senal de corte del job en curso (tiempo maximo agotado). La arma el worker.
+_abort: contextvars.ContextVar[threading.Event | None] = contextvars.ContextVar("scan_progress_abort", default=None)
 MAX_EVENTS = 12
+
+
+class JobAborted(BaseException):
+    """El job supero su tiempo maximo. Hereda de BaseException a proposito: los
+    `except Exception` del rastreador (que siguen con la pagina siguiente) no lo
+    atrapan, asi el hilo abandona la fuente en el siguiente paso que informe."""
+
+
+def arm(event: threading.Event) -> contextvars.Token:
+    """Asocia a este hilo la senal de corte de su job."""
+    return _abort.set(event)
+
+
+def disarm(token: contextvars.Token) -> None:
+    try:
+        _abort.reset(token)
+    except (ValueError, RuntimeError):
+        _abort.set(None)
+
+
+def check_abort() -> None:
+    """Lanza JobAborted si el job de este hilo ya fue cerrado por tiempo."""
+    event = _abort.get()
+    if event is not None and event.is_set():
+        raise JobAborted("Tiempo maximo de la fuente agotado")
 
 
 def _now() -> str:
@@ -117,6 +146,8 @@ def start(source_id: int, job_id: int | None, *, connector: str = "") -> None:
 
 def stage(stage_name: str, detail: str = "", *, source_id: int | None = None, **fields) -> None:
     """Mueve la fuente a una etapa y deja una linea en su bitacora corta."""
+    if source_id is None:
+        check_abort()
     sid = source_id if source_id is not None else _current.get()
     if sid is None:
         return
@@ -142,6 +173,7 @@ def stage(stage_name: str, detail: str = "", *, source_id: int | None = None, **
 
 def attempt(url: str, status: str, detail: str = "", *, route: str = "") -> None:
     """Registra un intento de acceso (URL principal, ruta de la matriz, respaldo)."""
+    check_abort()
     sid = _current.get()
     if sid is None:
         return
@@ -185,6 +217,7 @@ def accessed(via: str, http_status: int = 0, detail: str = "", *, source_id: int
 
 def page_visited(url: str, status: str, *, planned: int | None = None) -> None:
     """Una pagina mas del recorrido (llamado desde `crawl_site`)."""
+    check_abort()
     sid = _current.get()
     if sid is None:
         return

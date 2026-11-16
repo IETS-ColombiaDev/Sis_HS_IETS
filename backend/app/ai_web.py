@@ -370,6 +370,7 @@ def _parse_items(
     dropped: list[str] = []
     cited = 0
     located = 0
+    index = None  # el corpus se normaliza una vez para todas las senales
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -384,9 +385,9 @@ def _parse_items(
             if source_text:
                 # La URL precisa: la pagina o el item del corpus donde esta la cita
                 # (o el nombre), no la portada de la fuente.
-                spot = evidence_locator.locate(
-                    source_text, source_url, evidence, hints=(item.get("technology") or "", item.get("title") or "")
-                )
+                if index is None:
+                    index = evidence_locator.Index(source_text, source_url)
+                spot = index.locate(evidence, hints=(item.get("technology") or "", item.get("title") or ""))
                 if spot["url"]:
                     item["url"] = spot["url"]
                     located += 1

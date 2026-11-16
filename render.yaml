@@ -24,6 +24,10 @@ services:
         value: "true"
       - key: INGEST_WORKER_FORCE
         value: "true"
+      # Render gratuito: 0,1 CPU y 512 MB. Una fuente a la vez; con varias el
+      # proceso se quedaba sin memoria, se reiniciaba y la vigilancia quedaba en 0.
+      - key: INGEST_MAX_PARALLEL
+        value: "1"
       - key: RUN_MIGRATIONS
         value: "true"
       - key: DATABASE_URL

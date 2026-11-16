@@ -140,6 +140,28 @@ def test_invalid_links_and_email_are_explained(api):
     assert no_coi.status_code == 422
 
 
+def test_only_three_fields_plus_email_and_coi_are_mandatory(api, monkeypatch):
+    # RF02 - Requerimiento replanteado por pruebas del equipo metodológico (nov 2026).
+    monkeypatch.setattr(settings, "public_submissions_per_window", 50)
+    minimal = {
+        "inn_name": "novamab",
+        "indication": "Melanoma avanzado",
+        "evidence_links": ["https://clinicaltrials.gov/study/NCT01234567"],
+        "coi_accepted": True,
+        "submitter_email": "ana@example.org",
+    }
+    assert api.client.post("/api/public/submissions", json=minimal).status_code == 201
+    for missing in (
+        {"inn_name": ""},
+        {"indication": ""},
+        {"evidence_links": []},
+        {"submitter_email": ""},
+        {"coi_accepted": False},
+    ):
+        res = api.client.post("/api/public/submissions", json={**minimal, **missing})
+        assert res.status_code == 422, missing
+
+
 def test_accepted_submission_reaches_the_inbox_as_reactive_with_its_coi(api):
     body = _payload(has_conflict=True, conflict_statement="Consultoria pagada por el fabricante en 2025.")
     sid = api.client.post("/api/public/submissions", json=body).json()["id"]

@@ -482,16 +482,56 @@ PARAM_SEED: list[dict] = [
         "value_type": "str",
         "description": "Tokens que senalan un ensayo fase III asociado al pais.",
     },
+    # --- Cribado de la bandeja (priority.compute_screening_score) -------------
+    {"key": "screening.points_inminente", "value": "35", "value_type": "int",
+     "description": "Cribado: puntos si el horizonte de la senal es inminente."},
+    {"key": "screening.points_transicional", "value": "25", "value_type": "int",
+     "description": "Cribado: puntos si el horizonte es transicional."},
+    {"key": "screening.points_emergente", "value": "15", "value_type": "int",
+     "description": "Cribado: puntos si el horizonte es emergente."},
+    {"key": "screening.points_tech_type", "value": "12", "value_type": "int",
+     "description": "Cribado: puntos si el tipo de tecnologia esta en la lista de tipos que suman."},
+    {"key": "screening.tech_types", "value": "medicamento,dispositivo,digital", "value_type": "str",
+     "description": "Cribado: tipos de tecnologia que suman puntos (separados por coma)."},
+    {"key": "screening.points_regulatory", "value": "18", "value_type": "int",
+     "description": "Cribado: puntos si la senal menciona fase III, aprobacion o un regulador."},
+    {"key": "screening.keywords_regulatory", "value": "phase iii,phase 3,fase iii,aprob,approv,regulator,nice,fda,ema",
+     "value_type": "str",
+     "description": "Cribado: palabras que cuentan como hito regulatorio o fase III (separadas por coma)."},
+    {"key": "screening.points_trial", "value": "10", "value_type": "int",
+     "description": "Cribado: puntos si menciona fase II o ensayo (solo si no sumo el hito regulatorio)."},
+    {"key": "screening.keywords_trial", "value": "phase ii,phase 2,fase ii,ensayo,trial", "value_type": "str",
+     "description": "Cribado: palabras que cuentan como fase II o ensayo (separadas por coma)."},
+    {"key": "screening.points_area", "value": "8", "value_type": "int",
+     "description": "Cribado: puntos si la senal tiene area terapeutica."},
+    {"key": "screening.points_summary", "value": "10", "value_type": "int",
+     "description": "Cribado: puntos si el resumen es suficientemente largo."},
+    {"key": "screening.summary_min_chars", "value": "120", "value_type": "int",
+     "description": "Cribado: caracteres minimos del resumen para sumar sus puntos."},
+    {"key": "screening.points_identified", "value": "7", "value_type": "int",
+     "description": "Cribado: puntos si la tecnologia esta identificada aparte del titulo."},
+    {"key": "screening.queue_threshold", "value": "70", "value_type": "int",
+     "description": "Cribado: puntaje desde el que una senal se destaca como cribado alto."},
+    # --- Corroboracion entre fuentes (corroboration.py) ------------------------
+    {"key": "corroboration.bonus_per_source", "value": "5", "value_type": "int",
+     "description": "Puntos de orden en la bandeja por cada fuente adicional que reporta la misma tecnologia."},
+    {"key": "corroboration.bonus_max", "value": "15", "value_type": "int",
+     "description": "Tope del bono de corroboracion en la bandeja."},
+    # --- Vigilancia ------------------------------------------------------------
+    {"key": "ingest.job_timeout_minutes", "value": "20", "value_type": "int",
+     "description": (
+         "Minutos maximos que la vigilancia dedica a una fuente. Si se excede, la fuente "
+         "se cierra con error y la corrida sigue con la siguiente."
+     )},
 ]
 
 # Parametros que se sembraron alguna vez y ya no gobiernan ningun calculo. La
 # migracion los elimina de las bases existentes para que la pantalla de
 # configuracion no ofrezca perillas sin efecto.
 #
-# `screening.queue_threshold`: el destaque en la cola de cribado es una ayuda
-# visual, no una regla metodologica, y vive como constante compartida entre
-# `priority.SCREENING_QUEUE_THRESHOLD` y su equivalente en el frontend.
-RETIRED_PARAMS: tuple[str, ...] = ("screening.queue_threshold",)
+# `screening.queue_threshold` estuvo retirado; volvio en nov-2026 junto con los
+# demas pesos del cribado, porque ahora si gobierna el destaque de la bandeja.
+RETIRED_PARAMS: tuple[str, ...] = ()
 
 
 # --------------------------------------------------------------------------- #

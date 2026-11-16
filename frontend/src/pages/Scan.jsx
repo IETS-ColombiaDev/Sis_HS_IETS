@@ -20,8 +20,11 @@ import EmptyState from "../components/EmptyState";
 import { ietsTag } from "../utils/iets";
 import LinkPreview from "../components/LinkPreview";
 import { AccessReport, ScanRunSummary, SourceProgress } from "../components/ScanProgress";
+import { useScan } from "../scan/ScanContext";
+import { UrlOriginTag } from "../components/UrlOrigin";
 
 const PROGRESS_POLL_MS = 2500;
+const REPORT_POLL_MS = 15000;
 const FILTER_STATUS = { ejecutando: ["ejecutando"], pendiente: ["pendiente"], ok: ["ok", "parcial"], error: ["error"], cancelado: ["cancelado"] };
 const RUN_ORDER = { ejecutando: 0, pendiente: 1, error: 2 };
 
@@ -80,7 +83,8 @@ export default function Scan() {
   const [preview, setPreview] = useState(null);
   const [previewing, setPreviewing] = useState(false);
   const firstLoad = useRef(true);
-  const [progress, setProgress] = useState(null);
+  // El avance lo sigue ScanContext en toda la aplicación (no se pierde al cambiar de módulo).
+  const { progress, refresh: loadProgress, lastFetch } = useScan();
   const [progressFilter, setProgressFilter] = useState("");
   const [cancelling, setCancelling] = useState(false);
   const wasActive = useRef(false);
@@ -107,16 +111,6 @@ export default function Scan() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadProgress = useCallback(async () => {
-    try {
-      const { data } = await api.get("/ingest/progress");
-      setProgress(data);
-      return data;
-    } catch {
-      return null;
-    }
-  }, []);
-
   const loadReport = useCallback(async () => {
     try {
       const { data } = await api.get("/ingest/access-report");
@@ -132,13 +126,11 @@ export default function Scan() {
     loadReport();
   }, [load, loadProgress, loadReport, version]);
 
-  // Mientras haya fuentes en cola o en curso, el estado se refresca solo.
+  // En esta pantalla el avance se refresca más seguido; al terminar se recargan registro e informe.
   useEffect(() => {
     if (!progress?.active) {
       if (wasActive.current) {
         wasActive.current = false;
-        const c = progress?.counts || {};
-        toast.info(`Vigilancia terminada: ${(c.ok || 0) + (c.parcial || 0)} fuente(s) ok, ${c.error || 0} con error.`);
         load();
         loadReport();
       }
@@ -147,7 +139,7 @@ export default function Scan() {
     wasActive.current = true;
     const timer = setInterval(loadProgress, PROGRESS_POLL_MS);
     // El informe cambia más despacio: cada 15 s basta durante la corrida.
-    const reportTimer = setInterval(loadReport, 15000);
+    const reportTimer = setInterval(loadReport, REPORT_POLL_MS);
     return () => {
       clearInterval(timer);
       clearInterval(reportTimer);
@@ -320,7 +312,7 @@ export default function Scan() {
         phase="Fase 1 · Identificación"
         hint={GLOSSARY.vigilancia}
         tasks={[
-          "Priorice las fuentes de nivel A y B: ClinicalTrials, openFDA, Health Canada, EMA, PubMed y TGA.",
+          "Pulse «Ejecutar vigilancia»: corre en el servidor y puede seguir trabajando en otros módulos; la barra flotante muestra el avance y el tiempo restante.",
           "La sonda corre antes de cada corrida de contrato. Ámbar o rojo suspende esa fuente, no el resto.",
           "Las señales nuevas llegan a la bandeja de entrada; el nivel D no pisa campos ya llenados por A/B.",
         ]}
@@ -344,6 +336,7 @@ export default function Scan() {
         cancelling={cancelling}
         filter={progressFilter}
         onFilter={setProgressFilter}
+        lastFetch={lastFetch}
       />
 
       <AccessReport report={report} onReload={loadReport} />
@@ -533,6 +526,7 @@ export default function Scan() {
                             {s.url.replace(/^https?:\/\//, "").slice(0, 55)}{s.url.length > 58 ? "…" : ""}
                           </a>
                         )}
+                        <UrlOriginTag source={s} />
                         <SourceProgress row={progressBySource[s.id]} />
                       </div>
                     </div>

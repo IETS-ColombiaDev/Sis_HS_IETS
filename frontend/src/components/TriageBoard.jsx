@@ -3,19 +3,20 @@ import Button from "./Button";
 import Icon from "./Icon";
 import Tooltip from "./Tooltip";
 import ClampText from "./ClampText";
-import { SCREENING_QUEUE_THRESHOLD } from "../constants/methodology";
+import { useScreeningThreshold } from "../scan/useScreeningThreshold";
 
 /**
  * Puntaje de cribado de la senal capturada. Ordena la cola de trabajo; no es el
  * indice de priorizacion %P, que se calcula con la matriz oficial P1 a P6.
  */
 export function ScreeningScore({ score, compact = false }) {
+  const threshold = useScreeningThreshold();
   const n = Number(score) || 0;
-  const high = n >= SCREENING_QUEUE_THRESHOLD;
+  const high = n >= threshold;
   const tone = high ? "priorizado" : n >= 50 ? "revisado" : "viewer";
   return (
     <Tooltip
-      text={`Puntaje de cribado: ${n}. Ordena la cola de señales sin calificar (destaque desde ${SCREENING_QUEUE_THRESHOLD}). No es el índice %P de la matriz oficial.`}
+      text={`Puntaje de cribado: ${n}. Ordena la cola de señales sin calificar (destaque desde ${threshold}, ajustable en Configuración). No es el índice %P de la matriz oficial.`}
     >
       <Badge tone={tone}>{compact ? `Cribado ${n}` : `Cribado ${n}/100`}</Badge>
     </Tooltip>

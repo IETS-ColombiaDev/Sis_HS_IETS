@@ -1,14 +1,9 @@
-"""Tecnologias y staging: bandeja de entrada, clasificacion y asignacion al ciclo.
-
-Cubre RF03 (staging con `raw_payload`), RF04 (buzon de entrada con filtros),
-RF06 y RF07 (clasificacion obligatoria) y RF08 (asignacion al ciclo activo).
-"""
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import func, or_
+from sqlalchemy import String, cast, exists, func, or_
 from sqlalchemy.orm import Session
 
 from .. import audit, corroboration, cycle_service, evaluation_service, reliability_service, screening_service
@@ -18,6 +13,7 @@ from ..deps import get_current_user, require_permission
 from ..events import bump_state_version
 from ..methodology import CONDITIONS, EXCLUSION_REASONS, TECHNOLOGY_STATUS_LABELS
 from ..models import (
+    AuditLog,
     Cluster,
     Cycle,
     CycleTechnology,
@@ -34,6 +30,9 @@ from ..schemas import (
     AssignToCycleOut,
     CountItem,
     ExclusionIn,
+    StagingBatchOut,
+    StagingDiscardIn,
+    StagingRestoreIn,
     StagingStats,
     TechnologyOut,
     TechnologyUpdate,
@@ -114,6 +113,29 @@ def _entry_for(db: Session, cycle_id: int, technology_id: int) -> CycleTechnolog
 # --------------------------------------------------------------------------- #
 COLOMBIA_TZ = timezone(timedelta(hours=-5))
 
+STAGING_STATUS = "capturada_no_asignada"
+DISCARDED_STATUS = "excluida"  # estado de descarte existente (RF-004)
+DISCARD_ACTION = "staging:discard"
+RESTORE_ACTION = "staging:restore"
+DISCARD_REASON_PREFIX = "Tecnología ya conocida"
+
+
+def _inbox_discarded_filter():
+    """`Solo cuenta como descarte de bandeja la tecnologia excluida que no
+    fue fusionada, que nunca entro a un ciclo y que tiene `staging:discard` en la
+    bitacora.
+    """
+    return (
+        (Technology.status == DISCARDED_STATUS)
+        & Technology.merged_into_id.is_(None)
+        & ~Technology.cycle_entries.any()
+        & exists().where(
+            AuditLog.entity_type == "technologies",
+            AuditLog.action == DISCARD_ACTION,
+            AuditLog.entity_id == cast(Technology.id, String),
+        )
+    )
+
 
 def _colombia_midnight_utc(day: date) -> datetime:
     """Medianoche de Colombia de `day`, en UTC: captured_at se guarda en UTC."""
@@ -132,6 +154,7 @@ def list_staging(
     date_from: date | None = Query(None, description="Capturadas desde este dia (hora Colombia)"),
     date_to: date | None = Query(None, description="Capturadas hasta este dia, inclusive (hora Colombia)"),
     corroborated: bool | None = Query(None, description="Solo las que otra fuente tambien reporta"),
+    view: str | None = Query(None, description="'descartadas' lista lo descartado desde la bandeja (RF-004)"),
     limit: int = Query(100, le=500),
     offset: int = Query(0, ge=0),
 ):
@@ -140,7 +163,10 @@ def list_staging(
     Orden: puntaje de cribado + bono de corroboracion (RF-002), luego lo mas reciente.
     """
     corroboration.refresh(db)
-    query = db.query(Technology).filter(Technology.status == "capturada_no_asignada")
+    if view == "descartadas":
+        query = db.query(Technology).filter(_inbox_discarded_filter())
+    else:
+        query = db.query(Technology).filter(Technology.status == STAGING_STATUS)
     if corroborated:
         query = query.filter(Technology.corroboration_count > 1)
     if source_id:
@@ -182,6 +208,7 @@ def staging_stats(db: Session = Depends(get_db), user: User = Depends(get_curren
     base = db.query(Technology).filter(Technology.status == "capturada_no_asignada")
     unassigned = base.with_entities(func.count(Technology.id)).scalar() or 0
     total = db.query(func.count(Technology.id)).scalar() or 0
+    discarded = db.query(func.count(Technology.id)).filter(_inbox_discarded_filter()).scalar() or 0
 
     by_channel = [
         CountItem(label=row[0] or "sin canal", value=row[1])
@@ -219,7 +246,76 @@ def staging_stats(db: Session = Depends(get_db), user: User = Depends(get_curren
         without_cluster=without_cluster,
         without_tech_type=without_type,
         corroborated=corroborated,
+        discarded=discarded,
     )
+
+
+@router.post("/staging/discard", response_model=StagingBatchOut)
+def discard_from_staging(
+    payload: StagingDiscardIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_STAGING_ASSIGN)),
+):
+    reason = f"{DISCARD_REASON_PREFIX}: {payload.reason}"
+    affected = 0
+    rejected: list[str] = []
+    for tech_id in dict.fromkeys(payload.technology_ids):
+        tech = db.get(Technology, tech_id)
+        if tech is None:
+            rejected.append(f"Tecnología {tech_id}: no existe.")
+            continue
+        if tech.status != STAGING_STATUS:
+            name = tech.commercial_name or tech.inn_name or f"ID {tech_id}"
+            rejected.append(f"{name}: ya no está en la bandeja de entrada.")
+            continue
+        tech.status = DISCARDED_STATUS
+        audit.record_action(
+            db,
+            entity_type="technologies",
+            entity_id=tech.id,
+            action=DISCARD_ACTION,
+            old_value={"status": STAGING_STATUS},
+            new_value={"status": DISCARDED_STATUS, "reason": reason, "actor": user.email},
+        )
+        affected += 1
+    db.commit()
+    if affected:
+        bump_state_version(db)
+    return StagingBatchOut(affected=affected, rejected=rejected)
+
+
+@router.post("/staging/restore", response_model=StagingBatchOut)
+def restore_to_staging(
+    payload: StagingRestoreIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_STAGING_ASSIGN)),
+):
+    ids = list(dict.fromkeys(payload.technology_ids))
+    restorable = {
+        t.id: t
+        for t in db.query(Technology).filter(Technology.id.in_(ids), _inbox_discarded_filter()).all()
+    }
+    affected = 0
+    rejected: list[str] = []
+    for tech_id in ids:
+        tech = restorable.get(tech_id)
+        if tech is None:
+            rejected.append(f"Tecnología {tech_id}: no fue descartada desde la bandeja.")
+            continue
+        tech.status = STAGING_STATUS
+        audit.record_action(
+            db,
+            entity_type="technologies",
+            entity_id=tech.id,
+            action=RESTORE_ACTION,
+            old_value={"status": DISCARDED_STATUS},
+            new_value={"status": STAGING_STATUS, "actor": user.email},
+        )
+        affected += 1
+    db.commit()
+    if affected:
+        bump_state_version(db)
+    return StagingBatchOut(affected=affected, rejected=rejected)
 
 
 @router.post("/assign-to-cycle", response_model=AssignToCycleOut)
