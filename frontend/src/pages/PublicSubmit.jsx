@@ -87,12 +87,20 @@ export default function PublicSubmit() {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
+    if (!form.commercial_name.trim() && !form.inn_name.trim()) {
+      setError("La tecnología reportada es obligatoria (nombre comercial o DCI).");
+      return;
+    }
+    if (!form.indication.trim()) {
+      setError("La indicación propuesta es obligatoria.");
+      return;
+    }
     const links = form.evidence_links
       .split(/\n|,/)
       .map((s) => s.trim())
       .filter(Boolean);
     if (links.length === 0) {
-      setError("Agregue al menos un enlace a evidencia.");
+      setError("La fuente de información es obligatoria: adjunte al menos un enlace.");
       return;
     }
     const bad = links.find((l) => !/^https?:\/\//i.test(l));
@@ -160,39 +168,46 @@ export default function PublicSubmit() {
             </p>
           )}
           <fieldset className="ps-section">
-            <legend><span>1</span> La tecnología</legend>
+            <legend><span>1</span> Datos obligatorios</legend>
+            <p className="fb-public-note">
+              Tecnología reportada: escriba el nombre comercial, la DCI o ambos. Basta con uno.
+            </p>
             <div className="form-two-col">
-              <Input id="ps-commercial" label="Nombre comercial" hint={HINTS.commercial_name} required value={form.commercial_name} onChange={set("commercial_name")} />
-              <Input id="ps-inn" label="Denominación común internacional (DCI)" hint={HINTS.inn_name} required value={form.inn_name} onChange={set("inn_name")} />
+              <Input id="ps-commercial" label="Tecnología reportada: nombre comercial" hint={HINTS.commercial_name} value={form.commercial_name} onChange={set("commercial_name")} />
+              <Input id="ps-inn" label="Tecnología reportada: DCI" hint={HINTS.inn_name} value={form.inn_name} onChange={set("inn_name")} />
             </div>
-            <div className="form-two-col">
-              <Input id="ps-manufacturer" label="Fabricante o desarrollador" required value={form.manufacturer} onChange={set("manufacturer")} />
-              <Select id="ps-phase" label="Fase de desarrollo" hint={HINTS.development_phase} required value={form.development_phase} onChange={set("development_phase")}>
-                <option value="">Seleccione...</option>
-                <option value="Fase II">Fase II</option>
-                <option value="Fase III">Fase III</option>
-                <option value="Fase IV">Fase IV</option>
-                <option value="Aprobado en agencia de referencia">Aprobado en agencia de referencia</option>
-                <option value="Otro">Otro</option>
-              </Select>
-            </div>
-            <Textarea id="ps-indication" label="Indicación / patología" hint={HINTS.indication} required rows={3} value={form.indication} onChange={set("indication")} help="Enfermedad o condición y población a la que se destina." />
-            <Textarea id="ps-mechanism" label="Mecanismo de acción" hint={HINTS.mechanism} required rows={3} value={form.mechanism} onChange={set("mechanism")} />
-          </fieldset>
-
-          <fieldset className="ps-section">
-            <legend><span>2</span> Evidencia</legend>
+            <Textarea id="ps-indication" label="Indicación propuesta" hint={HINTS.indication} required rows={3} value={form.indication} onChange={set("indication")} help="Enfermedad o condición y población a la que se destina." />
             <Textarea
               id="ps-links"
-              label="Enlaces a evidencia (uno por línea)"
+              label="Fuente de información (enlaces, uno por línea)"
               hint={HINTS.evidence_links}
               required
               rows={3}
               value={form.evidence_links}
               onChange={set("evidence_links")}
               placeholder="https://clinicaltrials.gov/study/NCT..."
-              help="ClinicalTrials.gov, FDA, EMA, artículos o comunicados oficiales. Un enlace por línea."
+              help="ClinicalTrials.gov, FDA, EMA, artículos o comunicados oficiales. Deben iniciar con http:// o https://."
             />
+          </fieldset>
+
+          <fieldset className="ps-section">
+            <legend><span>2</span> Información complementaria</legend>
+            <p className="fb-public-note" data-testid="complementary-note">
+              Estos campos son opcionales. Si no tiene el dato, puede escribir «No disponible».
+            </p>
+            <div className="form-two-col">
+              <Input id="ps-manufacturer" label="Fabricante o desarrollador" value={form.manufacturer} onChange={set("manufacturer")} />
+              <Select id="ps-phase" label="Fase de desarrollo" hint={HINTS.development_phase} value={form.development_phase} onChange={set("development_phase")}>
+                <option value="">Seleccione...</option>
+                <option value="Fase II">Fase II</option>
+                <option value="Fase III">Fase III</option>
+                <option value="Fase IV">Fase IV</option>
+                <option value="Aprobado en agencia de referencia">Aprobado en agencia de referencia</option>
+                <option value="Otro">Otro</option>
+                <option value="No disponible">No disponible</option>
+              </Select>
+            </div>
+            <Textarea id="ps-mechanism" label="Mecanismo de acción" hint={HINTS.mechanism} rows={3} value={form.mechanism} onChange={set("mechanism")} />
           </fieldset>
 
           <fieldset className="ps-section">
@@ -213,7 +228,7 @@ export default function PublicSubmit() {
           <fieldset className="ps-section">
             <legend><span>4</span> Sus datos de contacto</legend>
             <div className="form-two-col">
-              <Input id="ps-name" label="Su nombre" required value={form.submitter_name} onChange={set("submitter_name")} />
+              <Input id="ps-name" label="Su nombre" value={form.submitter_name} onChange={set("submitter_name")} help="Opcional." />
               <Input id="ps-email" label="Correo" type="email" required value={form.submitter_email} onChange={set("submitter_email")} help="Le escribimos solo sobre esta postulación." />
             </div>
             <Input id="ps-org" label="Organización" value={form.submitter_org} onChange={set("submitter_org")} help="Opcional." />
