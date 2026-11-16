@@ -1,3 +1,4 @@
+"""Esquemas Pydantic (validacion y serializacion de la API)."""
 from __future__ import annotations
 
 from datetime import date, datetime

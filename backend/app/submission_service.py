@@ -109,6 +109,7 @@ def accept_submission(db: Session, submission: Submission, *, reviewer: str, not
         summary=submission.mechanism,
         technology=name,
         title=name,
+        weights=screening_weights(db),
     )
     tech = Technology(
         commercial_name=submission.commercial_name,
