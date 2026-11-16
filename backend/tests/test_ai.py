@@ -316,23 +316,16 @@ def test_fetch_url_retries_then_succeeds(monkeypatch):
             self.content = body
             self.encoding = "utf-8"
 
-    class FakeClient:
-        def __init__(self, *a, **k):
-            pass
+    def fake_tls_get(url, *, timeout, headers, params=None):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            return FakeResp(503)
+        return FakeResp(200, b"<html><p>ok</p></html>")
 
-        def __enter__(self):
-            return self
+    # fetch_url descarga con tls_get (tope de tiempo total incluido).
+    from app.ingest import base as ingest_base
 
-        def __exit__(self, *a):
-            return False
-
-        def get(self, url):
-            calls["n"] += 1
-            if calls["n"] < 3:
-                return FakeResp(503)
-            return FakeResp(200, b"<html><p>ok</p></html>")
-
-    monkeypatch.setattr(scraper.httpx, "Client", FakeClient)
+    monkeypatch.setattr(ingest_base, "tls_get", fake_tls_get)
     status, ctype, text, raw = scraper.fetch_url("https://fuente.test/x")
     assert status == 200 and calls["n"] == 3 and "ok" in text
 

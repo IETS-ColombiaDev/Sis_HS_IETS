@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from .. import ingest, source_profile
 from ..catalog import CATEGORIES, FREQ_HOURS
-from ..catalog_service import LOCAL_SOURCE_MARK, mark_edited, normalize_url
+from ..catalog_service import LOCAL_SOURCE_MARK, mark_edited, normalize_url, url_provenance
 from ..database import get_db
 from ..deps import get_current_user, require_permission
 from ..events import bump_state_version
@@ -41,6 +41,11 @@ def _to_out(db: Session, source: Source) -> SourceOut:
     out.tech_types = list(source.tech_types or [])
     out.entry_urls = list(source.entry_urls or [])
     out.reference_urls = list(source.reference_urls or [])
+    prov = url_provenance(source)
+    out.url_origin = prov["origin"]
+    out.url_origin_label = prov["label"]
+    out.matrix_url = prov["matrix_url"]
+    out.url_note = prov["note"]
     return out
 
 
@@ -49,7 +54,6 @@ def _validate_profile(db: Session, data: dict) -> None:
     options = source_profile.load_options(db)
     labels = {
         "source_level": "nivel de fuente",
-        "priority_level": "nivel de priorización",
         "matrix_origin": "origen",
     }
     for key, label in labels.items():

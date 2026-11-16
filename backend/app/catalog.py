@@ -1116,13 +1116,73 @@ def _matrix_sources() -> list[dict]:
     return out
 
 
+# Conectores que leen la pagina web: su URL principal es la de la matriz EH.
+# Los demas (clinicaltrials, fda, pubmed...) consultan una API oficial.
+WEB_CONNECTORS = {"html", "pdf", "manual", ""}
+
+# Fuentes cuya primera URL de la matriz no sirve como portada. Se conserva la del
+# sistema y la ficha muestra este motivo junto a la URL original.
+# Verificado el 06-11-2026 descargando ambas URLs desde el servidor.
+MATRIX_URL_EXCEPTIONS: dict[str, str] = {
+    "FP-HT-05": (
+        "La URL de la matriz (euroscan.org) responde con una página casi vacía: la red "
+        "EuroScan opera hoy como i-HTS, y el sistema entra por i-hts.org."
+    ),
+}
+
+
+def _url_key(url: str) -> str:
+    return re.sub(r"^https?://(www\.)?", "", (url or "").strip().lower()).split("#")[0].rstrip("/")
+
+
+def matrix_urls(row: dict) -> list[str]:
+    """Todas las URLs que la fila de la matriz reporta (consulta y metodologicas)."""
+    return [u for u in [*(row.get("consult_urls") or []), *(row.get("methodology_urls") or [])] if u]
+
+
+def _original_for(current: str, matrix_row: dict, *, primary: bool) -> str:
+    """URL original de la matriz que corresponde a la fuente.
+
+    La fuente principal de la fila usa la primera URL de consulta. Una sub-fuente
+    (otra fuente que comparte la fila, p. ej. FDA dispositivos dentro de FDA) usa
+    la URL de la fila del mismo sitio que mas se parece a su pagina especifica.
+    """
+    from difflib import SequenceMatcher
+
+    if primary:
+        return (entry_urls_for(matrix_row) or [""])[0]
+    host = _url_key(current).split("/")[0]
+    same = [u for u in matrix_urls(matrix_row) if _url_key(u).split("/")[0] == host]
+    if not same:
+        return ""
+    return max(same, key=lambda u: SequenceMatcher(None, _url_key(u), _url_key(current)).ratio())
+
+
 def _with_matrix(rows: list[dict]) -> list[dict]:
-    """Agrega a cada fuente los campos de su fila en la matriz EH."""
+    """Agrega a cada fuente los campos de su fila en la matriz EH.
+
+    La URL principal de una fuente web es la ORIGINAL de la matriz (su primera URL
+    de consulta): el rastreo entra primero por donde el equipo indico. Solo se
+    conserva otra si la fuente es una API oficial, una sub-fuente que comparte fila
+    con otra (su pagina especifica) o una excepcion documentada arriba.
+    """
     by_code = rows_by_code()
     for row in rows:
         hit = by_code.get(row["catalog_code"])
         if hit is not None:
             row.update(profile_fields(hit[0], primary=hit[1]))
+            known = {_url_key(u) for u in matrix_urls(hit[0])}
+            original = _original_for(row.get("url") or "", hit[0], primary=hit[1])
+            if (
+                original
+                and (row.get("connector") or "") in WEB_CONNECTORS
+                and row["catalog_code"] not in MATRIX_URL_EXCEPTIONS
+                and _url_key(row.get("url") or "") not in known
+            ):
+                row["url"] = original
+                probe = (row.get("connector_config") or {}).get("probe")
+                if isinstance(probe, dict) and probe.get("url"):
+                    probe["url"] = original
         row.setdefault("scan_profile", {})
     return rows
 

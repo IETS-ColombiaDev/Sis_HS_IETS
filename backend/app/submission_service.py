@@ -15,7 +15,7 @@ from .audit import record_action
 from .classification import suggest_cluster, suggest_condition, suggest_tech_type
 from .events import bump_state_version
 from .models import Submission, Technology
-from .priority import compute_screening_score
+from .priority import compute_screening_score, screening_weights
 
 
 class SubmissionRuleError(ValueError):

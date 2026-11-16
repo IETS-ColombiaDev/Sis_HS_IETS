@@ -29,6 +29,22 @@ META_ID = "meta"
 CHUNK_PREFIX = "c"
 CHUNK_BYTES = 600_000
 PUSH_DEBOUNCE_S = 5.0
+# Minimo entre copias. Cada copia exporta, compacta y comprime toda la base: con
+# 0,1 CPU tarda casi un minuto. Durante una vigilancia hay commits a cada rato y,
+# sin este minimo, el proceso pasaba el tiempo copiando en vez de rastrear.
+PUSH_MIN_INTERVAL_S = 120.0
+_last_push_at = 0.0
+# Con una vigilancia en curso la copia espera mas: la CPU es para el rastreo.
+PUSH_MIN_INTERVAL_SCANNING_S = 300.0
+
+
+def _min_interval() -> float:
+    try:
+        from .worker import draining
+
+        return PUSH_MIN_INTERVAL_SCANNING_S if draining() else PUSH_MIN_INTERVAL_S
+    except Exception:  # noqa: BLE001
+        return PUSH_MIN_INTERVAL_S
 _RESERVED_DEFAULT = {"(default)", "default"}
 _RRHH_COLLECTIONS = {"usuarios", "users"}
 _resolved_db: str | None = None
@@ -359,7 +375,8 @@ def push_now(*, force: bool = False) -> dict:
 
 
 def _push_locked(*, force: bool) -> dict:
-    global _last_sha, _status, _busy
+    global _last_sha, _status, _busy, _last_push_at
+    _last_push_at = time.monotonic()
     _busy = True
     try:
         payload, snap = browser_backup.export_snapshot()
@@ -482,10 +499,11 @@ def schedule_push() -> None:
     # candado y sube el estado mas reciente.
     if not _autosync or not enabled():
         return
+    delay = max(PUSH_DEBOUNCE_S, _last_push_at + _min_interval() - time.monotonic())
     with _lock:
         if _timer is not None:
             _timer.cancel()
-        _timer = threading.Timer(PUSH_DEBOUNCE_S, _flush)
+        _timer = threading.Timer(delay, _flush)
         _timer.daemon = True
         _timer.start()
 

@@ -56,12 +56,45 @@ def tls_get(url: str, *, timeout, headers: dict, params: dict | None = None) -> 
     extra = {"params": params} if params else {}
     try:
         with _http_client(url, timeout, headers) as client:
-            return client.get(url, **extra)
+            return _bounded_get(client, url, timeout, extra)
     except httpx.TransportError as exc:
         if not _learn_missing_intermediate(url, exc):
             raise
         with _http_client(url, timeout, headers) as client:
-            return client.get(url, **extra)
+            return _bounded_get(client, url, timeout, extra)
+
+
+def total_deadline(timeout) -> float:
+    """Tiempo TOTAL maximo de una descarga: 4 veces el de lectura, minimo 60 s."""
+    read = timeout.read if isinstance(timeout, httpx.Timeout) else timeout
+    try:
+        read = float(read or 0)
+    except (TypeError, ValueError):
+        read = 0.0
+    return max(60.0, 4.0 * read)
+
+
+def _bounded_get(client: httpx.Client, url: str, timeout, extra: dict) -> httpx.Response:
+    """GET con tope de tiempo TOTAL, no solo entre bloques.
+
+    El timeout de httpx cuenta la espera entre bloques: un servidor que envia un
+    byte por segundo sin cerrar nunca la conexion retenia la descarga (y con ella
+    la fuente y la vigilancia completa) indefinidamente. Aqui se corta al pasar
+    `total_deadline` con ReadTimeout, que los llamadores ya tratan como fallo de red.
+    """
+    deadline = time.monotonic() + total_deadline(timeout)
+    request = client.build_request("GET", url, **extra)
+    response = client.send(request, stream=True)
+    try:
+        chunks: list[bytes] = []
+        for chunk in response.iter_bytes():
+            chunks.append(chunk)
+            if time.monotonic() > deadline:
+                raise httpx.ReadTimeout(f"Descarga de {url[:120]} supero el tiempo total", request=request)
+        response._content = b"".join(chunks)  # equivale a response.read()
+    finally:
+        response.close()
+    return response
 
 
 def _learn_missing_intermediate(url: str, exc: Exception) -> bool:
