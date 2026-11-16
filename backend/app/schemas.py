@@ -1,9 +1,8 @@
-"""Esquemas Pydantic (validacion y serializacion de la API)."""
 from __future__ import annotations
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # --------------------------------------------------------------------------- #
@@ -907,6 +906,29 @@ class AssignToCycleOut(BaseModel):
     rejected: list[str] = []
 
 
+class StagingDiscardIn(BaseModel):
+
+    technology_ids: list[int] = Field(min_length=1)
+    reason: str = Field(min_length=5, max_length=1000)
+
+    @field_validator("reason")
+    @classmethod
+    def _reason_not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) < 5:
+            raise ValueError("El motivo del descarte es obligatorio (mínimo 5 caracteres).")
+        return value
+
+
+class StagingRestoreIn(BaseModel):
+    technology_ids: list[int] = Field(min_length=1)
+
+
+class StagingBatchOut(BaseModel):
+    affected: int
+    rejected: list[str] = []
+
+
 class ExclusionIn(BaseModel):
     reason_code: str
     note: str = ""
@@ -921,6 +943,7 @@ class StagingStats(BaseModel):
     without_tech_type: int = 0
     # RF-002: senales sin asignar que otra fuente tambien reporta.
     corroborated: int = 0
+    discarded: int = 0
 
 
 # =========================================================================== #
