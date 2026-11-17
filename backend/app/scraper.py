@@ -218,6 +218,12 @@ def _upgrade_general_url(db: Session, source: Source, landing_url: str, data: di
         if not _is_general_url(old.url, landing_url, source.url):
             continue
         old.url = new_url[:1020]
+        from . import signal_links
+
+        if not old.query_url:
+            old.query_url = (landing_url or source.url or "")[:1024]
+        old.link_type = signal_links.classify(old.url, source, old.query_url)
+        old.link_status = "sin_verificar"
         if data.get("raw_content") and "Cita de la fuente:" in data["raw_content"]:
             old.raw_content = data["raw_content"]
         from .models import Technology
@@ -1545,6 +1551,10 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                 status="nuevo",
                 **data,
             )
+            from . import signal_links
+
+            # URL consultada aparte de la URL de la senal; evidencia si no hay enlace exacto.
+            signal_links.annotate(finding, source, query_url=landing_url)
             finding.screening_score = compute_screening_score(
                 horizon=finding.horizon,
                 technology_type=finding.technology_type,

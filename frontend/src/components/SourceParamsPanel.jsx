@@ -372,9 +372,24 @@ export default function SourceParamsPanel({ toast }) {
         <Textarea id="search-generic" label="Términos genéricos (coma)" hint="Se combinan con los de cada fuente y categoría." rows={2} value={genericText} onChange={(e) => setGenericText(e.target.value)} />
 
         <h4 className="source-section-title">Criterios de búsqueda por categoría (hoja «Criterios de búsqueda»)</h4>
+        <p className="source-section-note" data-testid="categories-scope-note">
+          El escaneo usa solo las categorías marcadas como activas. Alcance vigente: Medicamentos y Dispositivos médicos.
+          Las demás quedan inactivas (no se borran) y se pueden activar aquí cuando se amplíe el alcance.
+          {" "}Activas: {(search.terms_by_category || []).filter((c) => c.active !== false).length} de {(search.terms_by_category || []).length}.
+        </p>
         <div style={{ display: "grid", gap: 8 }}>
           {(search.terms_by_category || []).map((c, idx) => (
-            <div key={idx} style={{ display: "grid", gridTemplateColumns: "220px 90px 1fr auto", gap: 8, alignItems: "start" }}>
+            <div key={idx} style={{ display: "grid", gridTemplateColumns: "84px 220px 90px 1fr auto", gap: 8, alignItems: "start", opacity: c.active === false ? 0.6 : 1 }}>
+              <label className="catalog-check" style={{ marginTop: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={c.active !== false}
+                  onChange={(e) => updateCategory(idx, { active: e.target.checked })}
+                  aria-label={`Categoría ${c.category || idx + 1} activa`}
+                  data-testid={`category-active-${idx}`}
+                />
+                <span>{c.active !== false ? "Activa" : "Inactiva"}</span>
+              </label>
               <input className="filter-input" aria-label={`Categoría ${idx + 1}`} value={c.category} onChange={(e) => updateCategory(idx, { category: e.target.value })} />
               <select className="filter-select" aria-label={`Tecnología ${idx + 1}`} value={c.tech_type} onChange={(e) => updateCategory(idx, { tech_type: e.target.value })}>
                 {(options.tech_type || []).map((o) => <option key={o.value} value={o.value}>{o.value}</option>)}
@@ -390,7 +405,7 @@ export default function SourceParamsPanel({ toast }) {
             </div>
           ))}
         </div>
-        <Button size="sm" variant="secondary" style={{ marginTop: 8 }} onClick={() => setSearch({ ...search, terms_by_category: [...(search.terms_by_category || []), { category: "", tech_type: "MT", terms: [] }] })}>
+        <Button size="sm" variant="secondary" style={{ marginTop: 8 }} onClick={() => setSearch({ ...search, terms_by_category: [...(search.terms_by_category || []), { category: "", tech_type: "MT", terms: [], active: true }] })}>
           <Icon name="plus" size={14} /> Agregar categoría
         </Button>
 

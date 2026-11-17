@@ -222,6 +222,22 @@ def _recover_orphan_jobs() -> None:
         db.close()
 
 
+def backfill_signal_links() -> None:
+    """RF-001: las senales capturadas antes del ajuste reciben tipo de enlace y evidencia."""
+    from . import signal_links
+
+    db = SessionLocal()
+    try:
+        out = signal_links.backfill(db, actor="sistema", only_missing=True)
+        if out.get("procesadas"):
+            log.info("Enlaces de senales clasificados: %s", out.get("por_tipo"))
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        log.warning("No se pudieron clasificar los enlaces de las senales: %s", exc)
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     assert_safe_configuration()
@@ -285,6 +301,7 @@ async def lifespan(app: FastAPI):
         backfill_product_details()
         seed_official_cycles()
         seed_api_sources()
+        backfill_signal_links()
     load_runtime_config()
 
     from .settings_store import load_ingest_keys

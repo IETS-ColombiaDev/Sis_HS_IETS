@@ -597,6 +597,9 @@ def persist_record(
         )
         or None,
     )
+    from . import signal_links
+
+    signal_links.annotate(finding, source, query_url=source.url or "")
     db.add(finding)
     db.flush()
 

@@ -293,6 +293,13 @@ class FindingOut(FindingBase):
     source_url: str = ""
     raw_content: str = ""
     link: str = ""  # url + resaltado de la cita: abre la pagina sobre el texto de la senal
+    # RF-001: pagina consultada, tipo de enlace, verificacion y evidencia de captura.
+    query_url: str = ""
+    link_type: str = ""
+    link_status: str = ""
+    link_http: int | None = 0
+    link_checked_at: datetime | None = None
+    evidence: dict | None = None
     created_at: datetime
     updated_at: datetime
     recommendations_count: int = 0
@@ -845,6 +852,11 @@ class TechnologyOut(BaseModel):
     raw_origin: str = ""
     # URL mas especifica de la senal (propia, del hallazgo o del crudo).
     signal_url: str = ""
+    # Tipo de enlace de la senal (RF-001): exacto | consulta | sin_enlace, y evidencia de captura.
+    link_type: str = ""
+    link_status: str = ""
+    query_url: str = ""
+    evidence: dict | None = None
     reliability_verdict: str = ""
     reliability_score: int | None = None
     finding_id: int | None = None

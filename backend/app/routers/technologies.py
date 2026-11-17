@@ -63,6 +63,12 @@ def _to_out(db: Session, tech: Technology, entry: CycleTechnology | None = None)
     out.has_raw = bool(payload)
     out.raw_origin = str(payload.get("origin") or "")
     out.signal_url = reliability_service.signal_link(db, tech)
+    finding = db.get(Finding, tech.finding_id) if tech.finding_id else None
+    if finding is not None:
+        out.link_type = finding.link_type or ""
+        out.link_status = finding.link_status or ""
+        out.query_url = finding.query_url or ""
+        out.evidence = finding.evidence if isinstance(finding.evidence, dict) else None
     verdict = tech.reliability if isinstance(tech.reliability, dict) else {}
     out.reliability_verdict = str(verdict.get("verdict") or "")
     out.reliability_score = verdict.get("score") if isinstance(verdict.get("score"), int) else None
@@ -140,6 +146,37 @@ def _inbox_discarded_filter():
 def _colombia_midnight_utc(day: date) -> datetime:
     """Medianoche de Colombia de `day`, en UTC: captured_at se guarda en UTC."""
     return datetime.combine(day, time.min, COLOMBIA_TZ).astimezone(timezone.utc)
+
+
+# --------------------------------------------------------------------------- #
+#  RF-005: buscador de la pantalla principal y recorrido por etapas
+# --------------------------------------------------------------------------- #
+@router.get("/search")
+def search_technologies(
+    q: str = Query("", max_length=200),
+    limit: int = Query(30, ge=1, le=100),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Busca tecnologias y senales por nombre (parcial, sin tildes ni mayusculas)."""
+    from .. import tech_search
+
+    return tech_search.search(db, q, limit=limit)
+
+
+@router.get("/{technology_id}/history")
+def technology_history(
+    technology_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Recorrido de la tecnologia por etapas, desde la bitacora."""
+    from .. import tech_search
+
+    try:
+        return tech_search.history(db, technology_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/staging", response_model=list[TechnologyOut])

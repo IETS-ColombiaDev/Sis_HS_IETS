@@ -343,7 +343,10 @@ def term_pool(source, profile: dict, cfg: dict) -> list[str]:
     if "MT" in techs or not techs:
         techs |= {"MED", "DM", "BIOM", "IA", "SD", "MT"}
     pool: list[str] = list(profile.get("search_terms") or [])
-    for cat in cfg.get("terms_by_category") or []:
+    from .source_profile import active_terms_by_category
+
+    # RF-006: solo las categorias activas en Configuracion entran a la busqueda.
+    for cat in active_terms_by_category(cfg):
         if (cat.get("tech_type") or "MT").upper() in techs:
             pool.extend(cat.get("terms") or [])
     pool.extend(cfg.get("generic_terms") or [])

@@ -729,8 +729,8 @@ export default function Staging() {
                                 href={item.signal_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                title={`Abrir la fuente original: ${item.signal_url}`}
-                                aria-label={`Abrir la fuente original de ${name.slice(0, 60)}`}
+                                title={`${item.link_type === "exacto" ? "Enlace exacto" : item.link_type === "consulta" ? "Página de consulta (la fuente no ofrece enlace directo)" : "Abrir la fuente original"}: ${item.signal_url}`}
+                                aria-label={`${item.link_type === "consulta" ? "Abrir la página de consulta" : "Abrir la fuente original"} de ${name.slice(0, 60)}`}
                               >
                                 <Icon name="external" size={13} />
                               </a>

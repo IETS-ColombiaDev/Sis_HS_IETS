@@ -5,10 +5,20 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.0.0 · actualizada el 29 de octubre de 2026 (validación del módulo 0) |
+| **Versión del sistema** | 7.1.0 · actualizada el 17 de noviembre de 2026 (III seguimiento de la validación del módulo 0) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
+
+### Novedades del 17 de noviembre de 2026 (III seguimiento)
+
+| Qué cambió | Dónde leerlo |
+|---|---|
+| **Enlace a la fuente original**: cada señal dice si su enlace es (Enlace exacto) o (Página de consulta, la fuente no ofrece enlace directo); en el segundo caso muestra la evidencia de captura. Reporte de enlaces por fuente y verificación de enlaces caídos (RF-001) | [10.9](#109-enlace-a-la-fuente-original-y-evidencia-de-captura) y [14.3](#143-reporte-de-enlaces-por-fuente) |
+| **Prioridad de la fuente retirada** de pantallas, procesos y exportaciones; queda apagada por parámetro (OBS-001) | [4.4](#44-la-fuente-ya-no-se-prioriza), [8.7](#87-recargar-catálogo--qué-se-conserva) y [8.9](#89-url-original-de-la-matriz-y-etiquetas) |
+| **Cargar matriz** desde el Catálogo de fuentes: validación, vista previa de diferencias y conflictos, reporte descargable y bitácora (OBS-002) | [8.10](#810-cargar-matriz-paso-a-paso) y [30.1](#301-origen) |
+| **Buscador de tecnologías** en la pantalla principal, con módulo, etapa, estado y recorrido (RF-005) | [6.4](#64-buscar-una-tecnología-o-señal) |
+| **Criterios de búsqueda**: solo Medicamentos y Dispositivos médicos activos; las demás categorías se activan desde Configuración (RF-006) | [25.6](#256-parámetros-de-fuentes-matriz-eh) |
 
 ### Novedades del 27 de octubre de 2026
 
@@ -248,7 +258,13 @@ Indica **cómo** se obtiene el dato, no qué tan importante es la fuente. A y B 
 
 ### 4.4 La fuente ya no se prioriza
 
-La columna de prioridad de la matriz (alta, media, revisar) era un comentario interno del equipo y **no se usa**: la cola atiende las fuentes por orden alfabético, la IA no recibe ninguna prioridad y el catálogo no la muestra. Lo que distingue a una fuente es su **nivel** (primaria, secundaria, terciaria) y su **nivel de acceso** (A a E). La relevancia de cada señal la ordena el cribado y la decide el %P.
+Por decisión del equipo técnico (06-11-2026) **no existe prioridad de fuente**. Lo que la matriz registra en la columna (Observaciones) es un criterio de aplicabilidad al proyecto y se guarda solo como texto: el cargue de la matriz nunca lo lee como prioridad.
+
+- El (Catálogo de fuentes) no muestra prioridad, prioridad sugerida, botón (Aplicar) ni filtros u orden por prioridad.
+- La vigilancia atiende las fuentes por orden alfabético; el cribado, los puntajes, los tableros, las alertas, la IA y el CSV del catálogo no usan la prioridad de la fuente.
+- Los valores históricos se conservan en la base y en la bitácora, pero no se muestran ni se pueden editar mientras el parámetro `cfg.sources.priority_enabled` siga apagado. Se reactivará cuando el equipo técnico defina criterios tras la revisión de literatura.
+
+Lo que distingue a una fuente es su **nivel** (primaria, secundaria, terciaria) y su **nivel de acceso** (A a E). Este ajuste no toca la priorización de señales ni de tecnologías: la relevancia de cada señal la ordena el cribado y la decide el %P.
 
 ### 4.5 %P vs screening_score
 
@@ -342,6 +358,18 @@ Es su “escritorio del día”: pendientes **de su perfil** (no de todo el inst
 - No hay trabajo para su perfil en ese ciclo, **o**
 - El ciclo está en un estado donde aún no aplica su tarea (ej. clínico en “En configuración”), **o**
 - Está mirando el ciclo equivocado.
+
+### 6.4 Buscar una tecnología o señal
+
+En la parte superior de la (Bandeja de trabajo) está la caja (Buscar una tecnología o señal). La ven todos los perfiles con acceso de lectura.
+
+1. Escriba al menos dos letras de cualquier parte del nombre. No importan mayúsculas ni tildes: portatil, PORTÁTIL y "monitor port" encuentran lo mismo. Puede escribir en español o en inglés (se busca en el texto tal como se capturó y como lo clasificó el equipo).
+2. La búsqueda revisa el nombre comercial, la DCI, la marca, el fabricante, el título de la señal y la fuente.
+3. Cada resultado muestra: nombre, tipo de tecnología, módulo y etapa actual, estado (incluidas las descartadas en la bandeja, las excluidas, las fusionadas por duplicado y las de ciclos cerrados), responsable del último cambio, fecha del último cambio y en qué campo coincidió.
+4. (Abrir el registro) lleva directo a la tecnología en su módulo (Bandeja de entrada, Filtrado, Priorización o Evaluación).
+5. (Ver recorrido por etapas) muestra, tomado de la bitácora, cada cambio de etapa con fecha, hora y persona.
+
+Si no hay resultados, el sistema lo dice y sugiere buscar por otra parte del nombre, la DCI, el fabricante o la fuente.
 
 ---
 
@@ -470,7 +498,8 @@ Tecnologías que aparecen en fuentes de **contraste** y no están en el ciclo. C
 |---|---|---|
 | **CSV** | Quien consulta | Descarga el listado (incluye matriz y flujo). Separado por punto y coma y en UTF-8: abre con doble clic en Excel, en columnas y con tildes |
 | **Sondear A/B** | Vigilancia | Sonda masiva de niveles A y B |
-| **Recargar catálogo** | Escritura | Reaplica D-06 y la matriz vigente: actualiza oficiales y URL de la matriz, retira obsoletas; **conserva** lo que el equipo editó (ver 8.7) |
+| **Recargar catálogo** | Escritura | Reaplica el catálogo verificado D-06 y la matriz que ya está cargada en el sistema (no pide archivo): crea las fuentes oficiales que falten, actualiza sus datos y URL de la matriz, retira las que ya no están en el catálogo y **conserva** lo que el equipo editó y las fuentes registradas a mano. No borra señales (ver 8.7) |
+| **Cargar matriz** | Escritura | Sube el Excel de la matriz (MATRIZ_FUENTES_ESCANEO_EH, `.xlsx`) o una hoja de Google Sheets, la valida y muestra la vista previa de diferencias antes de aplicar (ver 8.10) |
 | **Detectar fuentes con IA** | Escritura | Busca en la web sitios de escaneo de horizonte que aún no están en el catálogo y los propone (ver 8.8) |
 | **Alta rápida** | Escritura | Nombre + URL en minutos |
 | **Agregar fuente** | Escritura | Formulario completo |
@@ -548,12 +577,12 @@ La recarga corre sola en cada arranque del servidor y con el botón **Recargar c
 
 | Siempre se restituye desde D-06 | Sigue a la matriz vigente… | …salvo que el equipo lo haya editado |
 |---|---|---|
-| URL, título oficial, adaptador | Prioridad, nivel de fuente, tipos de tecnología | Se conserva lo editado |
+| URL, título oficial, adaptador | Nivel de fuente, tipos de tecnología | Se conserva lo editado |
 | Nivel de acceso A–E | URLs de entrada y de referencia | Se conserva lo editado |
 | Frecuencia / metadatos de catálogo | Ruta de acceso, qué consultar, tipo de material, observaciones, restricciones | Se conserva lo editado |
 | | Flujo de escaneo (`scan_profile`) | Se conserva lo editado |
 
-**Cómo sabe el sistema qué editó el equipo.** Cada vez que alguien guarda **Editar fuente** (o **Aplicar** una prioridad sugerida), el campo cambiado queda marcado como *editado* y la recarga ya no lo pisa. Lo que nadie tocó sigue a la matriz: si la matriz agrega una URL, la fuente la recibe en el siguiente arranque.
+**Cómo sabe el sistema qué editó el equipo.** Cada vez que alguien guarda **Editar fuente**, el campo cambiado queda marcado como *editado* y la recarga ya no lo pisa. Lo que nadie tocó sigue a la matriz: si la matriz agrega una URL, la fuente la recibe en el siguiente arranque.
 
 En la primera recarga de una base anterior a esta regla, el sistema consulta la **bitácora**: solo cuenta como editado lo que una persona cambió desde el formulario de la fuente. Las URL que el equipo agregó de sitios que la matriz no menciona se conservan junto a las de la matriz.
 
@@ -572,7 +601,7 @@ Para ampliar el inventario con sitios que todavía no se vigilan (agencias regul
    - clasifica cada candidata (nombre, país, bloque, tipos, nivel de acceso A–E, nivel de fuente y por qué sirve);
    - visita cada una: las que no responden van a «Descartadas porque no respondieron»; las que piden acceso se marcan «acceso restringido».
 5. Revise la lista y pulse **Dar de alta** en cada propuesta útil, o marque varias y **Dar de alta las seleccionadas**.
-6. La fuente nueva queda con prioridad **revisar**, etiqueta `propuesta_ia` y la nota «Propuesta por IA – pendiente de verificación». Ábrala con **Editar**, confirme los datos y la prioridad, y active la ingesta.
+6. La fuente nueva queda con la etiqueta `propuesta_ia` y la nota «Propuesta por IA – pendiente de verificación». Ábrala con **Editar**, confirme los datos y active la ingesta.
 
 Límites por corrida: 2 llamadas a la IA, hasta 6 consultas web y 12 candidatas; máximo 6 corridas por persona cada 10 minutos. Cada corrida y cada alta quedan en la bitácora.
 
@@ -593,7 +622,27 @@ La URL principal de cada fuente web es la **original de la matriz EH** (Excel «
 | **URL distinta a la matriz** | Alguien cambió la URL; la ficha muestra la original para comparar |
 | **Propuesta por IA** / **Registrada por el equipo** | No está en la matriz |
 
-El indicador **URL original de la matriz** del catálogo cuenta cuántas fuentes usan la del Excel y cuántas otra. Si una URL del Excel deja de funcionar, corríjala en el Excel y reimporte la matriz.
+El indicador **URL original de la matriz** del catálogo cuenta cuántas fuentes usan la del Excel y cuántas otra. Si una URL del Excel deja de funcionar, corríjala en el Excel y vuelva a cargar la matriz con (Cargar matriz).
+
+Las tarjetas y la ficha de la fuente ya no muestran etiquetas de prioridad ni (Prioridad sugerida): ver 4.4.
+
+### 8.10 Cargar matriz (paso a paso)
+
+**Quién:** perfiles con permiso de edición de fuentes (superadministrador, evaluador técnico y evaluador clínico). Los demás ven el botón deshabilitado con la explicación.
+
+**Explicación sencilla.** La matriz de fuentes es el Excel donde el equipo técnico lista las fuentes que el sistema debe vigilar y las URL de cada una. Cargar la matriz es entregarle al sistema la versión nueva de ese Excel. El sistema la lee, la compara con lo que ya tiene y le muestra qué cambiaría, sin guardar nada. Usted revisa y confirma. Solo entonces el sistema aplica los cambios, le entrega un reporte y deja registro en la bitácora de quién hizo el cargue y qué cambió.
+
+1. En `/fuentes` pulse (Cargar matriz).
+2. Elija (Subir Excel) y seleccione el archivo `.xlsx`, o (URL de Google Sheets) y pegue el enlace de la hoja.
+3. Pulse (Comparar con el inventario). El sistema valida y muestra:
+   - **Validación de la matriz**: cuántas filas, fuentes y URL de consulta trae, y las inconsistencias (cantidad declarada en la columna Cant URL SI EAA distinta de las URL listadas, URL repetidas en una celda). Las inconsistencias se informan y **no se corrigen en silencio**: ajústelas en el Excel y vuelva a cargarlo.
+   - **Fuentes nuevas**, **con cambios** (valor actual frente al de la matriz), **sin cambios** y **en el inventario pero no en esta matriz** (retiradas de la matriz; no se borran solas).
+   - **Conflictos**: campos que el equipo editó a mano y que la matriz trae distintos, marcados (Editado por el equipo).
+4. (Opcional) (Descargar reporte) baja la vista previa en CSV.
+5. Marque qué crear y qué actualizar. Deje sin marcar (Sobrescribir lo editado en el panel) para respetar lo editado por el equipo.
+6. Pulse (Aplicar). Se descarga el reporte final y queda en la bitácora el cargue completo y, por fuente, el valor anterior y el nuevo de cada campo.
+
+Cómo se leen las URL: manda el **texto escrito** en la celda; el hipervínculo oculto solo se usa si el texto no trae ninguna URL. Las rutas #/ de sitios tipo SPA se conservan.
 
 ---
 
@@ -763,6 +812,18 @@ Cuando la misma tecnología aparece en fuentes distintas (por ejemplo FDA, EMA y
 - **No fusiona nada.** Si son la misma tecnología y quiere un solo registro, use **Filtrado y depuración › Duplicados** (la fusión siempre la confirma una persona).
 
 El cálculo se actualiza solo al abrir la bandeja cuando hubo capturas o cambios.
+
+### 10.9 Enlace a la fuente original y evidencia de captura
+
+En el panel (Origen de la señal) y en la ficha de la señal el enlace lleva una etiqueta:
+
+| Etiqueta | Qué significa | Qué hacer |
+|---|---|---|
+| **Enlace exacto** | La URL lleva a la ficha, artículo, documento o registro de la señal | Pulse (Abrir la señal en la fuente) |
+| **Página de consulta, la fuente no ofrece enlace directo** | La fuente publica la señal en un listado, buscador, tabla de pipeline o portada sin enlace propio por ítem | Lea la **Evidencia de captura** (título, fragmento, fecha y hora, URL consultada) y busque ese texto en la página con (Abrir la página de consulta) |
+| **Sin enlace** | La señal no trae URL | Use la evidencia de captura |
+
+Si la verificación de enlaces encontró que la URL no responde o redirige a la portada, aparece además la marca (No responde) o (Redirige a otra página).
 
 ### 10.8 De dónde salen los datos de producto
 
@@ -967,6 +1028,16 @@ Cola de **señales** (no la matriz oficial). Ordenadas por `screening_score` par
 - Eliminar solo si **no** entró a un ciclo (si ya es expediente, use descartar / excluir en el flujo metodológico).
 
 No use esta pantalla como sustituto de `/priorizacion`.
+
+### 14.3 Reporte de enlaces por fuente
+
+Arriba de la lista pulse (Reporte de enlaces). Muestra, por fuente, cuántas señales tienen enlace exacto, cuántas solo página de consulta (con evidencia), cuántas no tienen enlace y cuántas no responden.
+
+- (Clasificar señales): vuelve a clasificar todas las señales y guarda su evidencia de captura. No cambia ninguna URL. Queda en bitácora.
+- (Verificar enlaces): abre cada enlace en segundo plano y marca los que no responden o redirigen a la portada. Tarda unos minutos; el avance aparece en el mismo panel. Queda en bitácora.
+- (Descargar CSV): el reporte por fuente para Excel.
+
+Requieren permiso de edición de señales; consultar y descargar está abierto a todos los perfiles.
 
 ---
 
@@ -1236,6 +1307,15 @@ Sin llave el sistema sigue, con cupos bajos.
 
 ### 25.6 Parámetros de fuentes (matriz EH)
 
+#### Criterios de búsqueda por categoría
+
+En (Configuración) › (Parámetros de fuentes), sección (Criterios de búsqueda por categoría), cada una de las 11 categorías tiene la casilla (Activa). El escaneo usa **solo** los términos de las categorías activas.
+
+- Alcance vigente (III seguimiento, 17-11-2026): activas **Medicamentos** y **Dispositivos médicos**. Las otras nueve (Dispositivos implantables, Equipos biomédicos, Dispositivos de monitoreo, Tecnologías intervencionistas, IA clínica, SaMD, Telemedicina, mHealth y Wearables) quedan inactivas, no eliminadas.
+- Para ampliar el alcance marque la casilla y pulse (Guardar). No requiere cambios de código. Cada cambio queda en la bitácora con el valor anterior y el nuevo.
+- Las señales ya capturadas en categorías inactivas no se reclasifican ni se borran.
+- **Decisión pendiente del equipo técnico**: si Dispositivos implantables, Equipos biomédicos y Dispositivos de monitoreo se consideran parte de Dispositivos médicos (se activarían) o siguen inactivas.
+
 #### Importar Excel
 
 1. Seleccione el archivo «Fuentes de información proactiva EH» (`.xlsx`).
@@ -1468,7 +1548,9 @@ En la columna de URL manda el texto escrito: el hipervínculo de la celda solo s
 
 El catálogo resultante: **97 fuentes** (incluidas noticias), con **141 URL de entrada**: las 128 URL de consulta SI EAA más las URL generales de las filas que no tienen URL de consulta (el recorrido necesita al menos una por fuente).
 
-Para revisar en la matriz institucional (no lo corrige el sistema):
+**Por qué 93 filas dan 97 fuentes.** Una fila de la matriz puede corresponder a varios servicios que en el catálogo tienen código propio (FDA fila 29 → 3 fuentes; EMA fila 31 → 2; Health Canada fila 34 → 2; EUnetHTA fila 47 → 2; NIHR fila 54 → 2) y, a la vez, algunas fuentes aparecen en dos filas (FDA filas 29 y 30, Health Canada filas 34 y 35). Contando cada código una sola vez quedan 97 fuentes. Las 128 URL son las URL de consulta distintas de cada fila. El sistema muestra estos tres números al cargar la matriz.
+
+Para revisar en la matriz institucional (no lo corrige el sistema; al cargar la matriz aparece en **Validación de la matriz**):
 
 - FDA (fila 29) repite `pma.cfm` en 2.2 y 2.6: declara 9 URL, únicas 8.
 - Health Canada (fila 34) declara 1 URL pero lista 2.

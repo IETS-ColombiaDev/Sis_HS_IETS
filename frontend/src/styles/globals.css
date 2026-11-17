@@ -3814,6 +3814,7 @@ button.linkish {
 .matrix-suggest-grid select, .matrix-suggest-grid input[type=text] { font-size: 12.5px; padding: 4px 6px; border: 1px solid #CBD5E1; border-radius: 6px; }
 .matrix-diff { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
 .matrix-diff th, .matrix-diff td { text-align: left; padding: 4px 6px; border-top: 1px solid #F1F5F9; vertical-align: top; overflow-wrap: anywhere; }
+.matrix-diff tr.matrix-conflict th, .matrix-diff tr.matrix-conflict td { background: #FEF2F2; }
 .matrix-diff th { color: #64748B; font-weight: 500; width: 26%; }
 .matrix-diff .old { color: #991B1B; text-decoration: line-through; text-decoration-color: rgba(153, 27, 27, .4); }
 .matrix-diff .new { color: #065F46; }

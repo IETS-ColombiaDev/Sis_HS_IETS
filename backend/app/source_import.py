@@ -9,7 +9,7 @@ Flujo del boton "Importar matriz" del catalogo de fuentes:
 2. Comparacion con el inventario, fila por fila:
    - `nueva`: no hay fuente con su codigo de catalogo, su URL ni su dominio/nombre;
    - `cambios`: la fuente existe y la matriz trae valores distintos (nivel,
-     prioridad, tipos, URLs de entrada, ruta de acceso, que consultar...);
+     tipos, URLs de entrada, ruta de acceso, que consultar...);
    - `sin_cambios`;
    - `ausentes`: fuentes que vinieron de una matriz anterior y no estan en esta.
 3. Deteccion sugerida para cada fila nueva: primero por reglas (adaptador por
@@ -208,12 +208,23 @@ def _diff(source: Source, row: dict, primary: bool) -> list[dict]:
 
 def compare(db: Session, parsed: dict, *, origin: str, ai: bool = True, check_reach: bool = True) -> dict:
     """Compara la matriz leida con el inventario y sugiere la deteccion de lo nuevo."""
+    from .catalog_service import human_edits
     from .source_discovery import build_index
 
     rows = parsed.get("rows") or []
     sources = db.query(Source).all()
     by_code = {s.catalog_code: s for s in sources if s.catalog_code}
     index = build_index(db)
+    edits = human_edits(db)
+
+    def edited(src: Source) -> set[str]:
+        return set(src.edited_fields or []) | set(edits.get(src.id) or set())
+
+    def flag(src: Source, diffs: list[dict]) -> list[dict]:
+        # Conflicto: la matriz trae otro valor en un campo que el equipo edito a mano.
+        mine = edited(src)
+        return [{**d, "conflict": d["field"] in mine} for d in diffs]
+
     matched_ids: set[int] = set()
     new: list[dict] = []
     changed: list[dict] = []
@@ -238,13 +249,13 @@ def compare(db: Session, parsed: dict, *, origin: str, ai: bool = True, check_re
             continue
         matched_ids.add(source.id)
         primary = not row.get("codes") or (row.get("codes") or [""])[0] == source.catalog_code
-        diffs = _diff(source, row, primary)
+        diffs = flag(source, _diff(source, row, primary))
         # Los demas codigos de la fila son sub-servicios de la misma organizacion:
         # comparten la clasificacion y tampoco estan "ausentes".
         for other in _code_siblings(row, by_code, source):
             matched_ids.add(other.id)
             diffs += [{**d, "label": f"{d['label']} ({other.title})", "source_id": other.id}
-                      for d in _diff(other, row, False)]
+                      for d in flag(other, _diff(other, row, False))]
         entry = {
             **base,
             "source_id": source.id,
@@ -253,7 +264,7 @@ def compare(db: Session, parsed: dict, *, origin: str, ai: bool = True, check_re
             "probable": reason in {"dominio", "nombre"} and not row.get("codes"),
         }
         if diffs:
-            changed.append({**entry, "changes": diffs})
+            changed.append({**entry, "changes": diffs, "conflicts": sum(1 for d in diffs if d.get("conflict"))})
         else:
             same.append(entry)
 
@@ -283,7 +294,9 @@ def compare(db: Session, parsed: dict, *, origin: str, ai: bool = True, check_re
             "cambios": len(changed),
             "sin_cambios": len(same),
             "ausentes": len(missing),
+            "conflictos": sum(c.get("conflicts", 0) for c in changed),
         },
+        "validation": source_matrix.validation_summary(parsed),
         "new": new,
         "changed": changed,
         "unchanged": same,
@@ -554,12 +567,25 @@ def apply(
         primary = not row.get("codes") or row["codes"][0] == source.catalog_code
         targets = [(source, primary)] + [(o, False) for o in _code_siblings(row, by_code, source)]
         for target, is_primary in targets:
+            fields = source_matrix.profile_fields(row, primary=is_primary)
+            before = {k: getattr(target, k, None) for k in fields}
             _apply_catalog_fields(
                 target,
-                source_matrix.profile_fields(row, primary=is_primary),
+                fields,
                 overwrite_admin=overwrite,
                 edits=edits.get(target.id),
             )
+            after = {k: getattr(target, k, None) for k in fields}
+            changed_keys = [k for k in fields if before[k] != after[k]]
+            if changed_keys:
+                record_action(
+                    db,
+                    entity_type="sources",
+                    entity_id=str(target.id),
+                    action="matrix_update",
+                    old_value={k: before[k] for k in changed_keys},
+                    new_value={k: after[k] for k in changed_keys},
+                )
             updated.append(target.title)
 
     created: list[str] = []
@@ -621,6 +647,7 @@ def apply(
             prev.write_text(source_matrix.DATA_FILE.read_text(encoding="utf-8"), encoding="utf-8")
         source_matrix.write_data_file(parsed)
     summary = {
+        "validation": source_matrix.validation_summary(parsed),
         "created": len(created),
         "updated": len(updated),
         "skipped": skipped,
@@ -635,7 +662,7 @@ def apply(
         entity_type="sources",
         entity_id="matrix",
         action="matrix_import_compare",
-        new_value={k: v for k, v in summary.items() if k not in {"created_titles", "updated_titles"}},
+        new_value={k: v for k, v in summary.items() if k not in {"created_titles", "updated_titles", "validation"}},
     )
     db.commit()
     return summary
