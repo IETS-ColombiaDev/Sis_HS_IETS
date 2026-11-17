@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import String, cast, exists, func, or_
@@ -192,12 +193,16 @@ def list_staging(
     date_to: date | None = Query(None, description="Capturadas hasta este dia, inclusive (hora Colombia)"),
     corroborated: bool | None = Query(None, description="Solo las que otra fuente tambien reporta"),
     view: str | None = Query(None, description="'descartadas' (RF-004) o 'legacy' (senales de fuentes del inventario anterior)"),
+    sort: Literal["puntaje", "recientes"] = Query(
+        "puntaje", description="'puntaje' (cribado + corroboracion) o 'recientes' (fecha de captura)"
+    ),
     limit: int = Query(100, le=500),
     offset: int = Query(0, ge=0),
 ):
     """Senales capturadas aun no asignadas a ningun ciclo.
 
-    Orden: puntaje de cribado + bono de corroboracion (RF-002), luego lo mas reciente.
+    Orden por defecto (`sort=puntaje`): puntaje de cribado + bono de corroboracion
+    (RF-002), luego lo mas reciente. Con `sort=recientes`: fecha de captura descendente.
     """
     corroboration.refresh(db)
     if view == "descartadas":
@@ -230,12 +235,16 @@ def list_staging(
         )
     # Total filtrado para paginar desde la interfaz sin cambiar el contrato de lista.
     response.headers["X-Total-Count"] = str(query.with_entities(func.count(Technology.id)).scalar() or 0)
-    rows = (
-        query.order_by(
+    if sort == "recientes":
+        ordering = (Technology.captured_at.desc(), Technology.id.desc())
+    else:
+        ordering = (
             (Technology.screening_score + func.coalesce(Technology.corroboration_bonus, 0)).desc(),
             Technology.captured_at.desc(),
             Technology.id.desc(),
         )
+    rows = (
+        query.order_by(*ordering)
         .offset(offset)
         .limit(limit)
         .all()
