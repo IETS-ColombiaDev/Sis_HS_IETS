@@ -46,6 +46,10 @@ def enqueue(
     ordered = sorted(sources, key=lambda s: (s.title or "").lower())
     jobs: list[IngestJob] = []
     now = datetime.now(timezone.utc)
+    # Sin cola activa, esto abre una corrida nueva: su inicio delimita el avance.
+    starts_run = (
+        db.query(IngestJob.id).filter(IngestJob.status.in_(("pendiente", "ejecutando"))).first() is None
+    )
     for source in ordered:
         if getattr(source, "retired", False) or source.catalog_active is False:
             continue
@@ -70,10 +74,31 @@ def enqueue(
         )
         db.add(job)
         jobs.append(job)
+    if starts_run and jobs:
+        from . import settings_store
+
+        settings_store._upsert(db, RUN_STARTED_KEY, now.isoformat())
     db.commit()
     for job in jobs:
         db.refresh(job)
     return jobs
+
+
+RUN_STARTED_KEY = "cfg.scan.run_started_at"
+
+
+def run_started_at(db: Session) -> datetime | None:
+    """Inicio de la corrida en curso o de la ultima (lo fija `enqueue`)."""
+    from . import settings_store
+
+    raw = settings_store.get_value(db, RUN_STARTED_KEY, "")
+    try:
+        value = datetime.fromisoformat(raw) if raw else None
+    except ValueError:
+        return None
+    if value is not None and value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value
 
 
 def enqueue_due(db: Session, *, triggered_by: str = "programador") -> list[IngestJob]:
@@ -572,6 +597,9 @@ def persist_record(
         )
         or None,
     )
+    from . import signal_links
+
+    signal_links.annotate(finding, source, query_url=source.url or "")
     db.add(finding)
     db.flush()
 

@@ -140,6 +140,77 @@ def list_findings(
     return [_to_out(db, f) for f in findings]
 
 
+# --------------------------------------------------------------------------- #
+#  RF-001: tipo de enlace de cada senal, evidencia y verificacion
+# --------------------------------------------------------------------------- #
+@router.get("/links/report")
+def links_report(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Conteo por fuente: enlace exacto, pagina de consulta, sin enlace y enlaces caidos."""
+    from .. import signal_links
+
+    out = signal_links.report(db)
+    out["check"] = signal_links.check_state()
+    return out
+
+
+@router.get("/links/report.csv")
+def links_report_csv(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    import csv
+    import io
+
+    from fastapi.responses import StreamingResponse
+
+    from .. import signal_links
+
+    data = signal_links.report(db)
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";", lineterminator="\r\n")
+    writer.writerow(["fuente", "senales", "enlace_exacto", "pagina_de_consulta", "sin_enlace", "sin_clasificar",
+                     "no_responde", "redirige", "bloquea_verificacion", "tipo_predominante"])
+    for row in data["sources"]:
+        writer.writerow([row["source_title"], row["total"], row["exacto"], row["consulta"], row["sin_enlace"],
+                         row["sin_clasificar"], row["caido"], row["redirigido"], row["bloqueado"], row["predominante"]])
+    return StreamingResponse(
+        iter(["\ufeff" + buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="enlaces_por_fuente.csv"'},
+    )
+
+
+@router.post("/links/classify")
+def links_classify(db: Session = Depends(get_db), user: User = Depends(require_permission(P_TECHNOLOGY_WRITE))):
+    """Clasifica las senales ya capturadas y les guarda la evidencia de captura (no cambia la URL)."""
+    from .. import signal_links
+
+    result = signal_links.backfill(db, actor=user.email)
+    bump_state_version(db)
+    return result
+
+
+@router.post("/links/check")
+def links_check(
+    limit: int = Query(2000, ge=1, le=5000),
+    user: User = Depends(require_permission(P_TECHNOLOGY_WRITE)),
+):
+    """Verifica en segundo plano si cada enlace responde. El avance se lee en /links/report."""
+    import threading
+
+    from .. import signal_links
+    from ..database import SessionLocal
+
+    state = signal_links.check_state()
+    if state.get("running"):
+        return state
+    threading.Thread(
+        target=signal_links.check_links,
+        args=(SessionLocal,),
+        kwargs={"limit": limit, "actor": user.email},
+        name="link-check",
+        daemon=True,
+    ).start()
+    return {**state, "running": True}
+
+
 @router.get("/{finding_id}", response_model=FindingOut)
 def get_finding(finding_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     finding = db.get(Finding, finding_id)
@@ -162,6 +233,9 @@ def create_finding(
     data = payload.model_dump()
     content_hash = _hash(data["title"], data.get("url", ""))
     finding = Finding(content_hash=content_hash, **data)
+    from .. import signal_links
+
+    signal_links.annotate(finding, source)
     _apply_screening(finding, db)
     db.add(finding)
     db.commit()

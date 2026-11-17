@@ -3,6 +3,7 @@ import api, { AI_TIMEOUT, apiError } from "../api/client";
 import { useToast } from "./Toast";
 import Button from "./Button";
 import Icon from "./Icon";
+import SignalLinkInfo from "./SignalLinkInfo";
 import "./signal-origin.css";
 
 const VERDICT = {
@@ -129,6 +130,13 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
         {tech.source_title && <div className="so-source">{tech.source_title}</div>}
       </div>
 
+      <SignalLinkInfo
+        url={url}
+        linkType={tech.link_type}
+        linkStatus={tech.link_status}
+        queryUrl={tech.query_url}
+        evidence={tech.evidence}
+      />
       <div className="so-actions">
         {url ? (
           <a
@@ -138,6 +146,7 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
             rel="noopener noreferrer"
             data-testid="signal-url"
             title={url}
+            hidden={Boolean(tech.link_type)}
           >
             <Icon name="external" size={15} />
             <span>Abrir fuente original</span>

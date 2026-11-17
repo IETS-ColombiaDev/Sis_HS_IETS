@@ -17,6 +17,7 @@ import { IETS_PHASES } from "../constants/methodology";
 import { useScreeningThreshold } from "../scan/useScreeningThreshold";
 import { GLOSSARY } from "../constants/glossary";
 import InfoTip from "../components/InfoTip";
+import TechSearch from "../components/TechSearch";
 import "./dashboards.css";
 
 // Que mide cada indicador y como se calcula (criterio operativo: sin
@@ -198,6 +199,8 @@ export default function Dashboard() {
           </Button>
         )}
       </div>
+
+      <TechSearch />
 
       {!work.active_cycle_id && (
         <Card style={{ marginBottom: 20, background: "#FEF3C7", borderColor: "#FDE68A" }} padding={16}>

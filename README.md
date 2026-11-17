@@ -25,12 +25,17 @@ Inspirado en el modelo operativo del [NIHR Innovation Observatory](https://io.ni
 ## Nombre y descripción del proyecto
 
 **Sistema de Escaneo de Horizonte del IETS (Sis_HS_IETS)**  
-**Versión actual:** `7.0.0`
+**Versión actual:** `7.1.0` (17 de noviembre de 2026)
 
 El sistema automatiza el ciclo de vida del monitoreo proactivo y reactivo de tecnologías sanitarias (medicamentos, dispositivos médicos, procedimientos, biológicos, salud digital) antes o durante su llegada al mercado y al Sistema General de Seguridad Social en Salud (SGSSS) de Colombia.
 
 ### Capacidades principales
-- **Vigilancia proactiva multicanal:** Escaneo de 97 fuentes internacionales estructuradas en 6 bloques (agencias regulatorias, agencias de evaluación de tecnologías sanitarias - ETS, registros de ensayos clínicos, revistas científicas, organismos internacionales y portales de noticias). Incluye conectores nativos por API (ClinicalTrials.gov v2, openFDA, EMA, CTIS, PubMed, PCORI, Health Canada) y scraping web con respaldo de RSS oficial y Google News ante bloqueos antibot.
+- **Vigilancia proactiva por enlace:** El inventario es la primera hoja de la matriz `MATRIZ_FUENTES_ESCANEO_EH` (un enlace por fila): 142 filas de 85 organizaciones que dan **141 fuentes**, una por URL distinta, con código `EH-<ID>`. Cada fuente lleva su propio contexto (tipo de material, ruta de acceso, información a consultar, observaciones y restricciones) para que la extracción con IA sepa qué buscar en esa página. 108 se rastrean como página web, 7 se consultan por API oficial (ClinicalTrials.gov v2, PubMed, CTIS, PCORI, EMA, openFDA Drugs@FDA y Health Canada), 8 quedan en consulta manual por restricciones de uso y 18 de información general o metodológica quedan como referencia sin ingesta. El scraping web tiene respaldo de RSS oficial y Google News ante bloqueos antibot.
+- **Avance de la vigilancia en vivo:** Porcentaje ponderado por la etapa de cada fuente en curso, que nunca retrocede y cierra en 100 % solo cuando no queda nada en cola; tiempo estimado de fin y avance visible desde cualquier pantalla.
+- **Enlace a la fuente original (RF-001):** Cada señal guarda aparte la URL consultada y la URL exacta, y distingue (Enlace exacto) de (Página de consulta). Cuando la fuente no ofrece enlace directo, muestra la evidencia de captura (título, fragmento, fecha y hora, URL consultada). Incluye reporte de enlaces por fuente y verificación de enlaces caídos.
+- **Buscador de tecnologías (RF-005):** En la pantalla principal, búsqueda parcial sin tildes ni mayúsculas por nombre, DCI, marca, fabricante, señal o fuente, con módulo, etapa, estado, responsable, último cambio, enlace directo y recorrido por etapas tomado de la bitácora.
+- **Criterios de búsqueda por categoría (RF-006):** Solo Medicamentos y Dispositivos médicos activos; las demás categorías se activan desde Configuración, con registro en bitácora.
+- **Bandeja Legacy:** Las señales pendientes de fuentes del inventario anterior quedan en una pestaña aparte de la Bandeja de entrada, desde donde se pueden recuperar. Nada se borra.
 - **Canal reactivo externo:** Portal público de postulaciones (`/postular`) protegido por Google reCAPTCHA v3 y límite de tasa por IP, exigiendo declaración obligatoria de conflicto de interés (COI).
 - **Procesamiento inteligente y corroboración:** Extracción automática de detalles de producto (forma farmacéutica, concentración, vía de administración, marca, modelo de dispositivo) y detección de tecnologías corroboradas en múltiples fuentes (bono ponderado para la bandeja de entrada).
 - **Depuración y verificación regulatoria:** Motor de desduplicación difusa (Levenshtein, Jaro-Winkler, Token Sort) con soporte de emparejamiento decisivo por identificador NCT, normalización de vocabularios (ATC, CIE-10, MeSH, GMDN/EMDN) y cruce con copia local y consulta en vivo a bases de datos de INVIMA en `datos.gov.co`.
@@ -38,6 +43,7 @@ El sistema automatiza el ciclo de vida del monitoreo proactivo y reactivo de tec
 - **Evaluación temprana y revisión colegiada:** Elaboración de fichas técnicas, informes rápidos o Mini-HTA con control de versiones, revisión por pares internos y externos mediante token temporal sin cuenta requerida, y firma de COI previa.
 - **Diseminación institucional:** Generación de expedientes, fichas públicas y boletines consolidados en **PDF nativo** mediante ReportLab, tablero estratégico con grafo interactivo de gobernanza, y exportación masiva de paquetes ZIP de diseminación.
 - **Gobernanza y auditoría:** Registro inmutable append-only con triggers/permisos a nivel de motor de BD y middleware HTTP que audita cada mutación asociando usuario, IP, ruta, payload anterior y nuevo.
+- **Persistencia en Firestore sin pérdida:** La base SQLite se copia a Firestore por generaciones (una subida cortada no corrompe la copia), conserva la copia anterior como respaldo, no sube nada hasta haber leído la nube al arrancar y bloquea subir una base mucho más pequeña que la guardada.
 
 ---
 
@@ -300,9 +306,13 @@ python -m app.migrations
 
 **Revisiones implementadas:**
 1. `0001_baseline`: Estructura inicial completa (modelos v2 y v3).
-2. `0002_source_matrix_profile`: Parámetros de la matriz EH de 97 fuentes en la entidad `sources`.
+2. `0002_source_matrix_profile`: Parámetros de la matriz EH en la entidad `sources`.
 3. `0003_technology_reliability`: Trazabilidad y dictamen de confiabilidad (`technologies.reliability`).
 4. `0004_product_details_corroboration`: Datos de producto (dosis, forma, vía, marca, modelo), corroboración cruzada entre fuentes (`corroboration_count`, `corroboration_bonus`) y bloqueo de sobreescritura de campos editados.
+5. `0005_signal_links`: Enlace de cada señal a su fuente (`findings.query_url`, `link_type`, `link_status`, `link_http`, `link_checked_at`, `evidence`). No modifica `findings.url`.
+6. `0006_technology_legacy`: Marca `technologies.legacy` para la bandeja Legacy.
+
+Todas son reversibles (`alembic downgrade`) y solo agregan columnas; ninguna borra datos.
 
 ---
 
@@ -314,7 +324,7 @@ cd backend
 .\.venv\Scripts\Activate.ps1
 python -m pytest -q
 ```
-*Cubre motores de priorización, máquinas de estados de ciclos, desduplicación difusa, cruce INVIMA, conectores de ingesta, auditoría, RBAC y persistencia.*
+*Cubre motores de priorización, máquinas de estados de ciclos, desduplicación difusa, cruce INVIMA, conectores de ingesta, auditoría, RBAC, persistencia en Firestore, avance de la vigilancia, enlaces de señales, buscador, matriz por enlace y bandeja Legacy (654 pruebas al 17-11-2026). Las pruebas de la matriz por enlace usan el Excel de `backend/tests/fixtures/matriz_fuentes_escaneo_eh.xlsx`.*
 
 #### Pruebas de navegador de extremo a extremo (Playwright)
 ```powershell
@@ -341,7 +351,7 @@ Sis_HS_IETS/
 ├── backend/
 │   ├── alembic/                    # Control de versiones de esquema con Alembic
 │   │   ├── env.py                  # Configuración del entorno de migración
-│   │   └── versions/               # Revisiones versionadas (0001 a 0004)
+│   │   └── versions/               # Revisiones versionadas (0001 a 0006)
 │   ├── app/
 │   │   ├── main.py                 # Punto de entrada FastAPI, middlewares y montaje de SPA
 │   │   ├── config.py               # Settings validados mediante Pydantic
@@ -364,7 +374,14 @@ Sis_HS_IETS/
 │   │   ├── invima.py               # Sincronización y consulta del registro INVIMA
 │   │   ├── normalization.py        # Normalización de códigos ATC, CIE-10, MeSH, GMDN
 │   │   ├── scraper.py              # Motor de scraping y extracción web con fuentes de respaldo
-│   │   ├── source_matrix.py        # Lector del catálogo Excel de la Matriz EH
+│   │   ├── source_matrix.py        # Lector del Excel de la matriz EH (detecta el formato por enlace)
+│   │   ├── link_matrix.py          # Inventario por enlace (MATRIZ_FUENTES_ESCANEO_EH) y bandeja Legacy
+│   │   ├── catalog.py              # Catálogo verificado D-06 (referencia de API y consulta manual)
+│   │   ├── catalog_service.py      # Sincronización del inventario al arrancar y con (Recargar catálogo)
+│   │   ├── signal_links.py         # Tipo de enlace, evidencia, verificación y reporte de enlaces (RF-001)
+│   │   ├── tech_search.py          # Buscador de tecnologías y recorrido por etapas (RF-005)
+│   │   ├── scan_progress.py        # Estado en vivo de cada fuente durante la vigilancia
+│   │   ├── scan_eta.py             # Tiempo estimado de fin de la vigilancia
 │   │   ├── source_profile.py       # Perfiles de escaneo y configuración por fuente
 │   │   ├── web_search.py           # Consultas web automatizadas de apoyo
 │   │   ├── probe_service.py        # Sonda de salud y disponibilidad de fuentes
@@ -380,7 +397,7 @@ Sis_HS_IETS/
 │   │   ├── scheduler_service.py    # Programador de tareas periódicas de fondo
 │   │   ├── cli.py                  # Interfaz de línea de comandos de administración
 │   │   ├── migrations.py           # Envoltorio de ejecución programática de Alembic
-│   │   ├── data/                   # Archivos maestros (ej. matriz_fuentes_eh.json)
+│   │   ├── data/                   # matriz_enlaces_eh.json (inventario vigente) y matriz_fuentes_eh.json (matriz anterior)
 │   │   ├── ingest/                 # Conectores especializados de fuentes de datos
 │   │   │   ├── base.py             # Clase base abstracta de conectores
 │   │   │   ├── clinicaltrials.py   # Conector ClinicalTrials.gov API v2
@@ -392,8 +409,8 @@ Sis_HS_IETS/
 │   │   │   ├── health_canada.py    # Conector Health Canada (DPD / MDALL)
 │   │   │   ├── who_ictrp.py        # Conector ensayos clínicos de la OMS
 │   │   │   └── file_feed.py        # Ingesta por archivos planos y lotes
-│   │   └── routers/                # 24 módulos de rutas FastAPI (API REST)
-│   ├── tests/                      # 47 suites de pruebas unitarias y de integración
+│   │   └── routers/                # 25 módulos de rutas FastAPI (API REST)
+│   ├── tests/                      # 51 suites de pruebas unitarias y de integración
 │   ├── requirements.txt            # Dependencias fijadas de Python
 │   ├── alembic.ini                 # Configuración del motor Alembic
 │   ├── smoke_test.py               # Suite de regresión integral sobre la API
@@ -418,6 +435,8 @@ Sis_HS_IETS/
 ├── docker-compose.yml              # Orquestación de contenedores (API, Worker, Postgres, Caddy)
 ├── start.ps1                       # Script de arranque rápido de desarrollo en Windows
 ├── start-prod.ps1                  # Script de arranque en modo producción en Windows
+├── GUIA_USUARIO.md                 # Manual de operación por pantalla
+├── NOTAS_DESARROLLADOR.md          # Respuesta por requerimiento al III seguimiento
 └── README.md                       # Documentación técnica principal del proyecto
 ```
 
@@ -433,7 +452,7 @@ El sistema orquesta el ciclo de vida metodológico en seis fases interconectadas
 flowchart TD
     %% 1. Fuentes de Entrada
     subgraph S1 ["1. Entrada y Captura de Senales"]
-        F1["Fuentes Proactivas: 97 referentes (FDA, EMA, ClinicalTrials, Web)"]
+        F1["Fuentes Proactivas: 141 enlaces de la matriz EH (web, API oficial)"]
         F2["Postulacion Ciudadana Reactiva: formulario /postular"]
         SC["Captura: scraper.py y conectores en app/ingest/"]
         SUB["Recepcion: submissions.py (con reCAPTCHA y COI)"]
@@ -525,11 +544,12 @@ flowchart TD
 ### Explicación detallada paso a paso
 
 #### Paso 1: Entrada y captura de señales
-- **Canal proactivo:** Tareas programadas periódicas (`backend/app/scheduler_service.py`) o ejecuciones manuales invocan los conectores de APIs (`backend/app/ingest/clinicaltrials.py`, `fda.py`, `ema.py`, etc.) o el scraper web con resolución de RSS y Google News (`backend/app/scraper.py`). Cada registro extraído se valida y se inserta como un `Finding` (señal) persistente.
+- **Canal proactivo:** Tareas programadas periódicas (`backend/app/scheduler_service.py`) o ejecuciones manuales encolan una tarea por fuente activa; el worker las atiende con tiempo máximo por fuente para que la corrida no se detenga. Cada fuente es un enlace de la matriz por enlace (`backend/app/link_matrix.py`): se consulta por su adaptador de API (`backend/app/ingest/clinicaltrials.py`, `fda.py`, `ema.py`, etc.) o con el scraper web con respaldo de RSS y Google News (`backend/app/scraper.py`), que entrega a la IA el contexto de la fila (qué consultar, ruta de acceso, tipo de material). Cada registro extraído se valida y se inserta como un `Finding` (señal) con la URL consultada, la URL exacta, el tipo de enlace y la evidencia de captura (`backend/app/signal_links.py`).
+- **Inventario de fuentes:** Al arrancar, `catalog_service.sync_catalog` sincroniza el inventario con `backend/app/data/matriz_enlaces_eh.json`, respetando lo editado por el equipo. Las próximas cargas se hacen desde (Catálogo de fuentes) › (Cargar matriz) con el mismo formato; las fuentes que salen de la matriz se retiran sin borrarse.
 - **Canal reactivo:** Ciudadanos u organizaciones ingresan al formulario público `/postular`. El backend valida el captcha (`RECAPTCHA_SECRET`), aplica límites por IP y persiste una postulación (`Submission`) con su declaración de conflicto de intereses. Un evaluador revisa la postulación en `/postulaciones` y, de ser aceptada, la transforma en una señal apta para el flujo de trabajo.
 
 #### Paso 2: Ingesta, extracción y bandeja de entrada (Staging)
-- En `/bandeja-entrada` (`backend/app/routers/technologies.py`), los evaluadores visualizan las señales capturadas.
+- En `/bandeja-entrada` (`backend/app/routers/technologies.py`), los evaluadores visualizan las señales capturadas. La pestaña (Legacy) reúne las señales pendientes de fuentes del inventario anterior y permite recuperarlas.
 - El módulo `backend/app/product_details.py` analiza el título y resumen para inferir automáticamente concentración, forma farmacéutica, vía de administración o modelo de dispositivo.
 - El módulo `backend/app/corroboration.py` contrasta la tecnología contra las demás fuentes registradas. Si la misma innovación aparece en múltiples referentes (p. ej., FDA y EMA), se incrementa su `corroboration_count` y se le otorga un bono de visualización en la bandeja (hasta 15 puntos).
 - El evaluador confirma o ajusta el Clúster de Salud y la Tipología recomendados por `backend/app/classification.py`, y asigna la tecnología al ciclo operativo vigente (`backend/app/technology_service.py`).
@@ -591,5 +611,6 @@ El sistema implementa 5 perfiles definidos en `backend/app/rbac.py`:
 - [`GUIA_USUARIO.md`](GUIA_USUARIO.md): Manual paso a paso de operación de pantallas para cada perfil de usuario.
 - [`BACKLOG.md`](BACKLOG.md): Trazabilidad de Requerimientos Funcionales (RF01 a RF20), diagramas de arquitectura detallados y decisiones de diseño.
 - [`Plan_Fases_Actualizacion_Plataforma_EH_IETS.md`](Plan_Fases_Actualizacion_Plataforma_EH_IETS.md): Cronograma y arquitectura de fases de evolución del sistema.
-- [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md): Detalle técnico de los 97 referentes internacionales monitoreados.
+- [`NOTAS_DESARROLLADOR.md`](NOTAS_DESARROLLADOR.md): Respuesta por requerimiento al III seguimiento (RF-001, OBS-001, OBS-002, RF-005, RF-006) y al reemplazo del inventario por la matriz por enlace, con causa raíz, cambios y pasos de verificación.
+- [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md): Detalle técnico del catálogo verificado D-06 (97 referentes), que desde el 17-11-2026 queda como referencia de adaptadores de API y de consulta manual; el inventario vigente es la matriz por enlace.
 - [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md): Manual de identidad visual, paleta cromática y estándares de componentes.

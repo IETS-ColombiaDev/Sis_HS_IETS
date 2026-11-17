@@ -395,8 +395,10 @@ export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter
   const running = c.ejecutando || 0;
   const queued = c.pendiente || 0;
   const finished = done + failed + cancelled;
-  const pct = progress.total ? Math.round((finished / progress.total) * 100) : 0;
+  const pct = Math.floor(progress.percent_display ?? progress.percent ?? (finished / progress.total) * 100);
   const seg = (n) => `${(n / progress.total) * 100}%`;
+  // Lo avanzado dentro de las fuentes en curso (etapa y páginas), aparte de las terminadas.
+  const runningShare = Math.max(0, (progress.percent_display ?? progress.percent ?? 0) - (finished / progress.total) * 100);
   const eta = progress.eta;
   const rows = progress.sources || [];
   const now = rows.filter((r) => r.job_status === "ejecutando");
@@ -429,7 +431,7 @@ export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter
                 <span className="pulse-dot" aria-hidden="true" /> Vigilancia en curso
               </>
             ) : (
-              "Última vigilancia (últimas 12 h)"
+              <>Última vigilancia · {pct} %</>
             )}
           </div>
           <div className="scan-run-sub">
@@ -494,7 +496,7 @@ export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter
       >
         <span className="seg-ok" style={{ width: seg(done) }} />
         <span className="seg-error" style={{ width: seg(failed + cancelled) }} />
-        <span className="seg-running" style={{ width: seg(running) }} />
+        <span className="seg-running" style={{ width: `${progress.active ? runningShare : 0}%` }} />
       </div>
 
       {progress.active && (
@@ -586,13 +588,13 @@ export function ScanDock({ progress, onOpen }) {
   if (!progress?.active || !progress.total) return null;
   const c = progress.counts || {};
   const finished = (c.ok || 0) + (c.parcial || 0) + (c.error || 0) + (c.cancelado || 0);
-  const pct = Math.round((finished / progress.total) * 100);
+  const pct = Math.floor(progress.percent_display ?? progress.percent ?? (finished / progress.total) * 100);
   const eta = progress.eta;
   const current = (progress.sources || []).find((r) => r.job_status === "ejecutando");
   if (collapsed) {
     return (
       <button type="button" className="scan-dock scan-dock--mini" onClick={() => setCollapsed(false)} aria-label="Mostrar el avance de la vigilancia">
-        <span className="pulse-dot" aria-hidden="true" /> {finished}/{progress.total}
+        <span className="pulse-dot" aria-hidden="true" /> {pct} % · {finished}/{progress.total}
         {eta ? ` · ~${formatDuration(eta.eta_seconds)}` : ""}
       </button>
     );

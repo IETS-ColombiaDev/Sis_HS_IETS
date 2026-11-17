@@ -178,6 +178,14 @@ class Finding(Base):
     # Datos de producto extraidos en la captura (IA o reglas): forma farmaceutica,
     # concentracion, via, marca, modelo, fabricante (ver product_details).
     details: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
+    # Enlace a la fuente original (RF-001, ver signal_links): pagina consultada
+    # aparte de la URL exacta, tipo de enlace, ultima verificacion y evidencia.
+    query_url: Mapped[str] = mapped_column(String(1024), default="")
+    link_type: Mapped[str] = mapped_column(String(20), default="", index=True)  # exacto | consulta | sin_enlace
+    link_status: Mapped[str] = mapped_column(String(20), default="")  # ok | redirigido | caido | bloqueado | sin_verificar
+    link_http: Mapped[int] = mapped_column(Integer, default=0)
+    link_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    evidence: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -479,6 +487,10 @@ class Technology(Base):
     )
     screening_score: Mapped[int] = mapped_column(Integer, default=0)
     merged_into_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    # Senal de una fuente del inventario anterior (retirada al cargar la matriz por
+    # enlace): no aparece en la bandeja de pendientes sino en la bandeja Legacy,
+    # desde donde se puede recuperar (ver link_matrix).
+    legacy: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(

@@ -82,9 +82,11 @@ def test_minimax_strips_unclosed_thinking():
     assert text == ""
 
 
-def test_ocr_off_without_key():
+def test_ocr_off_without_key(monkeypatch):
     # Sin MINIMAX_API_KEY (ni llave en el panel) la IA queda en modo degradado:
-    # no hay llave embebida de respaldo en el codigo.
+    # no hay llave embebida de respaldo en el codigo. Se vacia la llave del
+    # entorno para que el resultado no dependa del backend/.env local.
+    monkeypatch.setattr(minimax_service.settings, "minimax_api_key", "")
     ai_service.configure_runtime(
         provider="minimax",
         ocr_enabled=True,

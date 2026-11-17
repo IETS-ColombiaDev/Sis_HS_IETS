@@ -28,6 +28,8 @@ const MATCH_LABEL = { codigo: "código de catálogo", url: "URL", nombre: "nombr
 function show(value) {
   if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
   if (value === null || value === undefined || value === "") return "—";
+  if (value === true) return "Sí";
+  if (value === false) return "No";
   return String(value);
 }
 
@@ -127,12 +129,16 @@ function ChangedRow({ row, selected, onToggle }) {
             <span>Coincide por {MATCH_LABEL[row.match_reason] || row.match_reason}</span>
             {row.probable && <Badge tone="warning">Coincidencia probable: verifique</Badge>}
             <span>{row.changes.length} campo(s)</span>
+            {row.conflicts > 0 && <Badge tone="danger">{row.conflicts} conflicto(s) con ediciones manuales</Badge>}
           </div>
           <table className="matrix-diff">
             <tbody>
               {row.changes.map((c, i) => (
-                <tr key={`${c.field}-${i}`}>
-                  <th>{c.label}</th>
+                <tr key={`${c.field}-${i}`} className={c.conflict ? "matrix-conflict" : ""}>
+                  <th>
+                    {c.label}
+                    {c.conflict && <div><Badge tone="danger">Editado por el equipo</Badge></div>}
+                  </th>
                   <td className="old">{show(c.current)}</td>
                   <td className="new">{show(c.incoming)}</td>
                 </tr>
@@ -143,6 +149,51 @@ function ChangedRow({ row, selected, onToggle }) {
       </div>
     </div>
   );
+}
+
+/** Reporte descargable de la carga (CSV para Excel): validación, nuevas, cambios, conflictos y ausentes. */
+export function matrixReportCsv(result, applied = null) {
+  const esc = (v) => `"${String(v ?? "").replace(/"/g, '""').replace(/\r?\n/g, " ")}"`;
+  const val = (v) => (Array.isArray(v) ? v.join(" | ") : v ?? "");
+  const lines = [["seccion", "fila_excel", "fuente", "campo", "valor_actual", "valor_matriz", "detalle"]];
+  const v = result.validation || {};
+  lines.push(["resumen", "", "", "filas", "", v.rows ?? result.rows, ""]);
+  lines.push(["resumen", "", "", "fuentes", "", v.sources ?? "", "Una fila puede dar varias fuentes del catálogo y dos filas pueden ser la misma fuente"]);
+  lines.push(["resumen", "", "", "url", "", v.urls ?? "", ""]);
+  (v.issues || []).forEach((i) => lines.push(["inconsistencia", i.excel_row, i.name, i.kind, "", "", i.detail]));
+  (result.new || []).forEach((r) => lines.push(["nueva", r.excel_row, r.name, "url", "", r.url, ""]));
+  (result.changed || []).forEach((r) =>
+    r.changes.forEach((c) =>
+      lines.push([
+        c.conflict ? "conflicto" : "cambio",
+        r.excel_row,
+        r.source_title,
+        c.label,
+        val(c.current),
+        val(c.incoming),
+        c.conflict ? "Campo editado por el equipo: no se pisa salvo que se marque sobrescribir" : "",
+      ])
+    )
+  );
+  (result.missing || []).forEach((m) => lines.push(["ausente_en_matriz", "", m.title, "", "", "", m.matrix_ref]));
+  if (applied) {
+    lines.push(["aplicado", "", "", "creadas", "", applied.created, (applied.created_titles || []).join(" | ")]);
+    lines.push(["aplicado", "", "", "actualizadas", "", applied.updated, (applied.updated_titles || []).join(" | ")]);
+    (applied.skipped || []).forEach((sk) => lines.push(["omitida", "", "", "", "", "", sk]));
+  }
+  return "﻿" + lines.map((l) => l.map(esc).join(";")).join("\r\n");
+}
+
+function saveCsv(text, name) {
+  const blob = new Blob([text], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export default function MatrixImportModal({ open, onClose, onApplied, connectors = [], toast }) {
@@ -258,7 +309,8 @@ export default function MatrixImportModal({ open, onClose, onApplied, connectors
         { token: result.token, create, update: updateList.map((r) => r.key), overwrite, persist },
         { timeout: 60000 }
       );
-      toast?.success(`Matriz aplicada: ${data.created} fuente(s) nuevas, ${data.updated} actualizadas.`);
+      toast?.success(`Matriz aplicada: ${data.created} fuente(s) nuevas, ${data.updated} actualizadas. Se descargó el reporte.`);
+      saveCsv(matrixReportCsv(result, data), `reporte_carga_matriz_${new Date().toISOString().slice(0, 10)}.csv`);
       if (data.skipped?.length) toast?.warning(`Omitidas: ${data.skipped.join("; ")}`);
       reset();
       onApplied?.(data);
@@ -284,6 +336,9 @@ export default function MatrixImportModal({ open, onClose, onApplied, connectors
       </div>
       <div className="fb-toolbar">
         <Button variant="ghost" onClick={reset} disabled={applying}>Cargar otra</Button>
+        <Button variant="secondary" onClick={() => saveCsv(matrixReportCsv(result), "vista_previa_matriz.csv")} disabled={applying} data-testid="matrix-report-download">
+          <Icon name="doc" size={14} /> Descargar reporte
+        </Button>
         <Button onClick={applyNow} loading={applying} disabled={!createList.length && !updateList.length}>
           Aplicar ({createList.length} nuevas, {updateList.length} actualizaciones)
         </Button>
@@ -299,7 +354,7 @@ export default function MatrixImportModal({ open, onClose, onApplied, connectors
   );
 
   return (
-    <Modal open={open} onClose={close} title="Importar matriz de fuentes (Excel o Google Sheets)" width={920} footer={footer}>
+    <Modal open={open} onClose={close} title="Cargar matriz de fuentes (MATRIZ_FUENTES_ESCANEO_EH, Excel o Google Sheets)" width={920} footer={footer}>
       {!result && (
         <div className="matrix-import-source">
           <p style={{ fontSize: 13, color: "#475569", margin: 0 }}>
@@ -359,7 +414,48 @@ export default function MatrixImportModal({ open, onClose, onApplied, connectors
             <Badge tone="warning">{result.summary.cambios} con cambios</Badge>
             <Badge tone="success">{result.summary.sin_cambios} sin cambios</Badge>
             <Badge tone="viewer">{result.summary.ausentes} ausentes en la matriz</Badge>
+            {result.summary.conflictos > 0 && <Badge tone="danger">{result.summary.conflictos} conflicto(s) con ediciones del equipo</Badge>}
           </div>
+          {result.validation && (
+            <section className="matrix-section" data-testid="matrix-validation">
+              <h4>Validación de la matriz</h4>
+              {result.validation.format === "enlaces" ? (
+                <p style={{ fontSize: 13, margin: "0 0 6px" }} data-testid="matrix-validation-links">
+                  Formato por enlace: <strong>{result.validation.rows}</strong> filas de{" "}
+                  <strong>{result.validation.organizations}</strong> organizaciones · <strong>{result.validation.sources}</strong>{" "}
+                  fuentes (una por URL distinta) · <strong>{result.validation.active_links}</strong> de consulta activa y{" "}
+                  <strong>{result.validation.general_links}</strong> de información general o metodológica, que quedan como
+                  referencia sin ingesta.
+                </p>
+              ) : (
+              <p style={{ fontSize: 13, margin: "0 0 6px" }}>
+                <strong>{result.validation.rows}</strong> filas · <strong>{result.validation.sources}</strong> fuentes ·{" "}
+                <strong>{result.validation.urls}</strong> URL de consulta.
+                {result.validation.sources !== result.validation.rows && (
+                  <span style={{ color: "#64748B" }}>
+                    {" "}Hay más fuentes que filas porque {result.validation.rows_with_several_sources?.length || 0} fila(s) corresponden a
+                    varios servicios con código propio en el catálogo (por ejemplo FDA, EMA o Health Canada), y algunas
+                    fuentes aparecen en dos filas.
+                  </span>
+                )}
+              </p>
+              )}
+              {(result.validation.issues || []).length === 0 ? (
+                <p style={{ fontSize: 13, color: "#047857", margin: 0 }}>Sin inconsistencias de cantidad ni URL repetidas.</p>
+              ) : (
+                <ul style={{ fontSize: 13, margin: 0, paddingLeft: 18 }} data-testid="matrix-issues">
+                  {result.validation.issues.map((i, idx) => (
+                    <li key={idx}>
+                      <strong>Fila {i.excel_row} ({i.name}):</strong> {i.detail}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p style={{ fontSize: 12, color: "#64748B", margin: "6px 0 0" }}>
+                Las inconsistencias se informan y no se corrigen solas: ajústelas en la matriz y vuelva a cargarla.
+              </p>
+            </section>
+          )}
           {result.ai_note && (
             <p style={{ fontSize: 12.5, color: "#475569", margin: 0 }}>
               <Icon name="spark" size={13} /> {result.ai_note}
@@ -419,6 +515,24 @@ export default function MatrixImportModal({ open, onClose, onApplied, connectors
                 <Button size="sm" variant="ghost" onClick={() => setShowSame((v) => !v)}>{showSame ? "Ocultar" : "Ver"}</Button>
               </h4>
               {showSame && <p style={{ fontSize: 12.5, color: "#475569" }}>{result.unchanged.map((r) => r.source_title).join(" · ")}</p>}
+            </section>
+          )}
+
+          {(result.legacy || []).length > 0 && (
+            <section className="matrix-section" data-testid="matrix-legacy">
+              <h4>
+                Inventario anterior que pasa a legacy <Badge tone="viewer">{result.legacy.length}</Badge>
+              </h4>
+              <p style={{ fontSize: 12.5, color: "#64748B", margin: "0 0 6px" }}>
+                Con el formato por enlace, la matriz es el inventario completo: al aplicar, estas fuentes se retiran (no se
+                borran) y sus señales pendientes pasan a la pestaña (Legacy) de la Bandeja de entrada, desde donde se pueden
+                recuperar.
+              </p>
+              <ul style={{ fontSize: 12.5, margin: 0, paddingLeft: 18, maxHeight: 160, overflow: "auto" }}>
+                {result.legacy.map((m) => (
+                  <li key={m.source_id}>{m.title} <span style={{ color: "#94A3B8" }}>({m.matrix_ref})</span></li>
+                ))}
+              </ul>
             </section>
           )}
 

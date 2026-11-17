@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-from .source_matrix import entry_urls_for, fold, profile_fields, rows_by_code
+from .source_matrix import entry_urls_for, fold, load_legacy_matrix, profile_fields, rows_by_code
 
 CATALOG_VERSION = "2026-10-23"
 
@@ -1106,7 +1106,7 @@ def _matrix_source(code: str, spec: dict, row: dict) -> dict:
 
 
 def _matrix_sources() -> list[dict]:
-    by_code = rows_by_code()
+    by_code = rows_by_code(load_legacy_matrix())
     out: list[dict] = []
     for code, spec in _MATRIX_NEW.items():
         hit = by_code.get(code)
@@ -1166,7 +1166,7 @@ def _with_matrix(rows: list[dict]) -> list[dict]:
     conserva otra si la fuente es una API oficial, una sub-fuente que comparte fila
     con otra (su pagina especifica) o una excepcion documentada arriba.
     """
-    by_code = rows_by_code()
+    by_code = rows_by_code(load_legacy_matrix())
     for row in rows:
         hit = by_code.get(row["catalog_code"])
         if hit is not None:
@@ -1217,11 +1217,19 @@ def _count(rows: list[dict], key: str) -> dict[str, int]:
 
 def catalog_stats() -> dict:
     rows = CATALOG_SOURCES
+    version = CATALOG_VERSION
+    from . import link_matrix
+
+    packaged = link_matrix.load_packaged()
+    if packaged.get("rows"):
+        # Inventario vigente: una fuente por enlace de la matriz de escaneo EH.
+        rows = link_matrix.build_sources(packaged)
+        version = "matriz_enlaces_eh"
     levels = {k: 0 for k in "ABCDE"}
     for row in rows:
         levels[row["access_level"]] = levels.get(row["access_level"], 0) + 1
     return {
-        "version": CATALOG_VERSION,
+        "version": version,
         "total": len(rows),
         "by_level": levels,
         "by_block": {cat: sum(1 for r in rows if r["category"] == cat) for cat in CATEGORIES},

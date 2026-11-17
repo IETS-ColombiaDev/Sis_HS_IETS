@@ -28,10 +28,21 @@ export function ScanProvider({ children }) {
   const [progress, setProgress] = useState(null);
   const [lastFetch, setLastFetch] = useState(null);
   const wasActive = useRef(false);
+  // Máximo alcanzado en la corrida: la barra nunca retrocede (un reintento
+  // devuelve una fuente al inicio, pero el avance mostrado no baja).
+  const peak = useRef({ run: null, pct: 0 });
 
   const refresh = useCallback(async () => {
     try {
       const { data } = await api.get("/ingest/progress");
+      if (data) {
+        const run = data.run_started_at || "";
+        const raw = runPercent(data);
+        if (peak.current.run !== run) peak.current = { run, pct: 0 };
+        const pct = data.active ? Math.min(99, Math.max(peak.current.pct, raw)) : raw;
+        peak.current.pct = pct;
+        data.percent_display = pct;
+      }
       setProgress(data);
       setLastFetch(Date.now());
       return data;
@@ -78,7 +89,8 @@ export function ScanProvider({ children }) {
     if (progress.active) {
       wasActive.current = true;
       const eta = progress.eta?.eta_seconds != null ? ` · ~${formatDuration(progress.eta.eta_seconds)}` : "";
-      document.title = `(${finished}/${progress.total}${eta}) Vigilancia · ${stripPrefix(document.title)}`;
+      const pct = Math.floor(progress.percent_display ?? 0);
+      document.title = `(${finished}/${progress.total} · ${pct}%${eta}) Vigilancia · ${stripPrefix(document.title)}`;
       return;
     }
     document.title = stripPrefix(document.title);
@@ -96,6 +108,15 @@ export function ScanProvider({ children }) {
   }, []);
 
   return <ScanContext.Provider value={{ progress, refresh, lastFetch }}>{children}</ScanContext.Provider>;
+}
+
+/** Avance de la corrida en %, ponderado por la etapa de cada fuente (lo calcula el servidor). */
+export function runPercent(progress) {
+  if (!progress || !progress.total) return 0;
+  if (typeof progress.percent === "number") return progress.percent;
+  const c = progress.counts || {};
+  const finished = (c.ok || 0) + (c.parcial || 0) + (c.error || 0) + (c.cancelado || 0);
+  return progress.active ? Math.min(99, (finished / progress.total) * 100) : 100;
 }
 
 export function useScan() {

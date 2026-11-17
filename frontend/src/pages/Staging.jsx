@@ -103,7 +103,7 @@ export default function Staging() {
   const params = useCallback(
     (offset) => {
       const p = { limit: PAGE_SIZE, offset };
-      if (view === "descartadas") p.view = "descartadas";
+      if (view === "descartadas" || view === "legacy") p.view = view;
       if (query.q) p.q = query.q;
       if (query.source_id) p.source_id = query.source_id;
       if (query.channel) p.channel = query.channel;
@@ -381,6 +381,22 @@ export default function Staging() {
     }
   };
 
+  // Bandeja Legacy: señales de fuentes del inventario anterior (matriz previa).
+  const doRecover = async (ids) => {
+    setSaving(true);
+    try {
+      const { data } = await api.post("/technologies/staging/recover", { technology_ids: ids });
+      setSelected(new Set());
+      await load();
+      if (data.affected) toast.success(`${data.affected} señal(es) recuperadas a Pendientes.`);
+      if (data.rejected?.length) toast.info(data.rejected.join(" "));
+    } catch (e) {
+      toast.error(apiError(e, "No se pudo recuperar"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const doAssign = async () => {
     setSaving(true);
     try {
@@ -438,6 +454,18 @@ export default function Staging() {
                 data-testid="staging-discard-batch"
               >
                 <Icon name="x" size={16} /> Descartar {selected.size || ""}
+              </Button>
+            )}
+            {canAssign && view === "legacy" && (
+              <Button
+                variant="secondary"
+                onClick={() => doRecover([...selected])}
+                disabled={selected.size === 0}
+                loading={saving}
+                title="Devolver las señales seleccionadas a Pendientes"
+                data-testid="staging-recover-batch"
+              >
+                Recuperar {selected.size || ""}
               </Button>
             )}
             {canAssign && view === "descartadas" && (
@@ -621,6 +649,7 @@ export default function Staging() {
         {[
           { key: "pendientes", label: "Pendientes" },
           { key: "descartadas", label: "Descartadas" },
+          { key: "legacy", label: `Legacy${stats?.legacy ? ` (${stats.legacy})` : ""}` },
         ].map((t) => (
           <button
             key={t.key}
@@ -636,7 +665,19 @@ export default function Staging() {
         ))}
       </div>
 
-      {items.length === 0 && view === "descartadas" ? (
+      {view === "legacy" && (
+        <p className="source-section-note" data-testid="staging-legacy-note" style={{ margin: "0 0 10px" }}>
+          Señales capturadas por las fuentes del inventario anterior, retiradas al cargar la matriz de escaneo por enlace
+          (17-11-2026). No se borraron: siguen en el sistema y en la bitácora. Use (Recuperar) para devolver las que
+          sirvan a Pendientes y clasificarlas como cualquier otra.
+        </p>
+      )}
+
+      {items.length === 0 && view === "legacy" ? (
+        <Card>
+          <EmptyState icon="🗄️" title="Bandeja Legacy vacía" message="No hay señales pendientes de fuentes del inventario anterior." />
+        </Card>
+      ) : items.length === 0 && view === "descartadas" ? (
         <Card>
           <EmptyState icon="🗂️" title="Sin descartadas" message="No hay señales descartadas desde la bandeja." />
         </Card>
@@ -729,8 +770,8 @@ export default function Staging() {
                                 href={item.signal_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                title={`Abrir la fuente original: ${item.signal_url}`}
-                                aria-label={`Abrir la fuente original de ${name.slice(0, 60)}`}
+                                title={`${item.link_type === "exacto" ? "Enlace exacto" : item.link_type === "consulta" ? "Página de consulta (la fuente no ofrece enlace directo)" : "Abrir la fuente original"}: ${item.signal_url}`}
+                                aria-label={`${item.link_type === "consulta" ? "Abrir la página de consulta" : "Abrir la fuente original"} de ${name.slice(0, 60)}`}
                               >
                                 <Icon name="external" size={13} />
                               </a>
@@ -803,6 +844,17 @@ export default function Staging() {
                             Descartar
                           </Button>
                         )}
+                        {canAssign && view === "legacy" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => doRecover([item.id])}
+                            disabled={saving}
+                            data-testid={`staging-recover-${item.id}`}
+                          >
+                            Recuperar
+                          </Button>
+                        )}
                         {canAssign && view === "descartadas" && (
                           <Button
                             variant="ghost"
@@ -823,7 +875,7 @@ export default function Staging() {
           </div>
           <div className="fa-pager">
             <span data-testid="staging-count">
-              Mostrando {items.length} de {total} señal(es) {view === "descartadas" ? "descartadas" : "sin asignar"}
+              Mostrando {items.length} de {total} señal(es) {view === "descartadas" ? "descartadas" : view === "legacy" ? "en Legacy" : "sin asignar"}
               {selected.size ? ` · ${selected.size} seleccionada(s)` : ""}
             </span>
             {items.length < total && (

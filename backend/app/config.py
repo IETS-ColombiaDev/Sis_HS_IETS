@@ -32,7 +32,8 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     allowed_email_domain: str = "iets.org.co"
     admin_emails: str = ""
-    allow_dev_login: bool = False
+    # TODO: apagar cuando el equipo lo decida (RNF12).
+    allow_dev_login: bool = True
     # Acceso con correo y contrasena (cuentas creadas por el superadministrador).
     password_min_length: int = 10
     login_max_attempts: int = 5

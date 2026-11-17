@@ -304,11 +304,27 @@ def update_web_search(
     user: User = Depends(require_permission(P_CONFIG_MANAGE)),
 ):
     from .. import source_profile
+    from ..audit import record_action
 
+    before = source_profile.load_search(db)
     try:
         cfg = source_profile.save_search(db, payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # Bitacora con antes y despues (sin la llave de Brave). RF-006: activar o
+    # desactivar una categoria de busqueda queda registrado.
+    hidden = {"brave_api_key", "brave_api_key_set", "brave_api_key_masked", "limits"}
+    changed = [k for k in cfg if k not in hidden and before.get(k) != cfg.get(k)]
+    if changed:
+        record_action(
+            db,
+            entity_type="config",
+            entity_id="web_search",
+            action="config:web_search",
+            old_value={k: before.get(k) for k in changed},
+            new_value={k: cfg.get(k) for k in changed},
+        )
+        db.commit()
     return _search_out(cfg, db)
 
 

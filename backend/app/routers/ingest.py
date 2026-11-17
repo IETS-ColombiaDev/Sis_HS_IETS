@@ -99,6 +99,49 @@ _STAGE_FROM_STATUS = {
     "cancelado": "cancelada",
 }
 PROGRESS_WINDOW_HOURS = 12
+# Cuanto de una fuente se da por hecho segun su etapa. Una fuente tarda minutos:
+# contar solo las terminadas dejaba la barra en 0 % mientras la primera corria.
+STAGE_WEIGHT = {
+    "en_cola": 0.0,
+    "sonda": 0.05,
+    "conectando": 0.1,
+    "accedida": 0.2,
+    "buscando": 0.3,
+    "recorriendo": 0.35,
+    "extrayendo": 0.8,
+    "guardando": 0.92,
+}
+RUNNING_CAP = 0.97
+
+
+def source_fraction(row: dict) -> float:
+    """Avance de una fuente entre 0 y 1. Terminada (bien, con error o cancelada) = 1."""
+    status = row.get("job_status")
+    if status in ("ok", "parcial", "error", "cancelado"):
+        return 1.0
+    if status != "ejecutando":
+        return 0.0
+    stage = row.get("stage") or "conectando"
+    frac = STAGE_WEIGHT.get(stage, 0.1)
+    if stage == "recorriendo":
+        planned = int(row.get("pages_planned") or 0)
+        visited = int(row.get("pages_visited") or 0)
+        if planned:
+            frac += 0.4 * min(1.0, visited / planned)
+    # Un reintento arranca de nuevo, pero la fuente ya gasto intentos: no retrocede a 0.
+    if (row.get("attempts") or 0) > 1:
+        frac = max(frac, 0.1)
+    return min(frac, RUNNING_CAP)
+
+
+def run_percent(rows: list[dict], active: bool) -> float:
+    """Avance ponderado de la corrida. 100 solo cuando no queda nada en cola ni en curso."""
+    if not rows:
+        return 0.0
+    if not active:
+        return 100.0
+    pct = 100.0 * sum(source_fraction(r) for r in rows) / len(rows)
+    return round(min(pct, 99.0), 1)
 
 
 def _utc(value: datetime | None) -> datetime | None:
@@ -121,7 +164,7 @@ def ingest_progress(
     mientras haya trabajo pendiente.
     """
     from .. import scan_eta, scan_progress
-    from ..ingest_service import job_timeout_seconds, parallel_jobs
+    from ..ingest_service import job_timeout_seconds, parallel_jobs, run_started_at
     from ..worker import is_running, keepalive_url
 
     since = datetime.now(timezone.utc) - timedelta(hours=PROGRESS_WINDOW_HOURS)
@@ -142,9 +185,19 @@ def ingest_progress(
 
     # Con una corrida activa, el avance cuenta SOLO esa corrida: mezclar las fuentes
     # de una corrida anterior (ultimas 12 h) mostraba "77 de 87" en una de 14.
+    # Tambien al terminar: la "ultima vigilancia" es esa corrida, no las ultimas 12 h,
+    # asi el resumen cierra en 100 % con las fuentes que de verdad se corrieron.
     running_now = [j for j in latest.values() if j.status in ("pendiente", "ejecutando")]
+    stored_start = run_started_at(db)
+    run_start = None
     if running_now:
-        run_start = min(_utc(j.created_at) or datetime.now(timezone.utc) for j in running_now) - timedelta(seconds=5)
+        run_start = min(_utc(j.created_at) or datetime.now(timezone.utc) for j in running_now)
+        if stored_start is not None:
+            run_start = min(run_start, stored_start)
+    elif stored_start is not None and stored_start >= since:
+        run_start = stored_start
+    if run_start is not None:
+        run_start -= timedelta(seconds=5)
         latest = {
             sid: j
             for sid, j in latest.items()
@@ -222,8 +275,15 @@ def ingest_progress(
         row["typical_seconds"] = typical.get(row["source_id"])
     order = {"ejecutando": 0, "pendiente": 1, "error": 2, "parcial": 3, "ok": 4, "cancelado": 5}
     out.sort(key=lambda r: (order.get(r["job_status"], 9), r["source_title"].lower()))
+    active = counts["pendiente"] + counts["ejecutando"] > 0
+    finished = counts["ok"] + counts["parcial"] + counts["error"] + counts["cancelado"]
+    for row in out:
+        row["fraction"] = round(source_fraction(row), 3)
     return {
-        "active": counts["pendiente"] + counts["ejecutando"] > 0,
+        "active": active,
+        "percent": run_percent(out, active),
+        "finished": finished,
+        "run_started_at": run_start + timedelta(seconds=5) if run_start is not None else None,
         "worker_running": is_running(),
         "parallel": lanes,
         "job_timeout_minutes": int(timeout_s // 60),

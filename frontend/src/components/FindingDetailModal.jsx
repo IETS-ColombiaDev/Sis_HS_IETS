@@ -4,6 +4,7 @@ import HintButton from "./HintButton";
 import Badge from "./Badge";
 import Icon from "./Icon";
 import NotesPanel from "./NotesPanel";
+import SignalLinkInfo from "./SignalLinkInfo";
 import { TermLabel } from "./InfoTip";
 import { ScreeningScore } from "./TriageBoard";
 import { HORIZON_LABELS, STATUS_LABELS } from "../constants/methodology";
@@ -53,8 +54,15 @@ export default function FindingDetailModal({
         <DL label="Capturada" value={finding.created_at ? new Date(finding.created_at).toLocaleString() : ""} />
         <DL label="Informes" value={finding.recommendations_count ? `${finding.recommendations_count} recomendación(es)` : ""} />
 
+        <SignalLinkInfo
+          url={finding.link || finding.url}
+          linkType={finding.link_type}
+          linkStatus={finding.link_status}
+          queryUrl={finding.query_url}
+          evidence={finding.evidence}
+        />
         <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {finding.url && (
+          {finding.url && !finding.link_type && (
             <a href={finding.link || finding.url} target="_blank" rel="noopener noreferrer" title={finding.url}>
               <Button variant="secondary" size="sm"><Icon name="external" size={14} /> Enlace original</Button>
             </a>

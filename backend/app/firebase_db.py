@@ -35,7 +35,14 @@ PUSH_DEBOUNCE_S = 5.0
 PUSH_MIN_INTERVAL_S = 120.0
 _last_push_at = 0.0
 # Con una vigilancia en curso la copia espera mas: la CPU es para el rastreo.
-PUSH_MIN_INTERVAL_SCANNING_S = 300.0
+PUSH_MIN_INTERVAL_SCANNING_S = 180.0
+# Una copia local que pesa menos de esta fraccion de la que esta en la nube no se
+# sube sola: casi siempre es una base recien sembrada tras un arranque en el que
+# no se pudo leer Firestore, y subirla borraria el trabajo guardado.
+SHRINK_GUARD_RATIO = 0.5
+# Hasta leer Firestore con exito al arrancar no se sube nada: si la lectura fallo
+# (red, cuota), la base local es la sembrada vacia y pisaria la buena.
+_pull_ok = False
 
 
 def _min_interval() -> float:
@@ -340,6 +347,43 @@ def fetch_meta() -> dict | None:
         "raw_size": _read_i(fields, "raw_size"),
         "gzip_size": _read_i(fields, "gzip_size"),
         "chunk_count": _read_i(fields, "chunk_count"),
+        "gen": _read_s(fields, "gen"),
+        "prev_gen": _read_s(fields, "prev_gen"),
+        "prev_sha256": _read_s(fields, "prev_sha256"),
+        "prev_chunk_count": _read_i(fields, "prev_chunk_count"),
+        "prev_taken_at": _read_s(fields, "prev_taken_at"),
+        "prev_raw_size": _read_i(fields, "prev_raw_size"),
+    }
+
+
+def _chunk_id(gen: str, i: int) -> str:
+    """Id del fragmento i. Cada copia escribe en su propia generacion: la anterior
+    sigue intacta hasta que el meta apunta a la nueva, asi un corte a mitad de la
+    subida nunca deja la nube con fragmentos mezclados."""
+    return f"g{gen}{CHUNK_PREFIX}{i:04d}" if gen else f"{CHUNK_PREFIX}{i:04d}"
+
+
+def _chunk_owner(doc_id: str) -> tuple[str, int] | None:
+    """(generacion, indice) de un documento de fragmento; None si no lo es."""
+    if doc_id.startswith("g") and CHUNK_PREFIX in doc_id[1:]:
+        gen, _, idx = doc_id[1:].rpartition(CHUNK_PREFIX)
+        if gen and idx.isdigit():
+            return gen, int(idx)
+    if doc_id.startswith(CHUNK_PREFIX) and doc_id[len(CHUNK_PREFIX):].isdigit():
+        return "", int(doc_id[len(CHUNK_PREFIX):])
+    return None
+
+
+def _previous_meta(meta: dict) -> dict | None:
+    """La copia anterior que se conserva como respaldo (si la hay)."""
+    if not meta.get("prev_chunk_count"):
+        return None
+    return {
+        "gen": meta.get("prev_gen") or "",
+        "sha256": meta.get("prev_sha256") or "",
+        "chunk_count": meta.get("prev_chunk_count") or 0,
+        "taken_at": meta.get("prev_taken_at") or "",
+        "raw_size": meta.get("prev_raw_size") or 0,
     }
 
 
@@ -347,9 +391,10 @@ def _fetch_payload(meta: dict) -> bytes:
     count = int(meta.get("chunk_count") or 0)
     if count <= 0:
         raise RuntimeError("La copia en Firestore no trae fragmentos.")
+    gen = meta.get("gen") or ""
     parts: list[bytes] = []
     for i in range(count):
-        fields = _get_doc(f"{CHUNK_PREFIX}{i:04d}")
+        fields = _get_doc(_chunk_id(gen, i))
         if not fields:
             raise RuntimeError(f"Falta el fragmento {i} de {count} en Firestore.")
         parts.append(_read_b(fields, "data"))
@@ -361,7 +406,7 @@ def _fetch_payload(meta: dict) -> bytes:
     return payload
 
 
-def push_now(*, force: bool = False) -> dict:
+def push_now(*, force: bool = False, allow_shrink: bool = False) -> dict:
     if not enabled():
         return {"ok": False, "reason": "disabled"}
     if not firebase_auth.configured():
@@ -369,12 +414,19 @@ def push_now(*, force: bool = False) -> dict:
     if not _sync_lock.acquire(timeout=SYNC_WAIT_S):
         return {"ok": False, "reason": "busy"}
     try:
-        return _push_locked(force=force)
+        if not _pull_ok:
+            # Nunca se sube sin antes haber leido la nube: se reintenta la lectura.
+            _pull_locked()
+            if not _pull_ok:
+                _status["error"] = "Copia en pausa: aún no se pudo leer Firestore; se reintenta sola."
+                _status["synced"] = False
+                return {"ok": False, "reason": "pull_pending"}
+        return _push_locked(force=force, allow_shrink=allow_shrink)
     finally:
         _sync_lock.release()
 
 
-def _push_locked(*, force: bool) -> dict:
+def _push_locked(*, force: bool, allow_shrink: bool = False) -> dict:
     global _last_sha, _status, _busy, _last_push_at
     _last_push_at = time.monotonic()
     _busy = True
@@ -387,27 +439,66 @@ def _push_locked(*, force: bool) -> dict:
         _status = {**_status, "synced": True, "skipped": True, "taken_at": snap.get("taken_at")}
         return {"ok": True, "skipped": True, "sha256": digest}
 
+    cloud = fetch_meta() or {}
+    raw_size = int(snap.get("raw_size") or 0)
+    cloud_raw = int(cloud.get("raw_size") or 0)
+    if not allow_shrink and cloud_raw and raw_size < cloud_raw * SHRINK_GUARD_RATIO:
+        msg = (
+            f"Copia bloqueada: la base local ({raw_size} bytes) es mucho menor que la guardada "
+            f"en Firestore ({cloud_raw} bytes). Se conserva la de la nube para no perder información."
+        )
+        log.error(msg)
+        _status = {**_status, "synced": False, "error": msg, "blocked_shrink": True}
+        return {"ok": False, "reason": "shrink_guard", "local_raw_size": raw_size, "cloud_raw_size": cloud_raw}
+
+    gen = digest[:12]
     chunks = [payload[i : i + CHUNK_BYTES] for i in range(0, len(payload), CHUNK_BYTES)] or [b""]
     for i, chunk in enumerate(chunks):
-        _put_doc(f"{CHUNK_PREFIX}{i:04d}", {"n": _iv(i), "data": _bv(chunk)})
-    _put_doc(
-        META_ID,
-        {
-            "epoch": _sv(str(snap.get("epoch") or "")),
-            "fingerprint": _sv(str(snap.get("fingerprint") or "")),
-            "taken_at": _sv(str(snap.get("taken_at") or "")),
-            "sha256": _sv(digest),
-            "raw_size": _iv(int(snap.get("raw_size") or 0)),
-            "gzip_size": _iv(len(payload)),
-            "chunk_count": _iv(len(chunks)),
-            "updated_at": _sv(datetime.now(timezone.utc).isoformat()),
-        },
-    )
+        _put_doc(_chunk_id(gen, i), {"n": _iv(i), "data": _bv(chunk)})
+    meta_fields = {
+        "epoch": _sv(str(snap.get("epoch") or "")),
+        "fingerprint": _sv(str(snap.get("fingerprint") or "")),
+        "taken_at": _sv(str(snap.get("taken_at") or "")),
+        "sha256": _sv(digest),
+        "raw_size": _iv(raw_size),
+        "gzip_size": _iv(len(payload)),
+        "chunk_count": _iv(len(chunks)),
+        "gen": _sv(gen),
+        "updated_at": _sv(datetime.now(timezone.utc).isoformat()),
+    }
+    # La copia anterior queda de respaldo: si la nueva no se puede leer, se restaura esa.
+    if cloud.get("chunk_count") and (cloud.get("gen") or "") != gen:
+        prev = {
+            "gen": cloud.get("gen") or "",
+            "sha256": cloud.get("sha256") or "",
+            "chunk_count": int(cloud.get("chunk_count") or 0),
+            "taken_at": cloud.get("taken_at") or "",
+            "raw_size": cloud_raw,
+        }
+    else:
+        prev = _previous_meta(cloud)
+    if prev:
+        meta_fields.update(
+            {
+                "prev_gen": _sv(prev["gen"]),
+                "prev_sha256": _sv(prev["sha256"]),
+                "prev_chunk_count": _iv(int(prev["chunk_count"] or 0)),
+                "prev_taken_at": _sv(prev["taken_at"]),
+                "prev_raw_size": _iv(int(prev["raw_size"] or 0)),
+            }
+        )
+    # El meta se escribe al final: hasta aqui la nube sigue apuntando a la copia anterior completa.
+    _put_doc(META_ID, meta_fields)
+    keep = {gen: len(chunks)}
+    if prev and prev["gen"] != gen:
+        keep[prev["gen"]] = int(prev["chunk_count"] or 0)
     for doc_id in _list_ids():
-        if doc_id.startswith(CHUNK_PREFIX) and doc_id[len(CHUNK_PREFIX) :].isdigit():
-            n = int(doc_id[len(CHUNK_PREFIX) :])
-            if n >= len(chunks):
-                _delete_doc(doc_id)
+        owner = _chunk_owner(doc_id)
+        if owner is None:
+            continue
+        doc_gen, idx = owner
+        if doc_gen not in keep or idx >= keep[doc_gen]:
+            _delete_doc(doc_id)
     _last_sha = digest
     _status = {
         "configured": True,
@@ -446,6 +537,14 @@ def pull_if_needed() -> dict:
 
 
 def _pull_locked() -> dict:
+    global _pull_ok
+    result = _pull_inner()
+    if result.get("ok"):
+        _pull_ok = True
+    return result
+
+
+def _pull_inner() -> dict:
     global _last_sha, _status, _busy
     if not enabled():
         _status = {"configured": firebase_auth.configured(), "enabled": False}
@@ -468,7 +567,15 @@ def _pull_locked() -> dict:
 
     _busy = True
     try:
-        payload = _fetch_payload(cloud)
+        try:
+            payload = _fetch_payload(cloud)
+        except Exception as exc:  # noqa: BLE001
+            prev = _previous_meta(cloud)
+            if prev is None:
+                raise
+            log.warning("Copia actual ilegible (%s); se restaura la anterior (%s).", exc, prev.get("taken_at"))
+            payload = _fetch_payload(prev)
+            cloud = {**cloud, **prev}
         browser_backup.restore_snapshot(payload, force=True)
         _last_sha = cloud.get("sha256") or hashlib.sha256(payload).hexdigest()
         _status = {
@@ -504,6 +611,19 @@ def schedule_push() -> None:
         if _timer is not None:
             _timer.cancel()
         _timer = threading.Timer(delay, _flush)
+        _timer.daemon = True
+        _timer.start()
+
+
+def push_soon() -> None:
+    """Copia pronto (sin el minimo entre copias): al terminar una vigilancia."""
+    global _timer
+    if not _autosync or not enabled():
+        return
+    with _lock:
+        if _timer is not None:
+            _timer.cancel()
+        _timer = threading.Timer(PUSH_DEBOUNCE_S, _flush)
         _timer.daemon = True
         _timer.start()
 

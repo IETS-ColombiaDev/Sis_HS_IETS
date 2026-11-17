@@ -46,6 +46,9 @@ def _to_out(db: Session, source: Source) -> SourceOut:
     out.url_origin_label = prov["label"]
     out.matrix_url = prov["matrix_url"]
     out.url_note = prov["note"]
+    if not source_profile.source_priority_enabled(db):
+        # OBS-001: criterio retirado; el historico queda en la base, no en pantalla ni exportaciones.
+        out.priority_level = ""
     return out
 
 
@@ -232,6 +235,14 @@ async def import_matrix_file(
         if not parsed.get("rows"):
             raise HTTPException(status_code=409, detail="No hay matriz empaquetada: suba el Excel.")
         persist = False
+    if parsed.get("format") == "enlaces":
+        from .. import link_matrix
+
+        summary = link_matrix.apply(db, parsed, actor=user.email, overwrite=overwrite)
+        if persist:
+            link_matrix.write_packaged(parsed)
+        bump_state_version(db)
+        return summary
     summary = catalog_service.import_matrix(
         db, parsed, overwrite=overwrite, persist=persist, triggered_by=user.email
     )
@@ -510,6 +521,8 @@ def create_source(
     user: User = Depends(require_permission(P_SOURCE_WRITE)),
 ):
     data = payload.model_dump()
+    if not source_profile.source_priority_enabled(db):
+        data["priority_level"] = ""  # OBS-001
     data["title"] = (data.get("title") or "").strip()
     data["url"] = (data.get("url") or "").strip()
     _validate(data)
@@ -593,6 +606,8 @@ def update_source(
     if not source:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fuente no encontrada")
     data = payload.model_dump(exclude_unset=True)
+    if not source_profile.source_priority_enabled(db):
+        data.pop("priority_level", None)  # OBS-001: criterio retirado, se ignora
     if "title" in data and data["title"] is not None:
         data["title"] = data["title"].strip()
     if "url" in data and data["url"] is not None:
