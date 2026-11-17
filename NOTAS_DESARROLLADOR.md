@@ -259,3 +259,29 @@ Simulación sobre la copia de la base local (124 fuentes, 1.126 señales): se cr
 - La vigilancia completa recorre 115 fuentes con ingesta (antes 95), así que tardará más en el plan gratuito de Render, que procesa una fuente a la vez.
 - Health Canada solo conserva la API de medicamentos, porque la matriz clasifica sus enlaces como MED; la API de dispositivos del catálogo anterior queda sin usar.
 - Para las próximas cargas, el ID de cada enlace debe mantenerse estable: es lo que identifica la fuente (EH-ID) y conserva su historial.
+
+---
+
+## Validación integral y funcionamiento sin IA ni OCR (17-11-2026)
+
+**Estado:** CUMPLIDO PARCIAL, 17-11-2026. Verificado en un servidor local con una copia de la base, contra los sitios reales y con la IA y el OCR apagados; falta repetirlo en el sistema desplegado.
+
+**Qué se probó:**
+1. Ingreso real con correo y contraseña: la contraseña errada se rechaza (401) y la correcta entra.
+2. Primera vigilancia real sobre 12 fuentes del inventario por enlace, sin IA: ClinicalTrials.gov, PubMed, openFDA, EMA y CTIS por API; pipelines de Novartis, AbbVie y Roche; FDA, TGA, Science Daily y Abbott por página web. Todas terminaron sin error.
+3. Herramientas sin IA: vista previa de enlace, dictamen de confiabilidad (solo chequeos), clasificación y verificación de enlaces, buscador y recorrido por etapas, asistente IA (respuesta de respaldo con datos del sistema), asistente de navegación (buscador local), barrido de duplicados, bandeja Legacy e informe de acceso.
+4. Suites automáticas: backend completo y pruebas de navegador (Playwright).
+
+**Causa raíz de lo que falló y se ajustó:**
+- Sin IA, la extracción por reglas guardaba menús ("2024 Device Approvals"), noticias de ciencia general ("NASA… Moon Base") y notas corporativas (patrocinios, adquisiciones). Se agregó un filtro de reglas (`scraper.rules_gate`) que se aplica cuando la IA no decide: descarta menús, tarjetas de navegación, páginas administrativas y textos sin evidencia de tecnología sanitaria en el propio título. Las filas de pipeline se conservan siempre.
+- Error previo en la clasificación por tipo: las raíces "therap", "vaccin", "device", "drug" exigían fin de palabra, por lo que "Therapy", "vaccines", "devices" o "drugs" no se reconocían y muchas señales quedaban como "otro". Se corrigieron las expresiones.
+- Los nombres generados para las fuentes por enlace usaban la ruta de la URL y desbordaban las tarjetas en pantallas de 390 px. Ahora se arman con el tipo de material recortado por palabras, o con el dominio y el número del enlace; las tarjetas parten textos largos.
+- Tres pruebas de navegador estaban desactualizadas frente a cambios ya aprobados (prioridad de fuente retirada por OBS-001 y rótulos legibles de los parámetros). Se actualizaron.
+- La versión del sistema decía 7.0.0; se dejó en 7.1.0.
+
+**Resultado de la vigilancia sin IA, antes y después del filtro:** FDA página de dispositivos de 12 a 2 señales (los 10 descartados eran menús); TGA de 40 a 4; Science Daily de 32 a 13 (solo noticias de salud con tecnología); AbbVie de 26 a 19; Abbott de 2 a 0 (eran páginas corporativas). Las API y los pipelines no cambiaron.
+
+**Pendientes y limitaciones:**
+- Páginas que cargan su contenido con JavaScript (por ejemplo el pipeline de Roche) no entregan datos sin navegador: quedan con pocas o ninguna señal y conviene revisarlas con IA activa o por consulta manual.
+- Sin OCR no se leen PDF escaneados como imagen.
+- La calidad sin IA es menor que con IA: el filtro reduce el ruido, pero la clasificación fina (fase, horizonte, área) es mejor con IA.

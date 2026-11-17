@@ -356,12 +356,28 @@ def _catalog_index() -> tuple[dict[str, dict], dict[str, dict]]:
     return by_code, manual_hosts
 
 
+TITLE_DETAIL_CHARS = 60
+
+
+def _short(text: str, limit: int = TITLE_DETAIL_CHARS) -> str:
+    """Recorta en un limite de palabra: el nombre se lee entero en pantallas angostas."""
+    text = re.sub(r"\s+", " ", text or "").strip(" .,;:-")
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0].rstrip(" .,;:-")
+    return f"{cut}…"
+
+
 def _title(row: dict, taken: set[str]) -> str:
-    detail = row["material_type"] or ""
-    if not detail or len(detail) > 70:
-        parts = urlsplit(row["url"])
-        path = (parts.path or "").strip("/")
-        detail = (row["domain"] + ("/" + path if path else ""))[:70] if row["url"] else ""
+    """Nombre de la fuente: organizacion y que es el enlace (tipo de material).
+
+    Nunca usa la ruta de la URL: una cadena larga sin espacios desbordaba las
+    tarjetas en pantallas de 390 px. Sin tipo de material, el dominio y el N°.
+    """
+    detail = _short(row.get("material_type") or "")
+    if not detail:
+        number = row.get("original_number") or ""
+        detail = f"{row.get('domain') or ''}" + (f" (enlace {number})" if number else "")
     title = f"{row['name']} · {detail}" if detail else row["name"]
     if title.lower() in taken:
         title = f"{title} (ID {row['link_id']})"

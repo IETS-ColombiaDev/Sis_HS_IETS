@@ -32,7 +32,7 @@ test.describe("fuentes · superadministrador", () => {
     await card.getByRole("button", { name: "Editar" }).click();
     await page.locator("#source-connector").selectOption("fixture");
     await page.locator("#source-access").selectOption("C");
-    await page.locator("#source-priority").selectOption("alta");
+    // OBS-001: la fuente ya no tiene prioridad (criterio retirado el 06-11-2026).
     await page.locator("#source-tier").selectOption("primaria");
     await page.getByTestId("flow-ocr").uncheck();
     await page.locator("#source-frequency").selectOption("semanal");
@@ -46,7 +46,7 @@ test.describe("fuentes · superadministrador", () => {
     await expectToast(page, "Fuente actualizada");
     card = await openSourceCard(page, name);
     await expect(card).toContainText("Acceso C");
-    await expect(card).toContainText("Prioridad Alta");
+    await expect(card).not.toContainText("Prioridad"); // OBS-001: la fuente no muestra prioridad
     await expect(card).toContainText("Primaria");
     await expect(card.locator(".flow-chip.off")).toHaveText(["OCR"]);
     await expect(card).toContainText("fixture");

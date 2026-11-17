@@ -79,7 +79,8 @@ _DRUG_SUFFIX = re.compile(
     re.I,
 )
 _TYPE_DISPOSITIVO = re.compile(
-    r"\b(device|dispositiv|implant|wearable|sensor|equipo|medtech|instrument|catheter|cat[eé]ter|robot|imaging|imagen|scanner|prosthes|pr[oó]tesis|stent|pump|monitor|diagnostic kit)\b",
+    # Raices seguidas de \w*: "devices", "implants", "monitoring" (con \b final no coincidian).
+    r"\b(device|dispositiv|implant|wearable|sensor|equipo|medtech|instrument|catheter|cat[eé]ter|robot|imaging|imagen|scanner|prosthes|pr[oó]tesis|stent|pump|monitor|diagnostic kit)\w*",
     re.I,
 )
 _TYPE_DIGITAL = re.compile(
@@ -87,7 +88,8 @@ _TYPE_DIGITAL = re.compile(
     re.I,
 )
 _TYPE_MEDICAMENTO = re.compile(
-    r"\b(drug|medicine|medicament|therap|terapia|treatment|tratamiento|vaccin|vacuna|antibod|anticuerp|inhibitor|inhibidor|biolog|farmac|monoclonal|cell therapy|terapia celular|gene therapy|terapia g[eé]nica|car-?t|oncolog|molecul)\b",
+    # Raices seguidas de \w*: "therapy", "vaccines", "drugs" (con \b final no coincidian).
+    r"\b(drug|medicine|medicament|therap|terapia|treatment|tratamiento|vaccin|vacuna|antibod|anticuerp|inhibitor|inhibidor|biolog|farmac|f[aá]rmac|monoclonal|cell therapy|terapia celular|gene therapy|terapia g[eé]nica|car-?t\b|oncolog|molecul)\w*",
     re.I,
 )
 
@@ -1129,6 +1131,153 @@ def _summarize(text: str, limit: int = 600) -> str:
     return cut + "..."
 
 
+# --------------------------------------------------------------------------- #
+#  Filtro por reglas cuando la IA no decide
+# --------------------------------------------------------------------------- #
+# Sin IA (apagada, sin cupo, sin respuesta o con error) los candidatos salen de
+# puntuar textos de la pagina: entran menus ("2024 Device Approvals"), noticias
+# de ciencia general y notas corporativas. Este filtro deja solo los que traen
+# evidencia de una tecnologia sanitaria en su propio texto.
+_GENERIC_WORDS = set(
+    """
+    device devices medical approval approvals approved clearance clearances cleared recently recent
+    humanitarian exemption exemptions listing list lists database databases search product products drug drugs
+    medicine medicines guidance information overview program programs resources news update updates innovation
+    innovations research development pipeline our science technology technologies solutions health healthcare care
+    services about center centre excellence digital premarket biologics vaccines blood therapy therapies cellular gene
+    home page portfolio professionals professional specialties specialty clinical trials trial studies study reports
+    report publications publication documents document data download human use under evaluation new latest annual year
+    market marketing authorisations authorizations authorisation authorization granted collection collections
+    supporting submission submissions review reviews regulatory regulation regulations frequently asked questions faq
+    insights insight spotlight stories story media press releases release center hub areas area therapeutic
+    pharmaceuticals pharmaceutical diagnostics diagnostic products portfolio medicamentos dispositivos medicos
+    informacion general listado nuevos nuevas aprobaciones aprobados registro registros investigacion desarrollo
+    innovacion noticias actualizaciones salud tecnologias tecnologia
+    treatment treatments treat aesthetics procedures procedure regulated radiation emitting classification orders
+    listings which novo granted diagnose diseases conditions affect fewer individuals people patients archived
+    disease condition affects per united states than or
+    s more learn read view all see find
+    """.split()
+)
+_STOP_WORDS = set(
+    "a an and the of for to in on with by from that have has been be is are at as or its this these those "
+    "de del la las el los y en para por con que se un una al".split()
+)
+_CORPORATE = re.compile(
+    r"\b(partner(ship)?s?|sponsor\w*|named|appoint\w*|award\w*|ranked|recogni[sz]ed|best places|workplace|"
+    r"formula 1|f1 team|community|charit\w*|foundation|sustainab\w*|esg|ceo|board of directors|acquisition|"
+    r"acquires?|merger|completes|celebrat\w*|anniversary|volunteer\w*|scholarship|careers?)\b",
+    re.I,
+)
+# Sufijos de DCI inequivocos para el filtro sin IA: los de _DRUG_SUFFIX como
+# "-ase" o "-sen" tambien aparecen en palabras comunes ("release", "chosen").
+_STRICT_DRUG_SUFFIX = re.compile(
+    r"\b\w{3,}(mab|tinib|nib|ciclib|gepant|parib|gliflozin|glutide|glipron|sertib|lisib|degib|denib|afenib|limus|"
+    r"kinra|leucel|temcel|sartan|prazole|navir|previr|buvir|tegravir|lukast|dronate|parin|mycin|cillin|floxacin|"
+    r"cycline|platin|taxel|rubicin|tecan|cept)\b",
+    re.I,
+)
+# Formas farmaceuticas y presentaciones: un producto concreto aunque su DCI no tenga sufijo conocido.
+_DOSAGE_FORM = re.compile(
+    r"\b(tablets?|capsules?|injection|injectable|infusion|solution for|film[- ]coated|vials?|syringes?|"
+    r"inhaler|cream|ointment|suspension|\d+(\.\d+)?\s?(mg|mcg|µg|ml|iu)\b|comprimidos?|c[aá]psulas?|inyectable|"
+    r"soluci[oó]n (inyectable|oral))\b",
+    re.I,
+)
+# Ancla de salud en el titulo: sin ella, "robot", "AI" o "launch" son ciencia o
+# tecnologia general (Science Daily, noticias), no tecnologia sanitaria.
+_HEALTH_ANCHOR = re.compile(
+    r"\b(patients?|pacientes?|disease|enfermedad|clinic\w*|cl[ií]nic\w*|health\w*|salud|medic\w*|m[eé]dic\w*|"
+    r"drugs?|f[aá]rmac\w*|pharma\w*|therap\w*|terap\w*|treat\w*|tratam\w*|cancer|c[aá]ncer|tumou?rs?|oncolog\w*|"
+    r"diagnos\w*|surg\w*|cirug\w*|hospital\w*|vaccin\w*|vacun\w*|fda|ema|invima|approv\w*|aprob\w*|"
+    r"devices?|dispositiv\w*|implant\w*|blood|sangre|heart|cardi\w*|brain|neuro\w*|alzheim\w*|parkinson\w*|"
+    r"diabet\w*|obesity|infect\w*|antibiot\w*|sleep|pain|dolor|leuk\w*|lymphom\w*|myelom\w*|sclerosis|"
+    r"migraine|arthritis|psoria\w*|asthma|copd|hiv|hepatitis|kidney|renal|liver|lung|stroke|dementia|"
+    r"trials?|ensayos?|phase|fase|biosimilar\w*|generic\w*|molecul\w*|antibod\w*|insulin\w*|dose|dosis)\b",
+    re.I,
+)
+_PRODUCT_TOKEN = re.compile(r"(\b[A-Za-z]+[- ]?\d{2,}[A-Za-z0-9]*\b|[®™])")
+# Paginas administrativas de una agencia (guias, formularios, tramites): no son una tecnologia.
+_ADMIN_PAGE = re.compile(
+    r"^(report(ing)?|submit|apply|about|fulfilling|how to|add or update|contact)\b|"
+    r"\b(regulatory guidelines|guidelines for|guidance (for|on)|information for (pharmacists|prescribers|health professionals|consumers)|"
+    r"reporting form|checklist|framework|scheme|goods orders|disclosure log|news and events|standards for|"
+    r"to consult on|consultation|listings? of)\b",
+    re.I,
+)
+# Texto de una tarjeta de navegacion: el titulo y su descripcion quedan pegados
+# sin espacio ("Clinical trialsInnovation...", "Genentech PipelineOur R&D...").
+_CARD_BLURB = re.compile(r"[a-z]{3,}[A-Z][a-z]{2,}")
+_REG_EVENT = re.compile(
+    r"\b(approv\w*|clearance|cleared|authori[sz]\w*|designation|breakthrough|510\(k\)|pma|de novo|nct\d{6,}|"
+    r"phase\s*(i{1,3}|[123])\b|fase\s*(i{1,3}|[123])\b|clinical trial|ensayo|launch\w*|lanzamiento|recall|"
+    r"aprobaci[oó]n|aprobad\w*|registro sanitario)\b",
+    re.I,
+)
+
+
+def _words(text: str) -> list[str]:
+    folded = _fold(re.sub(r"\([^)]*\)", " ", text or ""))
+    return re.findall(r"[a-z0-9]+", folded)
+
+
+def is_navigation_title(title: str) -> bool:
+    """Titulo de menu o seccion: casi solo palabras genericas y ningun nombre de producto."""
+    if _PRODUCT_TOKEN.search(title or ""):
+        return False
+    words = [w for w in _words(title) if w not in _STOP_WORDS and not re.fullmatch(r"\d+", w)]
+    if not words:
+        return False
+    generic = sum(1 for w in words if w in _GENERIC_WORDS)
+    return generic == len(words) or (len(words) >= 6 and generic / len(words) >= 0.75)
+
+
+def has_tech_evidence(text: str) -> bool:
+    return bool(
+        _TYPE_MEDICAMENTO.search(text)
+        or _TYPE_DISPOSITIVO.search(text)
+        or _TYPE_DIGITAL.search(text)
+        or _STRICT_DRUG_SUFFIX.search(text)
+        or _DOSAGE_FORM.search(text)
+        or _TECH_PATTERN.search(text)
+        or _REG_EVENT.search(text)
+    )
+
+
+def is_health_title(title: str) -> bool:
+    return bool(_HEALTH_ANCHOR.search(title) or _STRICT_DRUG_SUFFIX.search(title) or _DOSAGE_FORM.search(title))
+
+
+def rules_gate(findings: list[dict], keep=None) -> list[dict]:
+    """Candidatos que pasan las reglas sin IA. `keep(item)` conserva datos estructurados."""
+    summaries: dict[str, int] = {}
+    for f in findings:
+        key = (f.get("summary") or "").strip()
+        if key:
+            summaries[key] = summaries.get(key, 0) + 1
+    out: list[dict] = []
+    for f in findings:
+        if keep and keep(f):
+            out.append(f)
+            continue
+        title = (f.get("title") or "").strip()
+        summary = (f.get("summary") or "").strip()
+        # Un resumen repetido en varios candidatos es la descripcion de la pagina, no del item.
+        own = summary if summary and summaries.get(summary, 0) < 3 else ""
+        if not title or _NEWS_NOISE.search(title) or _CORPORATE.search(title) or _BLOCK.search(title) or _ADMIN_PAGE.search(title):
+            continue
+        # Tarjeta: palabras pegadas y una descripcion larga (un nombre como GlaxoSmithKline va en titulos cortos).
+        if is_navigation_title(title) or (_CARD_BLURB.search(title[:80]) and len(title.split()) > 12):
+            continue
+        if not has_tech_evidence(f"{title} {own}"):
+            continue
+        # El titulo debe hablar de salud: el texto del contenedor suele traer el menu de la pagina.
+        if not is_health_title(title):
+            continue
+        out.append(f)
+    return out
+
+
 def _is_pipeline_row(item: dict) -> bool:
     from .ingest.pipeline_rows import parse_row
 
@@ -1169,12 +1318,15 @@ def _enrich_with_ai(
                 reason = "IA apagada o sin configurar en Configuración › IA: solo extracción por reglas"
             else:
                 reason = "IA y OCR apagados en el flujo de esta fuente: solo extracción por reglas"
-            scan_progress.note("ai", used=False, reason=reason, final=len(findings_data))
+            gated = rules_gate(findings_data, keep_heuristic)
+            scan_progress.note(
+                "ai", used=False, reason=reason, final=len(gated), rules_dropped=len(findings_data) - len(gated)
+            )
             if isinstance(crawl, dict) and not (allow_ai and allow_ocr):
                 crawl.setdefault("steps", []).append(
                     {"action": "ia", "status": "omitido", "ms": 0, "detail": "IA y OCR apagados en el flujo de esta fuente"}
                 )
-            return findings_data
+            return gated
         t0 = time.perf_counter()
         report: dict = {}
         pages = len((crawl or {}).get("pages") or []) or 1
@@ -1225,12 +1377,16 @@ def _enrich_with_ai(
             )
         if replaced:
             return ai_web.merge_findings(kept, extra) if extra else kept
+        # La IA no respondio de forma legible: los candidatos de reglas pasan el filtro.
+        # Si respondio sin decidir (documentos), se conservan como antes y se suman los suyos.
+        gated = findings_data if report.get("answered") else rules_gate(findings_data, keep_heuristic)
         if extra:
-            return ai_web.merge_findings(findings_data, extra)
+            return ai_web.merge_findings(gated, extra)
+        return gated
     except Exception as exc:  # noqa: BLE001
-        scan_progress.note("ai", used=True, error=f"{type(exc).__name__}: {str(exc)[:120]}", final=len(findings_data))
-        return findings_data
-    return findings_data
+        gated = rules_gate(findings_data, keep_heuristic)
+        scan_progress.note("ai", used=True, error=f"{type(exc).__name__}: {str(exc)[:120]}", final=len(gated))
+        return gated
 
 
 # --------------------------------------------------------------------------- #
@@ -1482,7 +1638,8 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                 )
             # Un canal de Google News sin items pertinentes no tiene nada que leer.
             if news_fallback and not (crawl or {}).get("combined"):
-                scan_progress.note("ai", used=False, reason="El respaldo de Google News no trajo ítems pertinentes: nada que leer", final=0)
+                findings_data = rules_gate(findings_data)
+                scan_progress.note("ai", used=False, reason="El respaldo de Google News no trajo ítems pertinentes: nada que leer", final=len(findings_data))
             if not news_fallback or (crawl or {}).get("combined"):
                 findings_data = _enrich_with_ai(
                     findings_data,

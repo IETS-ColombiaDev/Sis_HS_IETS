@@ -734,6 +734,22 @@ Prueba un enlace sin registrar fuente. Útil antes de un alta rápida. No debe u
 
 ---
 
+### 9.10 Si la IA o el OCR no están disponibles
+
+La vigilancia no se detiene sin IA. Cuando la IA está apagada, sin cupo, sin respuesta o con error, el sistema sigue así:
+
+| Herramienta | Sin IA ni OCR |
+|---|---|
+| Registros por API (ClinicalTrials.gov, PubMed, openFDA, EMA, CTIS, ICTRP, PCORI, Health Canada) | Igual que con IA: los datos vienen estructurados de la API |
+| Páginas web y tablas de pipeline | Extracción por reglas con filtro de calidad: se descartan menús y secciones, noticias de ciencia sin relación con salud, notas corporativas y páginas administrativas. Las filas de pipeline se conservan siempre |
+| Documentos PDF | Se lee el texto con el extractor de PDF; sin OCR no se leen PDF escaneados como imagen |
+| (¿Es confiable?) | Dictamen solo con los chequeos automáticos |
+| Asistente IA | Responde con los datos del sistema (modelo "fallback (sin IA)") |
+| Asistente de navegación | Usa el buscador local de pantallas |
+| Buscador, enlaces, duplicados, INVIMA, priorización | No dependen de la IA |
+
+En la ficha de la fuente, en (Vigilancia), el paso de extracción dice "IA apagada o sin configurar: solo extracción por reglas" y cuántos candidatos descartó el filtro.
+
 ## 10. Bandeja de entrada (staging)
 
 **Ruta:** `/bandeja-entrada` · **Menú:** Bandeja de entrada
