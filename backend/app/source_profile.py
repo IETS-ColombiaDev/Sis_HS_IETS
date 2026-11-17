@@ -289,10 +289,21 @@ def source_context(source, options: dict | None = None) -> str:
         meta.append("Tipos de tecnologia: " + ", ".join(option_label(opts, "tech_type", t) for t in techs))
     if meta:
         lines.append("- " + " | ".join(meta))
+    aliases = [a for a in (getattr(source, "aliases", None) or []) if isinstance(a, str) and a]
+    if aliases:
+        lines.append(f"- Organizacion: {aliases[0][:160]}")
+    if getattr(source, "entity_type", ""):
+        lines.append(f"- Tipo de entidad: {getattr(source, 'entity_type')}")
+    if (getattr(source, "verification_status", "") or "") == "matriz_enlaces_eh":
+        lines.append(
+            "- Este enlace es una pagina concreta de la matriz de escaneo EH: extraiga solo tecnologias "
+            "sanitarias que aparezcan en esta pagina y que correspondan a lo que indica 'Que consultar'."
+        )
     for label, attr, size in (
         ("Que consultar", "consult_info", 500),
         ("Ruta de acceso", "access_path", 300),
         ("Tipo de material", "material_type", 200),
+        ("Observaciones del equipo", "observations", 300),
         ("Restricciones", "usage_restrictions", 200),
     ):
         value = re.sub(r"\s+", " ", getattr(source, attr, "") or "").strip()

@@ -235,6 +235,14 @@ async def import_matrix_file(
         if not parsed.get("rows"):
             raise HTTPException(status_code=409, detail="No hay matriz empaquetada: suba el Excel.")
         persist = False
+    if parsed.get("format") == "enlaces":
+        from .. import link_matrix
+
+        summary = link_matrix.apply(db, parsed, actor=user.email, overwrite=overwrite)
+        if persist:
+            link_matrix.write_packaged(parsed)
+        bump_state_version(db)
+        return summary
     summary = catalog_service.import_matrix(
         db, parsed, overwrite=overwrite, persist=persist, triggered_by=user.email
     )

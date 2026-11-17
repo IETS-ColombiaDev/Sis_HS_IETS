@@ -185,7 +185,12 @@ def test_hidden_hyperlink_is_ignored_when_text_has_urls():
 
 
 @needs_matrix
-def test_upload_matrix_preview_shows_validation_and_conflicts(api):  # noqa: F811
+def test_upload_matrix_preview_shows_validation_and_conflicts(api, monkeypatch, tmp_path):  # noqa: F811
+    from app import link_matrix
+
+    # Matriz anterior (una fila por organizacion) sobre el catalogo D-06.
+    monkeypatch.setattr(link_matrix, "DATA_FILE", tmp_path / "sin_matriz_enlaces.json")
+    source_matrix._cache = None
     api.post("/api/ingest/sources/import")
     with api.db() as db:
         fda = db.query(Source).filter(Source.catalog_code == "FP-RG-01").one()

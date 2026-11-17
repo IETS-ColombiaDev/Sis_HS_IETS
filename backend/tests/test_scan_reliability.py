@@ -9,6 +9,18 @@ from app import database, ingest_service, priority, scan_eta, scan_progress, wor
 from app.models import Finding, IngestJob, MethodologyParam, Source
 
 
+
+@pytest.fixture(autouse=True)
+def _catalogo_d06(monkeypatch, tmp_path):
+    """Estas pruebas validan el catalogo D-06 y la matriz anterior (una fila por
+    organizacion): se desactiva la matriz por enlace empaquetada."""
+    from app import link_matrix, source_matrix
+
+    monkeypatch.setattr(link_matrix, "DATA_FILE", tmp_path / "sin_matriz_enlaces.json")
+    source_matrix._cache = None
+    yield
+    source_matrix._cache = None
+
 def _job(db, sid, **kw):
     data = {"source_id": sid, "connector": "html", "status": "pendiente", "attempts": 0, "max_attempts": 3}
     data.update(kw)

@@ -214,3 +214,48 @@ Conteo de URL de consulta por tipo de tecnología de la fila (verificación pedi
 - La limitación aplica a los términos de búsqueda web. Las fuentes con adaptador de API (ClinicalTrials.gov, openFDA, PubMed, Health Canada, CTIS) y el recorrido de las páginas de la matriz no usan estas categorías y siguen trayendo lo que publica cada fuente.
 
 **Texto para la matriz (III Seguimiento):** Se revisó la matriz por tipo de tecnología: de las 128 URL de consulta, 55 son de filas DM, 43 de MED, 49 de filas multitecnología, 28 de IA, 10 de SaMD y 6 de biomédicos. En (Configuración) › (Parámetros de fuentes) › (Criterios de búsqueda por categoría) cada categoría tiene ahora la casilla (Activa) y el escaneo solo usa los términos de las categorías activas. Quedaron activas Medicamentos y Dispositivos médicos; las otras nueve quedan inactivas, no eliminadas, y se pueden activar desde Configuración sin cambios de código, con registro en bitácora. No se reclasificaron ni borraron señales ya capturadas. Queda pendiente que el equipo técnico decida si Dispositivos implantables, Equipos biomédicos y Dispositivos de monitoreo hacen parte de Dispositivos médicos o permanecen inactivos; mientras tanto quedan inactivos. Se actualizó la sección 25.6 de la Guía.
+
+---
+
+## Inventario de fuentes por enlace (MATRIZ_FUENTES_ESCANEO_EH)
+
+**Estado:** CUMPLIDO PARCIAL, 17-11-2026. Implementado, probado con pruebas automáticas y simulado sobre una copia de la base local; falta verificarlo en el sistema desplegado.
+
+**Solicitud:** eliminar las fuentes existentes y cargar como inventario la primera hoja del Excel MATRIZ_FUENTES_ESCANEO_EH (2).xlsx, dejar ese formato para las próximas cargas y que el flujo de escaneo use esa información para saber qué buscar.
+
+**Decisión tomada con el usuario:** las fuentes anteriores no se borran de la base, porque el borrado en cascada eliminaría todas las señales capturadas. Se retiran y se marcan como legacy; sus señales pendientes pasan a una bandeja (Legacy) desde donde se pueden recuperar. Cada fila del Excel es una fuente propia (una por enlace).
+
+**Resultado con el archivo recibido:** 142 filas de 85 organizaciones, 123 de consulta activa y 19 de información general o metodológica. Quedan 141 fuentes porque la URL de RedETS está en los ID 91 y 92 (se informa y se carga una vez). La hoja RESUMEN del archivo dice 141 enlaces, pero la hoja de la matriz tiene 142 filas: incluye EUDAMED (ID 142).
+
+| Tipo de fuente | Cantidad | Tratamiento |
+|---|---|---|
+| Consulta activa con rastreo web | 107 | Recorre el enlace (máximo 12 páginas) con el contexto de su fila |
+| Consulta activa por API oficial | 8 | ClinicalTrials.gov (ID 102), PubMed (101), ICTRP (103), CTIS (107), PCORI (99), EMA (61), openFDA Drugs@FDA (56) y Health Canada (65) heredan el adaptador del catálogo D-06 |
+| Consulta manual, sin ingesta | 8 | Boston Scientific (16 y 17), EMA (59 y 60, validación humana), Scopus (115), Synapse (117), Embase (119), IHSI (123) |
+| Información general o metodológica | 18 | Referencia sin ingesta |
+
+Simulación sobre la copia de la base local (124 fuentes, 1.126 señales): se crearon 141 fuentes EH, se retiraron las 124 anteriores como legacy, no se borró ninguna señal y 1.094 señales pendientes pasaron a la bandeja Legacy. Una segunda pasada no cambió nada, y una señal recuperada no volvió a Legacy.
+
+**Qué se cambió:**
+- Módulo nuevo `backend/app/link_matrix.py`: lectura del formato por enlace, validación (URL repetida o inválida, ID repetido, tipo de tecnología no reconocido), construcción de cada fuente, vista previa de la carga, aplicación al inventario con retiro legacy y bandeja Legacy.
+- `backend/app/data/matriz_enlaces_eh.json`: la matriz empaquetada. Al arrancar, el servidor sincroniza el inventario con ella (`catalog_service.sync_catalog`); la primera vez reemplaza el inventario anterior y después solo actualiza, respetando lo editado por el equipo.
+- `backend/app/source_matrix.py`: reconoce el formato por enlace en la primera hoja; el catálogo D-06 queda como referencia y lee la matriz anterior.
+- Contexto para la IA (`source_profile.source_context`): organización, tipo de entidad, instrucción de extraer solo lo que corresponde a la página y a "Que consultar", y las observaciones del equipo.
+- Migración reversible `0006_technology_legacy.py`: columna `technologies.legacy`. Probada bajando a 0005 y volviendo a subir sobre una copia de la base, sin pérdida de registros.
+- Endpoints: `GET /api/technologies/staging?view=legacy`, `POST /api/technologies/staging/recover` (permiso de asignación de la bandeja, bitácora `staging:recover_legacy`), conteo `legacy` en `/api/technologies/staging/stats`. El cargue registra `matrix_links_apply` y, por fuente, `matrix_update`.
+- Interfaz: pestaña (Legacy) con (Recuperar) en la Bandeja de entrada; en (Cargar matriz), validación del formato por enlace y lista (Inventario anterior que pasa a legacy).
+- Pruebas: `backend/tests/test_matriz_enlaces.py` (21 pruebas) con el Excel recibido como insumo de prueba en `backend/tests/fixtures/`. Las pruebas del catálogo D-06 se mantienen validando ese modo.
+
+**Dónde se ve en el sistema:** (Catálogo de fuentes), con las fuentes EH; (Bandeja de entrada) › pestaña (Legacy); (Catálogo de fuentes) › (Cargar matriz) para las próximas cargas.
+
+**Cómo verificarlo:**
+1. Después del despliegue, entre a (Catálogo de fuentes) y confirme que aparecen las fuentes con código EH (141 en total) y ninguna fuente activa del inventario anterior.
+2. Abra una fuente, por ejemplo Abbott · Información de tecnologias Innovadoras, y confirme que trae su tipo de material, ruta de acceso e información a consultar.
+3. Entre a (Bandeja de entrada) › pestaña (Legacy) y confirme que aparecen las señales del inventario anterior.
+4. Recupere una señal con (Recuperar) y confirme que aparece en Pendientes.
+5. Ejecute la vigilancia de una fuente EH y revise en (Vigilancia) que se accedió al enlace de la matriz.
+
+**Pendientes y limitaciones:**
+- La vigilancia completa recorre 115 fuentes con ingesta (antes 95), así que tardará más en el plan gratuito de Render, que procesa una fuente a la vez.
+- Health Canada solo conserva la API de medicamentos, porque la matriz clasifica sus enlaces como MED; la API de dispositivos del catálogo anterior queda sin usar.
+- Para las próximas cargas, el ID de cada enlace debe mantenerse estable: es lo que identifica la fuente (EH-ID) y conserva su historial.

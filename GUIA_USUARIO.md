@@ -19,6 +19,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 | **Cargar matriz** desde el Catálogo de fuentes: validación, vista previa de diferencias y conflictos, reporte descargable y bitácora (OBS-002) | [8.10](#810-cargar-matriz-paso-a-paso) y [30.1](#301-origen) |
 | **Buscador de tecnologías** en la pantalla principal, con módulo, etapa, estado y recorrido (RF-005) | [6.4](#64-buscar-una-tecnología-o-señal) |
 | **Criterios de búsqueda**: solo Medicamentos y Dispositivos médicos activos; las demás categorías se activan desde Configuración (RF-006) | [25.6](#256-parámetros-de-fuentes-matriz-eh) |
+| **Nuevo inventario de fuentes**: la matriz MATRIZ_FUENTES_ESCANEO_EH (primera hoja, un enlace por fila) reemplaza el catálogo anterior: 141 fuentes, una por enlace. Las fuentes anteriores quedan retiradas y sus señales pendientes pasan a la pestaña (Legacy) de la Bandeja de entrada | [8.1](#81-para-qué-sirve), [8.10](#810-cargar-matriz-paso-a-paso), [10.10](#1010-bandeja-legacy) y [30.1](#301-origen) |
 
 ### Novedades del 27 de octubre de 2026
 
@@ -447,9 +448,18 @@ Solo ciclos en configuración **sin trabajo**. Si ya hay tecnologías asignadas,
 
 ### 8.1 Para qué sirve
 
-Es el inventario maestro: **qué sitios** se vigilan, con qué **adaptador**, cada cuánto, con qué **prioridad** y con qué **flujo** (recorrido, OCR, IA, búsqueda web).
+Es el inventario maestro: **qué enlaces** se vigilan, con qué **adaptador**, cada cuánto y con qué **flujo** (recorrido, OCR, IA, búsqueda web).
 
-Hay **97 fuentes** en seis bloques, alineadas a la matriz «Fuentes de información proactiva EH», con **128 URL de consulta SI EAA** (columna «Cant URL SI EAA»). El indicador «Fuentes del catálogo» muestra **96** porque AHRQ queda inactiva (consulta manual); las retiradas del inventario anterior se cuentan aparte.
+Desde el 17 de noviembre de 2026 el inventario es la primera hoja de la matriz **MATRIZ_FUENTES_ESCANEO_EH** (hoja MATRIZ ESCANEO, un enlace por fila): **142 filas de 85 organizaciones**, que dan **141 fuentes**, una por URL distinta (la URL de RedETS aparece en dos filas y se carga una vez). Cada fuente tiene el código EH- seguido del ID de la fila y lleva su propio contexto: tipo de material, ruta de acceso, información a consultar, observaciones y restricciones.
+
+| Tipo de enlace | Fuentes | Qué hace el sistema |
+|---|---|---|
+| Consulta activa con rastreo web | 107 | Recorre el enlace (hasta 12 páginas) y extrae señales con el contexto de la fila |
+| Consulta activa por API oficial | 8 | ClinicalTrials.gov, PubMed, ICTRP de la OMS, CTIS, PCORI, EMA, openFDA (Drugs@FDA) y Health Canada se consultan por su API, que entrega datos estructurados; la URL de la matriz queda como referencia |
+| Consulta manual | 8 | Sitios con validación humana, registro de usuario o prohibición de rastreo (Boston Scientific, dos enlaces de EMA, Scopus, Synapse, Embase, IHSI): quedan en el catálogo sin ingesta |
+| Información general o metodológica | 18 | Quedan como referencia, sin ingesta |
+
+La búsqueda web dentro del dominio se hace una sola vez por dominio (desde su primer enlace activo), para no repetir la misma búsqueda en cada enlace de una organización. Las fuentes del inventario anterior quedan retiradas, no borradas (ver 10.10).
 
 ### 8.2 Las tres pestañas
 
@@ -629,6 +639,10 @@ Las tarjetas y la ficha de la fuente ya no muestran etiquetas de prioridad ni (P
 ### 8.10 Cargar matriz (paso a paso)
 
 **Quién:** perfiles con permiso de edición de fuentes (superadministrador, evaluador técnico y evaluador clínico). Los demás ven el botón deshabilitado con la explicación.
+
+**Formato vigente.** La primera hoja del Excel MATRIZ_FUENTES_ESCANEO_EH, con un enlace por fila y estas columnas: ID, Tipo de Entidad, Nivel de Fuente, Fuente verificada, Sitio / organización, País, Tipo de Tecnología, Origen del enlace, N° original, URL, Dominio, Tipo de material, Ruta de acceso, Información a consultar, Observaciones, Estructura de publicación, Formato, Frecuencia de actualización, Idioma, Disponibilidad de Interfaz y Restricciones de uso. El ID identifica la fuente entre cargas (código EH-ID): no lo cambie para un enlace que ya existe. Las hojas Criterios de búsqueda y Fuentes sin buscador se leen como apoyo. El sistema reconoce solo el formato; el formato anterior (una fila por organización) se sigue aceptando.
+
+Con el formato por enlace la matriz es el inventario completo: al aplicar, las fuentes que no son de la matriz pasan a legacy (se retiran, no se borran) y la vista previa las lista en (Inventario anterior que pasa a legacy). Las registradas a mano por el equipo se conservan.
 
 **Explicación sencilla.** La matriz de fuentes es el Excel donde el equipo técnico lista las fuentes que el sistema debe vigilar y las URL de cada una. Cargar la matriz es entregarle al sistema la versión nueva de ese Excel. El sistema la lee, la compara con lo que ya tiene y le muestra qué cambiaría, sin guardar nada. Usted revisa y confirma. Solo entonces el sistema aplica los cambios, le entrega un reporte y deja registro en la bitácora de quién hizo el cargue y qué cambió.
 
@@ -824,6 +838,16 @@ En el panel (Origen de la señal) y en la ficha de la señal el enlace lleva una
 | **Sin enlace** | La señal no trae URL | Use la evidencia de captura |
 
 Si la verificación de enlaces encontró que la URL no responde o redirige a la portada, aparece además la marca (No responde) o (Redirige a otra página).
+
+### 10.10 Bandeja Legacy
+
+La pestaña (Legacy) de la Bandeja de entrada reúne las señales pendientes de las fuentes del inventario anterior, retiradas al cargar la matriz por enlace. No se borró nada: las señales, sus tecnologías y la bitácora siguen en el sistema.
+
+1. Abra (Bandeja de entrada) y pulse la pestaña (Legacy). El número entre paréntesis es cuántas hay.
+2. Revise cada señal como en Pendientes (filtros, enlace a la fuente, evidencia).
+3. Pulse (Recuperar) en una señal, o seleccione varias y pulse (Recuperar N), para devolverlas a Pendientes y clasificarlas o asignarlas al ciclo.
+
+Solo pasan a Legacy las señales que estaban sin asignar. Las que ya estaban en un ciclo, fusionadas o descartadas siguen donde estaban. Una señal recuperada no vuelve a Legacy en los siguientes arranques. Recuperar requiere permiso de asignación de la bandeja y queda en bitácora (acción staging:recover_legacy).
 
 ### 10.8 De dónde salen los datos de producto
 
@@ -1538,6 +1562,8 @@ Los tips (i) de la interfaz usan el mismo lenguaje; si un término no cuadra, ab
 ## 30. Anexo: matriz EH y flujo de escaneo
 
 ### 30.1 Origen
+
+**Inventario vigente (desde el 17-11-2026).** Archivo MATRIZ_FUENTES_ESCANEO_EH, primera hoja (MATRIZ ESCANEO, un enlace por fila): 142 filas de 85 organizaciones, 123 de consulta activa y 19 de información general o metodológica. Da 141 fuentes porque la URL de RedETS está en los ID 91 y 92 (se informa como inconsistencia y se carga una vez). La hoja RESUMEN del archivo dice 141 enlaces; la hoja de la matriz tiene 142 filas (incluye EUDAMED, ID 142). Lo que sigue en esta sección describe la matriz anterior (una fila por organización), que se conserva como referencia del catálogo D-06.
 
 Archivo **«FUENTES DE INFORMACION PROACTIVA EH»**:
 

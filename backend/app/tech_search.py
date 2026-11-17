@@ -89,6 +89,9 @@ def _state(db: Session, tech: Technology) -> dict:
         label = "Fusionada por duplicado"
         flags.append(f"Fusionada en «{_name(merged)}»" if merged else "Fusionada por duplicado")
         module, stage, path = ("Módulo 1. Identificación", "Filtrado y depuración", "/filtrado")
+    elif status == "capturada_no_asignada" and getattr(tech, "legacy", False):
+        label = "Legacy (fuente del inventario anterior)"
+        module, stage, path = ("Módulo 1. Identificación", "Bandeja de entrada (Legacy)", "/bandeja-entrada")
     elif status == "excluida" and entry is None:
         label = "Descartada en la bandeja"
         module, stage, path = ("Módulo 1. Identificación", "Bandeja de entrada (descartadas)", "/bandeja-entrada")

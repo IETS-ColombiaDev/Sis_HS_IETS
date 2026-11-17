@@ -852,6 +852,7 @@ class TechnologyOut(BaseModel):
     raw_origin: str = ""
     # URL mas especifica de la senal (propia, del hallazgo o del crudo).
     signal_url: str = ""
+    legacy: bool | None = False
     # Tipo de enlace de la senal (RF-001): exacto | consulta | sin_enlace, y evidencia de captura.
     link_type: str = ""
     link_status: str = ""
@@ -957,6 +958,8 @@ class StagingStats(BaseModel):
     # RF-002: senales sin asignar que otra fuente tambien reporta.
     corroborated: int = 0
     discarded: int = 0
+    # Senales de fuentes del inventario anterior (bandeja Legacy).
+    legacy: int = 0
 
 
 # =========================================================================== #

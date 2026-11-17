@@ -76,6 +76,12 @@ def seed_sources_if_empty() -> None:
     db = SessionLocal()
     try:
         sync_catalog(db, triggered_by="arranque")
+    except Exception as exc:  # noqa: BLE001
+        # Un fallo al sincronizar el inventario no puede impedir el arranque: la
+        # base queda como estaba (rollback) y se reintenta en el proximo arranque
+        # o con (Recargar catalogo).
+        db.rollback()
+        log.exception("No se pudo sincronizar el inventario de fuentes: %s", exc)
     finally:
         db.close()
 

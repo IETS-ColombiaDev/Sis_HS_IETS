@@ -467,6 +467,11 @@ def parse_workbook(source: str | Path | bytes) -> dict:
         wb = openpyxl.load_workbook(handle, data_only=True)
     except Exception as exc:  # noqa: BLE001
         raise ValueError(f"No se pudo abrir el Excel de la matriz: {exc}") from exc
+    from . import link_matrix
+
+    # Formato vigente (17-11-2026): primera hoja con un enlace por fila.
+    if wb.worksheets and link_matrix.is_link_sheet(wb.worksheets[0]):
+        return link_matrix.parse_workbook(wb)
     matrix_ws = next((ws for ws in wb.worksheets if MATRIX_SHEET_HINT in fold(ws.title)), wb.worksheets[0])
     terms_ws = next((ws for ws in wb.worksheets if TERMS_SHEET_HINT in fold(ws.title)), None)
     rows = _parse_matrix_sheet(matrix_ws)
@@ -490,11 +495,33 @@ def load_matrix() -> dict:
     """Matriz empaquetada. Si falta el archivo, una matriz vacia (el catalogo sigue valido)."""
     global _cache
     if _cache is None:
-        try:
-            _cache = json.loads(Path(DATA_FILE).read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+        from . import link_matrix
+
+        # La matriz por enlace, si esta empaquetada, es la vigente.
+        for path in (link_matrix.DATA_FILE, Path(DATA_FILE)):
+            try:
+                _cache = json.loads(Path(path).read_text(encoding="utf-8"))
+                break
+            except (OSError, ValueError):
+                continue
+        else:
             _cache = {"rows": [], "search_terms": []}
     return _cache
+
+
+_legacy_cache: dict | None = None
+
+
+def load_legacy_matrix() -> dict:
+    """Matriz anterior (una fila por organizacion). Solo la usa el catalogo D-06,
+    que queda como referencia de adaptadores de API y consulta manual."""
+    global _legacy_cache
+    if _legacy_cache is None:
+        try:
+            _legacy_cache = json.loads(Path(DATA_FILE).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            _legacy_cache = {"rows": [], "search_terms": []}
+    return _legacy_cache
 
 
 def rows_by_code(matrix: dict | None = None) -> dict[str, tuple[dict, bool]]:

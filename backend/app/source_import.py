@@ -208,6 +208,10 @@ def _diff(source: Source, row: dict, primary: bool) -> list[dict]:
 
 def compare(db: Session, parsed: dict, *, origin: str, ai: bool = True, check_reach: bool = True) -> dict:
     """Compara la matriz leida con el inventario y sugiere la deteccion de lo nuevo."""
+    if parsed.get("format") == "enlaces":
+        from . import link_matrix
+
+        return link_matrix.compare(db, parsed, origin=origin)
     from .catalog_service import human_edits
     from .source_discovery import build_index
 
@@ -549,6 +553,15 @@ def apply(
     if entry is None:
         raise LookupError("La comparación expiró o no existe. Vuelva a cargar la matriz.")
     parsed = entry["parsed"]
+    if parsed.get("format") == "enlaces":
+        from . import link_matrix
+
+        chosen = {str(c.get("key")) for c in create or []} | {str(k) for k in update or []}
+        summary = link_matrix.apply(db, parsed, actor=actor, overwrite=overwrite, only_codes=chosen, retire_others=True)
+        if persist:
+            link_matrix.write_packaged(parsed)
+        summary.update(persisted=bool(persist), origin=entry["origin"], skipped=[], created_titles=[], updated_titles=[])
+        return summary
     rows = parsed.get("rows") or []
     by_key = {_row_key(r, i): r for i, r in enumerate(rows)}
     sources = db.query(Source).all()

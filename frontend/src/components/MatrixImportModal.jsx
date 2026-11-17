@@ -28,6 +28,8 @@ const MATCH_LABEL = { codigo: "código de catálogo", url: "URL", nombre: "nombr
 function show(value) {
   if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
   if (value === null || value === undefined || value === "") return "—";
+  if (value === true) return "Sí";
+  if (value === false) return "No";
   return String(value);
 }
 
@@ -417,6 +419,15 @@ export default function MatrixImportModal({ open, onClose, onApplied, connectors
           {result.validation && (
             <section className="matrix-section" data-testid="matrix-validation">
               <h4>Validación de la matriz</h4>
+              {result.validation.format === "enlaces" ? (
+                <p style={{ fontSize: 13, margin: "0 0 6px" }} data-testid="matrix-validation-links">
+                  Formato por enlace: <strong>{result.validation.rows}</strong> filas de{" "}
+                  <strong>{result.validation.organizations}</strong> organizaciones · <strong>{result.validation.sources}</strong>{" "}
+                  fuentes (una por URL distinta) · <strong>{result.validation.active_links}</strong> de consulta activa y{" "}
+                  <strong>{result.validation.general_links}</strong> de información general o metodológica, que quedan como
+                  referencia sin ingesta.
+                </p>
+              ) : (
               <p style={{ fontSize: 13, margin: "0 0 6px" }}>
                 <strong>{result.validation.rows}</strong> filas · <strong>{result.validation.sources}</strong> fuentes ·{" "}
                 <strong>{result.validation.urls}</strong> URL de consulta.
@@ -428,6 +439,7 @@ export default function MatrixImportModal({ open, onClose, onApplied, connectors
                   </span>
                 )}
               </p>
+              )}
               {(result.validation.issues || []).length === 0 ? (
                 <p style={{ fontSize: 13, color: "#047857", margin: 0 }}>Sin inconsistencias de cantidad ni URL repetidas.</p>
               ) : (
@@ -503,6 +515,24 @@ export default function MatrixImportModal({ open, onClose, onApplied, connectors
                 <Button size="sm" variant="ghost" onClick={() => setShowSame((v) => !v)}>{showSame ? "Ocultar" : "Ver"}</Button>
               </h4>
               {showSame && <p style={{ fontSize: 12.5, color: "#475569" }}>{result.unchanged.map((r) => r.source_title).join(" · ")}</p>}
+            </section>
+          )}
+
+          {(result.legacy || []).length > 0 && (
+            <section className="matrix-section" data-testid="matrix-legacy">
+              <h4>
+                Inventario anterior que pasa a legacy <Badge tone="viewer">{result.legacy.length}</Badge>
+              </h4>
+              <p style={{ fontSize: 12.5, color: "#64748B", margin: "0 0 6px" }}>
+                Con el formato por enlace, la matriz es el inventario completo: al aplicar, estas fuentes se retiran (no se
+                borran) y sus señales pendientes pasan a la pestaña (Legacy) de la Bandeja de entrada, desde donde se pueden
+                recuperar.
+              </p>
+              <ul style={{ fontSize: 12.5, margin: 0, paddingLeft: 18, maxHeight: 160, overflow: "auto" }}>
+                {result.legacy.map((m) => (
+                  <li key={m.source_id}>{m.title} <span style={{ color: "#94A3B8" }}>({m.matrix_ref})</span></li>
+                ))}
+              </ul>
             </section>
           )}
 

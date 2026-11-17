@@ -487,6 +487,10 @@ class Technology(Base):
     )
     screening_score: Mapped[int] = mapped_column(Integer, default=0)
     merged_into_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    # Senal de una fuente del inventario anterior (retirada al cargar la matriz por
+    # enlace): no aparece en la bandeja de pendientes sino en la bandeja Legacy,
+    # desde donde se puede recuperar (ver link_matrix).
+    legacy: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
