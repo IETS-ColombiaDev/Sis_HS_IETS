@@ -29,3 +29,11 @@ Thumbs.db
 
 # Excel de la matriz de fuentes EH: se procesa a backend/app/data/matriz_fuentes_eh.json
 FUENTES DE INFORMACION PROACTIVA EH*.xlsx
+
+# Secretos y datos locales: nunca al repositorio
+*.db
+~$*
+.env
+.env.*
+!.env.example
+!.env.*.example

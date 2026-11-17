@@ -57,7 +57,7 @@ def provider() -> str:
 def active_provider() -> str:
     pref = provider()
     if pref == "off":
-        # Apagada a proposito (panel o AI_PROVIDER=off): la llave embebida no la enciende.
+        # Apagada a proposito (panel o AI_PROVIDER=off): MINIMAX_API_KEY no la enciende.
         return ""
     if pref == "minimax" and minimax_service.is_enabled():
         return "minimax"

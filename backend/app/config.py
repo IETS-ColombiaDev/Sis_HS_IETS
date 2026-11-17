@@ -10,13 +10,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 DEFAULT_SECRET_KEY = "dev-secret-key-change-me"
 
-# Llave MiniMax Coding Plan embebida. Respaldo obligatorio aunque el .env o el
-# panel dejen MINIMAX_API_KEY vacio (pydantic pisa el default con cadena vacia).
-EMBEDDED_MINIMAX_API_KEY = (
-    "sk-cp-7WDJSryEIPxxhhUt3UyLEEDIPToA4yvTenYiOZJgzVjfk258uY-DOHJ_"
-    "-jvYnr7GkHew39RlyVjECLvtEpviwDKSBuzMgerNBpzlsGkEWb_S7Z1W_oe6caU"
-)
-
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -39,6 +32,7 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     allowed_email_domain: str = "iets.org.co"
     admin_emails: str = ""
+    # TODO: apagar cuando el equipo lo decida (RNF12).
     allow_dev_login: bool = True
     # Acceso con correo y contrasena (cuentas creadas por el superadministrador).
     password_min_length: int = 10
@@ -49,9 +43,9 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = ""
 
-    # MiniMax (proveedor principal de IA). Si viene vacio, minimax_service usa
-    # EMBEDDED_MINIMAX_API_KEY. Puede sustituirse con MINIMAX_API_KEY o el panel.
-    minimax_api_key: str = EMBEDDED_MINIMAX_API_KEY
+    # MiniMax (proveedor principal de IA). Solo se lee de la variable de entorno
+    # MINIMAX_API_KEY (o del panel). Sin llave, la IA arranca en modo degradado.
+    minimax_api_key: str = ""
     minimax_model: str = ""
     ai_provider: str = "auto"  # auto | minimax | gemini
     ai_ocr_enabled: bool = False
