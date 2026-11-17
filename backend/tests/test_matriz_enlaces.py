@@ -64,13 +64,18 @@ def test_tech_type_variants_are_normalized(parsed):
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "code,connector",
-    [("EH-102", "clinicaltrials"), ("EH-101", "pubmed"), ("EH-103", "who_ictrp"), ("EH-107", "ctis"),
+    [("EH-102", "clinicaltrials"), ("EH-101", "pubmed"), ("EH-107", "ctis"),
      ("EH-099", "pcori_hs"), ("EH-061", "ema"), ("EH-056", "fda"), ("EH-065", "health_canada")],
 )
 def test_registries_with_official_api_inherit_the_adapter(built, code, connector):
     src = built[code]
     assert src["connector"] == connector and src["scrape_enabled"] is True
     assert src["reference_urls"], "la URL de la matriz queda como referencia"
+
+
+def test_ictrp_without_public_api_is_crawled_as_a_page(built):
+    # La API de ICTRP no es publica: heredar el adaptador dejaba la fuente en error.
+    assert built["EH-103"]["connector"] == "html" and built["EH-103"]["scrape_enabled"] is True
 
 
 def test_only_one_row_per_registry_gets_the_api(built):

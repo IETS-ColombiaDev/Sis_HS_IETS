@@ -93,7 +93,7 @@ _MANUAL_RESTRICTION = re.compile(
 # por el patron hereda el adaptador del catalogo D-06 (codigo).
 API_RULES: tuple[tuple[str, str], ...] = (
     ("clinicaltrials.gov", "FP-CT-01"),
-    ("trialsearch.who.int", "FP-CT-02"),
+    # ICTRP (OMS) no tiene API publica estable: su enlace se rastrea como pagina web.
     ("euclinicaltrials.eu", "FP-CT-03"),
     ("pubmed.ncbi.nlm.nih.gov", "FP-LI-01"),
     ("horizonscandb.pcori.org", "FP-HT-01"),

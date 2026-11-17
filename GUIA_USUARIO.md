@@ -454,8 +454,8 @@ Desde el 17 de noviembre de 2026 el inventario es la primera hoja de la matriz *
 
 | Tipo de enlace | Fuentes | Qué hace el sistema |
 |---|---|---|
-| Consulta activa con rastreo web | 107 | Recorre el enlace (hasta 12 páginas) y extrae señales con el contexto de la fila |
-| Consulta activa por API oficial | 8 | ClinicalTrials.gov, PubMed, ICTRP de la OMS, CTIS, PCORI, EMA, openFDA (Drugs@FDA) y Health Canada se consultan por su API, que entrega datos estructurados; la URL de la matriz queda como referencia |
+| Consulta activa con rastreo web | 108 | Recorre el enlace (hasta 12 páginas) y extrae señales con el contexto de la fila |
+| Consulta activa por API oficial | 7 | ClinicalTrials.gov, PubMed, CTIS, PCORI, EMA, openFDA (Drugs@FDA) y Health Canada se consultan por su API, que entrega datos estructurados; la URL de la matriz queda como referencia. ICTRP de la OMS no tiene API pública estable y se rastrea como página web |
 | Consulta manual | 8 | Sitios con validación humana, registro de usuario o prohibición de rastreo (Boston Scientific, dos enlaces de EMA, Scopus, Synapse, Embase, IHSI): quedan en el catálogo sin ingesta |
 | Información general o metodológica | 18 | Quedan como referencia, sin ingesta |
 
@@ -740,7 +740,7 @@ La vigilancia no se detiene sin IA. Cuando la IA está apagada, sin cupo, sin re
 
 | Herramienta | Sin IA ni OCR |
 |---|---|
-| Registros por API (ClinicalTrials.gov, PubMed, openFDA, EMA, CTIS, ICTRP, PCORI, Health Canada) | Igual que con IA: los datos vienen estructurados de la API |
+| Registros por API (ClinicalTrials.gov, PubMed, openFDA, EMA, CTIS, PCORI, Health Canada) | Igual que con IA: los datos vienen estructurados de la API |
 | Páginas web y tablas de pipeline | Extracción por reglas con filtro de calidad: se descartan menús y secciones, noticias de ciencia sin relación con salud, notas corporativas y páginas administrativas. Las filas de pipeline se conservan siempre |
 | Documentos PDF | Se lee el texto con el extractor de PDF; sin OCR no se leen PDF escaneados como imagen |
 | (¿Es confiable?) | Dictamen solo con los chequeos automáticos |

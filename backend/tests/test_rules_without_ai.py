@@ -118,3 +118,41 @@ def test_enrichment_failure_falls_back_to_rules(monkeypatch):
     data = [{"title": "Contact us", "summary": ""}, {"title": "Wegovy (semaglutide)", "summary": ""}]
     out = scraper._enrich_with_ai(data, source_title="X", source_url="https://x.org", ai_decides=True)
     assert [d["title"] for d in out] == ["Wegovy (semaglutide)"]
+
+
+# --------------------------------------------------------------------------- #
+#  Paginas internas visitadas por el rastreo (sin IA)
+# --------------------------------------------------------------------------- #
+def _crawl(*pages):
+    return {"landing_url": "https://fabricante.test/innovacion", "pages": [
+        {"url": "https://fabricante.test/innovacion", "title": "Innovacion", "text": "x" * 500},
+        *[{"url": u, "title": t, "text": "Texto de la ficha. " * 30} for u, t in pages],
+    ]}
+
+
+def test_crawled_product_pages_become_candidates_with_exact_url():
+    crawl = _crawl(("https://fabricante.test/p/epm10", "Mindray ePM 10M/12M Patient Monitors | Mindray"))
+    cands = scraper.crawl_candidates(crawl)
+    assert [c["title"] for c in cands] == ["Mindray ePM 10M/12M Patient Monitors"]  # sin el sufijo del sitio
+    assert cands[0]["url"] == "https://fabricante.test/p/epm10"
+    assert rules_gate(cands) and "_crawled" not in rules_gate(scraper.crawl_candidates(crawl))[0]
+
+
+@pytest.mark.parametrize("title", [
+    "Get help paying for your medicines",
+    "Cancer Products and Solutions",
+    "Diversity in Clinical Trials",
+    "Pan African Clinical Trial Registry, last data file imported on 9 November 2026",
+])
+def test_institutional_crawled_pages_are_dropped(title):
+    assert rules_gate(scraper.crawl_candidates(_crawl(("https://fabricante.test/x", title)))) == []
+
+
+def test_without_ai_crawled_pages_are_added_to_the_landing_candidates(monkeypatch):
+    from app import ai_service
+
+    monkeypatch.setattr(ai_service, "web_assist_enabled", lambda: False)
+    monkeypatch.setattr(ai_service, "ocr_enabled", lambda: False)
+    crawl = _crawl(("https://fabricante.test/p/uni", "Philips launches UniGuide 3D Live Guidance for CT planning"))
+    out = scraper._enrich_with_ai([], source_title="X", source_url="https://fabricante.test/innovacion", crawl=crawl, ai_decides=True)
+    assert [d["url"] for d in out] == ["https://fabricante.test/p/uni"]

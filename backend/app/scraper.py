@@ -1156,7 +1156,8 @@ _GENERIC_WORDS = set(
     treatment treatments treat aesthetics procedures procedure regulated radiation emitting classification orders
     listings which novo granted diagnose diseases conditions affect fewer individuals people patients archived
     disease condition affects per united states than or
-    s more learn read view all see find
+    s more learn read view all see find patient monitoring image guided imaging resource last file imported
+    help paying access diversity safety expertise
     """.split()
 )
 _STOP_WORDS = set(
@@ -1193,16 +1194,19 @@ _HEALTH_ANCHOR = re.compile(
     r"devices?|dispositiv\w*|implant\w*|blood|sangre|heart|cardi\w*|brain|neuro\w*|alzheim\w*|parkinson\w*|"
     r"diabet\w*|obesity|infect\w*|antibiot\w*|sleep|pain|dolor|leuk\w*|lymphom\w*|myelom\w*|sclerosis|"
     r"migraine|arthritis|psoria\w*|asthma|copd|hiv|hepatitis|kidney|renal|liver|lung|stroke|dementia|"
-    r"trials?|ensayos?|phase|fase|biosimilar\w*|generic\w*|molecul\w*|antibod\w*|insulin\w*|dose|dosis)\b",
+    r"trials?|ensayos?|phase|fase|biosimilar\w*|generic\w*|molecul\w*|antibod\w*|insulin\w*|dose|dosis|"
+    r"ct|mri|pet|ultrasound|ecograf\w*|x-ray|radiolog\w*|interventional|intervencion\w*|catheter\w*|stent\w*|"
+    r"monitor\w*|implant\w*|prosthe\w*|robotic surgery|anesthe\w*|anestes\w*|ventilat\w*|dialysis|"
+    r"vital signs?|glucose|cgm)\b",
     re.I,
 )
 _PRODUCT_TOKEN = re.compile(r"(\b[A-Za-z]+[- ]?\d{2,}[A-Za-z0-9]*\b|[®™])")
 # Paginas administrativas de una agencia (guias, formularios, tramites): no son una tecnologia.
 _ADMIN_PAGE = re.compile(
-    r"^(report(ing)?|submit|apply|about|fulfilling|how to|add or update|contact)\b|"
-    r"\b(regulatory guidelines|guidelines for|guidance (for|on)|information for (pharmacists|prescribers|health professionals|consumers)|"
+    r"^(report(ing)?|submit|apply|about|fulfilling|how to|add or update|contact|guidance (for|on))\b|"
+    r"\b(regulatory guidelines|guidelines for|draft guidance|information for (pharmacists|prescribers|health professionals|consumers)|"
     r"reporting form|checklist|framework|scheme|goods orders|disclosure log|news and events|standards for|"
-    r"to consult on|consultation|listings? of)\b",
+    r"to consult on|consultation|listings? of|data file imported|last updated on)\b",
     re.I,
 )
 # Texto de una tarjeta de navegacion: el titulo y su descripcion quedan pegados
@@ -1248,6 +1252,70 @@ def is_health_title(title: str) -> bool:
     return bool(_HEALTH_ANCHOR.search(title) or _STRICT_DRUG_SUFFIX.search(title) or _DOSAGE_FORM.search(title))
 
 
+_TITLE_SITE_SUFFIX = re.compile(r"\s+[|·–—-]\s+[^|·–—-]{2,60}$")
+
+
+def crawl_candidates(crawl: dict | None) -> list[dict]:
+    """Paginas internas que visito el rastreo, como candidatas (sin IA).
+
+    Con IA, la IA lee estas paginas; sin ella solo quedaban los titulares de la
+    portada. Cada pagina visitada (ficha, noticia, informe) es un candidato con su
+    URL exacta; luego pasa por `rules_gate` como cualquier otro.
+    """
+    if not isinstance(crawl, dict):
+        return []
+    landing = _normalize_url(crawl.get("landing_url") or "")
+    out: list[dict] = []
+    for page in crawl.get("pages") or []:
+        url = page.get("url") or ""
+        if not url or _normalize_url(url) == landing:
+            continue
+        title = _clean(page.get("title") or "")
+        while _TITLE_SITE_SUFFIX.search(title):
+            title = _TITLE_SITE_SUFFIX.sub("", title).strip()
+        text = _clean(page.get("text") or "")
+        if not title or len(text) < 200:
+            continue
+        blob = f"{title} {text[:1500]}"
+        out.append(
+            {
+                "title": title[:590],
+                "url": url[:1020],
+                "summary": _summarize(text, 600)[:1000],
+                "raw_content": text[:5000],
+                "technology": title[:390],
+                "technology_type": _classify_type(blob),
+                "horizon": _classify_horizon(blob),
+                "phase": "",
+                "therapeutic_area": _guess_area(blob),
+                "published_date": "",
+                "_crawled": True,
+            }
+        )
+    return out
+
+
+def has_product_evidence(text: str) -> bool:
+    """Un producto o hecho concreto: codigo o marca, DCI, presentacion o evento regulatorio/clinico."""
+    return bool(
+        _PRODUCT_TOKEN.search(text)
+        or _STRICT_DRUG_SUFFIX.search(text)
+        or _DOSAGE_FORM.search(text)
+        or _REG_EVENT.search(text)
+        or _TECH_PATTERN.search(text)
+    )
+
+
+def _with_crawled(findings: list[dict], crawl: dict | None) -> list[dict]:
+    """Suma las paginas visitadas a los candidatos de la portada, sin repetir URL ni titulo."""
+    seen = {_normalize_url(f.get("url") or "") for f in findings} | {(f.get("title") or "").strip().lower() for f in findings}
+    extra = [
+        c for c in crawl_candidates(crawl)
+        if _normalize_url(c["url"]) not in seen and c["title"].strip().lower() not in seen
+    ]
+    return findings + extra
+
+
 def rules_gate(findings: list[dict], keep=None) -> list[dict]:
     """Candidatos que pasan las reglas sin IA. `keep(item)` conserva datos estructurados."""
     summaries: dict[str, int] = {}
@@ -1274,7 +1342,14 @@ def rules_gate(findings: list[dict], keep=None) -> list[dict]:
         # El titulo debe hablar de salud: el texto del contenedor suele traer el menu de la pagina.
         if not is_health_title(title):
             continue
+        # Una pagina interna visitada suele ser institucional ("Get help paying for your
+        # medicines", "Cancer Products and Solutions"): solo cuenta si nombra un producto o un hecho.
+        crawled = f.pop("_crawled", False)
+        if crawled and not has_product_evidence(title):
+            continue
         out.append(f)
+    for f in findings:
+        f.pop("_crawled", None)  # marca interna: no llega a la base
     return out
 
 
@@ -1318,9 +1393,11 @@ def _enrich_with_ai(
                 reason = "IA apagada o sin configurar en Configuración › IA: solo extracción por reglas"
             else:
                 reason = "IA y OCR apagados en el flujo de esta fuente: solo extracción por reglas"
-            gated = rules_gate(findings_data, keep_heuristic)
+            candidates = _with_crawled(findings_data, crawl)
+            gated = rules_gate(candidates, keep_heuristic)
             scan_progress.note(
-                "ai", used=False, reason=reason, final=len(gated), rules_dropped=len(findings_data) - len(gated)
+                "ai", used=False, reason=reason, final=len(gated), rules_dropped=len(candidates) - len(gated),
+                crawled_candidates=len(candidates) - len(findings_data),
             )
             if isinstance(crawl, dict) and not (allow_ai and allow_ocr):
                 crawl.setdefault("steps", []).append(
@@ -1379,12 +1456,12 @@ def _enrich_with_ai(
             return ai_web.merge_findings(kept, extra) if extra else kept
         # La IA no respondio de forma legible: los candidatos de reglas pasan el filtro.
         # Si respondio sin decidir (documentos), se conservan como antes y se suman los suyos.
-        gated = findings_data if report.get("answered") else rules_gate(findings_data, keep_heuristic)
+        gated = findings_data if report.get("answered") else rules_gate(_with_crawled(findings_data, crawl), keep_heuristic)
         if extra:
             return ai_web.merge_findings(gated, extra)
         return gated
     except Exception as exc:  # noqa: BLE001
-        gated = rules_gate(findings_data, keep_heuristic)
+        gated = rules_gate(_with_crawled(findings_data, crawl), keep_heuristic)
         scan_progress.note("ai", used=True, error=f"{type(exc).__name__}: {str(exc)[:120]}", final=len(gated))
         return gated
 
@@ -1619,6 +1696,10 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             # (empleos, resultados financieros): solo quedan los items pertinentes.
             news_fallback = via == "google_news"
             findings_data = extract_candidates(target, text, only_relevant=news_fallback)
+            # Tabla de pipeline solo si la pagina trae filas reconocibles. Con la matriz
+            # por enlace un fabricante tiene paginas de innovacion, portafolio o
+            # noticias: sin filas se recorren como cualquier otra pagina.
+            pipeline_table = is_pipeline_source(source) and any(_is_pipeline_row(c) for c in findings_data)
             crawl = None
             if news_fallback:
                 # Los enlaces de Google News son redirecciones por JavaScript: no se
@@ -1627,10 +1708,10 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                 # El sitio bloquea al robot, pero los buscadores lo tienen indexado:
                 # los fragmentos de resultados del dominio tambien entran al corpus.
                 crawl = _add_search_snippets(db, source, profile, context, crawl)
-            elif not is_pipeline_source(source) and not is_news_feed_url(landing_url):
+            elif not pipeline_table and not is_news_feed_url(landing_url):
                 crawl = _crawl_with_profile(db, source, landing_url, text, profile, context)
                 findings_data = apply_crawled_text(findings_data, crawl)
-            elif is_pipeline_source(source):
+            elif pipeline_table:
                 scan_progress.note(
                     "search",
                     enabled=False,
@@ -1651,7 +1732,7 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                     allow_ocr=profile["ocr"],
                     source_context=context,
                     ai_decides=True,
-                    keep_heuristic=_is_pipeline_row if is_pipeline_source(source) else None,
+                    keep_heuristic=_is_pipeline_row if pipeline_table else None,
                 )
 
         scan_progress.stage(

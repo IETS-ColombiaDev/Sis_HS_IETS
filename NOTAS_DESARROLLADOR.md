@@ -229,8 +229,8 @@ Conteo de URL de consulta por tipo de tecnología de la fila (verificación pedi
 
 | Tipo de fuente | Cantidad | Tratamiento |
 |---|---|---|
-| Consulta activa con rastreo web | 107 | Recorre el enlace (máximo 12 páginas) con el contexto de su fila |
-| Consulta activa por API oficial | 8 | ClinicalTrials.gov (ID 102), PubMed (101), ICTRP (103), CTIS (107), PCORI (99), EMA (61), openFDA Drugs@FDA (56) y Health Canada (65) heredan el adaptador del catálogo D-06 |
+| Consulta activa con rastreo web | 108 | Recorre el enlace (máximo 12 páginas) con el contexto de su fila |
+| Consulta activa por API oficial | 7 | ClinicalTrials.gov (ID 102), PubMed (101), CTIS (107), PCORI (99), EMA (61), openFDA Drugs@FDA (56) y Health Canada (65) heredan el adaptador del catálogo D-06. ICTRP (103) se rastrea como página: no tiene API pública estable |
 | Consulta manual, sin ingesta | 8 | Boston Scientific (16 y 17), EMA (59 y 60, validación humana), Scopus (115), Synapse (117), Embase (119), IHSI (123) |
 | Información general o metodológica | 18 | Referencia sin ingesta |
 
@@ -285,3 +285,21 @@ Simulación sobre la copia de la base local (124 fuentes, 1.126 señales): se cr
 - Páginas que cargan su contenido con JavaScript (por ejemplo el pipeline de Roche) no entregan datos sin navegador: quedan con pocas o ninguna señal y conviene revisarlas con IA activa o por consulta manual.
 - Sin OCR no se leen PDF escaneados como imagen.
 - La calidad sin IA es menor que con IA: el filtro reduce el ruido, pero la clasificación fina (fase, horizonte, área) es mejor con IA.
+
+---
+
+## Primera vigilancia completa del inventario por enlace (17-11-2026)
+
+**Estado:** CUMPLIDO PARCIAL, 17-11-2026. Corrida completa en un servidor local aislado contra los sitios reales, con la IA y el OCR apagados; falta la primera corrida en el sistema desplegado.
+
+**Resultado final:** las 115 fuentes con ingesta terminaron, ninguna con error, en 15 minutos con 3 fuentes a la vez (en Render, que procesa una a la vez, se estima del orden de 45 minutos). 930 señales nuevas: 65 fuentes entraron directo y trajeron señales, 28 entraron por respaldo (RSS oficial o Google News) porque el sitio bloquea robots (HTTP 403) o no responde desde fuera de su país, y 22 entraron sin señales.
+
+**Qué se corrigió durante la corrida:**
+- ICTRP de la OMS quedaba en error: no tiene API pública estable y había heredado el adaptador de API. Ahora se rastrea como página web y trae señales.
+- Sin IA, las páginas internas que visita el rastreo no se convertían en señales. Ahora cada página visitada es candidata, con su URL exacta, y pasa por el filtro de reglas; para estas páginas se exige un producto concreto (código, DCI, forma farmacéutica, marca) o un hecho regulatorio o clínico, para no guardar páginas institucionales.
+- Todas las fuentes de fabricantes se trataban como tablas de pipeline y no se recorrían. Ahora solo se tratan como tabla si la página trae filas de pipeline reconocibles; las páginas de innovación, portafolio y noticias se recorren.
+- Ajustes del filtro con títulos reales: anclas de imagen médica y dispositivos (CT, ultrasonido, monitores, stents), avisos administrativos de los registros y guías regulatorias solo al inicio del título.
+
+**Fuentes que bloquean robots:** no se intentó saltar la protección del sitio. Entran por la ruta legítima de respaldo y quedan marcadas como parciales en el informe de acceso.
+
+**Pendientes y limitaciones:** las 22 fuentes sin señales sin IA son sitios que cargan con JavaScript o solo ofrecen un formulario de búsqueda (Amgen, EUDAMED, DRKS, CRiS, PACTR, PATENTSCOPE, IEEE, Medtronic) o páginas institucionales sin productos nombrados (Philips, Roche, Abbott, IQWiG, RedETS). Con la IA activa, la IA lee esas páginas; si siguen sin señales conviene pasarlas a consulta manual.
