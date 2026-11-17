@@ -99,7 +99,7 @@ def test_compare_finds_new_changed_and_missing_sources(api):
     res = _compare(api, content)
     assert res.status_code == 200, res.text
     body = res.json()
-    assert body["summary"] == {"nuevas": 2, "cambios": 1, "sin_cambios": 0, "ausentes": 1}
+    assert body["summary"] == {"nuevas": 2, "cambios": 1, "sin_cambios": 0, "ausentes": 1, "conflictos": 0}
     changed = body["changed"][0]
     assert changed["source_title"] == "Observatorio Existente" and changed["match_reason"] == "url"
     assert {c["field"] for c in changed["changes"]} >= {"source_level", "tech_types"}

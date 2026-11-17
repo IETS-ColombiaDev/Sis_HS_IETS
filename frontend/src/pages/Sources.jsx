@@ -656,12 +656,12 @@ export default function Sources() {
             </HintButton>
             <HintButton
               variant="outline"
-              hint="Importa el Excel «FUENTES DE INFORMACION PROACTIVA EH» o una hoja de Google Sheets, la compara con el inventario y sugiere con IA cómo detectar señales en cada fuente nueva. No guarda nada hasta que usted aplique."
+              hint="Sube el Excel de la matriz de fuentes (MATRIZ_FUENTES_ESCANEO_EH, .xlsx) o una hoja de Google Sheets: valida, muestra la vista previa de diferencias y conflictos, y no guarda nada hasta que usted confirme. Genera un reporte descargable y queda en bitácora."
               disabledHint={noWrite}
               disabled={!canWrite}
               onClick={() => setMatrixOpen(true)}
             >
-              <Icon name="doc" size={16} /> Importar matriz
+              <Icon name="doc" size={16} /> Cargar matriz
             </HintButton>
             <HintButton variant="outline" hint={DISCOVER_HINT} disabledHint={noWrite} disabled={!canWrite} onClick={openDiscover}>
               <Icon name="spark" size={16} /> Detectar fuentes con IA

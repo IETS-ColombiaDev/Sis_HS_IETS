@@ -63,6 +63,12 @@ def _to_out(db: Session, tech: Technology, entry: CycleTechnology | None = None)
     out.has_raw = bool(payload)
     out.raw_origin = str(payload.get("origin") or "")
     out.signal_url = reliability_service.signal_link(db, tech)
+    finding = db.get(Finding, tech.finding_id) if tech.finding_id else None
+    if finding is not None:
+        out.link_type = finding.link_type or ""
+        out.link_status = finding.link_status or ""
+        out.query_url = finding.query_url or ""
+        out.evidence = finding.evidence if isinstance(finding.evidence, dict) else None
     verdict = tech.reliability if isinstance(tech.reliability, dict) else {}
     out.reliability_verdict = str(verdict.get("verdict") or "")
     out.reliability_score = verdict.get("score") if isinstance(verdict.get("score"), int) else None
@@ -142,6 +148,37 @@ def _colombia_midnight_utc(day: date) -> datetime:
     return datetime.combine(day, time.min, COLOMBIA_TZ).astimezone(timezone.utc)
 
 
+# --------------------------------------------------------------------------- #
+#  RF-005: buscador de la pantalla principal y recorrido por etapas
+# --------------------------------------------------------------------------- #
+@router.get("/search")
+def search_technologies(
+    q: str = Query("", max_length=200),
+    limit: int = Query(30, ge=1, le=100),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Busca tecnologias y senales por nombre (parcial, sin tildes ni mayusculas)."""
+    from .. import tech_search
+
+    return tech_search.search(db, q, limit=limit)
+
+
+@router.get("/{technology_id}/history")
+def technology_history(
+    technology_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Recorrido de la tecnologia por etapas, desde la bitacora."""
+    from .. import tech_search
+
+    try:
+        return tech_search.history(db, technology_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @router.get("/staging", response_model=list[TechnologyOut])
 def list_staging(
     response: Response,
@@ -154,7 +191,7 @@ def list_staging(
     date_from: date | None = Query(None, description="Capturadas desde este dia (hora Colombia)"),
     date_to: date | None = Query(None, description="Capturadas hasta este dia, inclusive (hora Colombia)"),
     corroborated: bool | None = Query(None, description="Solo las que otra fuente tambien reporta"),
-    view: str | None = Query(None, description="'descartadas' lista lo descartado desde la bandeja (RF-004)"),
+    view: str | None = Query(None, description="'descartadas' (RF-004) o 'legacy' (senales de fuentes del inventario anterior)"),
     limit: int = Query(100, le=500),
     offset: int = Query(0, ge=0),
 ):
@@ -165,8 +202,11 @@ def list_staging(
     corroboration.refresh(db)
     if view == "descartadas":
         query = db.query(Technology).filter(_inbox_discarded_filter())
+    elif view == "legacy":
+        query = db.query(Technology).filter(Technology.status == STAGING_STATUS, Technology.legacy.is_(True))
     else:
-        query = db.query(Technology).filter(Technology.status == STAGING_STATUS)
+        # Las senales de fuentes legacy viven en su propia bandeja hasta que se recuperen.
+        query = db.query(Technology).filter(Technology.status == STAGING_STATUS, Technology.legacy.isnot(True))
     if corroborated:
         query = query.filter(Technology.corroboration_count > 1)
     if source_id:
@@ -205,8 +245,11 @@ def list_staging(
 
 @router.get("/staging/stats", response_model=StagingStats)
 def staging_stats(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    base = db.query(Technology).filter(Technology.status == "capturada_no_asignada")
+    base = db.query(Technology).filter(Technology.status == "capturada_no_asignada", Technology.legacy.isnot(True))
     unassigned = base.with_entities(func.count(Technology.id)).scalar() or 0
+    legacy = db.query(func.count(Technology.id)).filter(
+        Technology.status == "capturada_no_asignada", Technology.legacy.is_(True)
+    ).scalar() or 0
     total = db.query(func.count(Technology.id)).scalar() or 0
     discarded = db.query(func.count(Technology.id)).filter(_inbox_discarded_filter()).scalar() or 0
 
@@ -247,6 +290,7 @@ def staging_stats(db: Session = Depends(get_db), user: User = Depends(get_curren
         without_tech_type=without_type,
         corroborated=corroborated,
         discarded=discarded,
+        legacy=legacy,
     )
 
 
@@ -310,6 +354,38 @@ def restore_to_staging(
             action=RESTORE_ACTION,
             old_value={"status": DISCARDED_STATUS},
             new_value={"status": STAGING_STATUS, "actor": user.email},
+        )
+        affected += 1
+    db.commit()
+    if affected:
+        bump_state_version(db)
+    return StagingBatchOut(affected=affected, rejected=rejected)
+
+
+@router.post("/staging/recover", response_model=StagingBatchOut)
+def recover_legacy(
+    payload: StagingRestoreIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_STAGING_ASSIGN)),
+):
+    """Bandeja Legacy: devuelve senales de fuentes del inventario anterior a la bandeja de pendientes."""
+    ids = list(dict.fromkeys(payload.technology_ids))
+    found = {t.id: t for t in db.query(Technology).filter(Technology.id.in_(ids), Technology.legacy.is_(True)).all()}
+    affected = 0
+    rejected: list[str] = []
+    for tech_id in ids:
+        tech = found.get(tech_id)
+        if tech is None:
+            rejected.append(f"Tecnología {tech_id}: no está en la bandeja Legacy.")
+            continue
+        tech.legacy = False
+        audit.record_action(
+            db,
+            entity_type="technologies",
+            entity_id=tech.id,
+            action="staging:recover_legacy",
+            old_value={"legacy": True},
+            new_value={"legacy": False, "actor": user.email},
         )
         affected += 1
     db.commit()

@@ -289,10 +289,21 @@ def source_context(source, options: dict | None = None) -> str:
         meta.append("Tipos de tecnologia: " + ", ".join(option_label(opts, "tech_type", t) for t in techs))
     if meta:
         lines.append("- " + " | ".join(meta))
+    aliases = [a for a in (getattr(source, "aliases", None) or []) if isinstance(a, str) and a]
+    if aliases:
+        lines.append(f"- Organizacion: {aliases[0][:160]}")
+    if getattr(source, "entity_type", ""):
+        lines.append(f"- Tipo de entidad: {getattr(source, 'entity_type')}")
+    if (getattr(source, "verification_status", "") or "") == "matriz_enlaces_eh":
+        lines.append(
+            "- Este enlace es una pagina concreta de la matriz de escaneo EH: extraiga solo tecnologias "
+            "sanitarias que aparezcan en esta pagina y que correspondan a lo que indica 'Que consultar'."
+        )
     for label, attr, size in (
         ("Que consultar", "consult_info", 500),
         ("Ruta de acceso", "access_path", 300),
         ("Tipo de material", "material_type", 200),
+        ("Observaciones del equipo", "observations", 300),
         ("Restricciones", "usage_restrictions", 200),
     ):
         value = re.sub(r"\s+", " ", getattr(source, attr, "") or "").strip()
@@ -306,8 +317,34 @@ def source_context(source, options: dict | None = None) -> str:
 # --------------------------------------------------------------------------- #
 #  Busqueda web
 # --------------------------------------------------------------------------- #
+# RF-006 (III seguimiento): el alcance vigente es medicamentos y dispositivos
+# medicos. Las demas categorias quedan inactivas (no se borran) y se reactivan
+# desde Configuracion. Decision pendiente del equipo tecnico: si Dispositivos
+# implantables, Equipos biomedicos y Dispositivos de monitoreo hacen parte de
+# Dispositivos medicos (se activarian) o siguen inactivas.
+DEFAULT_ACTIVE_CATEGORIES = ("medicamentos", "dispositivos medicos")
+
+
+def _fold(text: str) -> str:
+    from .source_matrix import fold
+
+    return fold(text or "").strip()
+
+
+def default_category_active(category: str) -> bool:
+    return _fold(category) in DEFAULT_ACTIVE_CATEGORIES
+
+
 def default_terms_by_category() -> list[dict]:
-    return copy.deepcopy(load_matrix().get("search_terms") or [])
+    out = copy.deepcopy(load_matrix().get("search_terms") or [])
+    for item in out:
+        item.setdefault("active", default_category_active(item.get("category", "")))
+    return out
+
+
+def active_terms_by_category(cfg: dict) -> list[dict]:
+    """Solo las categorias activas alimentan las consultas del escaneo."""
+    return [c for c in (cfg.get("terms_by_category") or []) if c.get("active", default_category_active(c.get("category", "")))]
 
 
 def load_search(db: Session) -> dict:
@@ -317,6 +354,10 @@ def load_search(db: Session) -> dict:
     for key, value in stored.items():
         if key in out and value is not None:
             out[key] = value
+    for item in out.get("terms_by_category") or []:
+        # Configuraciones guardadas antes de RF-006 no traen `active`: rige el alcance vigente.
+        if "active" not in item:
+            item["active"] = default_category_active(item.get("category", ""))
     out["brave_api_key_set"] = bool(settings_store.get_value(db, BRAVE_KEY, ""))
     return out
 
@@ -336,7 +377,9 @@ def _clean_terms_by_category(value) -> list[dict]:
         if not category:
             continue
         tech = str(item.get("tech_type") or "MT").strip().upper()[:12] or "MT"
-        out.append({"category": category, "tech_type": tech, "terms": _str_list(item.get("terms"), limit=30)})
+        active = item.get("active")
+        active = default_category_active(category) if active is None else bool(active)
+        out.append({"category": category, "tech_type": tech, "terms": _str_list(item.get("terms"), limit=30), "active": active})
     return out
 
 
@@ -377,3 +420,18 @@ def save_search(db: Session, payload: dict) -> dict:
 def reset_search(db: Session) -> dict:
     settings_store.set_value(db, SEARCH_KEY, "")
     return load_search(db)
+
+
+# --------------------------------------------------------------------------- #
+#  OBS-001: prioridad de la fuente (criterio retirado)
+# --------------------------------------------------------------------------- #
+# El 06/11 el equipo tecnico retiro el criterio: la columna Observaciones de la
+# matriz era aplicabilidad al proyecto, no prioridad. El dato historico se
+# conserva en `sources.priority_level` (y en la bitacora), pero no se muestra,
+# no se acepta en ediciones y no ordena ni filtra nada mientras este parametro
+# siga apagado. Se reactiva cuando el equipo defina criterios.
+SOURCE_PRIORITY_KEY = "cfg.sources.priority_enabled"
+
+
+def source_priority_enabled(db: Session) -> bool:
+    return (settings_store.get_value(db, SOURCE_PRIORITY_KEY, "false") or "").strip().lower() in {"1", "true", "si", "on"}

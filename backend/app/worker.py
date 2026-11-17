@@ -188,6 +188,15 @@ def drain(*, wait_retries: bool = False, max_seconds: float = KICK_MAX_SECONDS) 
         log.exception("Drenaje de la cola de ingesta")
     finally:
         _drain_lock.release()
+        if total:
+            # Corrida terminada: las senales nuevas van a Firestore ya, sin esperar
+            # el minimo entre copias (un reinicio de Render las borraria del disco).
+            try:
+                from . import firebase_db
+
+                firebase_db.push_soon()
+            except Exception:  # noqa: BLE001
+                log.warning("No se pudo programar la copia a Firestore tras la vigilancia")
     return total
 
 

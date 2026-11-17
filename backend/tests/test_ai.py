@@ -82,8 +82,11 @@ def test_minimax_strips_unclosed_thinking():
     assert text == ""
 
 
-def test_ocr_off_without_key():
-    # Llave vacia del panel no apaga MiniMax: hay llave embebida de respaldo.
+def test_ocr_off_without_key(monkeypatch):
+    # Sin MINIMAX_API_KEY (ni llave en el panel) la IA queda en modo degradado:
+    # no hay llave embebida de respaldo en el codigo. Se vacia la llave del
+    # entorno para que el resultado no dependa del backend/.env local.
+    monkeypatch.setattr(minimax_service.settings, "minimax_api_key", "")
     ai_service.configure_runtime(
         provider="minimax",
         ocr_enabled=True,
@@ -91,9 +94,9 @@ def test_ocr_off_without_key():
         minimax_api_key="",
         minimax_model="",
     )
-    assert ai_service.is_enabled() is True
-    assert ai_service.ocr_enabled() is True
-    assert ai_service.web_assist_enabled() is True
+    assert ai_service.is_enabled() is False
+    assert ai_service.ocr_enabled() is False
+    assert ai_service.web_assist_enabled() is False
     ai_service.configure_runtime(ocr_enabled=False, web_enabled=False)
     assert ai_service.ocr_enabled() is False
     assert ai_service.web_assist_enabled() is False

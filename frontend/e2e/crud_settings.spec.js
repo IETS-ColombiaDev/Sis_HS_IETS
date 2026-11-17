@@ -12,14 +12,15 @@ test.describe("configuracion · superadministrador", () => {
     const original = (await api.get("/methodology/params")).find((p) => p.key === key).value;
     await loginAs(page, "superadmin", "/configuracion");
     await settle(page);
-    const input = page.getByLabel(`Valor de ${key}`);
-    const row = page.locator("div", { has: input }).filter({ hasText: key }).last();
+    // El campo se rotula con el nombre legible del parametro (paramInfo), no con su clave.
+    const input = page.getByLabel("Valor de Días de revisión regulatoria");
+    const row = page.locator("div", { has: input }).filter({ hasText: "Días de revisión regulatoria" }).last();
     await input.fill("12.5");
     await row.getByRole("button", { name: "Guardar" }).click();
     await expectToast(page, "entero");
     await input.fill(String(Number(original) + 1));
     await row.getByRole("button", { name: "Guardar" }).click();
-    await expectToast(page, `${key} actualizado`);
+    await expectToast(page, "Días de revisión regulatoria actualizado");
     await api.put(`/methodology/params/${key}`, { value: original });
     expectClean(errors);
   });

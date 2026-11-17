@@ -5,6 +5,7 @@ codigo de catalogo, URL normalizada, titulo o alias para no duplicar.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -32,6 +33,8 @@ TRACKING_PARAMS = {
     "mc_cid",
     "mc_eid",
 }
+
+log = logging.getLogger(__name__)
 
 # Marca de las fuentes registradas a mano desde /fuentes (alta rapida o avanzada).
 LOCAL_SOURCE_MARK = "agregada_localmente"
@@ -119,7 +122,41 @@ def normalize_url(url: str) -> str:
 
 
 def sync_catalog(db: Session, *, triggered_by: str = "sistema") -> dict:
-    """Upsert del catalogo D-06 + matriz EH y retiro de lo que ya no esta."""
+    """Upsert del catalogo vigente y retiro de lo que ya no esta.
+
+    Desde el 17-11-2026 el inventario es la matriz de escaneo por enlace
+    (`link_matrix`, una fuente por fila del Excel). El catalogo D-06 solo se
+    aplica si esa matriz no esta empaquetada.
+    """
+    from . import link_matrix
+
+    packaged = link_matrix.load_packaged()
+    if not packaged.get("rows") and link_matrix.current_mode(db) == link_matrix.MODE_LINKS:
+        # El inventario ya es la matriz por enlace pero falta su JSON (despliegue
+        # incompleto): no se vuelve al catalogo D-06, que reactivaria lo legacy.
+        log.error("Falta %s: se conserva el inventario por enlace sin sincronizar.", link_matrix.DATA_FILE)
+        return {
+            "version": "matriz_enlaces_eh",
+            "created": 0,
+            "updated": 0,
+            "retired": 0,
+            "total": db.query(Source).filter(Source.catalog_code.like(f"{link_matrix.CODE_PREFIX}%")).count(),
+            "stats": catalog_stats(),
+            "imported_at": datetime.now(timezone.utc).isoformat(),
+            "triggered_by": triggered_by,
+        }
+    if packaged.get("rows"):
+        out = link_matrix.apply(db, packaged, actor=triggered_by, overwrite=False)
+        return {
+            "version": "matriz_enlaces_eh",
+            "created": out["created"],
+            "updated": out["updated"],
+            "retired": out["retired_eh"] + out["legacy_sources"],
+            "total": out["total"],
+            "stats": catalog_stats(),
+            "imported_at": datetime.now(timezone.utc).isoformat(),
+            "triggered_by": triggered_by,
+        }
     created = 0
     updated = 0
     retired = 0

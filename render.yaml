@@ -52,3 +52,8 @@ services:
         value: nam5
       - key: FIREBASE_SERVICE_ACCOUNT_KEY
         sync: false
+      # IA (MiniMax). Obligatoria: la llave ya no esta en el codigo. Ponga el
+      # valor a mano en el panel de Render (Environment); sin ella la IA queda
+      # en modo degradado.
+      - key: MINIMAX_API_KEY
+        sync: false

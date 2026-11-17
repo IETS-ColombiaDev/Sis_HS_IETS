@@ -15,6 +15,7 @@ import InfoTip from "../components/InfoTip";
 import DataTable from "../components/DataTable";
 import TriageBoard, { ScreeningScore } from "../components/TriageBoard";
 import FindingDetailModal from "../components/FindingDetailModal";
+import LinkReport from "../components/LinkReport";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { Input, Textarea, Select } from "../components/Field";
 import Modal from "../components/Modal";
@@ -263,6 +264,8 @@ export default function Findings() {
           </div>
         }
       />
+
+      <LinkReport canWrite={isEditor} toast={toast} />
 
       {!isEditor && (
         <div className="fb-readonly-note" data-testid="findings-readonly">

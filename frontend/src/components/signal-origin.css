@@ -308,3 +308,16 @@
 .staging-rel--confiable { background: #d1fae5; color: #065f46; }
 .staging-rel--verificar { background: #fef3c7; color: #92400e; }
 .staging-rel--baja { background: #fee2e2; color: #991b1b; }
+
+/* Tipo de enlace y evidencia de captura (RF-001). */
+.sl-box { margin: 8px 0 4px; }
+.sl-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sl-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid transparent; }
+.sl-badge--ok { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.sl-badge--warn { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+.sl-badge--bad { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.sl-query { font-size: 12px; color: #475569; }
+.sl-evidence { margin-top: 10px; padding: 10px 12px; border: 1px dashed #cbd5e1; border-radius: 10px; background: #fff; font-size: 13px; color: #334155; display: grid; gap: 4px; }
+.sl-evidence-title { font-weight: 700; color: #0f172a; }
+.sl-snippet { margin: 4px 0; padding-left: 10px; border-left: 3px solid #c7d2fe; color: #1e293b; font-style: italic; }
+.sl-muted { color: #64748b; font-size: 12px; font-style: normal; }

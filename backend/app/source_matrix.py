@@ -4,7 +4,7 @@ Origen: el Excel "FUENTES DE INFORMACION PROACTIVA EH" (hoja "MATRIZ FI EH",
 columnas A-R, y hoja "Criterios de busqueda"). Este modulo:
 
 - lee el Excel ubicando las columnas por su encabezado (tolera columnas movidas);
-- normaliza nivel de fuente, prioridad, tipos de tecnologia, URLs y frecuencia;
+- normaliza nivel de fuente, tipos de tecnologia, URLs y frecuencia;
 - asocia cada fila a un codigo del catalogo D-06 o le asigna uno nuevo;
 - arma el perfil de recorrido de cada fuente (URLs de entrada, ruta de acceso,
   que consultar, restricciones) que usan el rastreador y la IA.
@@ -33,13 +33,15 @@ MATRIX_SHEET_HINT = "matriz"
 TERMS_SHEET_HINT = "criterio"
 
 SOURCE_LEVELS = ("primaria", "secundaria", "terciaria", "por_definir")
-PRIORITY_LEVELS = ("alta", "media", "baja", "revisar")
+# OBS-001 (06/11): la matriz ya no aporta prioridad de fuente. La columna
+# Observaciones se guarda como texto y nunca se interpreta como prioridad.
 TECH_CODES = ("MED", "DM", "BIOM", "IA", "SD", "MT")
 ORIGINS = ("FVEH042025", "AGREGADA")
 
 # Encabezado normalizado -> campo. El orden importa: los mas especificos primero
 # ("URL / sitio a consultar" contiene "consultar", igual que "Informacion a consultar").
 _HEADER_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("declared_url_count", ("cant url",)),
     ("consult_raw", ("sitio a consultar",)),
     ("methodology_raw", ("documentos metdologicos", "documentos metodologicos", "informacion general y documentos")),
     ("consult_info", ("informacion a consultar",)),
@@ -103,7 +105,7 @@ TERM_CATEGORY_DEFAULTS = {
 #  Fila de la matriz -> codigo(s) del catalogo
 # --------------------------------------------------------------------------- #
 # El primer codigo recibe el perfil completo (URLs de entrada incluidas); los
-# demas comparten la clasificacion (nivel, prioridad, tipos) porque son
+# demas comparten la clasificacion (nivel y tipos) porque son
 # sub-servicios de la misma organizacion en el catalogo D-06.
 MATRIX_CODE_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
     (r"^abbott", ("FP-MF-16",)),
@@ -356,6 +358,46 @@ def _parse_matrix_sheet(ws) -> list[dict]:
     return rows
 
 
+def _declared_count(value) -> int | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return int(float(text.replace(",", ".")))
+    except ValueError:
+        return None
+
+
+def row_issues(raw: dict, consult: list[str]) -> list[dict]:
+    """Inconsistencias de la fila, para reportarlas sin corregirlas en silencio (OBS-002)."""
+    issues: list[dict] = []
+    written = [clean_url(u) for u in _URL_RE.findall(raw.get("consult_raw", "") or "")]
+    written = [u for u in written if u]
+    seen: set[str] = set()
+    repeated: list[str] = []
+    for url in written:
+        if url in seen and url not in repeated:
+            repeated.append(url)
+        seen.add(url)
+    if repeated:
+        issues.append({
+            "kind": "url_repetida",
+            "detail": f"La celda repite {len(repeated)} URL: {', '.join(repeated)}. Se carga una sola vez cada una.",
+            "urls": repeated,
+        })
+    declared = _declared_count(raw.get("declared_url_count"))
+    if declared is not None and declared != len(written):
+        issues.append({
+            "kind": "cantidad_distinta",
+            "detail": f"Cant URL SI EAA declara {declared} y la celda lista {len(written)} URL"
+            + (f" ({len(consult)} distintas)." if len(consult) != len(written) else "."),
+            "declared": declared,
+            "listed": len(written),
+            "distinct": len(consult),
+        })
+    return issues
+
+
 def normalize_row(raw: dict, links: dict | None = None, *, excel_row: int = 0, name: str = "") -> dict:
     links = links or {}
     consult = extract_urls(raw.get("consult_raw", ""), links.get("consult_raw", ""))
@@ -390,6 +432,8 @@ def normalize_row(raw: dict, links: dict | None = None, *, excel_row: int = 0, n
         "language": clean_text(raw.get("language")),
         "interface": clean_text(raw.get("interface")),
         "restrictions": clean_text(raw.get("restrictions")),
+        "declared_url_count": _declared_count(raw.get("declared_url_count")),
+        "issues": row_issues(raw, consult),
     }
 
 
@@ -423,6 +467,11 @@ def parse_workbook(source: str | Path | bytes) -> dict:
         wb = openpyxl.load_workbook(handle, data_only=True)
     except Exception as exc:  # noqa: BLE001
         raise ValueError(f"No se pudo abrir el Excel de la matriz: {exc}") from exc
+    from . import link_matrix
+
+    # Formato vigente (17-11-2026): primera hoja con un enlace por fila.
+    if wb.worksheets and link_matrix.is_link_sheet(wb.worksheets[0]):
+        return link_matrix.parse_workbook(wb)
     matrix_ws = next((ws for ws in wb.worksheets if MATRIX_SHEET_HINT in fold(ws.title)), wb.worksheets[0])
     terms_ws = next((ws for ws in wb.worksheets if TERMS_SHEET_HINT in fold(ws.title)), None)
     rows = _parse_matrix_sheet(matrix_ws)
@@ -446,11 +495,33 @@ def load_matrix() -> dict:
     """Matriz empaquetada. Si falta el archivo, una matriz vacia (el catalogo sigue valido)."""
     global _cache
     if _cache is None:
-        try:
-            _cache = json.loads(Path(DATA_FILE).read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+        from . import link_matrix
+
+        # La matriz por enlace, si esta empaquetada, es la vigente.
+        for path in (link_matrix.DATA_FILE, Path(DATA_FILE)):
+            try:
+                _cache = json.loads(Path(path).read_text(encoding="utf-8"))
+                break
+            except (OSError, ValueError):
+                continue
+        else:
             _cache = {"rows": [], "search_terms": []}
     return _cache
+
+
+_legacy_cache: dict | None = None
+
+
+def load_legacy_matrix() -> dict:
+    """Matriz anterior (una fila por organizacion). Solo la usa el catalogo D-06,
+    que queda como referencia de adaptadores de API y consulta manual."""
+    global _legacy_cache
+    if _legacy_cache is None:
+        try:
+            _legacy_cache = json.loads(Path(DATA_FILE).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            _legacy_cache = {"rows": [], "search_terms": []}
+    return _legacy_cache
 
 
 def rows_by_code(matrix: dict | None = None) -> dict[str, tuple[dict, bool]]:
@@ -489,6 +560,47 @@ def profile_fields(row: dict, *, primary: bool = True) -> dict:
             }
         )
     return fields
+
+
+def validation_summary(parsed: dict) -> dict:
+    """Totales de la matriz (filas, fuentes, URL) y sus inconsistencias (OBS-002).
+
+    Una fila puede producir varias fuentes del catalogo (FDA, EMA, Health Canada,
+    EUnetHTA y NIHR tienen sub-servicios con codigo propio) y dos filas pueden ser
+    la misma fuente (FDA filas 29 y 30, Health Canada 34 y 35): por eso el numero
+    de fuentes no es igual al de filas.
+    """
+    rows = parsed.get("rows") or []
+    codes: list[str] = []
+    for row in rows:
+        codes.extend(row.get("codes") or [])
+    uncoded = sum(1 for row in rows if not row.get("codes"))
+    multi = [
+        {"excel_row": r.get("excel_row"), "name": r.get("name"), "codes": r.get("codes")}
+        for r in rows if len(r.get("codes") or []) > 1
+    ]
+    by_code: dict[str, list[int]] = {}
+    for row in rows:
+        for code in row.get("codes") or []:
+            by_code.setdefault(code, []).append(row.get("excel_row") or 0)
+    shared = {code: rws for code, rws in by_code.items() if len(rws) > 1}
+    issues = [
+        {"excel_row": r.get("excel_row"), "name": r.get("name"), **issue}
+        for r in rows for issue in (r.get("issues") or [])
+    ]
+    by_type: dict[str, int] = {}
+    for row in rows:
+        for tech in row.get("tech_types") or ["sin_tipo"]:
+            by_type[tech] = by_type.get(tech, 0) + len(row.get("consult_urls") or [])
+    return {
+        "rows": len(rows),
+        "sources": len(set(codes)) + uncoded,
+        "urls": sum(len(r.get("consult_urls") or []) for r in rows),
+        "rows_with_several_sources": multi,
+        "codes_in_several_rows": shared,
+        "issues": issues,
+        "urls_by_tech_type": by_type,
+    }
 
 
 def write_data_file(parsed: dict, path: Path | None = None) -> Path:
