@@ -14,12 +14,14 @@ import re
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urljoin, urlparse, urlunparse
 import time
+import unicodedata
 import warnings
 
 import httpx
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 from sqlalchemy.orm import Session
 
+from . import settings_store
 from .models import Finding, ScrapeLog, Source
 from .scan_progress import ACCESS_VIA_LABELS
 from .priority import compute_screening_score, screening_weights
@@ -60,18 +62,51 @@ MAX_ITEMS_PER_SOURCE = 40
 # --------------------------------------------------------------------------- #
 #  Heuristicas de clasificacion
 # --------------------------------------------------------------------------- #
-_HORIZON_INMINENTE = re.compile(
-    r"\b(launch|approv|marketing author[iz]ation|registro sanitario|aprobad|autorizad|pivotal|phase\s*iii|phase\s*3|fase\s*iii|regulatory|nice ta\b|chmp|positive opinion|fda approv|ema approv|recommend)\b",
-    re.I,
-)
-_HORIZON_EMERGENTE = re.compile(
-    r"\b(preclinic|pre-clinic|early[- ]stage|phase\s*i\b|phase\s*1\b|fase\s*i\b|phase\s*i/ii|discovery|first-in-human|pipeline|proof of concept)\b",
-    re.I,
-)
-_HORIZON_TRANSICIONAL = re.compile(
-    r"\b(phase\s*ii\b|phase\s*2\b|fase\s*ii\b|clinical trial|ensayo cl[ií]nico|in development|under (review|evaluation))\b",
-    re.I,
-)
+# Horizonte: palabras clave editables en Configuracion > Reglas de horizonte
+# (settings_store.HORIZON_RULES). Aqui se convierten a regex y se guardan en
+# cache por proceso; `refresh_horizon_rules` recompila cuando cambia el token
+# de version guardado en la BD, de modo que api y worker se enteran del cambio.
+def _fold_accents(text: str) -> str:
+    """Quita tildes y diacriticos (conserva mayusculas: se compara con re.I)."""
+    raw = unicodedata.normalize("NFKD", text or "")
+    return "".join(ch for ch in raw if not unicodedata.combining(ch))
+
+
+def horizon_term_pattern(term: str) -> str:
+    """Palabra o frase simple -> regex: escapada, palabra completa, sin tildes;
+    un espacio entre palabras admite cualquier espacio en blanco."""
+    words = _fold_accents(term).split()
+    return r"\b" + r"\s+".join(re.escape(w) for w in words) + r"\b"
+
+
+def compile_horizon_rules(rules: dict) -> dict:
+    """{nivel: regex compilado} en orden de prioridad + `default` + `any`."""
+    patterns: dict[str, re.Pattern] = {}
+    for level in settings_store.HORIZON_LEVELS:
+        alternatives = "|".join(horizon_term_pattern(t) for t in rules[level])
+        patterns[level] = re.compile(f"(?:{alternatives})", re.I)
+    return {
+        "patterns": patterns,
+        "any": re.compile("|".join(p.pattern for p in patterns.values()), re.I),
+        "default": rules.get("default", ""),
+    }
+
+
+_HORIZON_CACHE: dict = {"version": None, **compile_horizon_rules(settings_store.default_horizon_rules())}
+
+
+def refresh_horizon_rules(db: Session, *, force: bool = False) -> bool:
+    """Recompila las reglas si la version de la BD difiere de la del proceso.
+
+    Cuesta una lectura de una fila; se llama al inicio de cada escaneo de fuente.
+    """
+    version = settings_store.horizon_rules_version(db)
+    if not force and version == _HORIZON_CACHE["version"]:
+        return False
+    compiled = compile_horizon_rules(settings_store.load_horizon_rules(db))
+    _HORIZON_CACHE.update(compiled, version=version)
+    return True
+
 
 # Sufijos tipicos de denominaciones comunes internacionales (INN) de medicamentos.
 _DRUG_SUFFIX = re.compile(
@@ -143,13 +178,11 @@ warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 
 def _classify_horizon(text: str) -> str:
-    if _HORIZON_INMINENTE.search(text):
-        return "inminente"
-    if _HORIZON_TRANSICIONAL.search(text):
-        return "transicional"
-    if _HORIZON_EMERGENTE.search(text):
-        return "emergente"
-    return ""
+    folded = _fold_accents(text)
+    for level, pattern in _HORIZON_CACHE["patterns"].items():  # prioridad fija
+        if pattern.search(folded):
+            return level
+    return _HORIZON_CACHE["default"]
 
 
 def _classify_type(text: str) -> str:
@@ -179,7 +212,7 @@ def _relevance_score(text: str) -> int:
         score += 4
     if _TYPE_MEDICAMENTO.search(text) or _TYPE_DISPOSITIVO.search(text) or _TYPE_DIGITAL.search(text):
         score += 2
-    if _HORIZON_INMINENTE.search(text) or _HORIZON_TRANSICIONAL.search(text) or _HORIZON_EMERGENTE.search(text):
+    if _HORIZON_CACHE["any"].search(_fold_accents(text)):
         score += 2
     if _HS_RELEVANCE.search(text):
         score += 1
@@ -1522,6 +1555,8 @@ def _crawl_with_profile(db: Session, source: Source, landing_url: str, html: str
 
 def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") -> ScrapeLog:
     """Ejecuta el escaneo de una fuente y persiste hallazgos nuevos."""
+    # Reglas de horizonte vigentes (otro proceso pudo cambiarlas en Configuracion).
+    refresh_horizon_rules(db)
     log = ScrapeLog(
         source_id=source.id,
         # "ejecutando" hasta que termine: si la fuente se corta por tiempo, no queda un "ok" falso.
