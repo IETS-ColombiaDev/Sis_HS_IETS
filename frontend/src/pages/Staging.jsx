@@ -70,8 +70,8 @@ export default function Staging() {
   const [loadingMore, setLoadingMore] = useState(false);
   const firstLoad = useRef(true);
   const [selected, setSelected] = useState(() => new Set());
-  const [filters, setFilters] = useState({ q: "", source_id: "", channel: "", date_from: "", date_to: "", corroborated: false });
-  const [query, setQuery] = useState({ q: "", source_id: "", channel: "", date_from: "", date_to: "", corroborated: false });
+  const [filters, setFilters] = useState({ q: "", source_id: "", channel: "", date_from: "", date_to: "", corroborated: false, sort: "puntaje" });
+  const [query, setQuery] = useState({ q: "", source_id: "", channel: "", date_from: "", date_to: "", corroborated: false, sort: "puntaje" });
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
@@ -110,6 +110,7 @@ export default function Staging() {
       if (query.date_from) p.date_from = query.date_from;
       if (query.date_to) p.date_to = query.date_to;
       if (query.corroborated) p.corroborated = true;
+      if (query.sort === "recientes") p.sort = "recientes";
       return p;
     },
     [query, view]
@@ -629,6 +630,16 @@ export default function Staging() {
             Solo detectadas en varias fuentes
             <InfoTip text={GLOSSARY.fa_corroborada} label="Qué es una señal corroborada" />
           </label>
+          <Select
+            aria-label="Ordenar por"
+            title="Ordenar por"
+            value={filters.sort}
+            onChange={(e) => setFilters({ ...filters, sort: e.target.value })}
+            style={{ marginBottom: 0 }}
+          >
+            <option value="puntaje">Ordenar por: puntaje</option>
+            <option value="recientes">Ordenar por: más recientes</option>
+          </Select>
         </div>
       </Card>
 

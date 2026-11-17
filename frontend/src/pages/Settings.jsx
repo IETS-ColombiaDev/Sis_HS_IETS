@@ -15,6 +15,7 @@ import MethodologyPanel from "../components/MethodologyPanel";
 import SchedulePanel from "../components/SchedulePanel";
 import SourceParamsPanel from "../components/SourceParamsPanel";
 import BackupPanel from "../components/BackupPanel";
+import HorizonRulesPanel from "../components/HorizonRulesPanel";
 
 const TABS = [
   { id: "metodologia", label: "Gobierno metodológico", icon: "sliders" },
@@ -23,6 +24,7 @@ const TABS = [
   { id: "programacion", label: "Tareas programadas", icon: "clock" },
   { id: "fuentes", label: "Llaves de fuentes", icon: "globe" },
   { id: "parametros_fuentes", label: "Parámetros de fuentes", icon: "layers" },
+  { id: "reglas_horizonte", label: "Reglas de horizonte", icon: "sliders" },
   { id: "copia_local", label: "Persistencia (Firebase)", icon: "save" },
 ];
 
@@ -342,6 +344,7 @@ export default function Settings() {
       {tab === "programacion" && <SchedulePanel />}
 
       {tab === "parametros_fuentes" && <SourceParamsPanel toast={toast} />}
+      {tab === "reglas_horizonte" && <HorizonRulesPanel toast={toast} />}
 
       {tab === "copia_local" && <BackupPanel />}
 

@@ -6,6 +6,9 @@ Los valores de BD tienen prioridad sobre las variables de entorno.
 """
 from __future__ import annotations
 
+import json
+import uuid
+
 from sqlalchemy.orm import Session
 
 from .models import AppMeta
@@ -147,3 +150,128 @@ def save_schedule(db: Session, **changes) -> dict:
         else:
             set_value(db, keys[name], "true" if value else "false")
     return load_schedule(db)
+
+
+# --------------------------------------------------------------------------- #
+#  Reglas de horizonte para paginas web (scraper.py)
+# --------------------------------------------------------------------------- #
+# Palabras o frases simples (no regex). scraper.py las convierte por dentro:
+# texto escapado, palabra completa, sin distinguir mayusculas ni tildes, y un
+# espacio entre palabras admite cualquier espacio en blanco. La prioridad es
+# fija: inminente > transicional > emergente; si nada coincide, `default`.
+# Cada guardado renueva un token de version: cada proceso (api, worker) compara
+# la version de la BD con la suya y recompila al cambiar.
+HORIZON_RULES = "cfg.horizon_rules"
+HORIZON_RULES_VERSION = "cfg.horizon_rules_version"
+
+HORIZON_LEVELS: tuple[str, ...] = ("inminente", "transicional", "emergente")
+HORIZON_DEFAULT_CHOICES: tuple[str, ...] = ("", "emergente", "transicional", "inminente")
+HORIZON_TERM_MAX_LEN = 80
+HORIZON_TERMS_MAX = 200
+
+# Equivalentes en terminos de los regex historicos de scraper.py:
+#  - `phase\s*iii` -> "phase iii" + "phaseiii" (con y sin espacio).
+#  - `author[iz]ation` -> "authorization" + "authorisation". Unica diferencia
+#    intencional: el regex historico admitia UNA letra ("authoriation",
+#    "authorzation") y nunca coincidio con las grafias reales.
+#  - `cl[ií]nico` -> "clinico" (las tildes se ignoran al comparar).
+#  - `early[- ]stage` -> "early-stage" + "early stage".
+#  - Raices como "approv" se conservan tal cual: el regex exigia palabra
+#    completa (\b al final), igual que la conversion actual.
+DEFAULT_HORIZON_RULES: dict = {
+    "inminente": [
+        "launch", "approv", "marketing authorization", "marketing authorisation",
+        "registro sanitario", "aprobad", "autorizad", "pivotal",
+        "phase iii", "phaseiii", "phase 3", "phase3", "fase iii", "faseiii",
+        "regulatory", "nice ta", "chmp", "positive opinion", "fda approv",
+        "ema approv", "recommend",
+    ],
+    "transicional": [
+        "phase ii", "phaseii", "phase 2", "phase2", "fase ii", "faseii",
+        "clinical trial", "ensayo clinico", "in development",
+        "under review", "under evaluation",
+    ],
+    "emergente": [
+        "preclinic", "pre-clinic", "early-stage", "early stage",
+        "phase i", "phasei", "phase 1", "phase1", "fase i", "fasei",
+        "phase i/ii", "phasei/ii", "discovery", "first-in-human",
+        "pipeline", "proof of concept",
+    ],
+    "default": "",
+}
+
+
+def _clean_term(raw) -> str:
+    return " ".join(str(raw or "").split())
+
+
+def normalize_horizon_rules(data: dict) -> dict:
+    """Valida y limpia las reglas. Lanza ValueError con un mensaje legible.
+
+    Cada lista debe tener al menos un termino; los terminos son palabras o
+    frases simples que empiezan y terminan en letra o numero.
+    """
+    if not isinstance(data, dict):
+        raise ValueError("Las reglas de horizonte deben ser un objeto.")
+    out: dict = {}
+    for level in HORIZON_LEVELS:
+        terms = data.get(level)
+        if not isinstance(terms, list):
+            raise ValueError(f"Falta la lista de palabras clave de '{level}'.")
+        seen: set[str] = set()
+        clean: list[str] = []
+        for raw in terms:
+            term = _clean_term(raw)
+            if not term:
+                continue
+            if len(term) > HORIZON_TERM_MAX_LEN:
+                raise ValueError(f"'{term[:30]}…' supera {HORIZON_TERM_MAX_LEN} caracteres.")
+            if not (term[0].isalnum() and term[-1].isalnum()):
+                raise ValueError(f"'{term}' debe empezar y terminar en letra o número.")
+            key = term.lower()
+            if key not in seen:
+                seen.add(key)
+                clean.append(term)
+        if not clean:
+            raise ValueError(f"La lista de '{level}' no puede quedar vacía.")
+        if len(clean) > HORIZON_TERMS_MAX:
+            raise ValueError(f"La lista de '{level}' admite como máximo {HORIZON_TERMS_MAX} términos.")
+        out[level] = clean
+    default = str(data.get("default") or "")
+    if default not in HORIZON_DEFAULT_CHOICES:
+        raise ValueError("El horizonte por defecto debe ser vacío, emergente, transicional o inminente.")
+    out["default"] = default
+    return out
+
+
+def default_horizon_rules() -> dict:
+    return json.loads(json.dumps(DEFAULT_HORIZON_RULES))
+
+
+def horizon_rules_version(db: Session) -> str:
+    """Token de la ultima version guardada ("" = nunca se han guardado)."""
+    return get_value(db, HORIZON_RULES_VERSION, "")
+
+
+def load_horizon_rules(db: Session) -> dict:
+    """Reglas vigentes; si no hay guardadas (o estan corruptas), las por defecto."""
+    raw = get_value(db, HORIZON_RULES, "")
+    if raw:
+        try:
+            return normalize_horizon_rules(json.loads(raw))
+        except (ValueError, TypeError):
+            pass
+    return default_horizon_rules()
+
+
+def save_horizon_rules(db: Session, data: dict) -> dict:
+    """Valida, guarda y renueva el token de version (avisa a los demas procesos)."""
+    rules = normalize_horizon_rules(data)
+    set_values(
+        db,
+        {
+            HORIZON_RULES: json.dumps(rules, ensure_ascii=False),
+            HORIZON_RULES_VERSION: uuid.uuid4().hex,
+        },
+    )
+    return rules

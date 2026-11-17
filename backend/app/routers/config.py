@@ -515,3 +515,63 @@ def run_schedule_task(
 
         kick()
     return scheduler_service.run_out(db, run)
+
+
+# --------------------------------------------------------------------------- #
+#  Reglas de horizonte (paginas web) — solo superadministrador
+# --------------------------------------------------------------------------- #
+HORIZON_RULES_NOTICE = (
+    "Los cambios aplican a las señales que se capturen desde ahora; "
+    "las ya capturadas no se reclasifican"
+)
+
+
+class HorizonRulesIn(BaseModel):
+    inminente: list[str]
+    transicional: list[str]
+    emergente: list[str]
+    default: str = ""
+
+
+class HorizonRulesOut(HorizonRulesIn):
+    defaults: dict
+    notice: str = HORIZON_RULES_NOTICE
+
+
+def _horizon_out(rules: dict) -> HorizonRulesOut:
+    return HorizonRulesOut(**rules, defaults=settings_store.default_horizon_rules())
+
+
+@router.get("/horizon-rules", response_model=HorizonRulesOut)
+def get_horizon_rules(db: Session = Depends(get_db), user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    return _horizon_out(settings_store.load_horizon_rules(db))
+
+
+@router.put("/horizon-rules", response_model=HorizonRulesOut)
+def update_horizon_rules(
+    payload: HorizonRulesIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CONFIG_MANAGE)),
+):
+    from .. import scraper
+    from ..audit import record_action
+
+    before = settings_store.load_horizon_rules(db)
+    try:
+        after = settings_store.save_horizon_rules(db, payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # Este proceso recompila ya; los demas (worker) al ver el nuevo token de version.
+    scraper.refresh_horizon_rules(db)
+    changed = [k for k in after if before.get(k) != after.get(k)]
+    if changed:
+        record_action(
+            db,
+            entity_type="config",
+            entity_id="horizon_rules",
+            action="config:horizon_rules",
+            old_value={k: before.get(k) for k in changed},
+            new_value={k: after.get(k) for k in changed},
+        )
+        db.commit()
+    return _horizon_out(after)
