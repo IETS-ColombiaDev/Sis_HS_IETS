@@ -26,6 +26,8 @@ sobre conteo y ultima actualizacion), y despues de cada vigilancia.
 """
 from __future__ import annotations
 
+import threading
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -106,11 +108,25 @@ def _fingerprint(db: Session) -> str:
     return f"{RULES_VERSION}|{count}|{last.isoformat() if last else ''}|{merged}|{dedup.threshold(db)}|{per}|{top}"
 
 
+_refresh_lock = threading.Lock()
+
+
 def refresh(db: Session, *, force: bool = False) -> dict:
     """Recalcula la corroboracion de la bandeja. Devuelve un resumen.
 
     Sin `force`, no hace nada si el acervo no cambio desde el ultimo calculo.
+
+    Un solo calculo a la vez: la bandeja pide el listado y los indicadores al
+    mismo tiempo y ambos entraban aqui. En una base recien creada los dos
+    insertaban la misma clave de la huella y uno fallaba con error 500
+    (UNIQUE constraint failed: app_meta.key). El segundo espera y encuentra la
+    huella ya al dia.
     """
+    with _refresh_lock:
+        return _refresh(db, force=force)
+
+
+def _refresh(db: Session, *, force: bool = False) -> dict:
     fingerprint = _fingerprint(db)
     if not force and settings_store.get_value(db, FINGERPRINT_KEY, "") == fingerprint:
         return {"refreshed": False, "staging": 0, "corroborated": 0}
