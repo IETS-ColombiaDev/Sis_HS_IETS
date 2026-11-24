@@ -25,7 +25,7 @@ Inspirado en el modelo operativo del [NIHR Innovation Observatory](https://io.ni
 ## Nombre y descripción del proyecto
 
 **Sistema de Escaneo de Horizonte del IETS (Sis_HS_IETS)**  
-**Versión actual:** `7.1.0` (17 de noviembre de 2026)
+**Versión actual:** `7.1.1` (24 de noviembre de 2026)
 
 El sistema automatiza el ciclo de vida del monitoreo proactivo y reactivo de tecnologías sanitarias (medicamentos, dispositivos médicos, procedimientos, biológicos, salud digital) antes o durante su llegada al mercado y al Sistema General de Seguridad Social en Salud (SGSSS) de Colombia.
 
