@@ -77,3 +77,44 @@ def test_total_deadline_scales_with_read_timeout():
     assert base.total_deadline(5.0) == 60.0
     assert base.total_deadline(30.0) == 120.0
     assert base.total_deadline(httpx.Timeout(45.0)) == 180.0
+
+
+def test_downloads_share_one_tls_context_and_pool():
+    # Cada descarga creaba un cliente con su propio contexto TLS (~0,2 s de CPU al
+    # cargar las raices): la mitad de la CPU de la vigilancia.
+    a = base._http_client("https://uno.example.org/x", 5.0, {})
+    b = base._http_client("https://dos.example.org/y", 5.0, {})
+    assert base.shared_ssl_context() is base.shared_ssl_context()
+    assert a._transport is b._transport
+    a.close()
+    # Cerrar un cliente no cierra el pool compartido: el siguiente lo reutiliza.
+    with base._http_client("https://tres.example.org/z", 5.0, {}) as c:
+        assert c._transport is b._transport
+
+
+def test_crawl_downloads_child_pages_in_parallel_and_keeps_order(monkeypatch):
+    import threading
+    import time as _time
+
+    from app import prompt_store, scraper
+
+    prompt_store.configure_runtime(pause_ms=0, retries=0)
+    active = {"now": 0, "max": 0}
+    lock = threading.Lock()
+
+    def fetch(url, timeout=None, retries=None):
+        with lock:
+            active["now"] += 1
+            active["max"] = max(active["max"], active["now"])
+        _time.sleep(0.2)
+        with lock:
+            active["now"] -= 1
+        return 200, "text/html", f"<html><title>{url}</title><body><p>{url}</p></body></html>", b""
+
+    monkeypatch.setattr(scraper, "fetch_url", fetch)
+    urls = [f"https://fuente.test/e{i}" for i in range(6)]
+    started = _time.perf_counter()
+    out = scraper.fetch_many(urls, 5.0)
+    assert [u for u, *_ in out] == urls
+    assert active["max"] > 1
+    assert _time.perf_counter() - started < 6 * 0.2

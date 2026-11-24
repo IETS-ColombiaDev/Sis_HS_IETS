@@ -8,6 +8,8 @@ La sonda corre antes de cada corrida de nivel A/B y a demanda desde la API.
 """
 from __future__ import annotations
 
+import logging
+import threading
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlsplit
 
@@ -20,8 +22,11 @@ from .ingest.base import (
     ConnectorError,
     json_path_exists,
     schema_signature,
+    shared_ssl_context,
 )
 from .models import Source
+
+log = logging.getLogger(__name__)
 
 CONTACT = "escaneo.horizonte@iets.org.co"
 # Respuestas de un sitio en linea que no deja entrar robots (o pide sesion).
@@ -230,6 +235,223 @@ def probe_all(db: Session, *, only_ab: bool = False) -> list[dict]:
     return results
 
 
+# --------------------------------------------------------------------------- #
+#  Sondeo de todo el inventario en segundo plano
+# --------------------------------------------------------------------------- #
+# Sondear las 141 fuentes una tras otra dentro de la peticion tardaba minutos y
+# el navegador (o el proxy de Render) cortaba antes. Ahora corre en un hilo, de
+# a BULK_WORKERS fuentes a la vez, y la pantalla consulta el avance.
+BULK_WORKERS = 6
+BULK_SCOPES = ("all", "ab", "pending")
+_bulk_lock = threading.Lock()
+_bulk: dict = {
+    "running": False,
+    "scope": "",
+    "total": 0,
+    "done": 0,
+    "counts": {"verde": 0, "ambar": 0, "rojo": 0},
+    "current": [],
+    "started_at": None,
+    "finished_at": None,
+    "by": "",
+    "error": "",
+}
+
+
+def _snapshot() -> dict:
+    state = dict(_bulk)
+    state["counts"] = dict(_bulk["counts"])
+    state["current"] = list(_bulk["current"])
+    return state
+
+
+def bulk_state() -> dict:
+    with _bulk_lock:
+        return _snapshot()
+
+
+def bulk_targets(db: Session, scope: str) -> list[int]:
+    """Fuentes del alcance: todas las activas, solo A/B, o las que nunca se han sondeado."""
+    query = db.query(Source.id).filter(Source.retired.is_(False), Source.catalog_active.isnot(False))
+    if scope == "ab":
+        query = query.filter(Source.access_level.in_(("A", "B")))
+    elif scope == "pending":
+        query = query.filter((Source.last_probe_at.is_(None)) | (Source.health_status == ""))
+    return [row[0] for row in query.order_by(Source.title).all()]
+
+
+def start_bulk(session_factory, *, scope: str = "all", actor: str = "", wait: bool = False) -> dict:
+    """Arranca el sondeo en segundo plano. Si ya hay uno en curso, devuelve su estado.
+
+    `wait=True` corre en el hilo actual (pruebas y linea de comandos).
+    """
+    if scope not in BULK_SCOPES:
+        raise ValueError(f"Alcance desconocido: {scope}")
+    db = session_factory()
+    try:
+        ids = bulk_targets(db, scope)
+    finally:
+        db.close()
+    with _bulk_lock:
+        if _bulk["running"]:
+            return _snapshot()
+        _bulk.update(
+            running=True,
+            scope=scope,
+            total=len(ids),
+            done=0,
+            counts={"verde": 0, "ambar": 0, "rojo": 0},
+            current=[],
+            started_at=datetime.now(timezone.utc).isoformat(),
+            finished_at=None,
+            by=actor,
+            error="",
+        )
+    if wait:
+        _run_bulk(session_factory, ids, scope, actor)
+    else:
+        threading.Thread(
+            target=_run_bulk, args=(session_factory, ids, scope, actor), name="probe-bulk", daemon=True
+        ).start()
+    return bulk_state()
+
+
+def _probe_one(session_factory, source_id: int) -> str:
+    db = session_factory()
+    label = ""
+    try:
+        source = db.get(Source, source_id)
+        if source is None:
+            return ""
+        label = (source.title or "")[:80]
+        with _bulk_lock:
+            _bulk["current"].append(label)
+        try:
+            return probe_source(db, source).get("status") or "rojo"
+        except Exception as exc:  # noqa: BLE001 - una fuente rara no detiene el lote
+            log.warning("La sonda de %s fallo: %s", label, exc)
+            db.rollback()
+            try:
+                source = db.get(Source, source_id)
+                detail = {"source_id": source_id, "url": source.url, "message": f"Error de la sonda: {type(exc).__name__}"}
+                _store(db, source, "rojo", detail, True)
+            except Exception:  # noqa: BLE001
+                db.rollback()
+            return "rojo"
+    finally:
+        db.close()
+        with _bulk_lock:
+            if label in _bulk["current"]:
+                _bulk["current"].remove(label)
+
+
+def _run_bulk(session_factory, ids: list[int], scope: str, actor: str) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    try:
+        with ThreadPoolExecutor(max_workers=BULK_WORKERS, thread_name_prefix="probe") as pool:
+            for status in pool.map(lambda sid: _probe_one(session_factory, sid), ids):
+                with _bulk_lock:
+                    _bulk["done"] += 1
+                    if status in _bulk["counts"]:
+                        _bulk["counts"][status] += 1
+        db = session_factory()
+        try:
+            record_action(
+                db,
+                entity_type="sources",
+                entity_id="sondeo",
+                action="source_probe_bulk",
+                new_value={"alcance": scope, "fuentes": len(ids), "por_estado": bulk_state()["counts"], "por": actor},
+            )
+            db.commit()
+            from .events import bump_state_version
+
+            bump_state_version(db)
+        finally:
+            db.close()
+    except Exception as exc:  # noqa: BLE001
+        log.exception("Sondeo en lote")
+        with _bulk_lock:
+            _bulk["error"] = f"{type(exc).__name__}: {exc}"[:240]
+    finally:
+        with _bulk_lock:
+            _bulk["running"] = False
+            _bulk["current"] = []
+            _bulk["finished_at"] = datetime.now(timezone.utc).isoformat()
+
+
+PROBE_LABELS = {"verde": "Verde", "ambar": "Ámbar", "rojo": "Rojo", "": "Sin sonda"}
+PROBE_ACTIONS = {
+    "verde": "Ninguna",
+    "ambar": "Revisar la URL o el contrato de la fuente",
+    "rojo": "Revisar la URL en la matriz o pasar la fuente a consulta manual",
+    "": "Sondear",
+}
+
+
+def build_probe_xlsx(db: Session) -> tuple[bytes, str]:
+    """Informe de sondas del inventario activo, con el que el equipo corrige la matriz."""
+    from .xlsx_report import Column, Sheet, build_workbook, stamp
+
+    sources = (
+        db.query(Source)
+        .filter(Source.retired.is_(False), Source.catalog_active.isnot(False))
+        .order_by(Source.title)
+        .all()
+    )
+    rows = []
+    for s in sources:
+        detail = s.last_probe_detail if isinstance(s.last_probe_detail, dict) else {}
+        status = (s.health_status or "").lower()
+        if status not in PROBE_LABELS:
+            status = ""
+        rows.append(
+            [
+                s.title or "",
+                detail.get("url") or s.url or "",
+                (s.access_level or "").upper(),
+                s.connector or "",
+                PROBE_LABELS[status],
+                detail.get("http_status") or "",
+                detail.get("message") or "",
+                PROBE_ACTIONS[status],
+                s.last_probe_at,
+                s.matrix_ref or "",
+            ]
+        )
+    order = {"Rojo": 0, "Ámbar": 1, "Sin sonda": 2, "Verde": 3}
+    rows.sort(key=lambda r: (order.get(r[4], 9), r[0].lower()))
+    counts = {k: sum(1 for r in rows if r[4] == v) for k, v in PROBE_LABELS.items()}
+    sheet = Sheet(
+        "Sondas",
+        [
+            Column("Fuente", 46, wrap=True),
+            Column("URL sondeada", 50, kind="url"),
+            Column("Nivel", 7),
+            Column("Adaptador", 14),
+            Column("Estado", 11, kind="status"),
+            Column("HTTP", 7),
+            Column("Detalle", 60, wrap=True),
+            Column("Acción sugerida", 34, wrap=True),
+            Column("Fecha de la sonda", 17, kind="date"),
+            Column("Referencia en la matriz", 24),
+        ],
+        rows,
+        note=(
+            f"{len(rows)} fuentes: {counts['verde']} verdes, {counts['ambar']} ámbar, {counts['rojo']} rojas y "
+            f"{counts['']} sin sonda. Las rojas y ámbar aparecen primero."
+        ),
+    )
+    info = [
+        ("Qué es la sonda", "Una visita de prueba a la URL de la fuente, como la hace la vigilancia: dice si responde, si cambió o si bloquea."),
+        ("Verde", "Responde (directo o por su ruta de respaldo oficial). No requiere acción."),
+        ("Ámbar", "Responde con cambios (esquema distinto, cero registros, robots.txt) o la URL principal ya no existe y se usa el respaldo: corregir la URL."),
+        ("Rojo", "No responde o bloquea el acceso automático y no hay respaldo: revisar la URL en la matriz o pasar la fuente a consulta manual."),
+    ]
+    return build_workbook([sheet], title="Informe de sondas de fuentes", info=info), f"sondas_fuentes_{stamp()}.xlsx"
+
+
 def health_board(db: Session) -> dict:
     rows = db.query(Source).filter(Source.retired.is_(False)).all()
     counts = {"verde": 0, "ambar": 0, "rojo": 0, "sin_sonda": 0}
@@ -329,7 +551,7 @@ def _check_robots(url: str, respect: bool | None) -> dict | None:
     parts = urlsplit(url)
     robots_url = urljoin(f"{parts.scheme}://{parts.netloc}", "/robots.txt")
     try:
-        with httpx.Client(timeout=10.0, follow_redirects=True, headers={"User-Agent": USER_AGENT}) as client:
+        with httpx.Client(timeout=10.0, follow_redirects=True, headers={"User-Agent": USER_AGENT}, verify=shared_ssl_context()) as client:
             resp = client.get(robots_url)
         if resp.status_code >= 400:
             return {"url": robots_url, "allowed": True, "note": f"HTTP {resp.status_code}"}

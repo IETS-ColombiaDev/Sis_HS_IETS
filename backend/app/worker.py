@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -41,6 +42,34 @@ RETRY_POLL_SECONDS = 30
 # haya cola, el propio servicio se visita por su URL publica cada 4 min.
 KEEPALIVE_SECONDS = 240
 _keepalive_thread: threading.Thread | None = None
+
+
+_libc = None
+
+
+def release_memory() -> None:
+    """Devuelve al sistema la memoria que dejo libre la fuente recien procesada.
+
+    En Linux (Render) glibc conserva la memoria liberada por Python: tras decenas
+    de paginas grandes analizadas, el proceso crecia fuente a fuente hasta pasar
+    los 512 MB del plan gratuito y Render lo reiniciaba a mitad de la corrida.
+    `gc.collect` libera los ciclos y `malloc_trim(0)` devuelve los bloques libres.
+    En otros sistemas solo se hace la recoleccion.
+    """
+    global _libc
+    import gc
+
+    gc.collect()
+    if _libc is False or not sys.platform.startswith("linux"):
+        return
+    try:
+        if _libc is None:
+            import ctypes
+
+            _libc = ctypes.CDLL("libc.so.6")
+        _libc.malloc_trim(0)
+    except Exception:  # noqa: BLE001 - p. ej. musl sin malloc_trim
+        _libc = False
 
 
 def _force_worker_on_sqlite() -> bool:
@@ -218,6 +247,7 @@ def _run_lanes(lanes: int) -> int:
                 # Cada fuente corre con tiempo maximo: una colgada no detiene la corrida.
                 run_job_guarded(job_id, timeout_s)
                 count += 1
+                release_memory()
             except Exception:  # noqa: BLE001
                 log.exception("Carril del worker de ingesta")
                 return count

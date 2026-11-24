@@ -38,6 +38,12 @@ test("la guía rápida se abre al ingresar y recorre el mapa del sistema", async
 
   await guide.getByRole("button", { name: "Entendido, empezar" }).click();
   await expect(guide).toHaveCount(0);
+  // Al cerrar la guía (no antes: no se apilan ventanas) sale el aviso de fuentes
+  // de consulta manual (tipo E) por validar, que la base de pruebas siembra.
+  const prompt = page.getByTestId("manual-review-prompt");
+  await expect(prompt).toBeVisible();
+  await page.getByTestId("manual-prompt-later").click();
+  await expect(prompt).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Bandeja de trabajo" }).first()).toBeVisible();
 
   const stored = await page.evaluate((k) => localStorage.getItem(k), ONBOARDING_KEY);

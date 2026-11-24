@@ -303,3 +303,160 @@ Simulación sobre la copia de la base local (124 fuentes, 1.126 señales): se cr
 **Fuentes que bloquean robots:** no se intentó saltar la protección del sitio. Entran por la ruta legítima de respaldo y quedan marcadas como parciales en el informe de acceso.
 
 **Pendientes y limitaciones:** las 22 fuentes sin señales sin IA son sitios que cargan con JavaScript o solo ofrecen un formulario de búsqueda (Amgen, EUDAMED, DRKS, CRiS, PACTR, PATENTSCOPE, IEEE, Medtronic) o páginas institucionales sin productos nombrados (Philips, Roche, Abbott, IQWiG, RedETS). Con la IA activa, la IA lee esas páginas; si siguen sin señales conviene pasarlas a consulta manual.
+
+---
+
+## Vigilancia más rápida y estable en Render (24-11-2026)
+
+**Problema reportado:** en el sitio desplegado la vigilancia llegaba a cerca del 60 % y se rompía, y tardaba demasiado.
+
+**Qué se midió:** corrida completa local de las 115 fuentes con una fuente a la vez (como Render), IA y OCR apagados, Firestore apagado. Localmente no se rompía, pero consumía 467 s de CPU: en Render (0,1 CPU) eso solo son unos 78 minutos de cómputo, y la CPU por minuto crecía a lo largo de la corrida.
+
+**Causa principal del consumo:** cada descarga creaba un cliente HTTP nuevo con su propio contexto TLS; cargar las raíces de certificados cuesta ~0,2 s de CPU por página (en Render ~2 s) y no se reutilizaban conexiones. Era la mitad de la CPU de la vigilancia.
+
+**Cambios:**
+- Un solo contexto TLS por proceso y un pool de conexiones compartido (`ingest/base.py`); también en la búsqueda web, la sonda, la verificación de enlaces y las imágenes de la IA.
+- Las páginas internas de cada fuente (entradas de la matriz, resultados de búsqueda, fichas) se descargan de a 4 a la vez; el análisis sigue en orden en el hilo de la fuente.
+- Una página interna caída se reintenta 1 vez (antes hasta 3 veces con 15 s cada una). La URL principal conserva sus reintentos.
+- Tras cada fuente se libera memoria (`gc` y `malloc_trim` en Linux) y la imagen fija `MALLOC_ARENA_MAX=2`, para que el proceso no crezca fuente a fuente hasta pasar los 512 MB de Render.
+- Un job interrumpido por un reinicio vuelve al final de la cola, no al principio: si una fuente tumba el proceso, ya no lo vuelve a tumbar en bucle y la corrida sigue hasta el 100 %.
+- Corregido un desempaque erróneo en `crawl_site` cuando no se le pasa el HTML de entrada.
+
+**Resultado (misma máquina, mismas 115 fuentes):** de 37 a 20 minutos y de 467 a 127 s de CPU (−73 %), 115 de 115 terminadas, 0 errores, 935 señales (936 antes; la diferencia es variación de los sitios).
+
+**Pendiente:** confirmar en Render con una corrida completa; si vuelve a detenerse, revisar en los registros de Render si hubo reinicio por memoria ("Out of memory") o por la verificación de salud.
+
+---
+
+## Pendientes del Módulo 0 (24-11-2026)
+
+**Estado:** CUMPLIDO PARCIAL, 24-11-2026. Implementado, con pruebas automáticas (backend y navegador) y verificado contra los sitios reales sobre una copia local de la base de la vigilancia del 24-11-2026 (141 fuentes, 935 señales). Falta verificarlo en el sistema desplegado.
+
+### 1. RF-001: que el enlace lleve a la señal exacta
+
+**Qué se hizo.** Módulo nuevo `backend/app/link_resolver.py`. Para cada señal en «página de consulta»:
+1. Busca en la página un enlace cuyo texto sea el nombre de la señal, o la URL del producto declarada en los datos estructurados (JSON-LD). Si la encuentra, la señal pasa a **enlace exacto** y la URL anterior queda en `evidence.resolved.previous_url`. Si dos fichas distintas tienen el mismo nombre, desempata por el contexto (indicación o fase); si no puede, no adivina.
+2. Si la fuente no tiene enlace por ítem (tablas de pipeline) y el nombre está en la página, guarda en `evidence.locator_url` un enlace con fragmento de texto (`#:~:text=`). Ese enlace abre la página y el navegador resalta la señal.
+3. Si no la encuentra, lo dice (`evidence.resolved.reason`) y conserva la evidencia de captura.
+
+Corre en la captura, sin descargas extra (usa el HTML que el rastreo ya tiene), y a demanda con (Ubicar señales exactas) en segundo plano. El **Diagnóstico para la matriz** dice por fuente si el equipo técnico debe mejorar la URL (portada, buscador, URL caída o contenido que carga con JavaScript) o si la fuente no ofrece enlace por ítem. Endpoints: `POST /api/findings/links/resolve`, `GET /api/findings/links/resolve/state`, `GET /api/findings/links/diagnosis` y `GET /api/findings/links/diagnosis.xlsx`.
+
+**Resultado sobre las 935 señales reales:** de las 178 en página de consulta, 25 pasaron a enlace exacto, 148 abren la página resaltando la señal y 5 quedan sin ubicar. En total, 930 de 935 llevan a la señal exacta o al punto de la página donde está. Las 20 de Novartis entran con la URL propia de cada producto e indicación (p. ej. `…/novartis-pipeline#AAA601-GEPNETpediatrics`). Se verificó también en una captura real de Novartis, AstraZeneca y Merck.
+
+**Fuentes en las que conviene mejorar la matriz** (diagnóstico más sondas):
+- **Reuters Salud** (`reutershealth.com`): el sitio ya no publica (HTTP 401 y nada en Google News). Hay que registrar una URL vigente o retirar la fuente.
+- **CTRI India**: rechaza la conexión desde fuera de la India. Hay que validar desde Render; si sigue igual, pasarla a consulta manual.
+- **AIFA** (dos enlaces con ruta `#/…`) y **Boehringer Ingelheim**: la página carga su contenido con JavaScript y la señal no se puede ubicar. Hay que registrar una URL más específica (listado, RSS o descarga) o pasarlas a consulta manual.
+
+### 2. Sondas de las 141 fuentes
+
+**Qué se hizo.** «Sondear A/B» corría dentro de la petición y solo probaba 7 fuentes. Ahora **Sondear todas** corre en segundo plano, de a seis fuentes a la vez, y la pantalla muestra el avance (`POST /api/ingest/probe/run`, `GET /api/ingest/probe/status`). El **Informe de sondas (Excel)** (`GET /api/ingest/probe/report.xlsx`) lista cada fuente con su estado, el detalle y la acción sugerida, con las rojas primero.
+
+**Resultado (corrida real, 24-11-2026):** 141 fuentes en 68 segundos. 139 verdes y 2 rojas (CTRI y Reuters, ver arriba). Entre las verdes, 24 bloquean robots (HTTP 403) y 7 no respondieron en su portada; todas entran por su ruta de respaldo oficial.
+
+### 3. Fuentes tipo E por validar
+
+**Qué se hizo.** Módulo `backend/app/manual_review.py`: lista las fuentes E activas y marca como «por validar» las que nunca se validaron o cuya fecha de próxima revisión (`sources.next_review_due`) ya llegó. La frecuencia sale de la matriz (semanal). Registrar una validación (resultado, nota y señales registradas) fija la próxima revisión y deja la constancia en la bitácora (acción `manual_review`). No se creó ninguna tabla. Se ve en cuatro lugares:
+- un aviso al entrar, una vez por sesión, que no se apila con la guía de bienvenida;
+- un contador junto a «Bandeja de entrada» en el menú;
+- un aviso amarillo en la Bandeja de entrada con la ventana de validación;
+- la tarjeta «Fuentes tipo E por validar» en la Bandeja de trabajo del superadministrador y del evaluador técnico.
+
+Desde la ventana se registran las señales encontradas (`POST /api/findings`, que ahora valida tipo, horizonte y título). Inventario actual: 8 fuentes E (Boston Scientific ×2, EMA ×2, Scopus, Synapse, Embase, IHSI).
+
+### 4. Catálogo en Excel
+
+`GET /api/sources/export.xlsx` (botón «Descargar Excel»). El libro trae estas hojas:
+- **Fuentes:** filtros, panel fijo, hipervínculos, estado de la sonda y señales capturadas;
+- **Consulta manual (tipo E);**
+- **Resumen:** conteos por nivel de acceso, nivel de fuente, tipo de tecnología, adaptador y salud;
+- **Retiradas;**
+- **Información.**
+
+Las celdas que empiezan por `=`, `+`, `-` o `@` se escriben como texto, para evitar inyección de fórmulas. El CSV sigue disponible. El generador compartido está en `backend/app/xlsx_report.py`.
+
+### 5. RF-02-F: cruce de postulaciones con la búsqueda proactiva y la web
+
+**Qué se hizo.** Módulo `backend/app/submission_crosscheck.py` y migración reversible `0007` (`submissions.cross_check`). Al llegar, cada postulación se cruza con la vigilancia de inmediato; la parte web se completa en segundo plano. El evaluador puede repetir el cruce (`POST /api/submissions/{id}/cross-check`). Lo que vio queda guardado con la tecnología al aceptarla.
+- **Vigilancia:** usa el comparador del filtrado y una regla de nombre contenido («Lutathera» en «Lutathera (AAA601)»; una palabra genérica sola no cuenta). Cada coincidencia trae el enlace a la señal exacta.
+- **Registros oficiales por API:** ClinicalTrials.gov, FDA (Drugs@FDA y 510k) y PubMed.
+- **Web:** solo se muestran los resultados de los buscadores que mencionan la tecnología.
+
+**Por qué los registros oficiales:** en la prueba real, Yahoo y DuckDuckGo bloquearon y **Bing devolvió resultados ajenos, incluso contenido para adultos**, ante consultas que no reconocía. El filtro de pertinencia los descarta todos y la interfaz informa cuántos descartó.
+
+**Resultado real:**
+- «Lutathera» (Novartis) coincide con sus 2 señales del pipeline de Novartis, con enlace exacto. En los registros trae 3 ensayos de ClinicalTrials.gov, la ficha LUTATHERA NDA208700 de la FDA y artículos de PubMed.
+- «Zilovertamab vedotin» coincide con la señal del pipeline de Merck y trae 3 ensayos de ClinicalTrials.gov.
+
+### Cómo se verificó
+
+- Backend: 29 pruebas nuevas en `backend/tests/test_modulo0_pendientes.py`. Suite completa en verde.
+- Navegador: `frontend/e2e/modulo0_pendientes.spec.js` (aviso de entrada y validación de una fuente E, descargas en Excel, diagnóstico de enlaces y cruce de postulaciones). Se ajustó `onboarding.spec.js` porque el aviso aparece al cerrar la guía. Suite E2E completa en verde.
+- Corridas reales contra los sitios sobre una copia local de la base, con Firestore apagado. No se tocó la base de producción.
+
+### Pendientes y limitaciones
+
+- Verificar en el sistema desplegado: Sondear todas, Ubicar señales exactas y una postulación de prueba.
+- El resaltado de la señal depende del navegador: funciona en Chrome, Edge, Safari y Firefox recientes. En los demás abre la página sin resaltar.
+- Sin IA, algunas «señales» de pipelines y portafolios son texto de la página y no productos (p. ej. «Identify and monitor side effects» en Merck). El enlace las ubica bien; el ruido es del filtro de captura y conviene revisarlo aparte.
+
+---
+
+## Auditoría del Módulo 0 (24-11-2026)
+
+**Estado:** CUMPLIDO PARCIAL, 24-11-2026. Auditoría sobre el código que va en el PR de `develop` a `main`, con corridas reales contra los sitios en una copia local (Firestore apagado). Falta la verificación en el sistema desplegado.
+
+**Qué se revisó:** vigilancia completa, sondas, enlaces, bandeja, fuentes tipo E, postulaciones, exportaciones, permisos de los endpoints nuevos, migración y concurrencia (sondeo de las 141 fuentes mientras corre la vigilancia: sin bloqueos de base ni errores).
+
+### Hallazgos y correcciones
+
+**1. Ruido en la captura sin IA (precisión).** De las 645 señales web de la corrida, 255 no eran tecnologías:
+- menús desplegables (Swissmedic, MFDS);
+- advertencias de seguridad de un dispositivo (Abbott, 46);
+- leyendas y controles de tablas (Merck);
+- páginas índice («2026 Biological Approvals»);
+- ofertas de empleo (Bayer, por el respaldo de Google News);
+- títulos del propio sitio (NEJM);
+- noticias corporativas, jurídicas o políticas;
+- páginas educativas, eventos y webinars.
+
+Se agregaron reglas a `scraper.py`, cada una con su caso real en el comentario y en las pruebas: `never_a_signal` (también aplica a filas de pipeline), `is_prose`, `is_menu_dump`, `_INDEX_PAGE`, `_JOB_AD`, `_EVENT_PAGE`, `_ADVERSE_BULLET`, `_EDUCATIONAL` y ampliaciones de `_CORPORATE`, `_ADMIN_PAGE` y de las palabras genéricas. El criterio quedó en una sola función, `capture_noise_reason`, que usan la captura y la depuración.
+
+**2. La misma señal repetida por varios enlaces de una organización.** Con el inventario por enlace, BD traía la misma lista de noticias en sus tres fuentes y Abbott en dos. Ahora, al guardar, si el mismo ítem (mismo título y misma URL) ya entró por otra fuente del mismo dominio, no se repite (`sibling_source_ids`).
+
+**3. Corroboración inflada.** «En varias fuentes» contaba cada enlace como una fuente: dos páginas de la FDA con la misma tecnología sumaban como dos fuentes y daban bono de orden. Ahora el origen es la organización (`corroboration.org_host`: `accessdata.fda.gov` y `www.fda.gov` son `fda.gov`). El cálculo se rehace solo en la siguiente consulta de la bandeja.
+
+**4. Health Canada traía productos de consumo.** El registro DPD clasifica como medicamento los protectores solares, enjuagues y antigripales de venta libre («COOLA ANTI-AGING HAND CREAM», «DAYQUIL»). Se filtran por principio activo (`is_consumer_product`): si todos los activos son de consumo o de venta libre, no entra. Con la API real, de 47 productos quedaron 35, todos medicamentos de prescripción o biológicos.
+
+**5. El ruido que ya estaba en la bandeja.** Las reglas nuevas solo actúan sobre capturas futuras. Se agregó `reprocess_noise` (`POST /api/ingest/reprocess?target=ruido`, sin `apply` simula) y el botón **Depurar ruido** en la Bandeja de entrada, visible para quien administra la configuración. Pasa a Descartadas, con motivo y bitácora, lo que hoy no entraría: ruido, repetidas y productos de consumo. No borra nada y se puede restaurar. No entra en `target=all`.
+
+**6. Costo del cruce de postulaciones.** Comparar contra todo el acervo dentro de la petición del formulario público costaba 0,28 s de CPU con 939 tecnologías (unos 3 s en Render, y crecía con la base). Un prefiltro por nombre y NCT deja solo las candidatas; el resultado es idéntico al exhaustivo (240 casos, 0 diferencias) y cinco veces más rápido. Además, el cruce ahora reconoce el NCT que la persona cita en sus enlaces de evidencia.
+
+### Resultado medido
+
+Vigilancia completa real con el código final (115 fuentes, una a la vez, sin IA), comparada con la del mismo día antes de la auditoría:
+
+| | Antes | Después |
+|---|---|---|
+| Fuentes terminadas / con error | 115 / 0 | 115 / 0 |
+| Tiempo total | 20 min | 20,5 min |
+| Señales capturadas | 935 | 651 |
+| Señales web que eran ruido | 255 de 645 | 15 de 375 (casos de Swissmedic y Bayer cubiertos por el último ajuste de reglas) |
+| Mismo ítem repetido entre fuentes de una organización | 27 | 0 |
+| Señales marcadas «en varias fuentes» | 184 | 14 (organizaciones distintas) |
+| Con enlace exacto o que abren y resaltan la señal | 930 de 935 | 648 de 651 |
+
+Sondeo de las 141 fuentes lanzado mientras corría la vigilancia: terminó sin bloqueos de base ni errores (139 verdes, 2 rojas). Sobre la base anterior, **Depurar ruido** retira 301 de 935 señales (ruido, repetidas y productos de venta libre) y una segunda pasada no cambia nada.
+
+**Pruebas:** backend 825 aprobadas (103 del Módulo 0, con 51 títulos reales de ruido que ya no entran y 18 señales reales que siguen entrando); navegador 101 de 101; integración continua de GitHub en verde para el commit anterior (pytest, Alembic, PostgreSQL 15, imagen Docker, frontend y prueba de humo).
+
+### Cómo aplicarlo en el sistema desplegado
+
+1. Después del despliegue, en **Bandeja de entrada** pulse **Depurar ruido**, revise la lista y confirme.
+2. Corra una vigilancia completa: las fuentes de una misma organización ya no repiten señales y el ruido no vuelve a entrar.
+3. El indicador «En varias fuentes» se recalcula solo al abrir la bandeja.
+
+### Pendientes y limitaciones
+
+- El filtro sin IA es de reglas: prioriza no dejar entrar ruido. Puede perder algún titular legítimo redactado como pregunta o como frase larga sin nombre de producto. Con la IA activa, la IA decide.
+- Quedan señales de calidad media que no son ruido claro, como artículos de divulgación de noticias generales. Decidir si se conservan es criterio metodológico del equipo técnico.

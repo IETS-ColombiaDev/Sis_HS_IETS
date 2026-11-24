@@ -92,9 +92,15 @@ def reset_cooldowns() -> None:
 # --------------------------------------------------------------------------- #
 #  Motores
 # --------------------------------------------------------------------------- #
+def _ssl():
+    from .ingest.base import shared_ssl_context
+
+    return shared_ssl_context()
+
+
 def _fetch(url: str, *, params: dict, timeout: float, method: str = "GET", headers: dict | None = None) -> httpx.Response:
     cfg = httpx.Timeout(timeout, connect=min(10.0, timeout))
-    with httpx.Client(follow_redirects=True, timeout=cfg, headers=headers or _headers()) as client:
+    with httpx.Client(follow_redirects=True, timeout=cfg, headers=headers or _headers(), verify=_ssl()) as client:
         if method == "POST":
             resp = client.post(url, data=params)
         else:

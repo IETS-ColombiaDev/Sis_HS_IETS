@@ -196,6 +196,24 @@ def test_orphan_running_job_returns_to_the_queue(db):
     assert ingest_service.tick(db)[0].status == "ok"
 
 
+def test_orphan_job_goes_to_the_end_of_the_queue(db):
+    # Si una fuente tumbo el proceso (memoria en Render), reintentarla primero lo
+    # volvia a tumbar y la corrida quedaba clavada en el mismo porcentaje.
+    culprit = _source(db, title="A culpable", url="https://a.example.org")
+    other = _source(db, title="B siguiente", url="https://b.example.org")
+    now = dt.datetime.now(dt.timezone.utc)
+    queued_at = now - dt.timedelta(minutes=10)
+    db.add(IngestJob(connector="fixture", source_id=culprit.id, status="ejecutando", attempts=1,
+                     started_at=now - dt.timedelta(hours=1), scheduled_for=queued_at))
+    db.add(IngestJob(connector="fixture", source_id=other.id, status="pendiente", scheduled_for=queued_at))
+    db.commit()
+    assert ingest_service.recover_stale(db) == 1
+    first = ingest_service.claim_next(db)
+    assert db.get(IngestJob, first).source_id == other.id
+    second = ingest_service.claim_next(db)
+    assert db.get(IngestJob, second).source_id == culprit.id
+
+
 def test_kick_does_not_block_the_request(monkeypatch):
     # Bug: `kick` corria `tick` dentro del hilo de la peticion.
     started = threading.Event()

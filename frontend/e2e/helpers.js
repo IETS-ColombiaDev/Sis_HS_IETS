@@ -48,20 +48,45 @@ export async function tokenForRole(request, role) {
   return apiToken(request, email);
 }
 
-/** Deja la pagina autenticada con el perfil pedido y navega a `path`. */
-export async function loginAs(page, role = "superadmin", path = "/") {
+export const MANUAL_PROMPT_KEY = "iets.manualReviewPrompt";
+
+/**
+ * Deja la pagina autenticada con el perfil pedido y navega a `path`.
+ *
+ * El aviso de fuentes tipo E por validar (sale al entrar, una vez por sesion)
+ * se da por visto salvo que la prueba pida verlo con `{ manualPrompt: true }`:
+ * la base de pruebas siembra fuentes E y el aviso taparia la pantalla.
+ */
+export async function loginAs(page, role = "superadmin", path = "/", { manualPrompt = false } = {}) {
   const token = await tokenForRole(page.request, role);
   // Se inyecta una sola vez por pestana: asi un cierre de sesion posterior en la
   // prueba no queda deshecho por la siguiente navegacion.
-  await page.addInitScript(([k, t, g]) => {
+  await page.addInitScript(([k, t, g, m]) => {
     if (!window.sessionStorage.getItem("e2e_token_injected")) {
       window.localStorage.setItem(k, t);
       window.sessionStorage.setItem("e2e_token_injected", "1");
     }
     window.localStorage.setItem(g, "1");
-  }, [TOKEN_KEY, token, ONBOARDING_KEY]);
+    if (m) window.sessionStorage.setItem(m, "1");
+  }, [TOKEN_KEY, token, ONBOARDING_KEY, manualPrompt ? "" : `${MANUAL_PROMPT_KEY}:${emailFor(role)}`]);
   await page.goto(path);
   return token;
+}
+
+/**
+ * Cierra el aviso de fuentes tipo E por validar si aparece (ingresos por la
+ * pantalla de inicio de sesion, que no pasan por `loginAs`).
+ */
+export async function dismissManualPrompt(page) {
+  const prompt = page.getByTestId("manual-review-prompt");
+  try {
+    await prompt.waitFor({ state: "visible", timeout: 4000 });
+  } catch {
+    return false;
+  }
+  await page.getByTestId("manual-prompt-later").click();
+  await expect(prompt).toHaveCount(0);
+  return true;
 }
 
 /**

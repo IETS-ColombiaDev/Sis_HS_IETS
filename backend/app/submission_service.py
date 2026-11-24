@@ -91,6 +91,17 @@ def create_submission(db: Session, data: dict, *, ip: str = "", captcha: str = "
     )
     db.commit()
     db.refresh(row)
+    # RF-02-F: cruce inmediato con la vigilancia proactiva (local y rapido). El de
+    # la web lo completa el router en segundo plano para no demorar el formulario.
+    try:
+        from . import submission_crosscheck
+
+        submission_crosscheck.run(db, row, web=False, actor="sistema")
+    except Exception:  # noqa: BLE001 - el cruce nunca impide recibir la postulacion
+        db.rollback()
+        import logging
+
+        logging.getLogger(__name__).warning("No se pudo cruzar la postulación %s", row.id, exc_info=True)
     bump_state_version(db)
     return row
 
@@ -136,6 +147,8 @@ def accept_submission(db: Session, submission: Submission, *, reviewer: str, not
                 "email": submission.submitter_email,
                 "org": submission.submitter_org,
             },
+            # RF-02-F: lo que el evaluador vio al moderar (coincidencias y web).
+            "cross_check": (submission.cross_check or {}).get("summary") if isinstance(submission.cross_check, dict) else None,
         },
     )
     tech.condition = suggest_condition(

@@ -1,0 +1,143 @@
+/* Fuentes de consulta manual (nivel E) por validar — Módulo 0. */
+.mr-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  color: #78350f;
+}
+.mr-banner-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #fde68a;
+  color: #92400e;
+  flex: 0 0 auto;
+}
+.mr-banner-text {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.mr-banner-text strong {
+  display: block;
+  font-size: 15px;
+}
+.mr-banner-text span {
+  font-size: 13px;
+}
+.mr-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+.mr-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mr-intro {
+  margin: 0 0 4px;
+  font-size: 13.5px;
+  color: #475569;
+}
+.mr-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+.mr-item.is-due {
+  border-color: #fcd34d;
+  box-shadow: inset 3px 0 0 #f59e0b;
+}
+.mr-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  flex-wrap: wrap;
+}
+.mr-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.mr-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 12.5px;
+  color: #64748b;
+  margin-top: 4px;
+}
+.mr-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.mr-body {
+  border-top: 1px solid #f1f5f9;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mr-hint {
+  margin: 0;
+  font-size: 13px;
+  color: #334155;
+}
+.mr-steps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #475569;
+}
+.mr-signal,
+.mr-close {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.mr-row {
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  gap: 8px;
+}
+.mr-row-end {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.mr-empty {
+  padding: 14px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13.5px;
+}
+@media (max-width: 640px) {
+  .mr-row {
+    grid-template-columns: 1fr;
+  }
+}
+.sb-link .mr-count {
+  margin-left: auto;
+}

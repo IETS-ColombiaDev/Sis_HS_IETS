@@ -260,10 +260,10 @@ SAMPLE_LIMIT = 5
 # perfil decide que se muestra y la matriz RBAC garantiza que se puede actuar.
 ROLE_WORK_ITEMS: dict[str, tuple[str, ...]] = {
     rbac.SUPERADMIN: (
-        "rate", "classify", "novelty", "filter_ready", "invima", "drafts", "submissions", "merges",
-        "cycle_deadline", "close_blockers", "bulletins_pending",
+        "manual_sources", "rate", "classify", "novelty", "filter_ready", "invima", "drafts", "submissions",
+        "merges", "cycle_deadline", "close_blockers", "bulletins_pending",
     ),
-    rbac.EVALUADOR_TECNICO: ("rate", "classify", "novelty", "filter_ready", "invima"),
+    rbac.EVALUADOR_TECNICO: ("manual_sources", "rate", "classify", "novelty", "filter_ready", "invima"),
     rbac.EVALUADOR_CLINICO: ("rate", "drafts"),
     rbac.TOMADOR_DECISIONES: ("bulletins_published", "alerts", "dashboard"),
     rbac.REVISOR_PARES: ("reviews",),
@@ -271,6 +271,7 @@ ROLE_WORK_ITEMS: dict[str, tuple[str, ...]] = {
 ITEM_PERMISSION: dict[str, str | None] = {
     "rate": None,  # depende de los criterios que el perfil califica
     "classify": rbac.P_STAGING_ASSIGN,
+    "manual_sources": rbac.P_STAGING_ASSIGN,
     "novelty": rbac.P_SCREENING_WRITE,
     "filter_ready": rbac.P_SCREENING_WRITE,
     "invima": rbac.P_INVIMA_SYNC,
@@ -603,6 +604,37 @@ def _item_drafts(db):
     )
 
 
+def _item_manual_sources(db):
+    """Fuentes de consulta manual (nivel E) que una persona debe validar (Modulo 0)."""
+    from .. import manual_review
+
+    data = manual_review.overview(db)
+    if not data["total"]:
+        return None
+    due = [i for i in data["items"] if i["due"]]
+    return WorkItem(
+        key="manual_sources",
+        label="Fuentes tipo E por validar",
+        count=data["due"],
+        to="/bandeja-entrada?validar=fuentes-e",
+        action_label="Validar fuentes manuales",
+        help=(
+            "Fuentes de consulta manual (nivel de acceso E: bases con licencia, portales con usuario o captcha) "
+            "que la vigilancia automática no recorre. Cómo se calcula: fuentes E activas que nunca se han "
+            "validado o cuya próxima revisión ya llegó, según su frecuencia en la matriz."
+        ),
+        samples=[
+            WorkSample(
+                id=i["id"],
+                name=i["title"],
+                to="/bandeja-entrada?validar=fuentes-e",
+                detail="Nunca validada" if i["never_reviewed"] else f"Vencida hace {i['overdue_days']} día(s)",
+            )
+            for i in due[:SAMPLE_LIMIT]
+        ],
+    )
+
+
 def _item_submissions(db):
     q = db.query(Submission).filter(Submission.status == "recibida")
     count = q.with_entities(func.count(Submission.id)).scalar() or 0
@@ -848,6 +880,7 @@ def build_my_work(db: Session, user: User, *, today: date | None = None) -> dict
     builders = {
         "rate": lambda: _item_rate(db, cycle, backlog),
         "classify": lambda: _item_classify(db),
+        "manual_sources": lambda: _item_manual_sources(db),
         "novelty": lambda: _item_novelty(db, cycle, split()),
         "filter_ready": lambda: _item_filter_ready(db, cycle, split()),
         "invima": lambda: _item_invima(db),

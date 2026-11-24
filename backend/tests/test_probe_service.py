@@ -112,7 +112,7 @@ def test_a_silent_site_is_skipped_on_the_next_scan(db, monkeypatch):
     src = _source(db, url="https://www.tga.gov.au/resources/artg")
     calls = []
 
-    def fetch(url, timeout=None):
+    def fetch(url, timeout=None, retries=None):
         calls.append(url)
         if "news.google.com" in url:
             return (200, "text/xml", FEED, FEED.encode())

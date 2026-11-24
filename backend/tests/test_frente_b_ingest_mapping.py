@@ -228,7 +228,7 @@ def test_scraper_splits_pipeline_rows_at_capture(db, monkeypatch):
     db.add(source)
     db.commit()
     row = ROWS[0]
-    monkeypatch.setattr(scraper, "fetch_url", lambda url, timeout=25.0: (200, "text/html", "<html></html>", b""))
+    monkeypatch.setattr(scraper, "fetch_url", lambda url, timeout=25.0, retries=None: (200, "text/html", "<html></html>", b""))
     monkeypatch.setattr(
         scraper,
         "extract_candidates",

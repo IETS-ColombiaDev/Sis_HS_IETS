@@ -5,14 +5,15 @@ import { test, expect } from "@playwright/test";
 import { loginAs, watchErrors, expectClean, settle, ROLES } from "./helpers";
 
 const EXPECTED_KEYS = {
-  superadmin: ["rate", "classify", "novelty", "filter_ready", "invima", "drafts", "submissions", "merges", "cycle_deadline", "close_blockers", "bulletins_pending"],
-  evaluador_tecnico: ["rate", "classify", "novelty", "filter_ready", "invima"],
+  superadmin: ["manual_sources", "rate", "classify", "novelty", "filter_ready", "invima", "drafts", "submissions", "merges", "cycle_deadline", "close_blockers", "bulletins_pending"],
+  evaluador_tecnico: ["manual_sources", "rate", "classify", "novelty", "filter_ready", "invima"],
   evaluador_clinico: ["rate", "drafts"],
   tomador_decisiones: ["bulletins_published", "alerts", "dashboard"],
   revisor_pares: ["reviews"],
 };
 // Bloques que dependen del estado (solo aparecen si hay algo que avisar).
-const CONDITIONAL = new Set(["invima", "cycle_deadline"]);
+// manual_sources: solo si el inventario tiene fuentes de consulta manual (nivel E).
+const CONDITIONAL = new Set(["invima", "cycle_deadline", "manual_sources"]);
 
 async function myWork(page) {
   return page.evaluate(async () => {

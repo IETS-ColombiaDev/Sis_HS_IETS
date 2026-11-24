@@ -211,6 +211,50 @@ def links_check(
     return {**state, "running": True}
 
 
+@router.post("/links/resolve")
+def links_resolve(
+    retry: bool = Query(False, description="Reintentar tambien las que ya se ubicaron resaltando el texto"),
+    user: User = Depends(require_permission(P_TECHNOLOGY_WRITE)),
+):
+    """Ubica en segundo plano la senal exacta de las que quedaron en pagina de consulta (RF-001)."""
+    from .. import link_resolver
+    from ..database import SessionLocal
+
+    return link_resolver.start(SessionLocal, actor=user.email, retry=retry)
+
+
+@router.get("/links/resolve/state")
+def links_resolve_state(user: User = Depends(get_current_user)):
+    from .. import link_resolver
+
+    return link_resolver.state()
+
+
+@router.get("/links/diagnosis")
+def links_diagnosis(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Por fuente: como quedaron sus enlaces y si conviene mejorar la URL en la matriz."""
+    from .. import link_resolver
+
+    out = link_resolver.diagnose(db)
+    out["resolve"] = link_resolver.state()
+    return out
+
+
+@router.get("/links/diagnosis.xlsx")
+def links_diagnosis_xlsx(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    from fastapi.responses import StreamingResponse
+
+    from .. import link_resolver
+    from ..xlsx_report import XLSX_MEDIA_TYPE
+
+    data, filename = link_resolver.build_diagnosis_xlsx(db)
+    return StreamingResponse(
+        iter([data]),
+        media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/{finding_id}", response_model=FindingOut)
 def get_finding(finding_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     finding = db.get(Finding, finding_id)
@@ -231,6 +275,9 @@ def create_finding(
     from ..scraper import _hash
 
     data = payload.model_dump()
+    _check_choices(data)
+    if not (data.get("title") or "").strip():
+        raise HTTPException(status_code=422, detail="El título de la señal es obligatorio.")
     content_hash = _hash(data["title"], data.get("url", ""))
     finding = Finding(content_hash=content_hash, **data)
     from .. import signal_links

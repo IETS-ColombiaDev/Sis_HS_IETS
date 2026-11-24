@@ -1294,6 +1294,55 @@ class IngestRunOut(BaseModel):
     processed: int = 0
 
 
+class ManualReviewEntry(BaseModel):
+    at: datetime | None = None
+    by: str = ""
+    outcome: str = ""
+    outcome_label: str = ""
+    note: str = ""
+    signals: int = 0
+
+
+class ManualReviewItem(BaseModel):
+    id: int
+    title: str
+    url: str = ""
+    catalog_code: str = ""
+    matrix_ref: str = ""
+    access_path: str = ""
+    consult_info: str = ""
+    usage_restrictions: str = ""
+    catalog_note: str = ""
+    frequency: str = ""
+    interval_hours: int = 168
+    next_review_due: datetime | None = None
+    due: bool = True
+    never_reviewed: bool = True
+    overdue_days: int = 0
+    last_review: ManualReviewEntry | None = None
+
+
+class ManualReviewOverview(BaseModel):
+    total: int
+    due: int
+    up_to_date: int
+    items: list[ManualReviewItem]
+    outcomes: dict[str, str] = {}
+
+
+class ManualReviewIn(BaseModel):
+    outcome: str = Field(pattern="^(con_senales|sin_novedades|no_accesible)$")
+    note: str = Field("", max_length=1000)
+    signals: int = Field(0, ge=0, le=500)
+
+
+class ManualReviewResult(BaseModel):
+    id: int
+    outcome: str
+    outcome_label: str
+    next_review_due: datetime | None = None
+
+
 class SourceProbeOut(BaseModel):
     source_id: int
     catalog_code: str = ""
@@ -1386,6 +1435,7 @@ class SubmissionOut(BaseModel):
     reviewed_at: datetime | None = None
     technology_id: int | None = None
     created_at: datetime
+    cross_check: dict | None = None
 
 
 class SubmissionReviewIn(BaseModel):

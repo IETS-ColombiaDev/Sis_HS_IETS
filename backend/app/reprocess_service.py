@@ -25,6 +25,14 @@ la base igual) y auditadas por el listener de la bitacora:
    `Finding.raw_content` ("Fila original del pipeline: ...") y en
    `Technology.raw_payload["pipeline"]["row"]`, de donde se relee en cada corrida.
 
+4. **Ruido de captura (auditoria del Modulo 0, 24-11-2026)**: senales de la bandeja
+   que el filtro vigente ya no dejaria entrar (texto de menus, leyendas, parrafos,
+   paginas indice, empleos, noticias no tecnologicas), el mismo item repetido por
+   varios enlaces de una organizacion y productos de consumo de Health Canada.
+   `reprocess_noise` las pasa a Descartadas (estado `excluida` con `staging:discard`
+   en la bitacora), de donde se pueden restaurar. No borra nada. No se incluye en
+   `target=all`: se pide de forma expresa con `target=ruido`.
+
 Uso (en backend/):
     python -m app.reprocess_service                 # simulacion, no escribe
     python -m app.reprocess_service --apply         # aplica ambas correcciones
@@ -214,6 +222,82 @@ def reprocess_product_details(db: Session, *, apply: bool = False, actor: str = 
     return _finish(db, "producto", changes, apply=apply, actor=actor)
 
 
+NOISE_DISCARD_PREFIX = "Ruido de captura"
+STAGING_STATUS = "capturada_no_asignada"
+DISCARDED_STATUS = "excluida"
+DISCARD_ACTION = "staging:discard"
+WEB_CONNECTORS = {"html", "pdf", ""}
+
+
+def reprocess_noise(db: Session, *, apply: bool = False, actor: str = "reproceso") -> dict:
+    """Retira de la bandeja las senales que el filtro de captura vigente no dejaria entrar.
+
+    Solo toca senales proactivas sin asignar. Usa el mismo criterio que la captura
+    (`scraper.capture_noise_reason`), de modo que no descarta nada que hoy entraria.
+    """
+    from . import scraper
+    from .corroboration import org_host
+    from .ingest.health_canada import is_consumer_product
+
+    sources = {s.id: s for s in db.query(Source).all()}
+    techs = (
+        db.query(Technology)
+        .filter(
+            Technology.status == STAGING_STATUS,
+            Technology.source_channel != "reactiva",
+            Technology.merged_into_id.is_(None),
+        )
+        .order_by(Technology.id)
+        .all()
+    )
+    finding_ids = [t.finding_id for t in techs if t.finding_id]
+    findings: dict[int, Finding] = {}
+    for start in range(0, len(finding_ids), 500):
+        chunk = finding_ids[start : start + 500]
+        findings.update({x.id: x for x in db.query(Finding).filter(Finding.id.in_(chunk)).all()})
+
+    first_seen: dict[tuple[str, str, str], int] = {}
+    changes: list[dict] = []
+    for tech in techs:
+        source = sources.get(tech.source_id) if tech.source_id else None
+        if source is None:
+            continue
+        finding = findings.get(tech.finding_id) if tech.finding_id else None
+        title = ((finding.title if finding is not None else "") or tech.commercial_name or "").strip()
+        connector = (source.connector or "html").lower()
+        reason = ""
+        if connector in WEB_CONNECTORS:
+            code = scraper.capture_noise_reason(title)
+            if code:
+                reason = scraper.NOISE_LABELS[code]
+            else:
+                url = ((finding.url if finding is not None else "") or tech.url or "").strip()
+                key = (org_host(source.url or ""), title.lower(), url)
+                if key[0] and key[1] and key[2]:
+                    if first_seen.setdefault(key, tech.id) != tech.id:
+                        reason = "Repetida: el mismo ítem ya entró por otro enlace de la misma organización"
+        elif connector == "health_canada":
+            ingredients = [p.strip() for p in (tech.inn_name or "").split(",") if p.strip()]
+            if is_consumer_product(ingredients):
+                reason = "Producto de consumo o de venta libre (Health Canada)"
+        if not reason:
+            continue
+        changes.append(
+            {"technology_id": tech.id, "motivo": reason, "titulo": title[:200], "fuente": source.title or ""}
+        )
+        if apply:
+            tech.status = DISCARDED_STATUS
+            record_action(
+                db,
+                entity_type="technologies",
+                entity_id=tech.id,
+                action=DISCARD_ACTION,
+                old_value={"status": STAGING_STATUS},
+                new_value={"status": DISCARDED_STATUS, "reason": f"{NOISE_DISCARD_PREFIX}: {reason}", "actor": actor},
+            )
+    return _finish(db, "ruido", changes, apply=apply, actor=actor)
+
+
 def _finish(db: Session, target: str, changes: list[dict], *, apply: bool, actor: str) -> dict:
     if apply and changes:
         record_action(
@@ -237,6 +321,9 @@ def reprocess_all(db: Session, *, apply: bool = False, only: str = "all", actor:
         results.append(reprocess_pipelines(db, apply=apply, actor=actor))
     if only in ("all", "producto"):
         results.append(reprocess_product_details(db, apply=apply, actor=actor))
+    # El ruido no entra en "all": descarta senales y se pide de forma expresa.
+    if only == "ruido":
+        results.append(reprocess_noise(db, apply=apply, actor=actor))
     return results
 
 
@@ -250,7 +337,7 @@ def main() -> None:  # pragma: no cover - uso manual
 
     parser = argparse.ArgumentParser(description="Reprocesa desde el crudo los mapeos corregidos (openFDA y pipelines).")
     parser.add_argument("--apply", action="store_true", help="Escribe los cambios. Sin esta bandera solo simula.")
-    parser.add_argument("--only", choices=("all", "fda", "pipeline", "producto"), default="all")
+    parser.add_argument("--only", choices=("all", "fda", "pipeline", "producto", "ruido"), default="all")
     args = parser.parse_args()
     audit.install_listeners()
     db = SessionLocal()

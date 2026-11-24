@@ -132,17 +132,39 @@ def recover_stale(db: Session, *, minutes: int = 30) -> int:
             started = started.replace(tzinfo=timezone.utc)
         if started is None or started < limit:
             stale.append(job)
-    for job in stale:
-        job.finished_at = datetime.now(timezone.utc)
-        job.message = "Interrumpido: el proceso se detuvo durante la ejecución."
+    # El job interrumpido vuelve al FINAL de la cola: si fue esa fuente la que tumbo
+    # el proceso (p. ej. memoria en Render), reintentarla primero lo volvia a tumbar
+    # y la corrida quedaba clavada en el mismo porcentaje. Asi las demas avanzan.
+    # Detras del ultimo pendiente (que suele estar vencido desde que se encolo la
+    # corrida): queda al final del orden sin hacerle esperar.
+    last = last_scheduled_pending(db)
+    now = datetime.now(timezone.utc)
+    for offset, job in enumerate(stale, start=1):
+        resume_at = (last + timedelta(milliseconds=offset)) if last is not None else now
+        job.finished_at = now
+        job.message = "Interrumpido: el proceso se detuvo durante la ejecución; se reintenta al final de la cola."
         if (job.attempts or 0) < (job.max_attempts or 3):
             job.status = "pendiente"
-            job.scheduled_for = datetime.now(timezone.utc)
+            job.scheduled_for = resume_at
         else:
             job.status = "error"
     if stale:
         db.commit()
     return len(stale)
+
+
+def last_scheduled_pending(db: Session) -> datetime | None:
+    """Fecha del ultimo job pendiente de la cola (None si no hay)."""
+    row = (
+        db.query(IngestJob.scheduled_for)
+        .filter(IngestJob.status == "pendiente", IngestJob.scheduled_for.isnot(None))
+        .order_by(IngestJob.scheduled_for.desc())
+        .first()
+    )
+    if row is None or row[0] is None:
+        return None
+    value = row[0]
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
 def tick(db: Session, *, limit: int = 4) -> list[IngestJob]:

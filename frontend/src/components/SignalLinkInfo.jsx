@@ -30,6 +30,10 @@ export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, ev
   const type = LINK_TYPE[linkType] || (url ? null : LINK_TYPE.sin_enlace);
   const broken = linkStatus === "caido" || linkStatus === "redirigido";
   const showEvidence = evidence && linkType !== "exacto";
+  // RF-001: la fuente no tiene enlace por ítem, pero el sistema verificó que la
+  // señal está en la página: el enlace abre la página y el navegador la resalta.
+  const locatorUrl = linkType !== "exacto" ? evidence?.locator_url : "";
+  const resolved = evidence?.resolved || null;
   return (
     <div className="sl-box" data-testid="signal-link-info">
       <div className="sl-row">
@@ -43,9 +47,28 @@ export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, ev
             {LINK_STATUS[linkStatus] || linkStatus}
           </span>
         )}
+        {locatorUrl && (
+          <a
+            className="so-link"
+            href={locatorUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`Abre la página y resalta «${evidence.locator_text || ""}»`}
+            data-testid="signal-link-locate"
+          >
+            <Icon name="search" size={14} /> Abrir la página y resaltar la señal
+          </a>
+        )}
         {url && (
-          <a className="so-link" href={url} target="_blank" rel="noopener noreferrer" title={url} data-testid="signal-link-open">
-            <Icon name="external" size={14} /> {type?.button || "Abrir enlace"}
+          <a
+            className={locatorUrl ? "sl-query" : "so-link"}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={url}
+            data-testid="signal-link-open"
+          >
+            {!locatorUrl && <Icon name="external" size={14} />} {type?.button || "Abrir enlace"}
           </a>
         )}
         {queryUrl && linkType === "exacto" && !compact && (
@@ -54,6 +77,20 @@ export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, ev
           </a>
         )}
       </div>
+      {linkType === "exacto" && resolved?.method === "enlace_en_pagina" && !compact && (
+        <div className="sl-muted" data-testid="signal-link-resolved">
+          Enlace exacto ubicado por el sistema en la página de la fuente.
+          {resolved.previous_url && (
+            <>
+              {" "}Antes apuntaba a{" "}
+              <a href={resolved.previous_url} target="_blank" rel="noopener noreferrer" style={{ overflowWrap: "anywhere" }}>
+                la página de consulta
+              </a>
+              .
+            </>
+          )}
+        </div>
+      )}
       {showEvidence && (
         <div className="sl-evidence" data-testid="signal-evidence">
           <div className="sl-evidence-title">Evidencia de captura</div>
@@ -71,7 +108,17 @@ export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, ev
               <a href={evidence.query_url || queryUrl} target="_blank" rel="noopener noreferrer">{evidence.query_url || queryUrl}</a>
             </div>
           )}
-          <div className="sl-muted">Busque el título o el fragmento en la página consultada para ubicar la señal.</div>
+          {locatorUrl ? (
+            <div className="sl-muted">
+              La fuente publica esta señal en una tabla o listado sin enlace propio. «Abrir la página y resaltar la señal»
+              lleva al punto exacto de la página (navegadores Chrome, Edge, Safari y Firefox recientes).
+            </div>
+          ) : (
+            <div className="sl-muted">
+              {resolved?.method === "sin_ubicar" && resolved.reason ? `${resolved.reason} ` : ""}
+              Busque el título o el fragmento en la página consultada para ubicar la señal.
+            </div>
+          )}
         </div>
       )}
     </div>

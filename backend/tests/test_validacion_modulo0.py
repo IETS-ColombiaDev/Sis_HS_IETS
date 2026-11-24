@@ -138,9 +138,9 @@ def _tech(db, name: str, source_id: int | None, **kw) -> Technology:
 
 
 def test_same_technology_in_three_sources_is_corroborated_and_ranked_first(api):
-    fda = api.add_source(title="FDA", url="https://fda.example.org")
-    ema = api.add_source(title="EMA", url="https://ema.example.org")
-    hc = api.add_source(title="Health Canada", url="https://hc.example.org")
+    fda = api.add_source(title="FDA", url="https://www.fda-demo.org")
+    ema = api.add_source(title="EMA", url="https://www.ema-demo.org")
+    hc = api.add_source(title="Health Canada", url="https://www.hc-demo.org")
     with api.db() as db:
         lone = _tech(db, "Zolbetuximab", fda, screening_score=60)
         a = _tech(db, "Lecanemab", fda, screening_score=50)
@@ -170,9 +170,38 @@ def test_same_technology_in_three_sources_is_corroborated_and_ranked_first(api):
     assert stats["corroborated"] >= 2
 
 
+def test_two_links_of_the_same_organisation_do_not_corroborate(api):
+    # Inventario por enlace: FDA tiene varias fuentes. La misma tecnologia vista en
+    # dos enlaces de fda.gov es la misma fuente dos veces, no una corroboracion.
+    one = api.add_source(title="FDA · aprobaciones", url="https://www.fda.gov/vaccines-blood-biologics/approvals")
+    two = api.add_source(title="FDA · base de datos", url="https://www.accessdata.fda.gov/scripts/cder/daf/")
+    other = api.add_source(title="EMA", url="https://www.ema.europa.eu/en/medicines")
+    with api.db() as db:
+        a = _tech(db, "Lecanemab", one)
+        _tech(db, "Lecanemab", two)
+        db.commit()
+        corroboration.refresh(db, force=True)
+        db.refresh(a)
+        assert a.corroboration_count == 1
+        _tech(db, "Lecanemab", other)
+        db.commit()
+        corroboration.refresh(db, force=True)
+        db.refresh(a)
+        assert a.corroboration_count == 2
+        assert [c["source_title"] for c in a.corroborating] == ["EMA"]
+
+
+def test_org_host_groups_subdomains_and_country_domains():
+    assert corroboration.org_host("https://www.accessdata.fda.gov/x") == "fda.gov"
+    assert corroboration.org_host("https://www.gov.uk/government") == "gov.uk"
+    assert corroboration.org_host("https://www.mfds.go.kr/eng") == "mfds.go.kr"
+    assert corroboration.org_host("https://ctri.nic.in/") == "ctri.nic.in"
+    assert corroboration.org_host("https://medicines.abbott.com/") == "abbott.com"
+
+
 def test_shared_nct_is_decisive_even_with_different_names(api):
-    s1 = api.add_source(title="ClinicalTrials", url="https://ct.example.org")
-    s2 = api.add_source(title="Pipeline", url="https://pipe.example.org")
+    s1 = api.add_source(title="ClinicalTrials", url="https://www.ct-demo.org")
+    s2 = api.add_source(title="Pipeline", url="https://www.pipe-demo.org")
     with api.db() as db:
         a = _tech(db, "MK-3475", s1, nct_ids=["NCT01234567"])
         _tech(db, "Keytruda", s2, nct_ids=["NCT01234567"])

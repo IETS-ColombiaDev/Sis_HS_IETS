@@ -152,6 +152,11 @@ def public_submit(payload: SubmissionPublicIn, request: Request, db: Session = D
         row = create_submission(db, payload.model_dump(), ip=ip, captcha=captcha)
     except SubmissionRuleError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # RF-02-F: el cruce con la web se completa en segundo plano.
+    from .. import submission_crosscheck
+    from ..database import SessionLocal
+
+    submission_crosscheck.schedule_web(SessionLocal, row.id)
     return SubmissionPublicAck(
         id=row.id,
         status=row.status,
@@ -171,6 +176,23 @@ def list_submissions(
         query = query.filter(Submission.status == status_filter)
     rows = query.order_by(Submission.created_at.desc()).limit(limit).all()
     return [SubmissionOut.model_validate(r) for r in rows]
+
+
+@router.post("/api/submissions/{submission_id}/cross-check", response_model=SubmissionOut)
+def cross_check(
+    submission_id: int,
+    web: bool = Query(True, description="Incluir la búsqueda en la web (tarda unos segundos)"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_STAGING_ASSIGN)),
+):
+    """Cruza la postulacion con la vigilancia proactiva y con la web (RF-02-F)."""
+    from .. import submission_crosscheck
+
+    row = db.get(Submission, submission_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Postulación no encontrada")
+    submission_crosscheck.run(db, row, web=web, actor=user.email)
+    return SubmissionOut.model_validate(row)
 
 
 @router.post("/api/submissions/{submission_id}/accept", response_model=SubmissionOut)

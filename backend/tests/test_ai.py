@@ -271,7 +271,7 @@ def test_crawl_site_visits_child_pages(monkeypatch):
         ),
     }
 
-    def fake_fetch(url, timeout=25.0):
+    def fake_fetch(url, timeout=25.0, retries=None):
         return pages[url]
 
     monkeypatch.setattr(scraper, "fetch_url", fake_fetch)

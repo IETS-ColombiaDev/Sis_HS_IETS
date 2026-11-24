@@ -316,7 +316,7 @@ def test_an_aborted_scrape_closes_its_log_and_saves_nothing(api, monkeypatch):
                          scan_profile={"web_search": False, "ocr": False, "max_pages": 1})
     event = threading.Event()
 
-    def fetch(url, timeout=None):
+    def fetch(url, timeout=None, retries=None):
         event.set()  # el worker cerro la fuente por tiempo mientras descargaba
         return (200, "text/html", "<html><h1>Nuevo farmaco en fase III aprobado</h1></html>", b"")
 
@@ -345,7 +345,7 @@ def test_scraped_signals_use_the_configured_weights(api, monkeypatch):
     sid = api.add_source(url="https://pesos.example.org", connector="html", connector_config={},
                          scan_profile={"web_search": False, "ocr": False, "max_pages": 1})
     page = "<html><body><h2>Nuevo farmaco aprobado para cancer de mama</h2></body></html>"
-    monkeypatch.setattr(scraper, "fetch_url", lambda url, timeout=None: (200, "text/html", page, page.encode()))
+    monkeypatch.setattr(scraper, "fetch_url", lambda url, timeout=None, retries=None: (200, "text/html", page, page.encode()))
     monkeypatch.setattr(scraper, "_enrich_with_ai", lambda *a, **k: [
         {"title": "Nuevo farmaco aprobado", "technology": "Farmaco X", "technology_type": "medicamento",
          "therapeutic_area": "Oncologia", "summary": "", "url": "https://pesos.example.org", "horizon": ""}

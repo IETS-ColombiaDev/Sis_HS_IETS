@@ -3895,3 +3895,18 @@ button.linkish {
 .param-group-origin { font-size: 12.5px; color: #475569; background: #F1F5F9; border-left: 3px solid #94A3B8; padding: 6px 10px; border-radius: 0 6px 6px 0; margin: 0 0 10px; }
 .scan-dock { right: 92px; }
 @media (max-width: 640px) { .scan-dock { right: 12px; bottom: 84px; } }
+
+/* Sondeo en lote del catálogo (Módulo 0): barra de avance. */
+.probe-progress {
+  margin-top: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border-light, #e2e8f0);
+  overflow: hidden;
+  max-width: 420px;
+}
+.probe-progress > div {
+  height: 100%;
+  background: linear-gradient(135deg, #6366f1, #3b82f6);
+  transition: width 0.4s ease;
+}
