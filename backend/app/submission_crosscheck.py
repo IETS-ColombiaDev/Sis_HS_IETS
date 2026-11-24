@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
@@ -61,14 +62,60 @@ def _in(host: str, domain: str) -> bool:
     return bool(host) and (host == domain or host.endswith("." + domain))
 
 
+_NCT_RE = re.compile(r"NCT\d{8}", re.I)
+PREFILTER_MIN = 75
+
+
+def submission_ncts(submission: Submission) -> list[str]:
+    """Identificadores NCT que la persona cito en sus enlaces de evidencia o en el mecanismo."""
+    text = " ".join([*(str(u) for u in (submission.evidence_links or [])), submission.mechanism or ""])
+    return sorted({m.upper() for m in _NCT_RE.findall(text)})
+
+
 def _probe_tech(submission: Submission) -> Technology:
     """Tecnologia transitoria (no se guarda) con los datos de la postulacion."""
     return Technology(
         commercial_name=submission.commercial_name or "",
         inn_name=submission.inn_name or "",
         manufacturer=submission.manufacturer or "",
-        nct_ids=[],
+        nct_ids=submission_ncts(submission),
     )
+
+
+def _candidate_ids(db: Session, submission: Submission) -> list[int]:
+    """Prefiltro barato: tecnologias cuyo nombre se parece o que comparten NCT.
+
+    Comparar a fondo contra todo el acervo dentro de la peticion del formulario
+    publico costaba ~0,3 s de CPU por cada 1.000 tecnologias (unos 3 s en Render).
+    Aqui solo se leen los nombres y se descarta lo que ni se parece; el comparador
+    del filtrado (`dedup.compare`) decide despues sobre las pocas que quedan.
+    """
+    from rapidfuzz import fuzz
+
+    from .link_resolver import keyfold
+
+    names = [keyfold(n) for n in search_names(submission)]
+    tokens = {t for n in search_names(submission) for t in _key_tokens(n) if len(t) >= 4}
+    ncts = set(submission_ncts(submission))
+    rows = (
+        db.query(Technology.id, Technology.commercial_name, Technology.inn_name, Technology.nct_ids)
+        .filter(Technology.merged_into_id.is_(None))
+        .all()
+    )
+    keep: list[int] = []
+    for tech_id, commercial, inn, tech_ncts in rows:
+        if ncts and ncts & {str(n).upper() for n in (tech_ncts or [])}:
+            keep.append(tech_id)
+            continue
+        folded = [keyfold(v) for v in (commercial, inn) if v]
+        if not folded:
+            continue
+        if tokens and tokens & {t for v in folded for t in v.split()}:
+            keep.append(tech_id)
+            continue
+        if any(fuzz.partial_ratio(n, v) >= PREFILTER_MIN for n in names for v in folded if n):
+            keep.append(tech_id)
+    return keep
 
 
 CONTAINED_SCORE = 90
@@ -99,12 +146,12 @@ def proactive_matches(db: Session, submission: Submission) -> dict:
     probe = _probe_tech(submission)
     threshold = dedup.threshold(db)
     own = submission.technology_id
-    candidates = (
-        db.query(Technology)
-        .filter(Technology.merged_into_id.is_(None))
-        .order_by(Technology.id)
-        .all()
-    )
+    ids = _candidate_ids(db, submission)
+    candidates: list[Technology] = []
+    for start in range(0, len(ids), 500):
+        chunk = ids[start : start + 500]
+        candidates.extend(db.query(Technology).filter(Technology.id.in_(chunk)).order_by(Technology.id).all())
+    candidates.sort(key=lambda t: t.id)
     scored = []
     for tech in candidates:
         if own and tech.id == own:

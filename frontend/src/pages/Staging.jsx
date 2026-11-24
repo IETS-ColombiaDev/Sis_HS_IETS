@@ -15,6 +15,7 @@ import InfoTip, { TermLabel } from "../components/InfoTip";
 import Modal from "../components/Modal";
 import SignalOrigin from "../components/SignalOrigin";
 import ManualReviewPanel from "../components/ManualReviewPanel";
+import NoiseCleanup from "../components/NoiseCleanup";
 import useManualReview from "../scan/useManualReview";
 import { Input, Select, Textarea } from "../components/Field";
 import EmptyState from "../components/EmptyState";
@@ -463,6 +464,7 @@ export default function Staging() {
             <Button variant="secondary" onClick={() => navigate("/postulaciones")}>
               <Icon name="note" size={16} /> Postulaciones
             </Button>
+            {can(PERM.CONFIG_MANAGE) && <NoiseCleanup toast={toast} onDone={load} />}
             {canAssign && view === "pendientes" && (
               <Button
                 variant="secondary"

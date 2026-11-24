@@ -56,9 +56,34 @@ def bonus_for(count: int, per_source: int = BONUS_PER_SOURCE, maximum: int = BON
     return min(maximum, per_source * max(0, count - 1))
 
 
-def _origin_key(tech: Technology) -> str:
+# Dominios de segundo nivel que no identifican a la organizacion (gov.uk, com.br, go.kr...).
+_SECOND_LEVEL = {"co", "com", "gov", "gob", "org", "ac", "go", "ne", "or", "edu", "nic", "net"}
+RULES_VERSION = "org-v2"
+
+
+def org_host(url: str) -> str:
+    """Dominio de la organizacion: `www.fda.gov` y `accessdata.fda.gov` son `fda.gov`."""
+    from urllib.parse import urlsplit
+
+    host = (urlsplit(url or "").hostname or "").lower().removeprefix("www.")
+    labels = host.split(".")
+    if len(labels) <= 2:
+        return host
+    if len(labels[-1]) == 2 and labels[-2] in _SECOND_LEVEL:
+        return ".".join(labels[-3:])
+    return ".".join(labels[-2:])
+
+
+def _origin_key(tech: Technology, hosts: dict[int, str] | None = None) -> str:
+    """Origen de una senal para la corroboracion: la organizacion, no el enlace.
+
+    El inventario por enlace tiene varias fuentes de un mismo sitio (FDA, BD,
+    Abbott...). Dos enlaces de la misma organizacion que traen la misma
+    tecnologia son la misma fuente vista dos veces: no la corroboran.
+    """
     if tech.source_id:
-        return f"s{tech.source_id}"
+        host = (hosts or {}).get(tech.source_id) or ""
+        return f"h:{host}" if host else f"s{tech.source_id}"
     return "reactiva" if tech.source_channel == "reactiva" else f"t{tech.id}"
 
 
@@ -78,7 +103,7 @@ def _fingerprint(db: Session) -> str:
         ).one()
     )
     per, top = bonus_params(db)
-    return f"{count}|{last.isoformat() if last else ''}|{merged}|{dedup.threshold(db)}|{per}|{top}"
+    return f"{RULES_VERSION}|{count}|{last.isoformat() if last else ''}|{merged}|{dedup.threshold(db)}|{per}|{top}"
 
 
 def refresh(db: Session, *, force: bool = False) -> dict:
@@ -101,6 +126,7 @@ def refresh(db: Session, *, force: bool = False) -> dict:
     ]
     staging = [t for t in live if t.status == STAGING_STATUS]
     titles = dict(db.query(Source.id, Source.title).all())
+    hosts = {sid: org_host(url or "") for sid, url in db.query(Source.id, Source.url).all()}
 
     buckets: dict[str, list[Technology]] = {}
     by_nct: dict[str, list[Technology]] = {}
@@ -111,7 +137,7 @@ def refresh(db: Session, *, force: bool = False) -> dict:
 
     corroborated = 0
     for tech in staging:
-        own = _origin_key(tech)
+        own = _origin_key(tech, hosts)
         candidates: dict[int, Technology] = {}
         for nct in dedup.nct_set(tech):
             for other in by_nct.get(nct, []):
@@ -125,7 +151,7 @@ def refresh(db: Session, *, force: bool = False) -> dict:
         for other in candidates.values():
             if other.id == tech.id:
                 continue
-            origin = _origin_key(other)
+            origin = _origin_key(other, hosts)
             if origin == own or origin in matches:
                 continue
             result = dedup.compare(tech, other)

@@ -492,3 +492,184 @@ def test_structured_data_gives_each_product_its_own_url_and_the_indication_break
 def test_same_name_without_distinguishing_context_is_not_guessed():
     index = link_resolver.PageIndex(JSONLD_PAGE, QUERY)
     assert link_resolver.match_anchor(["Lutathera (AAA601)"], index, None, QUERY, title="Lutathera (AAA601)") is None
+
+
+# --------------------------------------------------------------------------- #
+#  Auditoria del Modulo 0: precision de la captura sin IA
+# --------------------------------------------------------------------------- #
+# Titulos reales de la vigilancia del 24-11-2026 que entraban como senales y no lo son.
+NOISE = [
+    "Human medicinescurrent page Close",  # menu desplegable (Swissmedic)
+    "Complementary & herbal medicines Close",
+    "Phase (1, 2, 3, Under review)",  # leyenda de tabla (Merck)
+    "Therapeutic protein or conjugate",
+    "Small molecule fixed-dose combination",
+    "Molecule Name (A-Z)",
+    "How much of the medicine or vaccine is needed and how often",
+    "Identify and monitor side effects",
+    "Additional information:Partnered product. Enhertu demonstrated a median progression-free survival of 14.3 months",
+    "Date clinical trial was approved:",  # rotulo
+    "Find a clinical trial in Canada",  # llamado a la accion
+    "Implant healing. While charging the generator, patients may perceive an increase in temperature at the generator site.",
+    "Keep the current paths from the electrosurgery device as far from the neurostimulation system as possible.",
+    "Paralysis, weakness, clumsiness, numbness, or pain below the level of the implant",
+    "Allergic or rejection response to implant materials",
+    "2026 Biological Approvals",  # pagina indice (FDA)
+    "2022 Biological Approvals (Archived)",
+    "Biological Approvals by Year",
+    "sDHT Medical Devices List",
+    "Contents of the AI-Enabled Medical Devices List:",
+    "Federal Food, Drug, and Cosmetic Act (FD&C Act)",
+    "60 2025 Drug Approval Report The MFDS published the 2025 Drug Approval Report for the purpose of informing",
+    "2024 Medical Device Approval Report.pdf Download Preview",
+    "Information News&Notice News&Notice Card News Photo News COVID-19 Latest COVID-19 News Diagnostics Devices",
+    "Medical Devices Certificate Verification",
+    "Ministry of Food and Drug Safety",
+    "Portfolio Sales Consultant, Oncology - Jacksonville, Florida in USA-AA",  # empleo (Bayer)
+    "Oncology Nurse Educator, Orange County, CA in USA-AA",
+    "The New England Journal of Medicine | Research & Review Articles on Disease & Clinical Practice",
+    "Chinese Clinical Trial Register (ChiCTR) - The world health organization international clinical trials registered",
+    "Trump’s healthcare plans under contention after Democrats’ midterm landslide",
+    "Judge Approves $7 Billion Settlement Over Claims That Roundup Caused Cancer",
+    "BD Marks 85 Years of Essential Medical Device Manufacturing in Glens Falls, NY",
+    "Lilly breaks ground in Pennsylvania’s Lehigh Valley on a $3.5 billion site to make next-generation obesity medicines",
+    "Small cell lung cancer: What are the signs?",
+    "Osteoporosis uncovered: Why managing bone health matters",
+    "Webinar: Appropriate Use of Medications in Hospital Settings",
+    "Patient Engagement Forum",
+    "30 April 202630 April 2026 Biology-guided radiotherapy for treatment of lung or bone tumour in adultsConditionCancer",
+    "November 10, 2026 5 Steps to Evaluate Enterprise AI at Clinical Scale Learn More",
+    "Respiratory Therapy and Devices",
+    "Hospitals and Health Systems, including medical-surgical suites, operating rooms, emergency rooms and intensive care",
+    "Savings & Support | Olumiant® (baricitinib)",
+    "Medical devicescurrent page",  # menu pegado sin espacio (Swissmedic)
+    "Federal Act on Medicinal Products and Medical Devices (Therapeutic Products Act, TPA; SR 812.21)",
+    "Ordinance on Clinical Trials of Medical Devices (ClinO-MD; SR 810.306)",
+    "Regulation (EU) 2017/746 on in-vitro diagnostic medical devices",
+    "BW600_00_015e_MB Clinical investigations with medical devices (PDF, 588 kB, 10.07.2026)",
+    "C2: The medical device is not yet CE-marked.",
+    "Complementary & herbal medicines",
+    "Tokyo 的 Senior Scientific Expert (GU Oncology VS1.2)",  # empleo (Bayer)
+]
+# Senales reales de la misma corrida que deben seguir entrando.
+SIGNALS = [
+    "FDA clears Deep Reasoning AI’s NeuroDR for neurovascular CT scans",
+    "Zenflow raises $52m for BPH implant and inks US distribution pact with Cook Medical",
+    "Abbott’s UltiSynq defibrillation lead lands simultaneous US-EU approvals",
+    "Bayer’s asundexian first FXIa inhibitor approved by U.S. Food and Drug Administration for secondary stroke risk reduction",
+    "FDA approves Lilly’s Mounjaro (tirzepatide) to reduce cardiovascular risk in adults with type 2 diabetes",
+    "CAPLYTA® (lumateperone) shows significant and rapid improvement in bipolar mania in pivotal Phase 3 study",
+    "Portable Neuromodulation Stimulator (PoNS) for treating gait deficit due to multiple sclerosis",
+    "Retatrutide in adults with obesity and type 2 diabetes (TRIUMPH-2): a double-blind, parallel-group, randomised trial",
+    "Interleukin-6 Inhibition with Ziltivekimab for Atherosclerotic Disease",
+    "Pembrolizumab (Keytruda)",
+    "ABECMA (idecabtagene vicleucel)",
+    "OraQuick ADVANCE Rapid HIV-1/2 Antibody Test",
+    "FDA Clears a Third Tubing-Free Insulin Pump, MiniMed Fit",
+    "Investigational Lyme Disease Vaccine Shows 73% Efficacy, Good Tolerability",
+    "Teplizumab approval shifts early care for new-onset type 1 diabetes in youth",
+    "Mindray ePM 10M/12M Patient Monitors",
+    "A Clinical Trial of MK-8690 in Participants With Rheumatoid Arthritis (MK-8690-004)",
+    # Una abreviatura no es un fin de frase: no es un parrafo.
+    "Left Atrial Appendage Occlusion Devices vs. Oral Anticoagulation Therapy for Stroke Prevention in Atrial Fibrillation Patients",
+]
+
+
+def _gate(title: str) -> bool:
+    from app import scraper
+
+    return bool(scraper.rules_gate([{"title": title, "summary": "", "url": "https://x.example.org/a"}]))
+
+
+@pytest.mark.parametrize("title", NOISE)
+def test_page_text_is_not_captured_as_a_signal(title):
+    assert not _gate(title), title
+
+
+@pytest.mark.parametrize("title", SIGNALS)
+def test_real_signals_keep_passing_the_filter(title):
+    assert _gate(title), title
+
+
+def test_legends_are_dropped_even_inside_a_pipeline_table():
+    from app import scraper
+
+    rows = [{"title": "Phase (1, 2, 3, Under review)", "summary": ""}, {"title": "zilovertamab vedotin (MK-2140)", "summary": ""}]
+    kept = scraper.rules_gate(rows, keep=lambda item: True)
+    assert [r["title"] for r in kept] == ["zilovertamab vedotin (MK-2140)"]
+
+
+def test_the_same_item_from_two_links_of_one_organisation_is_stored_once(api, monkeypatch):  # noqa: F811
+    from app import ingest_service, scraper
+
+    feed = (
+        '<?xml version="1.0"?><rss version="2.0"><channel><title>BD</title>'
+        "<item><title>BD Liverty TIPS Stent Graft receives FDA approval</title><link>https://news.bd.com/liverty</link>"
+        "<description>The stent graft received FDA approval.</description></item></channel></rss>"
+    )
+    monkeypatch.setattr(
+        scraper, "fetch_url", lambda url, timeout=None, retries=None: (200, "application/rss+xml", feed, feed.encode())
+    )
+    one = api.add_source(title="BD · Innovación", url="https://www.bd.com/en-us/innovation", connector="html", connector_config={})
+    two = api.add_source(title="BD · Productos", url="https://www.bd.com/es-es/our-products", connector="html", connector_config={})
+    with api.db() as db:
+        for sid in (one, two):
+            job = ingest_service.enqueue(db, [db.get(Source, sid)], triggered_by="prueba")[0]
+            ingest_service.run_job(db, job.id)
+        titles = [f.title for f in db.query(Finding).all()]
+    assert titles == ["BD Liverty TIPS Stent Graft receives FDA approval"]
+
+
+def test_health_canada_drops_consumer_and_over_the_counter_products():
+    from app.ingest.health_canada import is_consumer_product
+
+    assert is_consumer_product(["BEMOTRIZINOL", "BISOCTRIZOLE", "OCTINOXATE", "AVOBENZONE"])  # protector solar
+    assert is_consumer_product(["ACETAMINOPHEN", "DEXTROMETHORPHAN HYDROBROMIDE"])  # antigripal
+    assert is_consumer_product(["CETYLPYRIDINIUM CHLORIDE"])  # enjuague
+    assert not is_consumer_product(["OCRELIZUMAB"])
+    assert not is_consumer_product(["ACETAMINOPHEN", "OXYCODONE HYDROCHLORIDE"])  # con un activo de prescripcion
+    assert not is_consumer_product([])
+
+
+def test_noise_already_in_the_inbox_is_moved_to_discarded_and_can_be_restored(api):  # noqa: F811
+    sid = _source(api, title="Abbott · Portafolio", url="https://www.abbott.com/products")
+    sibling = _source(api, title="Abbott · Innovación", url="https://www.abbott.com/innovation")
+    noise = _finding(api, sid, title="Keep the current paths from the electrosurgery device as far from the system as possible.")
+    good = _finding(api, sid, title="Abbott UltiSynq defibrillation lead receives FDA approval", url="https://www.abbott.com/n/ultisynq")
+    repeated = _finding(api, sibling, title="Abbott UltiSynq defibrillation lead receives FDA approval", url="https://www.abbott.com/n/ultisynq")
+    # Simulacion: no cambia nada.
+    dry = api.post("/api/ingest/reprocess?target=ruido").json()[0]
+    assert dry["applied"] is False and dry["changed"] == 2
+    with api.db() as db:
+        assert db.query(Technology).filter(Technology.status == "excluida").count() == 0
+    done = api.post("/api/ingest/reprocess?target=ruido&apply=true").json()[0]
+    assert done["changed"] == 2
+    with api.db() as db:
+        status = {t.finding_id: t.status for t in db.query(Technology).all()}
+        assert status[noise] == "excluida" and status[repeated] == "excluida"
+        assert status[good] == "capturada_no_asignada"
+        reasons = [a.new_value["reason"] for a in db.query(AuditLog).filter(AuditLog.action == "staging:discard").all()]
+        assert all(r.startswith("Ruido de captura") for r in reasons) and len(reasons) == 2
+        discarded = [t.id for t in db.query(Technology).filter(Technology.status == "excluida").all()]
+    # Quedan en Descartadas y se pueden restaurar.
+    listed = api.get("/api/technologies/staging", params={"view": "descartadas"})
+    assert listed.status_code == 200
+    restored = api.post("/api/technologies/staging/restore", json={"technology_ids": discarded})
+    assert restored.status_code == 200 and restored.json()["affected"] == 2
+    # Idempotente y fuera de "all": el reproceso general no descarta senales.
+    assert all(r["target"] != "ruido" for r in api.post("/api/ingest/reprocess?target=all").json())
+    assert api.post("/api/ingest/reprocess?target=ruido", role="evaluador_tecnico").status_code == 403
+
+
+def test_a_trial_cited_by_the_submitter_matches_the_signal_with_that_nct(api):  # noqa: F811
+    # La persona postula con otro nombre, pero cita el mismo ensayo que la vigilancia ya tiene.
+    sid = _source(api, title="ClinicalTrials.gov", url="https://clinicaltrials.gov/")
+    with api.db() as db:
+        db.add(Technology(commercial_name="MK-3475", source_id=sid, status="capturada_no_asignada",
+                          source_channel="proactiva", nct_ids=["NCT01234567"]))
+        db.commit()
+    api.client.post("/api/public/submissions", json=_payload(commercial_name="Keytruda", inn_name="pembrolizumab"))
+    cross = api.get("/api/submissions").json()[0]["cross_check"]
+    assert cross["proactive"]["count"] == 1
+    match = cross["proactive"]["matches"][0]
+    assert match["name"] == "MK-3475" and match["decisive"] is True and match["matched_on"] == ["nct"]

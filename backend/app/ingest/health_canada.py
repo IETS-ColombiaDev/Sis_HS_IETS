@@ -29,6 +29,31 @@ _CONSUMER_RE = re.compile(
 )
 
 
+# Principios activos de productos de consumo (protectores solares, antisepticos, higiene
+# oral): el DPD los registra como medicamento, pero no son tecnologia sanitaria nueva.
+# La marca no siempre lo delata ("COOLA ANTI-AGING HAND CREAM", "CLOSYS HEALTHY GUMS").
+_CONSUMER_INGREDIENTS = (
+    "AVOBENZONE", "HOMOSALATE", "OCTISALATE", "OCTOCRYLENE", "OCTINOXATE", "OXYBENZONE", "ENSULIZOLE",
+    "ZINC OXIDE", "TITANIUM DIOXIDE", "CETYLPYRIDINIUM", "BENZALKONIUM", "ETHANOL", "ALCOHOL", "ISOPROPYL",
+    "SODIUM FLUORIDE", "SODIUM MONOFLUOROPHOSPHATE", "STANNOUS FLUORIDE", "TRICLOSAN", "CHLOROXYLENOL",
+    "SALICYLIC ACID", "BENZOYL PEROXIDE", "PYRITHIONE ZINC", "DIMETHICONE", "MENTHOL", "CAMPHOR",
+    "ALUMINUM CHLOROHYDRATE", "ALUMINUM ZIRCONIUM", "PETROLATUM", "ALLANTOIN", "HYDROGEN PEROXIDE",
+    "BEMOTRIZINOL", "BISOCTRIZOLE", "ECAMSULE", "DROMETRIZOLE", "MERADIMATE",
+    # Venta libre para resfriado, dolor, alergia y digestion: conocidos, no son senal de horizonte.
+    "ACETAMINOPHEN", "DEXTROMETHORPHAN", "DOXYLAMINE", "GUAIFENESIN", "PHENYLEPHRINE", "PSEUDOEPHEDRINE",
+    "CHLORPHENIRAMINE", "IBUPROFEN", "OXYMETAZOLINE", "XYLOMETAZOLINE", "DIPHENHYDRAMINE", "GLYCERIN",
+    "PRAMOXINE", "WITCH HAZEL", "LORATADINE", "CETIRIZINE", "ACETYLSALICYLIC", "NAPROXEN", "BISACODYL",
+    "SENNOSIDES", "LOPERAMIDE", "CALCIUM CARBONATE", "FAMOTIDINE", "MELATONIN", "LIDOCAINE", "BENZOCAINE",
+    "HYDROCORTISONE", "CLOTRIMAZOLE", "MICONAZOLE", "POLYETHYLENE GLYCOL", "SIMETHICONE", "DOCUSATE",
+)
+
+
+def is_consumer_product(ingredients: list[str]) -> bool:
+    """True si todos los principios activos son de producto de consumo."""
+    names = [str(i or "").upper() for i in ingredients if i]
+    return bool(names) and all(any(c in name for c in _CONSUMER_INGREDIENTS) for name in names)
+
+
 class HealthCanadaConnector(Connector):
     code = "health_canada"
     label = "Health Canada (MDALL / DPD)"
@@ -168,6 +193,8 @@ class HealthCanadaConnector(Connector):
             brand = clean_text(row.get("brand_name")).upper()
             # Generico: la marca es el nombre del principio activo ("BISOPROLOL TABLETS").
             if ingredients and any(_base_name(i) in brand for i in ingredients):
+                continue
+            if is_consumer_product(ingredients):
                 continue
             row["ingredient_name"] = ", ".join(ingredients)
             record = self._drug_record(row)

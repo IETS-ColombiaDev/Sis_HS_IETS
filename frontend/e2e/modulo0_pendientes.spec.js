@@ -95,3 +95,24 @@ test("una postulación llega cruzada con la vigilancia y se puede volver a cruza
   await expect(box.getByTestId(`submission-cross-run-${id}`)).toBeVisible();
   expectClean(errors);
 });
+
+test("depurar ruido simula primero y solo lo ve quien administra la configuración", async ({ page }) => {
+  const errors = watchErrors(page);
+  await loginAs(page, "superadmin", "/bandeja-entrada");
+  await settle(page);
+  await page.getByTestId("noise-cleanup-open").click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Depurar ruido de captura");
+  // La simulación termina en la lista de lo que retiraría o en «la bandeja está limpia».
+  await expect(dialog.getByTestId("noise-cleanup-preview").or(dialog.getByTestId("noise-cleanup-empty"))).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancelar" }).click();
+  await expect(dialog).toHaveCount(0);
+  expectClean(errors);
+});
+
+test("el evaluador técnico no ve la depuración de ruido", async ({ page }) => {
+  await loginAs(page, "evaluador_tecnico", "/bandeja-entrada");
+  await settle(page);
+  await expect(page.getByRole("heading", { level: 1, name: /Bandeja de entrada/ })).toBeVisible();
+  await expect(page.getByTestId("noise-cleanup-open")).toHaveCount(0);
+});

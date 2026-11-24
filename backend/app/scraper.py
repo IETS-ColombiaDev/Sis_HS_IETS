@@ -1251,6 +1251,11 @@ _GENERIC_WORDS = set(
     disease condition affects per united states than or
     s more learn read view all see find patient monitoring image guided imaging resource last file imported
     help paying access diversity safety expertise
+    equipment system systems advanced ambulatory hospital hospitals pharmacies pharmacy physician offices office
+    alternate sites site including support service management chronic surgical respiratory infusion nutrition iv
+    monitorizacion pacientes paciente soluciones equipos sistemas big problems steps evaluate enterprise scale
+    innovative designation providers artificial intelligence enabled incorporate sensor based that
+    complementary herbal authorised authorized substances substance active veterinary additional indications
     """.split()
 )
 _STOP_WORDS = set(
@@ -1260,7 +1265,9 @@ _STOP_WORDS = set(
 _CORPORATE = re.compile(
     r"\b(partner(ship)?s?|sponsor\w*|named|appoint\w*|award\w*|ranked|recogni[sz]ed|best places|workplace|"
     r"formula 1|f1 team|community|charit\w*|foundation|sustainab\w*|esg|ceo|board of directors|acquisition|"
-    r"acquires?|merger|completes|celebrat\w*|anniversary|volunteer\w*|scholarship|careers?)\b",
+    r"acquires?|merger|completes|celebrat\w*|anniversary|volunteer\w*|scholarship|careers?|"
+    r"settlements?|lawsuits?|antitrust|breakup|landslide|midterms?|democrats?|republicans?|elections?|"
+    r"marks \d+ years|breaks ground|has died|dies at)\b",
     re.I,
 )
 # Sufijos de DCI inequivocos para el filtro sin IA: los de _DRUG_SUFFIX como
@@ -1299,7 +1306,11 @@ _ADMIN_PAGE = re.compile(
     r"^(report(ing)?|submit|apply|about|fulfilling|how to|add or update|contact|guidance (for|on))\b|"
     r"\b(regulatory guidelines|guidelines for|draft guidance|information for (pharmacists|prescribers|health professionals|consumers)|"
     r"reporting form|checklist|framework|scheme|goods orders|disclosure log|news and events|standards for|"
-    r"to consult on|consultation|listings? of|data file imported|last updated on)\b",
+    r"to consult on|consultation|listings? of|data file imported|last updated on|"
+    r"clinical trials? regist(er|ry)|registry platform|trial registration|statement of the|notification of|"
+    r"transparency and sharing|forms? for|guidance document|certificate verification|approval process|"
+    r"savings (&|and) support|patient support|co-?pay|testing and inspection agencies)\b|"
+    r"^(ministry|national institute|regional office|department|office) of\b|^related organi[sz]ation",
     re.I,
 )
 # Texto de una tarjeta de navegacion: el titulo y su descripcion quedan pegados
@@ -1311,6 +1322,110 @@ _REG_EVENT = re.compile(
     r"aprobaci[oó]n|aprobad\w*|registro sanitario)\b",
     re.I,
 )
+
+
+# Texto de pagina que nunca es una senal, venga de donde venga (tambien de una tabla
+# de pipeline). Cada alternativa sale de ruido real de la vigilancia del 24-11-2026:
+# menus desplegables de Swissmedic ("Human medicinescurrent page Close"), leyendas de
+# Merck ("Phase (1, 2, 3, Under review)", "Therapeutic protein or conjugate"), notas de
+# AstraZeneca ("Additional information:..."), rotulos ("Date clinical trial was
+# approved:") y llamados a la accion ("Find a clinical trial in Canada").
+_NEVER_SIGNAL = re.compile(
+    # "medicinescurrent page": el rotulo del menu viene pegado, sin espacio.
+    r"current page\b|\bclose$|\((pdf|docx?|xlsx?), [\d.,]+ ?(kb|mb)|"
+    r"^(additional information|notes?|footnotes?|source|disclaimer|abbreviations?|legend|key)\s*:|"
+    r"^phase\s*\(|"
+    r":$|"
+    r"^(find|search|browse|view|see|learn|read|download|subscribe|sign up|contact|explore)\b|"
+    r"\b(learn more|read more|download|preview)$|[;,]\s*(and|or|y|o)$|"
+    r"^\d{1,2} [A-Za-z]+ \d{4}\d{1,2} [A-Za-z]+ \d{4}|"
+    r"^\d{1,2} (steps|ways|tips|reasons|things|keys)\b|"
+    # Frases explicativas y controles de una tabla (Merck: "How much medicine is needed...", "Molecule Name (A-Z)").
+    r"^(how|if|whether|why)\b|^(confirm|compare|identify|continue|ensure|avoid)\b|^for an? \w+,|\((a-z|z-a)\)$|"
+    r"^(small molecules?|therapeutic proteins?|monoclonal antibod(y|ies)|antibody[- ]drug conjugates?|vaccines?|"
+    r"biologics?|cell therap(y|ies)|gene therap(y|ies)|peptides?|oligonucleotides?|rna therapeutics?)"
+    r"(\s+(or|and|/)\s+[\w-]+)*(\s+fixed[- ]dose combination)?$",
+    re.I,
+)
+# Paginas indice, no tecnologias: "2026 Biological Approvals", "Biological Approvals by
+# Year", "60 2025 Drug Approval Report ...", "sDHT Medical Devices List", una ley.
+_INDEX_PAGE = re.compile(
+    r"^(19|20)\d\d\b.{0,60}\b(approvals?|reports?)\b(\s*\(archived\))?$|"
+    r"^\d{1,3}\s+(19|20)\d\d\b.*\breport\b|"
+    r"\bby year$|\blist$|\b(act|ley)\b\s*(\([^)]*\))?$|"
+    r"^(the )?list (of|is|includes)\b|\bglossary$|\binformation$|"
+    # Textos legales (Swissmedic): "Federal Act on...", "Ordinance on...", "Regulation (EU) 2017/746 on...".
+    r"^(federal act|ordinance|directive|decree|decreto|reglamento|resoluci[oó]n)\b|^regulation \((eu|ec)\)",
+    re.I,
+)
+# Eventos y apoyos al paciente: no son una tecnologia.
+_EVENT_PAGE = re.compile(
+    r"\b(forum|summit|webinar|symposium|workshop|expert talks|group input)\b",
+    re.I,
+)
+# Vinetas de riesgos y efectos adversos de la informacion de seguridad de un dispositivo.
+_ADVERSE_BULLET = re.compile(
+    r"\b(paralysis|numbness|clumsiness|allergic or rejection|rejection response|skin erosion|implant migration|"
+    r"unpleasant sensations|delayed wound healing)\b",
+    re.I,
+)
+# Codigo o marca registrada: mas estricto que _PRODUCT_TOKEN ("least 20 cm" no es un producto).
+_STRICT_PRODUCT = re.compile(r"\b[A-Za-z]{2,}-?\d{2,}[A-Za-z0-9]*\b|[®™]")
+# Ofertas de empleo que el respaldo de Google News trae del dominio del fabricante.
+_JOB_AD = re.compile(
+    r"\b(sales (consultant|representative|manager|specialist)|nurse educator|account (manager|executive)|"
+    r"medical science liaison|territory manager|carri[eè]re|"
+    r"(senior|junior|principal|lead) (scientific |medical |clinical |research )?(expert|scientist|director|manager|advisor))\b|"
+    r"\bUSA-[A-Z]{2}\b",
+    re.I,
+)
+# Paginas educativas para pacientes: hablan de una enfermedad, no de una tecnologia.
+_EDUCATIONAL = re.compile(
+    r"\b(what (is|are)|why \w+( \w+){0,3} matters|simplified|uncovered|explained|everyday impact|"
+    r"signs and symptoms|living with|understanding)\b",
+    re.I,
+)
+
+
+def is_prose(title: str) -> bool:
+    """Parrafo o instruccion, no un titular: frase larga con punto y sin producto.
+
+    Caso real: las advertencias de seguridad de Abbott ("Implant healing. While
+    charging the generator, patients may perceive...") entraban como senales.
+    """
+    words = len((title or "").split())
+    if words < 6:
+        return False
+    if _STRICT_PRODUCT.search(title) or _STRICT_DRUG_SUFFIX.search(title):
+        return False
+    # Una frase corta que termina en punto ("The medical device is not yet CE-marked.").
+    if words < 10:
+        return bool(re.search(r"[a-z]{3}[.;]$", title.strip()))
+    # Una abreviatura ("vs. Placebo", "Dr. Haskal", "St. Jude") no es un fin de frase.
+    plain = re.sub(r"\b(vs|dr|st|mr|mrs|ms|prof|inc|ltd|co|no|fig|approx|al)\.", r"\1", title, flags=re.I)
+    return bool(
+        re.search(r"[.;]$", title.strip())
+        or re.search(r"[a-z)]\.\s+[A-Z]", plain)
+        # Descripcion de un segmento ("Hospitals and Health Systems, including operating rooms...").
+        or re.search(r"\b(including|such as)\b", title, re.I)
+    )
+
+
+def is_menu_dump(title: str) -> bool:
+    """Varias opciones de menu pegadas en un solo texto (MFDS: "News&Notice News&Notice Card News Photo News...")."""
+    words = [w for w in _words(title) if len(w) >= 4]
+    if len(words) < 8:
+        return False
+    counts: dict[str, int] = {}
+    for w in words:
+        counts[w] = counts.get(w, 0) + 1
+    return max(counts.values()) >= 3
+
+
+def never_a_signal(title: str) -> bool:
+    """Descartes que aplican a todo candidato, incluidas las filas de pipeline."""
+    title = (title or "").strip()
+    return bool(not title or _NEVER_SIGNAL.search(title) or is_prose(title) or is_menu_dump(title))
 
 
 def _words(text: str) -> list[str]:
@@ -1409,6 +1524,52 @@ def _with_crawled(findings: list[dict], crawl: dict | None) -> list[dict]:
     return findings + extra
 
 
+NOISE_LABELS = {
+    "texto_de_pagina": "Texto de la página (menú, leyenda, rótulo o párrafo), no una tecnología",
+    "noticia_no_tecnologica": "Noticia corporativa, financiera, jurídica o política",
+    "pagina_bloqueada": "Página de error o de verificación del sitio",
+    "pagina_administrativa": "Página administrativa o de trámites",
+    "pagina_indice": "Página índice o listado general, no un ítem",
+    "oferta_de_empleo": "Oferta de empleo",
+    "evento_o_riesgo": "Evento, webinar o viñeta de riesgos, sin producto",
+    "titulo_del_sitio": "Título del propio sitio, página educativa o pregunta, sin producto",
+    "navegacion": "Opción de menú o categoría, sin producto",
+}
+
+
+def capture_noise_reason(title: str) -> str:
+    """Por que un titulo NO es una senal ("" si no es ruido). Clave de `NOISE_LABELS`.
+
+    Un solo criterio para la captura (`rules_gate`) y para depurar lo ya capturado
+    (`reprocess_service.reprocess_noise`): asi lo que hoy no entraria es lo mismo
+    que se retira de la bandeja.
+    """
+    title = (title or "").strip()
+    if never_a_signal(title):
+        return "texto_de_pagina"
+    if _NEWS_NOISE.search(title) or _CORPORATE.search(title):
+        return "noticia_no_tecnologica"
+    if _BLOCK.search(title):
+        return "pagina_bloqueada"
+    if _ADMIN_PAGE.search(title):
+        return "pagina_administrativa"
+    if _INDEX_PAGE.search(title):
+        return "pagina_indice"
+    if _JOB_AD.search(title):
+        return "oferta_de_empleo"
+    concrete = bool(_STRICT_PRODUCT.search(title) or _STRICT_DRUG_SUFFIX.search(title))
+    if not concrete and (_EVENT_PAGE.search(title) or _ADVERSE_BULLET.search(title)):
+        return "evento_o_riesgo"
+    # Titulo del propio sitio ("NEJM | Research & Review Articles...") o pagina educativa
+    # o pregunta retorica: solo cuentan si nombran un producto.
+    if not concrete and (" | " in title or title.endswith("?") or _EDUCATIONAL.search(title)):
+        return "titulo_del_sitio"
+    # Tarjeta: palabras pegadas y una descripcion larga (un nombre como GlaxoSmithKline va en titulos cortos).
+    if is_navigation_title(title) or (_CARD_BLURB.search(title[:80]) and len(title.split()) > 12):
+        return "navegacion"
+    return ""
+
+
 def rules_gate(findings: list[dict], keep=None) -> list[dict]:
     """Candidatos que pasan las reglas sin IA. `keep(item)` conserva datos estructurados."""
     summaries: dict[str, int] = {}
@@ -1418,17 +1579,17 @@ def rules_gate(findings: list[dict], keep=None) -> list[dict]:
             summaries[key] = summaries.get(key, 0) + 1
     out: list[dict] = []
     for f in findings:
+        title = (f.get("title") or "").strip()
+        # Leyendas, rotulos y parrafos no son senales aunque esten dentro de una tabla de pipeline.
+        if never_a_signal(title):
+            continue
         if keep and keep(f):
             out.append(f)
             continue
-        title = (f.get("title") or "").strip()
         summary = (f.get("summary") or "").strip()
         # Un resumen repetido en varios candidatos es la descripcion de la pagina, no del item.
         own = summary if summary and summaries.get(summary, 0) < 3 else ""
-        if not title or _NEWS_NOISE.search(title) or _CORPORATE.search(title) or _BLOCK.search(title) or _ADMIN_PAGE.search(title):
-            continue
-        # Tarjeta: palabras pegadas y una descripcion larga (un nombre como GlaxoSmithKline va en titulos cortos).
-        if is_navigation_title(title) or (_CARD_BLURB.search(title[:80]) and len(title.split()) > 12):
+        if capture_noise_reason(title):
             continue
         if not has_tech_evidence(f"{title} {own}"):
             continue
@@ -1444,6 +1605,17 @@ def rules_gate(findings: list[dict], keep=None) -> list[dict]:
     for f in findings:
         f.pop("_crawled", None)  # marca interna: no llega a la base
     return out
+
+
+def sibling_source_ids(db: Session, source: Source) -> list[int]:
+    """Otras fuentes activas de la misma organizacion (mismo dominio) que `source`."""
+    from .corroboration import org_host
+
+    host = org_host(source.url or "")
+    if not host:
+        return []
+    rows = db.query(Source.id, Source.url).filter(Source.id != source.id, Source.retired.is_(False)).all()
+    return [sid for sid, url in rows if org_host(url or "") == host]
 
 
 def _is_pipeline_row(item: dict) -> bool:
@@ -1851,6 +2023,7 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
         scan_progress.check_abort()
         weights = screening_weights(db)
         pipeline = is_pipeline_source(source)
+        siblings = sibling_source_ids(db, source)
         for data in findings_data:
             row = data["title"]
             # La huella se calcula sobre la fila original: estable entre corridas
@@ -1862,6 +2035,15 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                 .first()
             )
             if exists:
+                continue
+            # El mismo item (mismo titulo y misma URL) ya entro por otro enlace de la
+            # misma organizacion: no se repite. Con el inventario por enlace, tres
+            # fuentes de un sitio traian la misma lista de noticias tres veces.
+            if siblings and (
+                db.query(Finding.id)
+                .filter(Finding.source_id.in_(siblings), Finding.content_hash == content_hash)
+                .first()
+            ):
                 continue
             if not pipeline and _upgrade_general_url(db, source, landing_url, data):
                 relinked += 1

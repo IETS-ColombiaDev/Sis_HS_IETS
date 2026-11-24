@@ -572,7 +572,7 @@ def raw_preview(
 
 @router.post("/reprocess")
 def reprocess_from_raw(
-    target: str = Query("all", pattern="^(all|fda|pipeline|producto)$"),
+    target: str = Query("all", pattern="^(all|fda|pipeline|producto|ruido)$"),
     apply: bool = Query(False),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission(P_CONFIG_MANAGE)),
@@ -584,4 +584,9 @@ def reprocess_from_raw(
     """
     from ..reprocess_service import reprocess_all
 
-    return reprocess_all(db, apply=apply, only=target, actor=user.email)
+    results = reprocess_all(db, apply=apply, only=target, actor=user.email)
+    if apply and any(r.get("changed") for r in results):
+        from ..events import bump_state_version
+
+        bump_state_version(db)
+    return results
