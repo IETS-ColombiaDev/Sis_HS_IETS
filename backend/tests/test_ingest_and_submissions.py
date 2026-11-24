@@ -210,7 +210,7 @@ def test_a_blocked_html_source_fails_the_job_instead_of_reporting_ok(db, monkeyp
     from app import scraper
 
     source = _source(db, connector="html", url="https://bloqueado.test", connector_config={})
-    monkeypatch.setattr(scraper, "fetch_url", lambda url, timeout=None: (403, "text/html", "", b""))
+    monkeypatch.setattr(scraper, "fetch_url", lambda url, timeout=None, retries=None: (403, "text/html", "", b""))
     job = ingest_service.run_job(db, ingest_service.enqueue(db, [source], triggered_by="test")[0].id)
     assert job.status != "ok"
     assert "403" in job.message
@@ -229,7 +229,7 @@ def test_the_scan_log_is_committed_before_any_download(tmp_path, monkeypatch):
     source = _source(db, connector="html", url="https://lenta.test", connector_config={})
     seen = {}
 
-    def fetch(url, timeout=None):
+    def fetch(url, timeout=None, retries=None):
         if seen:  # solo importa la primera descarga; las demas son rutas de respaldo
             return (404, "text/html", "", b"")
         other = Session()  # otra conexion, como la de otro usuario

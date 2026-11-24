@@ -20,6 +20,7 @@ from .ingest.base import (
     ConnectorError,
     json_path_exists,
     schema_signature,
+    shared_ssl_context,
 )
 from .models import Source
 
@@ -329,7 +330,7 @@ def _check_robots(url: str, respect: bool | None) -> dict | None:
     parts = urlsplit(url)
     robots_url = urljoin(f"{parts.scheme}://{parts.netloc}", "/robots.txt")
     try:
-        with httpx.Client(timeout=10.0, follow_redirects=True, headers={"User-Agent": USER_AGENT}) as client:
+        with httpx.Client(timeout=10.0, follow_redirects=True, headers={"User-Agent": USER_AGENT}, verify=shared_ssl_context()) as client:
             resp = client.get(robots_url)
         if resp.status_code >= 400:
             return {"url": robots_url, "allowed": True, "note": f"HTTP {resp.status_code}"}

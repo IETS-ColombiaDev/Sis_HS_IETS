@@ -303,3 +303,25 @@ Simulación sobre la copia de la base local (124 fuentes, 1.126 señales): se cr
 **Fuentes que bloquean robots:** no se intentó saltar la protección del sitio. Entran por la ruta legítima de respaldo y quedan marcadas como parciales en el informe de acceso.
 
 **Pendientes y limitaciones:** las 22 fuentes sin señales sin IA son sitios que cargan con JavaScript o solo ofrecen un formulario de búsqueda (Amgen, EUDAMED, DRKS, CRiS, PACTR, PATENTSCOPE, IEEE, Medtronic) o páginas institucionales sin productos nombrados (Philips, Roche, Abbott, IQWiG, RedETS). Con la IA activa, la IA lee esas páginas; si siguen sin señales conviene pasarlas a consulta manual.
+
+---
+
+## Vigilancia más rápida y estable en Render (24-11-2026)
+
+**Problema reportado:** en el sitio desplegado la vigilancia llegaba a cerca del 60 % y se rompía, y tardaba demasiado.
+
+**Qué se midió:** corrida completa local de las 115 fuentes con una fuente a la vez (como Render), IA y OCR apagados, Firestore apagado. Localmente no se rompía, pero consumía 467 s de CPU: en Render (0,1 CPU) eso solo son unos 78 minutos de cómputo, y la CPU por minuto crecía a lo largo de la corrida.
+
+**Causa principal del consumo:** cada descarga creaba un cliente HTTP nuevo con su propio contexto TLS; cargar las raíces de certificados cuesta ~0,2 s de CPU por página (en Render ~2 s) y no se reutilizaban conexiones. Era la mitad de la CPU de la vigilancia.
+
+**Cambios:**
+- Un solo contexto TLS por proceso y un pool de conexiones compartido (`ingest/base.py`); también en la búsqueda web, la sonda, la verificación de enlaces y las imágenes de la IA.
+- Las páginas internas de cada fuente (entradas de la matriz, resultados de búsqueda, fichas) se descargan de a 4 a la vez; el análisis sigue en orden en el hilo de la fuente.
+- Una página interna caída se reintenta 1 vez (antes hasta 3 veces con 15 s cada una). La URL principal conserva sus reintentos.
+- Tras cada fuente se libera memoria (`gc` y `malloc_trim` en Linux) y la imagen fija `MALLOC_ARENA_MAX=2`, para que el proceso no crezca fuente a fuente hasta pasar los 512 MB de Render.
+- Un job interrumpido por un reinicio vuelve al final de la cola, no al principio: si una fuente tumba el proceso, ya no lo vuelve a tumbar en bucle y la corrida sigue hasta el 100 %.
+- Corregido un desempaque erróneo en `crawl_site` cuando no se le pasa el HTML de entrada.
+
+**Resultado (misma máquina, mismas 115 fuentes):** de 37 a 20 minutos y de 467 a 127 s de CPU (−73 %), 115 de 115 terminadas, 0 errores, 935 señales (936 antes; la diferencia es variación de los sitios).
+
+**Pendiente:** confirmar en Render con una corrida completa; si vuelve a detenerse, revisar en los registros de Render si hubo reinicio por memoria ("Out of memory") o por la verificación de salud.

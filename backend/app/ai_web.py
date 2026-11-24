@@ -17,6 +17,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from . import ai_service, evidence_locator, product_details, prompt_store
+from .ingest.base import shared_ssl_context
 
 MAX_AI_ITEMS = 18
 MAX_IMAGES = 3
@@ -73,7 +74,7 @@ def download_images(urls: list[str]) -> list[dict]:
     headers = {**_scraper().BROWSER_HEADERS, "Accept": "image/*,*/*"}
     for href in urls:
         try:
-            with httpx.Client(timeout=18.0, follow_redirects=True, headers=headers) as client:
+            with httpx.Client(timeout=18.0, follow_redirects=True, headers=headers, verify=shared_ssl_context()) as client:
                 resp = client.get(href)
             if resp.status_code >= 400:
                 continue

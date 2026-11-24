@@ -52,8 +52,12 @@ LABEL org.opencontainers.image.title="iets-horizonte" \
 # sobrescriben. En produccion el arranque exige una SECRET_KEY propia (no hay
 # valor por defecto aqui a proposito). DATABASE_URL en SQLite solo sirve para
 # probar la imagen aislada; con compose se usa PostgreSQL.
+# MALLOC_ARENA_MAX=2: con glibc cada hilo (jobs de vigilancia, descargas en
+# paralelo) puede abrir su propia arena de memoria y el proceso crece hasta pasar
+# los 512 MB de Render. Dos arenas bastan para un solo proceso de uvicorn.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    MALLOC_ARENA_MAX=2 \
     PATH="/opt/venv/bin:${PATH}" \
     ENVIRONMENT=production \
     ALLOW_DEV_LOGIN=false \

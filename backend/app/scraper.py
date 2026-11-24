@@ -295,12 +295,17 @@ def _decode_body(raw: bytes, content_type: str, declared: str = "") -> str:
     return raw.decode("utf-8", errors="replace")
 
 
-def fetch_url(url: str, timeout: float | None = None) -> tuple[int, str, str, bytes]:
-    """Descarga con reintentos. Nunca lanza: si falla, status 0 y cuerpo vacio."""
+def fetch_url(url: str, timeout: float | None = None, retries: int | None = None) -> tuple[int, str, str, bytes]:
+    """Descarga con reintentos. Nunca lanza: si falla, status 0 y cuerpo vacio.
+
+    `retries` limita los reintentos de esta descarga (las paginas internas del
+    rastreo usan menos que la URL principal de la fuente).
+    """
     from . import prompt_store
 
     timeout = float(timeout if timeout is not None else prompt_store.fetch_timeout())
-    attempts = int(prompt_store.retries()) + 1
+    configured = int(prompt_store.retries())
+    attempts = (configured if retries is None else max(0, min(int(retries), configured))) + 1
     last_status = 0
     last_type = ""
     last_raw = b""
@@ -512,6 +517,37 @@ def _page_payload(url: str, html: str = "", content_type: str = "", raw: bytes |
 
 
 MAX_ENTRY_URLS = 12
+# Paginas internas que se descargan a la vez dentro de una fuente. Solo la red va
+# en paralelo (el analisis sigue en orden en el hilo de la fuente): una fuente con
+# 8 fichas y 12 entradas pasaba minutos esperando una pagina tras otra. Lotes de 4
+# acotan la memoria (Render: 512 MB) y la carga sobre cada sitio.
+CRAWL_WORKERS = 4
+# Reintentos de una pagina interna: una ficha caida no debe costar 4 intentos.
+CHILD_RETRIES = 1
+
+
+def _fetch_one(url: str, timeout: float) -> tuple[tuple[int, str, str, bytes] | None, int, str]:
+    started = time.perf_counter()
+    try:
+        status, ctype, text, raw = fetch_url(url, timeout=timeout, retries=CHILD_RETRIES)
+    except Exception as exc:  # noqa: BLE001
+        return None, int((time.perf_counter() - started) * 1000), str(exc)[:200]
+    if text and "pdf" not in (ctype or "") and not url.lower().endswith(".pdf"):
+        raw = b""  # el HTML ya esta en `text`: el binario solo sirve para PDF
+    return (status, ctype, text, raw), int((time.perf_counter() - started) * 1000), ""
+
+
+def fetch_many(urls: list[str], timeout: float) -> list[tuple[str, tuple | None, int, str]]:
+    """Descarga varias URLs a la vez y devuelve los resultados en el mismo orden."""
+    if not urls:
+        return []
+    if len(urls) == 1:
+        return [(urls[0], *_fetch_one(urls[0], timeout))]
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=min(CRAWL_WORKERS, len(urls)), thread_name_prefix="crawl") as pool:
+        results = list(pool.map(lambda u: _fetch_one(u, timeout), urls))
+    return [(u, *r) for u, r in zip(urls, results)]
 
 
 def crawl_site(
@@ -569,16 +605,11 @@ def crawl_site(
         pages.append(payload)
         return payload
 
-    def visit_child(url: str, *, role: str) -> tuple[int, str, str]:
-        scan_progress.stage("recorriendo", f"Abriendo {role.replace('_', ' ')}: {url[:120]}")
-        started = time.perf_counter()
-        try:
-            status, ctype, text, raw = fetch_url(url, timeout=child_timeout)
-        except Exception as exc:  # noqa: BLE001
-            ms = int((time.perf_counter() - started) * 1000)
-            note(role, url, "error", ms, str(exc)[:200])
+    def record_child(url: str, role: str, result: tuple | None, ms: int, error: str = "") -> tuple[int, str, str]:
+        if result is None:
+            note(role, url, "error", ms, error)
             return 0, "", ""
-        ms = int((time.perf_counter() - started) * 1000)
+        status, ctype, text, raw = result
         if status == 0:
             note(role, url, "sin_conexion", ms, "El sitio no respondio tras los reintentos")
             return status, ctype, text
@@ -593,11 +624,39 @@ def crawl_site(
         note(role, url, "ok", ms, f"{chars} caracteres extraidos")
         return status, ctype, text
 
+    def visit_child(url: str, *, role: str) -> tuple[int, str, str]:
+        scan_progress.stage("recorriendo", f"Abriendo {role.replace('_', ' ')}: {url[:120]}")
+        return record_child(url, role, *_fetch_one(url, child_timeout))
+
+    def visit_many(urls: list[str], *, role: str) -> list[tuple[str, int, str, str]]:
+        """Visita las URLs en lotes paralelos; registra cada una en orden."""
+        out: list[tuple[str, int, str, str]] = []
+        pending: list[str] = []
+        seen: set[str] = set()
+        for u in urls:
+            key = _normalize_url(u)
+            if key in visited or key in seen:
+                continue
+            seen.add(key)
+            pending.append(u)
+        for i in range(0, len(pending), CRAWL_WORKERS):
+            batch = pending[i : i + CRAWL_WORKERS]
+            label = role.replace("_", " ")
+            scan_progress.stage(
+                "recorriendo",
+                f"Abriendo {len(batch)} {label}(s) a la vez: {batch[0][:100]}" if len(batch) > 1 else f"Abriendo {label}: {batch[0][:120]}",
+            )
+            if pause and i:
+                time.sleep(pause)
+            for url, result, ms, error in fetch_many(batch, child_timeout):
+                out.append((url, *record_child(url, role, result, ms, error)))
+        return out
+
     if html:
         add_page(landing_url, html, role="entrada")
         note("entrada", landing_url, "ok", 0, "HTML de entrada ya descargado")
     else:
-        status, ctype, text, raw = visit_child(landing_url, role="entrada")
+        status, ctype, text = visit_child(landing_url, role="entrada")
         html = text if status and status < 400 else ""
 
     # Paginas de las que se siguen enlaces: la principal y cada URL de entrada.
@@ -605,22 +664,16 @@ def crawl_site(
     entries = [u for u in (entry_urls or []) if u and _normalize_url(u) != landing][:MAX_ENTRY_URLS]
     if entries:
         note("ruta", landing_url, "ok", 0, f"{len(entries)} URL(s) de entrada de la matriz EH")
-    for url in entries:
-        if pause:
-            time.sleep(pause)
-        status, ctype, text = visit_child(url, role="entrada_matriz")
+    for url, status, ctype, text in visit_many(entries, role="entrada_matriz"):
         if status and status < 400 and text:
             sources_html.append((url, text))
 
     results = list(search_results or [])
     cap = len(results) if fetch_results is None else max(0, int(fetch_results))
-    for row in results[:cap]:
-        url = row.get("url") or ""
-        if not url or _follow_skip(url):
-            continue
-        if pause:
-            time.sleep(pause)
-        visit_child(url, role="busqueda")
+    visit_many(
+        [row.get("url") or "" for row in results[:cap] if row.get("url") and not _follow_skip(row.get("url") or "")],
+        role="busqueda",
+    )
 
     budget = len(pages) + max_pages
     if follow_links and sources_html:
@@ -647,15 +700,21 @@ def crawl_site(
                     follow.extend(collect_follow_urls(text, next_url, limit=max_pages, keywords=keywords))
 
         seen_follow: set[str] = set()
-        for href in follow:
-            if len(pages) >= budget:
+        idx = 0
+        # Lotes del tamano del cupo que falta: una ficha caida no consume cupo,
+        # asi que se sigue con las siguientes candidatas hasta llenarlo.
+        while idx < len(follow) and len(pages) < budget:
+            batch: list[str] = []
+            while idx < len(follow) and len(batch) < budget - len(pages):
+                href = follow[idx]
+                idx += 1
+                if href in seen_follow or _normalize_url(href) in visited:
+                    continue
+                seen_follow.add(href)
+                batch.append(href)
+            if not batch:
                 break
-            if href in seen_follow or _normalize_url(href) in visited:
-                continue
-            seen_follow.add(href)
-            if pause:
-                time.sleep(pause)
-            visit_child(href, role="ficha")
+            visit_many(batch, role="ficha")
     elif not follow_links:
         note("enlaces", landing_url, "omitido", 0, "Seguir enlaces internos esta apagado para esta fuente")
 

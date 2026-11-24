@@ -26,7 +26,7 @@ def page(monkeypatch):
     state = {"status": 200, "html": "<html><body><p>Alfamab recibe aprobacion de la FDA.</p></body></html>"}
     monkeypatch.setattr(scraper, "is_internal_url", lambda url: False)
     monkeypatch.setattr(
-        scraper, "fetch_url", lambda url, timeout=None: (state["status"], "text/html", state["html"], b"")
+        scraper, "fetch_url", lambda url, timeout=None, retries=None: (state["status"], "text/html", state["html"], b"")
     )
     monkeypatch.setattr(scraper, "extract_main_text", lambda html, url="": "Alfamab recibe aprobacion de la FDA.")
     return state

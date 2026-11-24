@@ -103,7 +103,7 @@ def test_feed_crawl_gives_the_ai_clean_text_not_xml():
 def test_a_blocked_site_reads_google_news_as_a_partial_run(db, monkeypatch):
     src = _source(db)
 
-    def fetch(url, timeout=None):
+    def fetch(url, timeout=None, retries=None):
         if "news.google.com" in url:
             return (200, "application/xml; charset=utf-8", GNEWS, GNEWS.encode())
         return (403, "text/html", "", b"")
@@ -122,7 +122,7 @@ def test_a_blocked_site_reads_google_news_as_a_partial_run(db, monkeypatch):
 def test_an_empty_google_news_fallback_creates_no_signal(db, monkeypatch):
     src = _source(db, title="Reuters Health", url="https://www.reutershealth.com/")
 
-    def fetch(url, timeout=None):
+    def fetch(url, timeout=None, retries=None):
         if "news.google.com" in url:
             return (200, "application/xml", EMPTY_GNEWS, EMPTY_GNEWS.encode())
         return (401, "text/html", "", b"")
@@ -150,7 +150,7 @@ def test_run_job_reports_each_stage_of_the_source(db, monkeypatch):
     scan_progress.clear()
     src = _source(db, url="https://ok.test/pipeline", title="Fuente OK")
     page = "<html><head><title>Pipeline</title></head><body><h2>New cancer drug trial phase 3</h2></body></html>"
-    monkeypatch.setattr(scraper, "fetch_url", lambda url, timeout=None: (200, "text/html", page, page.encode()))
+    monkeypatch.setattr(scraper, "fetch_url", lambda url, timeout=None, retries=None: (200, "text/html", page, page.encode()))
     monkeypatch.setattr(scraper, "_crawl_with_profile", lambda *a, **k: {"pages": [], "pages_visited": 1, "steps": []})
     monkeypatch.setattr(scraper, "_enrich_with_ai", lambda data, **kw: data)
     job = ingest_service.run_job(db, ingest_service.enqueue(db, [src], triggered_by="test")[0].id)
@@ -167,7 +167,7 @@ def test_run_job_reports_each_stage_of_the_source(db, monkeypatch):
 def test_a_failed_source_shows_the_retry_in_its_state(db, monkeypatch):
     scan_progress.clear()
     src = _source(db, url="https://caido.test/", title="Caída")
-    monkeypatch.setattr(scraper, "fetch_url", lambda url, timeout=None: (503, "text/html", "", b""))
+    monkeypatch.setattr(scraper, "fetch_url", lambda url, timeout=None, retries=None: (503, "text/html", "", b""))
     job = ingest_service.run_job(db, ingest_service.enqueue(db, [src], triggered_by="test")[0].id)
     assert job.status == "pendiente"  # vuelve a la cola
     state = scan_progress.get(src.id)
@@ -301,7 +301,7 @@ def test_a_failed_source_says_every_route_it_tried(db, monkeypatch):
     scan_progress.clear()
     src = _source(db, url="https://bloqueado.test/", title="Bloqueado")
 
-    def fetch(url, timeout=None):
+    def fetch(url, timeout=None, retries=None):
         if "news.google.com" in url:
             return (0, "", "", b"")
         return (403, "text/html", "", b"")
@@ -342,7 +342,7 @@ def test_a_blocked_site_still_searches_the_web_and_the_ai_reads_the_snippets(db,
     scan_progress.clear()
     src = _source(db)
 
-    def fetch(url, timeout=None):
+    def fetch(url, timeout=None, retries=None):
         if "news.google.com" in url:
             return (200, "application/xml", EMPTY_GNEWS, EMPTY_GNEWS.encode())
         return (403, "text/html", "", b"")

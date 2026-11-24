@@ -11,6 +11,7 @@ import hashlib
 import logging
 import random
 import re
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -42,9 +43,65 @@ def _host(url: str) -> str:
     return (urlsplit(url).hostname or "").lower()
 
 
+_ssl_context = None
+_transports: dict[int, httpx.HTTPTransport] = {}
+_transport_lock = threading.Lock()
+
+
+def shared_ssl_context():
+    """Contexto TLS unico del proceso (raices de certifi), creado una sola vez.
+
+    httpx crea uno nuevo por cliente y cargar las raices cuesta ~0,2 s de CPU: con
+    un cliente por descarga era la mitad de la CPU de la vigilancia (en Render, con
+    0,1 CPU, unos 2 s por pagina). Un SSLContext se puede compartir entre hilos.
+    """
+    global _ssl_context
+    if _ssl_context is None:
+        with _transport_lock:
+            if _ssl_context is None:
+                import ssl
+
+                import certifi
+
+                _ssl_context = ssl.create_default_context(cafile=certifi.where())
+    return _ssl_context
+
+
+def _shared_transport(verify) -> httpx.HTTPTransport:
+    """Pool de conexiones compartido: reutiliza TCP + TLS entre paginas del mismo sitio."""
+    key = id(verify)
+    transport = _transports.get(key)
+    if transport is None:
+        with _transport_lock:
+            transport = _transports.get(key)
+            if transport is None:
+                transport = httpx.HTTPTransport(
+                    verify=verify,
+                    limits=httpx.Limits(max_connections=32, max_keepalive_connections=16, keepalive_expiry=20.0),
+                )
+                _transports[key] = transport
+    return transport
+
+
+class _PooledClient(httpx.Client):
+    """Cliente liviano sobre el pool compartido: al cerrarlo no cierra el pool.
+
+    Cada descarga tiene su propio cliente (cookies, cabeceras y tiempos propios),
+    pero las conexiones y el contexto TLS se reutilizan.
+    """
+
+    def close(self) -> None:  # noqa: D401 - el transporte compartido sigue abierto
+        return None
+
+    def __exit__(self, *args) -> None:
+        return None
+
+
 def _http_client(url: str, timeout: float, headers: dict) -> httpx.Client:
-    verify = _intermediates.get(_host(url), True)
-    return httpx.Client(timeout=timeout, follow_redirects=True, headers=headers, verify=verify)
+    verify = _intermediates.get(_host(url)) or shared_ssl_context()
+    return _PooledClient(
+        timeout=timeout, follow_redirects=True, headers=headers, transport=_shared_transport(verify)
+    )
 
 
 def tls_get(url: str, *, timeout, headers: dict, params: dict | None = None) -> httpx.Response:

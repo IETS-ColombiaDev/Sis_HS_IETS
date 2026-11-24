@@ -182,12 +182,13 @@ def check_url(url: str) -> tuple[str, int, str]:
     """(estado, codigo HTTP, URL final). Usa el mismo cliente que el rastreador."""
     import httpx
 
+    from .ingest.base import shared_ssl_context
     from .scraper import BROWSER_HEADERS, is_internal_url
 
     if not url.lower().startswith(("http://", "https://")) or is_internal_url(url):
         return "caido", 0, ""
     try:
-        with httpx.Client(follow_redirects=True, timeout=CHECK_TIMEOUT_S, headers=BROWSER_HEADERS) as client:
+        with httpx.Client(follow_redirects=True, timeout=CHECK_TIMEOUT_S, headers=BROWSER_HEADERS, verify=shared_ssl_context()) as client:
             resp = client.get(url)
     except Exception:  # noqa: BLE001
         return "caido", 0, ""

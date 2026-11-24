@@ -207,7 +207,7 @@ def _site(monkeypatch):
     }
     visited: list[str] = []
 
-    def fake_fetch(url, timeout=25.0):
+    def fake_fetch(url, timeout=25.0, retries=None):
         visited.append(url)
         return pages.get(url, (404, "text/html", "", b""))
 
