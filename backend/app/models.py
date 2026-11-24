@@ -846,6 +846,8 @@ class Submission(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, index=True
     )
+    # RF-02-F: ultimo cruce con la vigilancia proactiva y con la web (migracion 0007).
+    cross_check: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
 
 
 # --------------------------------------------------------------------------- #

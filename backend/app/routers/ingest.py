@@ -475,6 +475,48 @@ def probe_governors(
     return probe_all(db, only_ab=only_ab)
 
 
+@router.post("/probe/run")
+def probe_run(
+    scope: str = Query("all", pattern="^(all|ab|pending)$"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_SCAN_RUN)),
+):
+    """Sondea en segundo plano todo el inventario activo (o solo A/B, o las nunca sondeadas).
+
+    Responde de inmediato con el estado; la pantalla consulta `/probe/status`.
+    """
+    from ..database import SessionLocal
+    from ..probe_service import start_bulk
+
+    return start_bulk(SessionLocal, scope=scope, actor=user.email)
+
+
+@router.get("/probe/status")
+def probe_status(user: User = Depends(get_current_user)):
+    from ..probe_service import bulk_state
+
+    return bulk_state()
+
+
+@router.get("/probe/report.xlsx")
+def probe_report_xlsx(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Informe de sondas en Excel: estado, detalle y accion sugerida por fuente."""
+    from fastapi.responses import StreamingResponse
+
+    from ..probe_service import build_probe_xlsx
+    from ..xlsx_report import XLSX_MEDIA_TYPE
+
+    data, filename = build_probe_xlsx(db)
+    return StreamingResponse(
+        iter([data]),
+        media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/health", response_model=IngestHealthOut)
 def ingest_health(
     db: Session = Depends(get_db),

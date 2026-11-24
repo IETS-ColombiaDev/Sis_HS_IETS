@@ -1,6 +1,6 @@
 // Acceso con contrasena y modulo de administracion de usuarios, por la interfaz.
 import { test, expect } from "@playwright/test";
-import { loginAs, watchErrors, expectClean, settle, apiToken, auth, ONBOARDING_KEY } from "./helpers";
+import { loginAs, watchErrors, expectClean, settle, apiToken, auth, ONBOARDING_KEY, dismissManualPrompt } from "./helpers";
 
 const STRONG = "Horizonte2026seguro";
 
@@ -65,6 +65,8 @@ test("alta de cuenta, primer ingreso con clave temporal y cambio obligatorio", a
   await page.locator("#pwd-confirm").fill(STRONG);
   await page.getByRole("button", { name: "Guardar contraseña" }).click();
   await expect(page.getByRole("heading", { name: "Bandeja de trabajo" }).first()).toBeVisible();
+  // Primer ingreso de alguien con permiso de la bandeja: sale el aviso de fuentes tipo E.
+  await dismissManualPrompt(page);
   await expect(page.locator(".user-meta")).toContainText("Evaluador clínico");
   // Un evaluador no ve la administracion.
   await expect(page.getByRole("link", { name: "Usuarios y perfiles" })).toHaveCount(0);

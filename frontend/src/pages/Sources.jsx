@@ -149,7 +149,8 @@ export default function Sources() {
   const [deleting, setDeleting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [probingAll, setProbingAll] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [bulk, setBulk] = useState(null);
+  const [exporting, setExporting] = useState("");
   // Deteccion de fuentes con IA
   const [discoverOpen, setDiscoverOpen] = useState(false);
   const [matrixOpen, setMatrixOpen] = useState(false);
@@ -443,18 +444,58 @@ export default function Sources() {
     }
   };
 
-  const probeGovernors = async () => {
+  // Sondeo en lote: corre en el servidor (de a varias fuentes a la vez) y aquí
+  // solo se consulta el avance. Así no se corta la petición con 141 fuentes.
+  const startBulk = async (scope) => {
     setProbingAll(true);
     try {
-      await api.post("/ingest/probe", null, { params: { only_ab: true } });
-      toast.success("Sonda ejecutada sobre las fuentes de nivel A y B");
-      load();
+      const { data } = await api.post("/ingest/probe/run", null, { params: { scope } });
+      setBulk(data);
+      toast.info(
+        scope === "ab"
+          ? "Sondeando las fuentes de nivel A y B en segundo plano."
+          : `Sondeando ${data.total} fuente(s) en segundo plano. Puede seguir trabajando; el avance se ve en «Salud de fuentes».`
+      );
     } catch (e) {
-      toast.error(apiError(e, "No se pudo sondear el catálogo"));
+      toast.error(apiError(e, "No se pudo iniciar el sondeo"));
     } finally {
       setProbingAll(false);
     }
   };
+  const probeGovernors = () => startBulk("ab");
+  const probeEverything = () => {
+    setTab("salud");
+    startBulk("all");
+  };
+
+  // Avance del sondeo en lote: se consulta al abrir la pantalla y cada 3 s mientras corre.
+  useEffect(() => {
+    let alive = true;
+    let timer;
+    const poll = async () => {
+      try {
+        const { data } = await api.get("/ingest/probe/status");
+        if (!alive) return;
+        setBulk((prev) => {
+          if (prev?.running && !data.running) {
+            load();
+            const c = data.counts || {};
+            toast.success(`Sondeo terminado: ${c.verde || 0} verdes, ${c.ambar || 0} ámbar y ${c.rojo || 0} rojas.`);
+          }
+          return data;
+        });
+        if (data.running) timer = setTimeout(poll, 3000);
+      } catch {
+        // El avance es informativo: si falla una consulta, la siguiente lo corrige.
+      }
+    };
+    if (bulk === null || bulk?.running) poll();
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bulk?.running]);
 
   const acceptTerms = async (s) => {
     try {
@@ -467,15 +508,21 @@ export default function Sources() {
     }
   };
 
-  const exportCsv = async () => {
-    setExporting(true);
+  const exportFile = async (kind) => {
+    setExporting(kind);
+    const today = new Date().toISOString().slice(0, 10);
+    const target = {
+      xlsx: ["/sources/export.xlsx", `catalogo_fuentes_iets_${today}.xlsx`],
+      csv: ["/sources/export", "catalogo_fuentes_iets.csv"],
+      probes: ["/ingest/probe/report.xlsx", `sondas_fuentes_${today}.xlsx`],
+    }[kind];
     try {
-      await downloadFromApi(api, "/sources/export", "catalogo_fuentes_iets.csv");
-      toast.success("Catálogo descargado");
+      await downloadFromApi(api, target[0], target[1]);
+      toast.success(kind === "probes" ? "Informe de sondas descargado" : "Catálogo descargado");
     } catch (e) {
       toast.error(apiError(e, "No se pudo exportar"));
     } finally {
-      setExporting(false);
+      setExporting("");
     }
   };
 
@@ -645,11 +692,28 @@ export default function Sources() {
         purpose="Inventario RF01 / D-06: fuentes verificadas clasificadas por contrato de datos. Las de nivel A y B sostienen el pipeline; el resto lo enriquece."
         actions={
           <div className="fb-toolbar">
-            <HintButton variant="secondary" hint="Descarga el listado maestro en CSV (abre en Excel)" onClick={exportCsv} loading={exporting}>
-              <Icon name="doc" size={16} /> CSV
+            <HintButton
+              variant="secondary"
+              hint="Descarga el catálogo en Excel (.xlsx): hoja de fuentes con filtros e hipervínculos, fuentes de consulta manual (tipo E) y su estado, resumen por nivel, tipo y salud, y las fuentes retiradas."
+              onClick={() => exportFile("xlsx")}
+              loading={exporting === "xlsx"}
+              data-testid="sources-export-xlsx"
+            >
+              <Icon name="doc" size={16} /> Descargar Excel
             </HintButton>
-            <HintButton variant="outline" hint={GLOSSARY.fb_sondear_ab} disabledHint={noScan} disabled={!canScan} onClick={probeGovernors} loading={probingAll}>
-              <Icon name="pulse" size={16} /> Sondear A/B
+            <HintButton variant="ghost" hint="El mismo listado en CSV (separado por punto y coma), para otros programas" onClick={() => exportFile("csv")} loading={exporting === "csv"}>
+              CSV
+            </HintButton>
+            <HintButton
+              variant="outline"
+              hint="Prueba todas las fuentes activas del inventario (no solo A y B) en segundo plano, de a varias a la vez. Deja el estado verde, ámbar o rojo de cada una y su informe en Excel."
+              disabledHint={bulk?.running ? "Ya hay un sondeo en curso" : noScan}
+              disabled={!canScan || bulk?.running}
+              onClick={probeEverything}
+              loading={probingAll}
+              data-testid="sources-probe-all"
+            >
+              <Icon name="pulse" size={16} /> Sondear todas
             </HintButton>
             <HintButton variant="outline" hint={GLOSSARY.fb_recargar_catalogo} disabledHint={noWrite} disabled={!canWrite} onClick={() => setConfirmImport(true)}>
               <Icon name="layers" size={16} /> Recargar catálogo
@@ -858,6 +922,53 @@ export default function Sources() {
 
       {tab === "salud" && (
         <Card>
+          <div className="fb-toolbar" style={{ justifyContent: "space-between", marginBottom: 12 }}>
+            <div style={{ fontSize: 14, flex: "1 1 320px" }} data-testid="probe-bulk-state">
+              {bulk?.running ? (
+                <>
+                  <strong>
+                    Sondeando {bulk.done} de {bulk.total}…
+                  </strong>{" "}
+                  <span style={{ color: "#64748b" }}>
+                    {bulk.counts?.verde || 0} verdes · {bulk.counts?.ambar || 0} ámbar · {bulk.counts?.rojo || 0} rojas
+                    {bulk.current?.length ? ` · ahora: ${bulk.current.slice(0, 2).join(", ")}` : ""}
+                  </span>
+                  <div className="probe-progress" aria-hidden="true">
+                    <div style={{ width: `${bulk.total ? Math.round((100 * bulk.done) / bulk.total) : 0}%` }} />
+                  </div>
+                </>
+              ) : bulk?.finished_at ? (
+                <span style={{ color: "#64748b" }}>
+                  Último sondeo en lote: {new Date(bulk.finished_at).toLocaleString("es-CO")} ({bulk.total} fuentes
+                  {bulk.by ? `, por ${bulk.by}` : ""}).
+                </span>
+              ) : (
+                <span style={{ color: "#64748b" }}>Use «Sondear todas» para probar el inventario completo.</span>
+              )}
+            </div>
+            <div className="fb-toolbar">
+              <HintButton
+                size="sm"
+                variant="outline"
+                hint={GLOSSARY.fb_sondear_ab}
+                disabledHint={bulk?.running ? "Ya hay un sondeo en curso" : noScan}
+                disabled={!canScan || bulk?.running}
+                onClick={probeGovernors}
+              >
+                Solo A/B
+              </HintButton>
+              <HintButton
+                size="sm"
+                variant="secondary"
+                hint="Informe en Excel de todas las fuentes: estado de la sonda, detalle y acción sugerida (rojas y ámbar primero)."
+                onClick={() => exportFile("probes")}
+                loading={exporting === "probes"}
+                data-testid="probe-report-xlsx"
+              >
+                <Icon name="doc" size={14} /> Informe de sondas (Excel)
+              </HintButton>
+            </div>
+          </div>
           <div className="health-counts">
             {["verde", "ambar", "rojo", "sin_sonda"].map((k) => (
               <div key={k} className={`health-pill health-pill--${k}`}>
@@ -892,7 +1003,7 @@ export default function Sources() {
             ]}
             rows={(health?.items || []).map((s) => ({ key: s.id, data: s }))}
             minWidth={860}
-            emptyMessage="Aún no hay sondas registradas. Use 'Sondear A/B' para la primera."
+            emptyMessage="Aún no hay sondas registradas. Use «Sondear todas» para la primera."
           />
         </Card>
       )}

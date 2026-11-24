@@ -16,8 +16,18 @@ from ..database import get_db
 from ..deps import get_current_user, require_permission
 from ..events import bump_state_version
 from ..models import Finding, IngestJob, RawRecord, Source, Technology, User
-from ..rbac import P_SCAN_RUN, P_SOURCE_WRITE
-from ..schemas import MatrixApplyIn, SourceCreate, SourceOut, SourceQuickCreate, SourceUpdate
+from ..rbac import P_SCAN_RUN, P_SOURCE_WRITE, P_STAGING_ASSIGN
+from ..schemas import (
+    ManualReviewEntry,
+    ManualReviewIn,
+    ManualReviewOverview,
+    ManualReviewResult,
+    MatrixApplyIn,
+    SourceCreate,
+    SourceOut,
+    SourceQuickCreate,
+    SourceUpdate,
+)
 
 router = APIRouter(prefix="/api/sources", tags=["sources"])
 
@@ -345,6 +355,69 @@ def preview_web_search(
 def list_categories(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     rows = db.query(Source.category).distinct().all()
     return sorted({r[0] for r in rows if r[0]} | set(BLOCKS))
+
+
+@router.get("/export.xlsx")
+def export_sources_xlsx(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Catalogo en Excel: hojas Fuentes, Consulta manual (tipo E), Resumen, Retiradas e Informacion."""
+    from ..catalog_export import build_catalog_xlsx
+    from ..xlsx_report import XLSX_MEDIA_TYPE
+
+    data, filename = build_catalog_xlsx(db)
+    return StreamingResponse(
+        iter([data]),
+        media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# --------------------------------------------------------------------------- #
+#  Fuentes de consulta manual (nivel E) por validar
+# --------------------------------------------------------------------------- #
+@router.get("/manual-review", response_model=ManualReviewOverview)
+def manual_review_overview(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Fuentes E activas y cuales estan por validar (contador de la bandeja)."""
+    from .. import manual_review
+
+    return manual_review.overview(db)
+
+
+@router.post("/{source_id}/manual-review", response_model=ManualReviewResult)
+def manual_review_record(
+    source_id: int,
+    payload: ManualReviewIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_STAGING_ASSIGN)),
+):
+    """Registra que una persona consulto la fuente E (resultado, nota y senales registradas)."""
+    from .. import manual_review
+
+    source = db.get(Source, source_id)
+    if source is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fuente no encontrada")
+    try:
+        return manual_review.record(
+            db, source, outcome=payload.outcome, note=payload.note, signals=payload.signals, actor=user.email
+        )
+    except manual_review.ManualReviewError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/{source_id}/manual-review/history", response_model=list[ManualReviewEntry])
+def manual_review_history(
+    source_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from .. import manual_review
+
+    return manual_review.history(db, source_id)
 
 
 @router.get("/export")

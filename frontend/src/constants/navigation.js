@@ -107,7 +107,7 @@ export const HOWTO = [
     keys: ["sonda", "salud", "fuente caida", "rojo", "ambar", "403", "bloquea", "no funciona fuente", "sondear"],
     steps: [
       "Abra Catálogo de fuentes y la pestaña «Salud de fuentes».",
-      "«Sondear A/B» prueba las fuentes principales; «Sonda» o «Repetir sonda» prueba una sola.",
+      "«Sondear todas» prueba el inventario completo en segundo plano (o «Solo A/B» las principales); «Sonda» o «Repetir sonda» prueba una sola.",
       "Verde = funciona (o usa una ruta de respaldo); ámbar = revise la URL; rojo = sin acceso.",
     ],
   },

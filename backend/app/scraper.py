@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import logging
 import html as html_lib
 import re
 from datetime import datetime, timezone
@@ -1913,6 +1914,18 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                 if id(finding) in pipeline_parts:
                     row, parsed = pipeline_parts[id(finding)]
                     apply_pipeline_fields(finding, tech, row, parsed, source.title)
+            # RF-001: las senales sin enlace propio se buscan en la pagina ya descargada:
+            # enlace exacto si la pagina lo tiene, o enlace que abre y resalta la senal.
+            try:
+                from . import link_resolver
+
+                pages_html = {landing_url: text} if text else {}
+                for page in (crawl or {}).get("pages") or []:
+                    if page.get("html") and page.get("url"):
+                        pages_html.setdefault(page["url"], page["html"])
+                link_resolver.resolve_with_pages(db, source, new_findings, pages_html)
+            except Exception:  # noqa: BLE001 - ubicar la senal nunca tumba la captura
+                logging.getLogger(__name__).warning("No se pudo ubicar la señal exacta en %s", source.title, exc_info=True)
 
         log.items_found = len(findings_data)
         log.items_new = new_count

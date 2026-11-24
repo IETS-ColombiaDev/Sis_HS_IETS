@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api, { apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useCycle } from "../cycle/CycleContext";
@@ -14,6 +14,8 @@ import Icon from "../components/Icon";
 import InfoTip, { TermLabel } from "../components/InfoTip";
 import Modal from "../components/Modal";
 import SignalOrigin from "../components/SignalOrigin";
+import ManualReviewPanel from "../components/ManualReviewPanel";
+import useManualReview from "../scan/useManualReview";
 import { Input, Select, Textarea } from "../components/Field";
 import EmptyState from "../components/EmptyState";
 import { LoadingBlock } from "../components/Spinner";
@@ -92,6 +94,21 @@ export default function Staging() {
 
   const canWrite = can(PERM.TECHNOLOGY_WRITE);
   const canAssign = can(PERM.STAGING_ASSIGN);
+
+  // Fuentes de consulta manual (nivel E) por validar: aviso visible arriba y
+  // ventana de validación. Se abre sola al llegar desde el pendiente
+  // (?validar=fuentes-e), por ejemplo desde la Bandeja de trabajo o el aviso de entrada.
+  const manual = useManualReview();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [manualOpen, setManualOpen] = useState(false);
+  useEffect(() => {
+    if (searchParams.get("validar") === "fuentes-e" && manual.allowed) {
+      setManualOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete("validar");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams, manual.allowed]);
 
   // La busqueda espera a que el usuario deje de escribir: antes cada tecla
   // disparaba dos consultas al servidor.
@@ -494,6 +511,40 @@ export default function Staging() {
           </div>
         }
       />
+
+      {manual.allowed && manual.due > 0 && (
+        <div className="mr-banner" role="status" data-testid="manual-review-banner">
+          <div className="mr-banner-icon">
+            <Icon name="alert" size={20} />
+          </div>
+          <div className="mr-banner-text">
+            <strong>
+              Por favor valide manualmente {manual.due} fuente{manual.due === 1 ? "" : "s"} de consulta (tipo E)
+            </strong>
+            <span>
+              La vigilancia automática no entra a estas fuentes (licencia, usuario o captcha). Consúltelas, registre lo que encuentre
+              y márquelas como validadas.
+            </span>
+          </div>
+          <Button onClick={() => setManualOpen(true)} data-testid="manual-review-open">
+            <Icon name="check" size={16} /> Validar ahora
+          </Button>
+        </div>
+      )}
+
+      <Modal
+        open={manualOpen}
+        onClose={() => setManualOpen(false)}
+        title={`Fuentes de consulta manual por validar (${manual.due} de ${manual.total})`}
+        width={760}
+        footer={
+          <Button variant="secondary" onClick={() => setManualOpen(false)}>
+            Cerrar
+          </Button>
+        }
+      >
+        <ManualReviewPanel data={manual.data} onChange={manual.reload} toast={toast} />
+      </Modal>
 
       <PhaseGuide
         phase="Fase 1 · Identificación"

@@ -20,10 +20,15 @@ import { useToast } from "./Toast";
 import { useBackup } from "../backup/BackupContext";
 import { ScanDock } from "./ScanProgress";
 import { useScan } from "../scan/ScanContext";
+import useManualReview from "../scan/useManualReview";
+import ManualReviewPrompt from "./ManualReviewPrompt";
 import "./layout.css";
 
 function Sidebar({ open, onClose }) {
   const { can } = useAuth();
+  const manual = useManualReview();
+  // Contadores junto al nombre del módulo (pendientes que no deben perderse de vista).
+  const badges = { "/bandeja-entrada": manual.due };
   const [filter, setFilter] = useState("");
   const q = fold(filter);
 
@@ -91,6 +96,16 @@ function Sidebar({ open, onClose }) {
                 >
                   <Icon name={item.icon} size={18} strokeWidth={1.9} />
                   <span className="sb-label">{item.label}</span>
+                  {badges[item.to] > 0 && (
+                    <span
+                      className="mr-count"
+                      title={`${badges[item.to]} fuente(s) de consulta manual (tipo E) por validar`}
+                      aria-label={`${badges[item.to]} fuentes tipo E por validar`}
+                      data-testid="nav-manual-review-count"
+                    >
+                      {badges[item.to]}
+                    </span>
+                  )}
                 </NavLink>
                 {item.help && <InfoTip text={item.help} position="right" label={`Qué es ${item.label}`} />}
               </div>
@@ -625,6 +640,7 @@ export default function Layout({ children }) {
         </main>
       </div>
       <NavAssistant onOpenGuide={() => setGuideOpen(true)} />
+      <ManualReviewPrompt suppressed={guideOpen} />
       {pathname !== "/vigilancia" && <ScanDock progress={scan.progress} onOpen={() => navigate("/vigilancia")} />}
       {guideOpen ? <OnboardingGuide open onClose={closeGuide} /> : null}
     </div>

@@ -13,6 +13,7 @@ import InfoTip from "../components/InfoTip";
 import Modal from "../components/Modal";
 import { Textarea } from "../components/Field";
 import EmptyState from "../components/EmptyState";
+import SubmissionCrossCheck from "../components/SubmissionCrossCheck";
 import { LoadingBlock } from "../components/Spinner";
 import { PERM } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
@@ -113,6 +114,12 @@ export default function Submissions() {
   useEffect(() => {
     load();
   }, [load, version]);
+
+  // Tras cruzar de nuevo, la tarjeta y la ventana de revisión muestran el resultado al instante.
+  const replaceRow = (updated) => {
+    setRows((list) => list.map((r) => (r.id === updated.id ? updated : r)));
+    setCurrent((cur) => (cur && cur.id === updated.id ? updated : cur));
+  };
 
   useEffect(() => {
     api.get("/public/submissions/config").then(({ data }) => setPortal(data)).catch(() => setPortal(null));
@@ -220,6 +227,7 @@ export default function Submissions() {
                 )}
               </div>
               <SubmissionFields row={row} />
+              <SubmissionCrossCheck row={row} canRun={canReview} onUpdated={replaceRow} toast={toast} compact />
               {row.status !== "recibida" && (
                 <p style={{ fontSize: 12.5, color: "#64748B" }}>
                   {row.status === "aceptada" ? "Aceptada" : "Rechazada"} por {row.reviewed_by || "—"}
@@ -271,6 +279,7 @@ export default function Submissions() {
         {current && (
           <>
             <SubmissionFields row={current} />
+            <SubmissionCrossCheck row={current} canRun={canReview} onUpdated={replaceRow} toast={toast} />
             <Textarea id="submission-note" label="Nota de revisión (obligatoria si rechaza)" value={note} onChange={(e) => setNote(e.target.value)} />
           </>
         )}
