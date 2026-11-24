@@ -19,6 +19,8 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 | **Fuentes tipo E por validar**: aviso al entrar, contador junto a «Bandeja de entrada», tarjeta en la Bandeja de trabajo y validación paso a paso | [10.11](#1011-fuentes-de-consulta-manual-tipo-e-por-validar) |
 | **Catálogo en Excel**: libro con fuentes, consulta manual, resumen y retiradas (el CSV sigue disponible) | [8.3](#83-botones-de-la-barra-superior) |
 | **Cruce de postulaciones (RF-02-F)** con la vigilancia proactiva, registros oficiales (ClinicalTrials.gov, FDA, PubMed) y la web | [11.3](#113-cruce-con-la-vigilancia-y-la-web) |
+| **Captura más precisa**: el filtro sin IA ya no deja entrar texto de menús, leyendas, párrafos, páginas índice, empleos ni noticias no tecnológicas; la misma noticia no se repite por varios enlaces de una organización; Health Canada no trae productos de venta libre. **Depurar ruido** retira de la bandeja lo que ya había entrado | [10.12](#1012-depurar-ruido-de-captura) |
+| **«En varias fuentes» cuenta organizaciones**: dos enlaces del mismo sitio (por ejemplo dos páginas de la FDA) son una sola fuente | [10.7](#107-misma-tecnología-en-varias-fuentes-corroboración) |
 
 ### Novedades del 17 de noviembre de 2026 (III seguimiento)
 
@@ -855,7 +857,7 @@ La barra de filtros de la bandeja permite combinar:
 Cuando la misma tecnología aparece en fuentes distintas (por ejemplo FDA, EMA y Health Canada), la bandeja lo hace visible:
 
 - **Cómo se reconoce:** mismo identificador de ensayo (NCT), o nombre comercial / DCI equivalentes según el **umbral de similitud** de Configuración (el mismo del filtrado de duplicados; por defecto 85). Se ignoran mayúsculas, dosis y presentaciones.
-- **Qué cuenta:** solo fuentes **distintas**. Dos señales de la misma fuente son un duplicado, no una corroboración. Una postulación del canal reactivo cuenta como una fuente más. También cuenta una tecnología que ya está en un ciclo desde otra fuente.
+- **Qué cuenta:** solo **organizaciones distintas**. Dos señales de la misma fuente, o de dos enlaces del mismo sitio (el inventario tiene varios enlaces de la FDA, de BD o de Abbott), son la misma fuente vista dos veces, no una corroboración. Una postulación del canal reactivo cuenta como una fuente más. También cuenta una tecnología que ya está en un ciclo desde otra fuente.
 - **Qué cambia:** cada fuente adicional suma **5 puntos al orden** de la bandeja (máximo 15). Así lo que se repite se revisa primero.
 - **Qué no cambia:** el cribado, el %P y la clasificación. **Repetirse no es importancia clínica**: la priorización oficial sigue siendo P1–P6.
 - **Filtro:** casilla **Solo detectadas en varias fuentes**.
@@ -895,6 +897,16 @@ Las fuentes de nivel de acceso **E** (bases con licencia, portales con usuario o
 5. La fuente sale de la lista hasta su próxima revisión según su frecuencia; si no se pudo consultar, vuelve a aparecer al día siguiente.
 
 Cada validación queda en la bitácora (quién, cuándo, resultado, nota y señales registradas). El Excel del catálogo trae la hoja «Consulta manual (tipo E)» con el estado de todas.
+
+### 10.12 Depurar ruido de captura
+
+La vigilancia sin IA lee páginas y decide con reglas qué es una señal. Esas reglas se afinaron el 24 de noviembre de 2026: ya no entran textos de menú, leyendas de tablas, párrafos, páginas índice, ofertas de empleo ni noticias que no hablan de una tecnología. Lo que había entrado antes se retira con **Depurar ruido** (botón de la Bandeja de entrada; solo lo ve quien administra la configuración):
+
+1. Pulse **Depurar ruido**. El sistema revisa las señales sin asignar y muestra cuántas no son tecnologías, agrupadas por motivo, con ejemplos. Todavía no cambia nada.
+2. Revise la lista. Si está de acuerdo, pulse **Pasar N a Descartadas**.
+3. Las señales pasan a la pestaña **Descartadas** con el motivo «Ruido de captura: …». No se borran: desde esa pestaña se restauran.
+
+Usa exactamente el mismo criterio que la captura: no descarta nada que hoy entraría. Solo toca señales proactivas sin asignar; las postulaciones y lo que ya está en un ciclo no se tocan.
 
 ### 10.10 Bandeja Legacy
 

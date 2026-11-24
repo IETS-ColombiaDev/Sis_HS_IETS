@@ -399,3 +399,64 @@ Las celdas que empiezan por `=`, `+`, `-` o `@` se escriben como texto, para evi
 - Verificar en el sistema desplegado: Sondear todas, Ubicar señales exactas y una postulación de prueba.
 - El resaltado de la señal depende del navegador: funciona en Chrome, Edge, Safari y Firefox recientes. En los demás abre la página sin resaltar.
 - Sin IA, algunas «señales» de pipelines y portafolios son texto de la página y no productos (p. ej. «Identify and monitor side effects» en Merck). El enlace las ubica bien; el ruido es del filtro de captura y conviene revisarlo aparte.
+
+---
+
+## Auditoría del Módulo 0 (24-11-2026)
+
+**Estado:** CUMPLIDO PARCIAL, 24-11-2026. Auditoría sobre el código que va en el PR de `develop` a `main`, con corridas reales contra los sitios en una copia local (Firestore apagado). Falta la verificación en el sistema desplegado.
+
+**Qué se revisó:** vigilancia completa, sondas, enlaces, bandeja, fuentes tipo E, postulaciones, exportaciones, permisos de los endpoints nuevos, migración y concurrencia (sondeo de las 141 fuentes mientras corre la vigilancia: sin bloqueos de base ni errores).
+
+### Hallazgos y correcciones
+
+**1. Ruido en la captura sin IA (precisión).** De las 645 señales web de la corrida, 255 no eran tecnologías:
+- menús desplegables (Swissmedic, MFDS);
+- advertencias de seguridad de un dispositivo (Abbott, 46);
+- leyendas y controles de tablas (Merck);
+- páginas índice («2026 Biological Approvals»);
+- ofertas de empleo (Bayer, por el respaldo de Google News);
+- títulos del propio sitio (NEJM);
+- noticias corporativas, jurídicas o políticas;
+- páginas educativas, eventos y webinars.
+
+Se agregaron reglas a `scraper.py`, cada una con su caso real en el comentario y en las pruebas: `never_a_signal` (también aplica a filas de pipeline), `is_prose`, `is_menu_dump`, `_INDEX_PAGE`, `_JOB_AD`, `_EVENT_PAGE`, `_ADVERSE_BULLET`, `_EDUCATIONAL` y ampliaciones de `_CORPORATE`, `_ADMIN_PAGE` y de las palabras genéricas. El criterio quedó en una sola función, `capture_noise_reason`, que usan la captura y la depuración.
+
+**2. La misma señal repetida por varios enlaces de una organización.** Con el inventario por enlace, BD traía la misma lista de noticias en sus tres fuentes y Abbott en dos. Ahora, al guardar, si el mismo ítem (mismo título y misma URL) ya entró por otra fuente del mismo dominio, no se repite (`sibling_source_ids`).
+
+**3. Corroboración inflada.** «En varias fuentes» contaba cada enlace como una fuente: dos páginas de la FDA con la misma tecnología sumaban como dos fuentes y daban bono de orden. Ahora el origen es la organización (`corroboration.org_host`: `accessdata.fda.gov` y `www.fda.gov` son `fda.gov`). El cálculo se rehace solo en la siguiente consulta de la bandeja.
+
+**4. Health Canada traía productos de consumo.** El registro DPD clasifica como medicamento los protectores solares, enjuagues y antigripales de venta libre («COOLA ANTI-AGING HAND CREAM», «DAYQUIL»). Se filtran por principio activo (`is_consumer_product`): si todos los activos son de consumo o de venta libre, no entra. Con la API real, de 47 productos quedaron 35, todos medicamentos de prescripción o biológicos.
+
+**5. El ruido que ya estaba en la bandeja.** Las reglas nuevas solo actúan sobre capturas futuras. Se agregó `reprocess_noise` (`POST /api/ingest/reprocess?target=ruido`, sin `apply` simula) y el botón **Depurar ruido** en la Bandeja de entrada, visible para quien administra la configuración. Pasa a Descartadas, con motivo y bitácora, lo que hoy no entraría: ruido, repetidas y productos de consumo. No borra nada y se puede restaurar. No entra en `target=all`.
+
+**6. Costo del cruce de postulaciones.** Comparar contra todo el acervo dentro de la petición del formulario público costaba 0,28 s de CPU con 939 tecnologías (unos 3 s en Render, y crecía con la base). Un prefiltro por nombre y NCT deja solo las candidatas; el resultado es idéntico al exhaustivo (240 casos, 0 diferencias) y cinco veces más rápido. Además, el cruce ahora reconoce el NCT que la persona cita en sus enlaces de evidencia.
+
+### Resultado medido
+
+Vigilancia completa real con el código final (115 fuentes, una a la vez, sin IA), comparada con la del mismo día antes de la auditoría:
+
+| | Antes | Después |
+|---|---|---|
+| Fuentes terminadas / con error | 115 / 0 | 115 / 0 |
+| Tiempo total | 20 min | 20,5 min |
+| Señales capturadas | 935 | 651 |
+| Señales web que eran ruido | 255 de 645 | 15 de 375 (casos de Swissmedic y Bayer cubiertos por el último ajuste de reglas) |
+| Mismo ítem repetido entre fuentes de una organización | 27 | 0 |
+| Señales marcadas «en varias fuentes» | 184 | 14 (organizaciones distintas) |
+| Con enlace exacto o que abren y resaltan la señal | 930 de 935 | 648 de 651 |
+
+Sondeo de las 141 fuentes lanzado mientras corría la vigilancia: terminó sin bloqueos de base ni errores (139 verdes, 2 rojas). Sobre la base anterior, **Depurar ruido** retira 301 de 935 señales (ruido, repetidas y productos de venta libre) y una segunda pasada no cambia nada.
+
+**Pruebas:** backend 825 aprobadas (103 del Módulo 0, con 51 títulos reales de ruido que ya no entran y 18 señales reales que siguen entrando); navegador 101 de 101; integración continua de GitHub en verde para el commit anterior (pytest, Alembic, PostgreSQL 15, imagen Docker, frontend y prueba de humo).
+
+### Cómo aplicarlo en el sistema desplegado
+
+1. Después del despliegue, en **Bandeja de entrada** pulse **Depurar ruido**, revise la lista y confirme.
+2. Corra una vigilancia completa: las fuentes de una misma organización ya no repiten señales y el ruido no vuelve a entrar.
+3. El indicador «En varias fuentes» se recalcula solo al abrir la bandeja.
+
+### Pendientes y limitaciones
+
+- El filtro sin IA es de reglas: prioriza no dejar entrar ruido. Puede perder algún titular legítimo redactado como pregunta o como frase larga sin nombre de producto. Con la IA activa, la IA decide.
+- Quedan señales de calidad media que no son ruido claro, como artículos de divulgación de noticias generales. Decidir si se conservan es criterio metodológico del equipo técnico.
