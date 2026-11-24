@@ -10,6 +10,16 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
 
+### Novedades del 24 de noviembre de 2026 (pendientes del Módulo 0)
+
+| Qué cambió | Dónde leerlo |
+|---|---|
+| **La señal exacta (RF-001)**: (Ubicar señales exactas) busca cada señal de «página de consulta» en su página. Si la página la enlaza, la señal pasa a (Enlace exacto); si la fuente la publica en una tabla sin enlace propio, el botón (Abrir la página y resaltar la señal) abre la página en el punto exacto. El **Diagnóstico para la matriz** dice qué fuentes debe mejorar el equipo técnico en la matriz y cómo | [10.9](#109-enlace-a-la-fuente-original-y-evidencia-de-captura) y [14.3](#143-reporte-de-enlaces-por-fuente) |
+| **Sondear todas**: prueba las 141 fuentes del inventario en segundo plano y deja su informe en Excel | [8.3](#83-botones-de-la-barra-superior) y [8.11](#811-sondear-todas-las-fuentes-paso-a-paso) |
+| **Fuentes tipo E por validar**: aviso al entrar, contador junto a «Bandeja de entrada», tarjeta en la Bandeja de trabajo y validación paso a paso | [10.11](#1011-fuentes-de-consulta-manual-tipo-e-por-validar) |
+| **Catálogo en Excel**: libro con fuentes, consulta manual, resumen y retiradas (el CSV sigue disponible) | [8.3](#83-botones-de-la-barra-superior) |
+| **Cruce de postulaciones (RF-02-F)** con la vigilancia proactiva, registros oficiales (ClinicalTrials.gov, FDA, PubMed) y la web | [11.3](#113-cruce-con-la-vigilancia-y-la-web) |
+
 ### Novedades del 17 de noviembre de 2026 (III seguimiento)
 
 | Qué cambió | Dónde leerlo |
@@ -246,7 +256,7 @@ Contrato de datos (no confundir con “nivel de fuente” primaria/secundaria):
 | **D** | Página que solo confirma: se lee como texto y no pisa datos de A/B |
 | **E** | Curaduría humana: login, pago o captcha; la consulta la hace una persona |
 
-Indica **cómo** se obtiene el dato, no qué tan importante es la fuente. A y B se prueban en lote con **Sondear A/B**; si dos fuentes se contradicen, prevalece el nivel más alto.
+Indica **cómo** se obtiene el dato, no qué tan importante es la fuente. Todo el inventario se prueba en lote con **Sondear todas** (o solo A y B con **Solo A/B**); si dos fuentes se contradicen, prevalece el nivel más alto.
 
 ### 4.3 Nivel de fuente (matriz EH)
 
@@ -496,7 +506,7 @@ Resultado de la última **sonda** (prueba sin guardar señales). Interprete:
 | Verde | Responde y el formato coincide | Seguir vigilando |
 | Ámbar | Responde pero cambió el formato o vino vacío | Revisar; la ingesta puede suspenderse |
 | Rojo | No responde | Revisar URL, red, o apagar temporalmente |
-| Sin sonda | Nunca se ha probado | Ejecutar Sonda o «Sondear A/B» |
+| Sin sonda | Nunca se ha probado | Ejecutar Sonda o «Sondear todas» |
 
 #### Cobertura
 
@@ -506,13 +516,23 @@ Tecnologías que aparecen en fuentes de **contraste** y no están en el ciclo. C
 
 | Botón | Quién | Qué hace |
 |---|---|---|
-| **CSV** | Quien consulta | Descarga el listado (incluye matriz y flujo). Separado por punto y coma y en UTF-8: abre con doble clic en Excel, en columnas y con tildes |
-| **Sondear A/B** | Vigilancia | Sonda masiva de niveles A y B |
+| **Descargar Excel** | Quien consulta | Descarga el catálogo en Excel (`.xlsx`): hoja **Fuentes** (una fila por fuente activa, con filtros, hipervínculos, estado de la sonda y señales capturadas), **Consulta manual (tipo E)** (estado de validación), **Resumen** (conteos por nivel de acceso, nivel de fuente, tipo de tecnología, adaptador y salud), **Retiradas** e **Información** |
+| **CSV** | Quien consulta | El mismo listado en texto separado por punto y coma (UTF-8), para otros programas |
+| **Sondear todas** | Vigilancia | Prueba todas las fuentes activas en segundo plano, de a varias a la vez (ver 8.11) |
 | **Recargar catálogo** | Escritura | Reaplica el catálogo verificado D-06 y la matriz que ya está cargada en el sistema (no pide archivo): crea las fuentes oficiales que falten, actualiza sus datos y URL de la matriz, retira las que ya no están en el catálogo y **conserva** lo que el equipo editó y las fuentes registradas a mano. No borra señales (ver 8.7) |
 | **Cargar matriz** | Escritura | Sube el Excel de la matriz (MATRIZ_FUENTES_ESCANEO_EH, `.xlsx`) o una hoja de Google Sheets, la valida y muestra la vista previa de diferencias antes de aplicar (ver 8.10) |
 | **Detectar fuentes con IA** | Escritura | Busca en la web sitios de escaneo de horizonte que aún no están en el catálogo y los propone (ver 8.8) |
 | **Alta rápida** | Escritura | Nombre + URL en minutos |
 | **Agregar fuente** | Escritura | Formulario completo |
+
+### 8.11 Sondear todas las fuentes (paso a paso)
+
+1. En el Catálogo de fuentes pulse **Sondear todas**. El sistema pasa a la pestaña **Salud de fuentes**.
+2. La sonda corre en el servidor, de a seis fuentes a la vez: puede seguir trabajando. El avance (fuentes probadas, verdes, ámbar y rojas) se actualiza solo.
+3. Al terminar aparece el resumen. Pulse **Informe de sondas (Excel)**: trae cada fuente con su estado, el detalle y la **acción sugerida**, con las rojas y ámbar primero.
+4. Lleve al equipo técnico las fuentes rojas o con «la dirección principal ya no existe»: hay que corregir su URL en la matriz o pasarlas a consulta manual.
+
+**Solo A/B** prueba solo las fuentes de nivel A y B. La sonda no modifica señales; deja el estado en la fuente y una entrada en la bitácora.
 
 ### 8.4 Alta rápida (paso a paso)
 
@@ -850,10 +870,31 @@ En el panel (Origen de la señal) y en la ficha de la señal el enlace lleva una
 | Etiqueta | Qué significa | Qué hacer |
 |---|---|---|
 | **Enlace exacto** | La URL lleva a la ficha, artículo, documento o registro de la señal | Pulse (Abrir la señal en la fuente) |
-| **Página de consulta, la fuente no ofrece enlace directo** | La fuente publica la señal en un listado, buscador, tabla de pipeline o portada sin enlace propio por ítem | Lea la **Evidencia de captura** (título, fragmento, fecha y hora, URL consultada) y busque ese texto en la página con (Abrir la página de consulta) |
+| **Página de consulta, la fuente no ofrece enlace directo** | La fuente publica la señal en un listado, buscador, tabla de pipeline o portada sin enlace propio por ítem | Si aparece **(Abrir la página y resaltar la señal)**, púlselo: abre la página y el navegador se desplaza a la señal y la resalta (Chrome, Edge, Safari y Firefox recientes). Si no aparece, lea la **Evidencia de captura** (título, fragmento, fecha y hora, URL consultada) y busque ese texto con (Abrir la página de consulta) |
 | **Sin enlace** | La señal no trae URL | Use la evidencia de captura |
 
 Si la verificación de enlaces encontró que la URL no responde o redirige a la portada, aparece además la marca (No responde) o (Redirige a otra página).
+
+**Cómo se ubica la señal exacta.** Al capturar, y cuando alguien pulsa (Ubicar señales exactas) en Señales capturadas (ver 14.3), el sistema busca cada señal de «página de consulta» en su página: si la página tiene un enlace con el nombre de la señal (o declara la URL del producto en sus datos estructurados, como los pipelines de Novartis), la señal pasa a **Enlace exacto** y la URL anterior queda en la evidencia; si no, y el nombre está en la página, arma el enlace que la resalta. Nunca inventa un enlace: si no encuentra la señal, lo dice y deja la evidencia.
+
+### 10.11 Fuentes de consulta manual (tipo E) por validar
+
+Las fuentes de nivel de acceso **E** (bases con licencia, portales con usuario o captcha, por ejemplo Scopus, Embase, Synapse o IHSI) no entran a la vigilancia automática: una persona del equipo las consulta en su navegador según la frecuencia de la matriz (semanal, salvo que la matriz diga otra). Para que no se pierdan de vista:
+
+- **Al entrar** al sistema, quien tiene permiso de la bandeja ve la ventana **«Por favor valide manualmente estas fuentes»** con las pendientes. (Validar ahora) lleva a la Bandeja de entrada; (Más tarde) la cierra hasta la próxima sesión.
+- **En el menú**, junto a «Bandeja de entrada», un contador naranja dice cuántas están por validar.
+- **En la Bandeja de entrada**, un aviso amarillo arriba con el botón (Validar ahora).
+- **En la Bandeja de trabajo**, la tarjeta «Fuentes tipo E por validar».
+
+**Paso a paso:**
+
+1. Pulse (Validar ahora). Se abre la lista: primero las nunca validadas y las vencidas.
+2. En cada fuente lea **Qué consultar** y **Restricciones**, y pulse (Abrir la fuente). Haga la consulta con su usuario institucional.
+3. Por cada tecnología nueva que encuentre pulse (Registrar señal encontrada): nombre, enlace exacto, tecnología, tipo y resumen. Queda en la bandeja con esa fuente.
+4. Elija el **Resultado de la consulta**: «Consultada, sin novedades», «Consultada, con señales registradas» o «No se pudo consultar» (en este caso escriba el motivo). Pulse (Marcar como validada).
+5. La fuente sale de la lista hasta su próxima revisión según su frecuencia; si no se pudo consultar, vuelve a aparecer al día siguiente.
+
+Cada validación queda en la bitácora (quién, cuándo, resultado, nota y señales registradas). El Excel del catálogo trae la hoja «Consulta manual (tipo E)» con el estado de todas.
 
 ### 10.10 Bandeja Legacy
 
@@ -895,10 +936,23 @@ Los valores se muestran en español («Inyectable», «Subcutánea»…). Nunca 
 1. Abra Postulaciones.  
 2. Filtre por “recibida”.  
 3. Lea el contenido y el COI. La tarjeta y la ventana de revisión muestran todos los campos que diligenció la persona; los vacíos aparecen como «—».  
-4. **Aceptar** → la tecnología entra a la bandeja como **reactiva** (aún debe clasificarse/asignarse).  
-5. **Rechazar** → escriba el motivo; queda en bitácora.
+4. Revise el **Cruce con la vigilancia y la web** (ver 11.3): dice si la vigilancia ya detectó la tecnología y qué registros oficiales la mencionan.
+5. **Aceptar** → la tecnología entra a la bandeja como **reactiva** (aún debe clasificarse/asignarse). Lo que mostraba el cruce queda guardado con la tecnología.
+6. **Rechazar** → escriba el motivo; queda en bitácora.
 
 No acepte postulaciones incompletas “para salir del paso”: contaminan filtrado y priorización.
+
+### 11.3 Cruce con la vigilancia y la web
+
+Cada postulación se cruza sola al llegar (RF-02-F); el botón (Cruzar de nuevo) repite el cruce cuando quiera.
+
+| Bloque | Qué muestra | Cómo se obtiene |
+|---|---|---|
+| **Vigilancia proactiva** | Las señales del sistema que corresponden a la misma tecnología, con su fuente, su estado y el enlace a la señal exacta (o el que abre la página y la resalta) | Mismo comparador del Filtrado (NCT compartido o nombre/DCI sobre el umbral). También cuenta cuando el nombre postulado aparece completo en el de la señal («Lutathera» en «Lutathera (AAA601)») |
+| **Registros oficiales** | Fichas de ClinicalTrials.gov, FDA (medicamentos y dispositivos 510k) y PubMed que mencionan el nombre comercial o la DCI | Consulta directa a las API públicas de esos registros |
+| **Web** | Resultados de los buscadores configurados que **mencionan** la tecnología; los oficiales y los del catálogo van marcados | Los buscadores devuelven a veces resultados ajenos: el sistema descarta los que no mencionan la tecnología y dice cuántos descartó |
+
+El cruce no acepta ni rechaza: es evidencia para decidir. Si la vigilancia ya la detectó, al aceptarla la bandeja la marcará «En varias fuentes».
 
 ---
 
@@ -1075,7 +1129,19 @@ Arriba de la lista pulse (Reporte de enlaces). Muestra, por fuente, cuántas se�
 
 - (Clasificar señales): vuelve a clasificar todas las señales y guarda su evidencia de captura. No cambia ninguna URL. Queda en bitácora.
 - (Verificar enlaces): abre cada enlace en segundo plano y marca los que no responden o redirigen a la portada. Tarda unos minutos; el avance aparece en el mismo panel. Queda en bitácora.
-- (Descargar CSV): el reporte por fuente para Excel.
+- (Ubicar señales exactas): busca cada señal de «página de consulta» en su página y la lleva a enlace exacto o a enlace que la resalta (ver 10.9). Corre en segundo plano y muestra cuántas ubicó. Queda en bitácora.
+- (Diagnóstico en Excel) y (CSV): el reporte por fuente para el equipo técnico.
+
+La pestaña **Diagnóstico para la matriz** dice, por fuente, si hay que **mejorar la matriz** y cómo:
+
+| Diagnóstico | ¿Cambiar la matriz? | Qué hacer |
+|---|---|---|
+| Enlaces exactos | No | Nada |
+| La fuente no tiene enlace por ítem | No | Nada: el sistema abre la página y resalta la señal |
+| Actualizar la URL en la matriz | **Sí** | La URL no responde, redirige o ya no existe: registre la dirección vigente |
+| La matriz apunta a la portada | **Sí** | Registre la URL de la sección donde se publican las novedades |
+| La matriz apunta a un buscador | **Sí** | Registre un listado fijo, un canal RSS o una descarga oficial |
+| La señal no se puede ubicar en la página | **Sí** | La página carga con JavaScript o cambió: registre una URL más específica o pase la fuente a consulta manual |
 
 Requieren permiso de edición de señales; consultar y descargar está abierto a todos los perfiles.
 

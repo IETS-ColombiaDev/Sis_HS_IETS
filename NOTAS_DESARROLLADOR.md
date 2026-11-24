@@ -325,3 +325,77 @@ Simulación sobre la copia de la base local (124 fuentes, 1.126 señales): se cr
 **Resultado (misma máquina, mismas 115 fuentes):** de 37 a 20 minutos y de 467 a 127 s de CPU (−73 %), 115 de 115 terminadas, 0 errores, 935 señales (936 antes; la diferencia es variación de los sitios).
 
 **Pendiente:** confirmar en Render con una corrida completa; si vuelve a detenerse, revisar en los registros de Render si hubo reinicio por memoria ("Out of memory") o por la verificación de salud.
+
+---
+
+## Pendientes del Módulo 0 (24-11-2026)
+
+**Estado:** CUMPLIDO PARCIAL, 24-11-2026. Implementado, con pruebas automáticas (backend y navegador) y verificado contra los sitios reales sobre una copia local de la base de la vigilancia del 24-11-2026 (141 fuentes, 935 señales). Falta verificarlo en el sistema desplegado.
+
+### 1. RF-001: que el enlace lleve a la señal exacta
+
+**Qué se hizo.** Módulo nuevo `backend/app/link_resolver.py`. Para cada señal en «página de consulta»:
+1. Busca en la página un enlace cuyo texto sea el nombre de la señal, o la URL del producto declarada en los datos estructurados (JSON-LD). Si la encuentra, la señal pasa a **enlace exacto** y la URL anterior queda en `evidence.resolved.previous_url`. Si dos fichas distintas tienen el mismo nombre, desempata por el contexto (indicación o fase); si no puede, no adivina.
+2. Si la fuente no tiene enlace por ítem (tablas de pipeline) y el nombre está en la página, guarda en `evidence.locator_url` un enlace con fragmento de texto (`#:~:text=`). Ese enlace abre la página y el navegador resalta la señal.
+3. Si no la encuentra, lo dice (`evidence.resolved.reason`) y conserva la evidencia de captura.
+
+Corre en la captura, sin descargas extra (usa el HTML que el rastreo ya tiene), y a demanda con (Ubicar señales exactas) en segundo plano. El **Diagnóstico para la matriz** dice por fuente si el equipo técnico debe mejorar la URL (portada, buscador, URL caída o contenido que carga con JavaScript) o si la fuente no ofrece enlace por ítem. Endpoints: `POST /api/findings/links/resolve`, `GET /api/findings/links/resolve/state`, `GET /api/findings/links/diagnosis` y `GET /api/findings/links/diagnosis.xlsx`.
+
+**Resultado sobre las 935 señales reales:** de las 178 en página de consulta, 25 pasaron a enlace exacto, 148 abren la página resaltando la señal y 5 quedan sin ubicar. En total, 930 de 935 llevan a la señal exacta o al punto de la página donde está. Las 20 de Novartis entran con la URL propia de cada producto e indicación (p. ej. `…/novartis-pipeline#AAA601-GEPNETpediatrics`). Se verificó también en una captura real de Novartis, AstraZeneca y Merck.
+
+**Fuentes en las que conviene mejorar la matriz** (diagnóstico más sondas):
+- **Reuters Salud** (`reutershealth.com`): el sitio ya no publica (HTTP 401 y nada en Google News). Hay que registrar una URL vigente o retirar la fuente.
+- **CTRI India**: rechaza la conexión desde fuera de la India. Hay que validar desde Render; si sigue igual, pasarla a consulta manual.
+- **AIFA** (dos enlaces con ruta `#/…`) y **Boehringer Ingelheim**: la página carga su contenido con JavaScript y la señal no se puede ubicar. Hay que registrar una URL más específica (listado, RSS o descarga) o pasarlas a consulta manual.
+
+### 2. Sondas de las 141 fuentes
+
+**Qué se hizo.** «Sondear A/B» corría dentro de la petición y solo probaba 7 fuentes. Ahora **Sondear todas** corre en segundo plano, de a seis fuentes a la vez, y la pantalla muestra el avance (`POST /api/ingest/probe/run`, `GET /api/ingest/probe/status`). El **Informe de sondas (Excel)** (`GET /api/ingest/probe/report.xlsx`) lista cada fuente con su estado, el detalle y la acción sugerida, con las rojas primero.
+
+**Resultado (corrida real, 24-11-2026):** 141 fuentes en 68 segundos. 139 verdes y 2 rojas (CTRI y Reuters, ver arriba). Entre las verdes, 24 bloquean robots (HTTP 403) y 7 no respondieron en su portada; todas entran por su ruta de respaldo oficial.
+
+### 3. Fuentes tipo E por validar
+
+**Qué se hizo.** Módulo `backend/app/manual_review.py`: lista las fuentes E activas y marca como «por validar» las que nunca se validaron o cuya fecha de próxima revisión (`sources.next_review_due`) ya llegó. La frecuencia sale de la matriz (semanal). Registrar una validación (resultado, nota y señales registradas) fija la próxima revisión y deja la constancia en la bitácora (acción `manual_review`). No se creó ninguna tabla. Se ve en cuatro lugares:
+- un aviso al entrar, una vez por sesión, que no se apila con la guía de bienvenida;
+- un contador junto a «Bandeja de entrada» en el menú;
+- un aviso amarillo en la Bandeja de entrada con la ventana de validación;
+- la tarjeta «Fuentes tipo E por validar» en la Bandeja de trabajo del superadministrador y del evaluador técnico.
+
+Desde la ventana se registran las señales encontradas (`POST /api/findings`, que ahora valida tipo, horizonte y título). Inventario actual: 8 fuentes E (Boston Scientific ×2, EMA ×2, Scopus, Synapse, Embase, IHSI).
+
+### 4. Catálogo en Excel
+
+`GET /api/sources/export.xlsx` (botón «Descargar Excel»). El libro trae estas hojas:
+- **Fuentes:** filtros, panel fijo, hipervínculos, estado de la sonda y señales capturadas;
+- **Consulta manual (tipo E);**
+- **Resumen:** conteos por nivel de acceso, nivel de fuente, tipo de tecnología, adaptador y salud;
+- **Retiradas;**
+- **Información.**
+
+Las celdas que empiezan por `=`, `+`, `-` o `@` se escriben como texto, para evitar inyección de fórmulas. El CSV sigue disponible. El generador compartido está en `backend/app/xlsx_report.py`.
+
+### 5. RF-02-F: cruce de postulaciones con la búsqueda proactiva y la web
+
+**Qué se hizo.** Módulo `backend/app/submission_crosscheck.py` y migración reversible `0007` (`submissions.cross_check`). Al llegar, cada postulación se cruza con la vigilancia de inmediato; la parte web se completa en segundo plano. El evaluador puede repetir el cruce (`POST /api/submissions/{id}/cross-check`). Lo que vio queda guardado con la tecnología al aceptarla.
+- **Vigilancia:** usa el comparador del filtrado y una regla de nombre contenido («Lutathera» en «Lutathera (AAA601)»; una palabra genérica sola no cuenta). Cada coincidencia trae el enlace a la señal exacta.
+- **Registros oficiales por API:** ClinicalTrials.gov, FDA (Drugs@FDA y 510k) y PubMed.
+- **Web:** solo se muestran los resultados de los buscadores que mencionan la tecnología.
+
+**Por qué los registros oficiales:** en la prueba real, Yahoo y DuckDuckGo bloquearon y **Bing devolvió resultados ajenos, incluso contenido para adultos**, ante consultas que no reconocía. El filtro de pertinencia los descarta todos y la interfaz informa cuántos descartó.
+
+**Resultado real:**
+- «Lutathera» (Novartis) coincide con sus 2 señales del pipeline de Novartis, con enlace exacto. En los registros trae 3 ensayos de ClinicalTrials.gov, la ficha LUTATHERA NDA208700 de la FDA y artículos de PubMed.
+- «Zilovertamab vedotin» coincide con la señal del pipeline de Merck y trae 3 ensayos de ClinicalTrials.gov.
+
+### Cómo se verificó
+
+- Backend: 29 pruebas nuevas en `backend/tests/test_modulo0_pendientes.py`. Suite completa en verde.
+- Navegador: `frontend/e2e/modulo0_pendientes.spec.js` (aviso de entrada y validación de una fuente E, descargas en Excel, diagnóstico de enlaces y cruce de postulaciones). Se ajustó `onboarding.spec.js` porque el aviso aparece al cerrar la guía. Suite E2E completa en verde.
+- Corridas reales contra los sitios sobre una copia local de la base, con Firestore apagado. No se tocó la base de producción.
+
+### Pendientes y limitaciones
+
+- Verificar en el sistema desplegado: Sondear todas, Ubicar señales exactas y una postulación de prueba.
+- El resaltado de la señal depende del navegador: funciona en Chrome, Edge, Safari y Firefox recientes. En los demás abre la página sin resaltar.
+- Sin IA, algunas «señales» de pipelines y portafolios son texto de la página y no productos (p. ej. «Identify and monitor side effects» en Merck). El enlace las ubica bien; el ruido es del filtro de captura y conviene revisarlo aparte.
