@@ -34,6 +34,8 @@ export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, ev
   // señal está en la página: el enlace abre la página y el navegador la resalta.
   const locatorUrl = linkType !== "exacto" ? evidence?.locator_url : "";
   const resolved = evidence?.resolved || null;
+  // Fuentes que bloquean robots se leen por su canal en Google Noticias: el enlace redirige al artículo.
+  const viaNews = /^https?:\/\/news\.google\.com\//i.test(url || "");
   return (
     <div className="sl-box" data-testid="signal-link-info">
       <div className="sl-row">
@@ -89,6 +91,22 @@ export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, ev
               .
             </>
           )}
+        </div>
+      )}
+      {viaNews && !compact && (
+        <div className="sl-muted" data-testid="signal-link-news">
+          Este enlace pasa por Google Noticias y redirige al artículo original de la fuente. Allí, busque el título de la
+          señal (Ctrl+F) para ubicarla.
+        </div>
+      )}
+      {linkType === "exacto" && resolved?.method === "enlace_del_registro" && !compact && (
+        <div className="sl-muted" data-testid="signal-link-registry">
+          Enlace exacto a la ficha del producto en el registro oficial.
+        </div>
+      )}
+      {linkType === "exacto" && evidence?.snippet && evidence.is_quote && !compact && (
+        <div className="sl-muted" data-testid="signal-link-quote">
+          Texto de la señal en la fuente: «{evidence.snippet}». El enlace abre la página y el navegador resalta ese texto.
         </div>
       )}
       {showEvidence && (

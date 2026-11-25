@@ -612,3 +612,102 @@ Los dos botones existían, pero escondidos:
 - El mapa del sitio no cubre todas las fuentes: hay sitios que no lo publican o que lo publican sin páginas relacionadas. Esas fuentes se siguen leyendo por su página principal y sus URL de entrada, como antes.
 - El conteo de señales del paquete inicial se hizo con el extractor por reglas, sin IA. Es una estimación para ordenar las páginas; la vigilancia real lo corrige con cada visita.
 - El paquete se debe refrescar cada cierto tiempo (el script se puede volver a correr) o complementar con una llave de buscador.
+
+## II seguimiento del Módulo 0: bandeja que no se cae y señal exacta sin botón (25-11-2026, versión 7.3.1)
+
+**Estado:** CUMPLIDO PARCIAL, 25-11-2026. Probado en local (suite de backend, suite de navegador y verificación contra los sitios reales sobre una copia de la base de la vigilancia: 141 fuentes y 651 señales). Falta la verificación en el sistema desplegado, que solo se puede hacer después del despliegue.
+
+Responde a la columna «II Seguimiento» del consolidado de observaciones del Módulo 0. Se revisó cada ítem marcado VALIDADO y se atendieron los PENDIENTES de RF-001-A.
+
+### 1. Ítems VALIDADO: se comprobó que siguen funcionando
+
+Comprobados por API sobre la copia de la base real (`scratchpad/seg2/verif.py`) y por las pruebas automáticas:
+
+| Ítem | Qué se comprobó | Resultado |
+|---|---|---|
+| OBS-001-B/C | Ninguna fuente expone prioridad; el CSV no trae la columna | 0 fuentes con valor; sin columna |
+| OBS-002-A | La matriz se compara y se carga desde Catálogo de fuentes | 142 filas leídas; 141 sin cambios, 0 nuevas, 0 faltantes |
+| RF-002-A | Misma tecnología en varias fuentes, con bono | 16 corroboradas; indicador y filtro coinciden; bono = 5 por fuente adicional, máximo 15 |
+| RF-003-A | Datos de producto en la bandeja | fabricante en 226 de 500, forma farmacéutica en 50, concentración en 40, marca en 31, vía en 31 |
+| RF-004-A | Descarte con motivo obligatorio y por grupo | sin motivo o en blanco: rechazo (422); lote de 3 con motivo: aceptado, queda en Descartadas y se restaura |
+| RF-005-A | Buscador con el estado de la tecnología | responde con nombre, fabricante, fuente y etapa |
+| RF-006-A | Criterios de búsqueda por categoría | panel y parámetros vigentes |
+| Pregunta 4 | CSV legible del catálogo | punto y coma, 21 columnas, UTF-8 con BOM; también en Excel |
+| Pregunta 5 | Recarga del catálogo por el equipo | misma comprobación de OBS-002-A |
+
+Nada de lo validado cambió de comportamiento.
+
+### 2. RF-001-A (25/11): bandeja de entrada vacía con error del servidor y bandeja de trabajo que no cargaba
+
+**Causas encontradas en el código** (no se puede ver el sistema desplegado desde el desarrollo; estas son las que explican el síntoma):
+
+1. La Bandeja de entrada recalculaba la corroboración entre fuentes **en cada consulta** mientras hubiera vigilancia, porque el acervo cambia con cada señal nueva, y **escribía en la base** al mismo tiempo que la vigilancia. En Render (un proceso, SQLite, CPU limitada) la consulta tardaba o fallaba con «database is locked».
+2. Cuando el listado fallaba, la pantalla mostraba **«La bandeja está vacía»** y solo un aviso pasajero. El listado y los indicadores se pedían juntos: si fallaba uno, se perdían los dos.
+3. Con el servicio recién despertado, la primera consulta supera el tiempo de espera del navegador.
+
+**Corrección:**
+
+- `corroboration.refresh_for_read` (nuevo). Con vigilancia en curso recalcula como mucho cada 3 minutos; si otro cálculo está en marcha no espera; si la base está ocupada, deshace y sirve el último cálculo. La Bandeja responde siempre.
+- Al terminar la vigilancia, el drenaje deja la corroboración al día (`refresh_after_scan`).
+- Bandeja de entrada (`Staging.jsx`): el listado y los indicadores van por separado. Si el listado no llega, la pantalla dice «No se pudo cargar la bandeja de entrada», aclara que **no está vacía**, reintenta sola cada 20 segundos (hasta 6 veces) y ofrece (Reintentar ahora). Si ya había señales en pantalla, las conserva y avisa.
+- El mensaje de tiempo agotado explica que el servidor puede estar iniciando.
+- La Bandeja de trabajo ya tenía pantalla de reintento; no cambió.
+
+### 3. RF-001-A (18/11): no se identificaba la señal exacta
+
+Se repitió la prueba aleatoria del equipo sobre la copia de la base (`scratchpad/seg2/muestra.py`, 50 señales con «enlace exacto», abriendo cada enlace). Hallazgos:
+
+| Hallazgo | Señales afectadas en la base | Corrección |
+|---|---|---|
+| Health Canada abría el buscador de la Drug Product Database, no la ficha | 36 | El conector arma la ficha con el código del producto: `…/dpd-bdpp/info?lang=eng&code=<drug_code>` |
+| FDA 510(k) abría el buscador de 510(k) | 10 | `…/cfPMN/pmn.cfm?ID=K…`; De Novo: `…/denovo.cfm?id=DEN…`; PMA con suplemento: `…/pma.cfm?id=P…S…` |
+| Genéricos de la FDA (ANDA) abrían una página vacía: la URL quedaba `ApplNo=A214272` | 22 | Solo los dígitos: `ApplNo=214272` |
+| El buscador de un registro oficial se presentaba como «Enlace exacto» | las anteriores | `signal_links.classify` reconoce esos buscadores como «página de consulta» |
+| El cruce de postulaciones enlazaba 510(k) con una ruta en minúsculas que el sitio rechaza (HTTP 400) | enlaces del cruce | Ruta corregida (`cfPMN`) |
+
+Los formatos se comprobaron contra los sitios el 25-11-2026.
+
+**Señales ya capturadas.** `link_resolver.repair_registry_links` corre en cada arranque: toma el identificador del registro original de cada señal y le pone la URL de su ficha. La URL anterior queda en `evidence.resolved.previous_url`. Es idempotente y deja una entrada en bitácora (`link_registry_repair`). En la copia de la base corrigió las 68 señales.
+
+**Sin botón.** `link_resolver.auto_start`, llamado por el vigilante de la cola cuando el sistema está libre, ubica solas las señales de «página de consulta» que nunca se intentaron ubicar. Cada señal se intenta una vez (un reinicio no repite descargas), máximo 3 corridas por proceso, nunca durante una vigilancia. `LINK_AUTO_RESOLVE=false` lo apaga. El botón (Ubicar señales exactas) sigue sirviendo para reintentar. En la copia de la base: 57 señales en 21 páginas, 8 segundos, 53 ubicadas con resaltado y 4 sin ubicar (2 de AIFA y 1 de Boehringer, que cargan con JavaScript, y 1 página que no respondió).
+
+**Menos memoria.** `resolve_all` descarga y procesa de a 8 páginas y suelta el HTML antes del lote siguiente (antes guardaba todas las páginas a la vez).
+
+**En pantalla.**
+
+- En la fila de la Bandeja de entrada, el icono del enlace abre la página **resaltando la señal** cuando ya está ubicada (icono de lupa).
+- Sin cita textual, el enlace pide resaltar el **nombre de la tecnología**. Si la página lo trae, el navegador lo marca; si no, abre igual. Con nombres del tipo «MARCA (principio activo)» se usa la marca.
+- El detalle muestra, para un enlace exacto con cita, el texto que se resalta; para una ficha de registro oficial, lo dice; y para un enlace que pasa por Google Noticias, avisa que redirige al artículo.
+
+**Resultado sobre las 651 señales de la copia:** 594 con enlace exacto, 53 abren la página resaltando la señal y 4 sin ubicar.
+
+### 4. Lo que la prueba aleatoria muestra y no se pudo cerrar
+
+De 50 señales con enlace exacto tomadas al azar después de las correcciones:
+
+- En 14 la página descargada trae el nombre de la señal (11 con resaltado).
+- 6 no se pudieron descargar desde el equipo de desarrollo (el sitio rechaza robots); en el navegador abren.
+- En 30 la página abre, pero el texto descargado no trae el nombre literal. No son enlaces rotos:
+  - 20 son enlaces de **Google Noticias** (181 de las 594 señales con enlace exacto). Se usan para fuentes que bloquean robots (Lancet, NEJM, Medscape, entre otras). El enlace redirige al artículo original, pero no admite resaltado y el sistema no puede comprobar el destino. Obtener la URL final exige un servicio interno de Google, no documentado; no se implementó.
+  - Las otras 10 son registros que arman la página con JavaScript (5 de ClinicalTrials.gov, 3 de CTIS y 2 de PCORI): en el navegador muestran el estudio o la ficha.
+
+**Decisión para el equipo técnico:** para las fuentes que hoy entran por Google Noticias, registrar en la matriz su canal RSS oficial (o una URL de listado) da enlaces directos al artículo.
+
+### 5. Otros pendientes del seguimiento
+
+- **RF-001-A, prueba piloto en URL de fabricantes (25/11, equipo técnico).** El sistema ya trae el insumo: Configuración › Parámetros de fuentes › Base de conocimiento de búsqueda lista, por fuente, las páginas de noticias y de pipeline que se visitan, y el Diagnóstico para la matriz dice en qué fabricantes conviene cambiar la URL. La prueba y la decisión sobre la matriz son del equipo técnico.
+- **Pregunta 2, fuentes tipo E.** El aviso y el panel de validación responden: 8 fuentes por validar en la copia de la base. Falta el ejercicio de validación del equipo técnico.
+- **Pregunta 8, términos del cribado.** Queda para después de la síntesis, como indicó el equipo.
+
+### 6. Pruebas
+
+- **Backend:** 930 aprobadas y 1 omitida. 30 son nuevas (`test_ii_seguimiento_modulo0.py`): bandeja con la base ocupada, sin recálculo en cada consulta durante la vigilancia, ubicación automática, lotes de páginas, resaltado por nombre, URL de registros oficiales y reparación de lo ya capturado. Se actualizó una aserción de `test_reliability.py` porque el enlace ahora pide resaltar el nombre.
+- **Navegador (E2E):** 109 pruebas en total (2 nuevas en `ii_seguimiento.spec.js`). La corrida completa se cortó por el límite de tiempo del comando, así que se hizo en dos partes, cada una con la base vacía: la primera (de `auth_admin` a `flow_deeplinks`) dio 68 aprobadas y 1 omitida; la segunda (de `flow_dissemination` a `ux_shell`) dio 37 aprobadas, 1 omitida y 2 fallidas. Las 2 fallidas eran las pruebas nuevas, por un dato de la propia prueba (la señal de ejemplo no traía URL); se corrigieron y pasaron al repetir su archivo junto con `flow_staging_screening.spec.js`. Total: 107 aprobadas y 2 omitidas (las dos se saltan solas según el estado de la base). No se repitió la corrida completa de una sola vez.
+- **Verificación real:** descrita en los puntos 1, 3 y 4.
+
+### 7. Al desplegar
+
+1. No hay migraciones nuevas.
+2. Al arrancar se corrigen solos los enlaces de la FDA y de Health Canada (queda en bitácora).
+3. Unos segundos después, con el sistema libre, se ubican solas las señales de «página de consulta».
+4. Repetir la prueba aleatoria desde la Bandeja de entrada: el icono de lupa de la fila abre la página con la señal resaltada.

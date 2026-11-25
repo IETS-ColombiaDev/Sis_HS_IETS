@@ -63,6 +63,8 @@ export default defineConfig({
           ENVIRONMENT: "development",
           ALLOW_DEV_LOGIN: "true",
           INGEST_WORKER_ENABLED: "false",
+          // Las senales de prueba apuntan a sitios ficticios: no se ubican solas en red.
+          LINK_AUTO_RESOLVE: "false",
           // Las pruebas envian varias postulaciones seguidas desde la misma IP.
           PUBLIC_SUBMISSIONS_PER_WINDOW: "50",
           SECRET_KEY: "e2e-secret-key-not-for-production-0123456789",

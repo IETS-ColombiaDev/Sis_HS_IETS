@@ -242,6 +242,11 @@ def backfill_signal_links() -> None:
         out = signal_links.backfill(db, actor="sistema", only_missing=True)
         if out.get("procesadas"):
             log.info("Enlaces de senales clasificados: %s", out.get("por_tipo"))
+        from . import link_resolver
+
+        repaired = link_resolver.repair_registry_links(db)
+        if repaired["fixed"] or repaired["reclassified"]:
+            log.info("Enlaces de registros oficiales corregidos: %s", repaired)
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         log.warning("No se pudieron clasificar los enlaces de las senales: %s", exc)

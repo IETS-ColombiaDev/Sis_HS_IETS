@@ -72,6 +72,21 @@ def _norm(url: str) -> str:
     return urlunsplit(("", host, path, "&".join(f"{k}={v}" for k, v in query), fragment)).lower()
 
 
+# Buscadores de registros oficiales: sin identificador en la URL son el formulario
+# de consulta, no la ficha de un producto, aunque la ruta no sea la portada.
+_SEARCH_HOMES = {
+    _norm(u)
+    for u in (
+        "https://health-products.canada.ca/dpd-bdpp/",
+        "https://health-products.canada.ca/mdall-limh/",
+        "https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm",
+        "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfPMN/pmn.cfm",
+        "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfPMN/denovo.cfm",
+        "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpma/pma.cfm",
+    )
+}
+
+
 def source_query_urls(source: Source | None) -> list[str]:
     """Paginas que el sistema consulta en la fuente: URL principal y URL de entrada de la matriz."""
     if source is None:
@@ -97,6 +112,8 @@ def classify(url: str, source: Source | None = None, query_url: str = "") -> str
         return "consulta"
     route = parts.fragment if _FRAGMENT_ROUTE.match(parts.fragment or "") else ""
     if (parts.path in ("", "/")) and not parts.query and not route:
+        return "consulta"
+    if key in _SEARCH_HOMES:
         return "consulta"
     params = {k.lower() for k, _ in parse_qsl(parts.query, keep_blank_values=True)}
     if params & _SEARCH_PARAMS or _SEARCH_PATH.search(parts.path or "") or _SEARCH_PATH.search(route):

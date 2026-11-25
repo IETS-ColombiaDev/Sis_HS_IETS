@@ -50,6 +50,18 @@ def _hermetic_invima(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _hermetic_link_auto_resolve(monkeypatch):
+    """Las senales no se ubican solas en red durante las pruebas (lo enciende la prueba que lo cubre)."""
+    from app import corroboration, link_resolver
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "link_auto_resolve", False)
+    monkeypatch.setattr(link_resolver, "_auto_runs", 0)
+    monkeypatch.setattr(corroboration, "_last_refresh", float("-inf"))
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _hermetic_web_search(monkeypatch):
     """Los buscadores (Yahoo, Bing, DuckDuckGo) no se consultan en red durante las pruebas.
 

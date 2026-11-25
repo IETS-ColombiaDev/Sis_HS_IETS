@@ -48,6 +48,7 @@ METHOD_LABELS = {
     "enlace_en_pagina": "Enlace exacto encontrado en la página de la fuente",
     "resaltado": "La página abre y resalta la señal (la fuente no tiene enlace por ítem)",
     "sin_ubicar": "No se pudo ubicar la señal en la página",
+    "enlace_del_registro": "Enlace exacto a la ficha del registro oficial",
 }
 
 
@@ -74,7 +75,7 @@ def signal_names(finding: Finding) -> list[str]:
             continue
         names.append(value)
         # Titulos compactos de pipeline: "Producto · indicacion · fase".
-        for sep in (" · ", " | ", " – ", " - ", ": "):
+        for sep in (" · ", " | ", " – ", " - ", ": ", " ("):
             if sep in value:
                 head = value.split(sep, 1)[0].strip()
                 if head:
@@ -362,8 +363,14 @@ def state() -> dict:
         return out
 
 
-def pending_groups(db: Session, *, source_ids: list[int] | None = None, retry: bool = False) -> dict[tuple[int, str], list[int]]:
-    """Senales de `consulta` agrupadas por (fuente, pagina consultada)."""
+def pending_groups(
+    db: Session, *, source_ids: list[int] | None = None, retry: bool = False, untried: bool = False
+) -> dict[tuple[int, str], list[int]]:
+    """Senales de `consulta` agrupadas por (fuente, pagina consultada).
+
+    Con `untried` solo entran las que nunca se intentaron ubicar (corrida automatica):
+    las que ya quedaron «sin ubicar» no se vuelven a descargar solas.
+    """
     query = db.query(Finding.id, Finding.source_id, Finding.query_url, Finding.url, Finding.evidence).filter(
         Finding.link_type == "consulta"
     )
@@ -371,8 +378,10 @@ def pending_groups(db: Session, *, source_ids: list[int] | None = None, retry: b
         query = query.filter(Finding.source_id.in_(source_ids))
     groups: dict[tuple[int, str], list[int]] = {}
     for fid, sid, qurl, url, evidence in query.all():
-        done = isinstance(evidence, dict) and (evidence.get("resolved") or {}).get("method") in ("resaltado",)
-        if done and not retry:
+        method = (evidence.get("resolved") or {}).get("method") if isinstance(evidence, dict) else None
+        if untried and method:
+            continue
+        if method == "resaltado" and not retry:
             continue
         page = qurl or url or ""
         if not page.lower().startswith(("http://", "https://")):
@@ -381,8 +390,19 @@ def pending_groups(db: Session, *, source_ids: list[int] | None = None, retry: b
     return groups
 
 
-def resolve_all(session_factory, *, actor: str = "sistema", source_ids: list[int] | None = None, retry: bool = False) -> dict:
-    """Descarga cada pagina consultada una vez y ubica sus senales. Pensado para un hilo aparte."""
+PAGE_BATCH = 8
+
+
+def resolve_all(
+    session_factory, *, actor: str = "sistema", source_ids: list[int] | None = None, retry: bool = False,
+    untried: bool = False,
+) -> dict:
+    """Descarga cada pagina consultada una vez y ubica sus senales. Pensado para un hilo aparte.
+
+    Trabaja por lotes de `PAGE_BATCH` paginas: descarga, ubica, guarda y suelta el
+    HTML antes del lote siguiente, para no tener todas las paginas en memoria a la
+    vez (Render tiene 512 MB).
+    """
     from concurrent.futures import ThreadPoolExecutor
 
     from .audit import record_action
@@ -394,30 +414,34 @@ def resolve_all(session_factory, *, actor: str = "sistema", source_ids: list[int
         _state.update(running=True, done=0, total=0, pages=0, counts={}, started_at=_now().isoformat(), finished_at=None, error="")
     db = session_factory()
     try:
-        groups = pending_groups(db, source_ids=source_ids, retry=retry)
+        groups = pending_groups(db, source_ids=source_ids, retry=retry, untried=untried)
         with _lock:
             _state["total"] = sum(len(v) for v in groups.values())
             _state["pages"] = len(groups)
         sources = {s.id: s for s in db.query(Source).filter(Source.id.in_([k[0] for k in groups] or [0])).all()}
-        pages = list({page for _sid, page in groups})
-        html_by_page: dict[str, str] = {}
+        by_page: dict[str, list[tuple[int, list[int]]]] = {}
+        for (sid, page), ids in groups.items():
+            by_page.setdefault(page, []).append((sid, ids))
+        pages = list(by_page)
+        counts = {"enlace_en_pagina": 0, "resaltado": 0, "sin_ubicar": 0}
         # Descarga en lotes paralelos (misma politica que el rastreo).
-        for i in range(0, len(pages), 8):
-            batch = pages[i : i + 8]
+        for i in range(0, len(pages), PAGE_BATCH):
+            batch = pages[i : i + PAGE_BATCH]
+            html_by_page: dict[str, str] = {}
             for url, result, _ms, _err in fetch_many(batch, 20.0):
                 if result and 0 < result[0] < 400 and result[2]:
                     html_by_page[url] = result[2]
-        counts = {"enlace_en_pagina": 0, "resaltado": 0, "sin_ubicar": 0}
-        for (sid, page), ids in groups.items():
-            html = html_by_page.get(page)
-            index = PageIndex(html, page) if html else None
-            for finding in db.query(Finding).filter(Finding.id.in_(ids)).all():
-                method = resolve_finding(db, finding, sources.get(sid), index, page)
-                counts[method] += 1
-                with _lock:
-                    _state["done"] += 1
-                    _state["counts"] = dict(counts)
-            db.commit()
+            for page in batch:
+                html = html_by_page.pop(page, None)
+                index = PageIndex(html, page) if html else None
+                for sid, ids in by_page[page]:
+                    for finding in db.query(Finding).filter(Finding.id.in_(ids)).all():
+                        method = resolve_finding(db, finding, sources.get(sid), index, page)
+                        counts[method] += 1
+                        with _lock:
+                            _state["done"] += 1
+                            _state["counts"] = dict(counts)
+                db.commit()
         record_action(
             db,
             entity_type="findings",
@@ -442,17 +466,145 @@ def resolve_all(session_factory, *, actor: str = "sistema", source_ids: list[int
             _state.update(running=False, finished_at=_now().isoformat())
 
 
-def start(session_factory, *, actor: str, source_ids: list[int] | None = None, retry: bool = False) -> dict:
+def start(
+    session_factory, *, actor: str, source_ids: list[int] | None = None, retry: bool = False, untried: bool = False
+) -> dict:
     with _lock:
         if _state["running"]:
             return state()
     threading.Thread(
         target=resolve_all,
-        kwargs={"session_factory": session_factory, "actor": actor, "source_ids": source_ids, "retry": retry},
+        kwargs={"session_factory": session_factory, "actor": actor, "source_ids": source_ids, "retry": retry,
+                "untried": untried},
         name="link-resolve",
         daemon=True,
     ).start()
     return state()
+
+
+AUTO_ACTOR = "sistema (automático)"
+AUTO_MAX_RUNS = 3
+_auto_runs = 0
+
+
+def auto_start(session_factory) -> bool:
+    """Ubica sola las senales que nunca se intentaron ubicar. True si lanzo la corrida.
+
+    El equipo no tiene que pulsar (Ubicar señales exactas): las senales capturadas
+    antes de esta funcion se ubican en segundo plano cuando el sistema esta libre
+    (lo llama el vigilante de la cola). Cada senal se intenta una sola vez, asi que
+    un reinicio no repite descargas; el boton sigue sirviendo para reintentar.
+    `LINK_AUTO_RESOLVE=false` lo apaga.
+    """
+    global _auto_runs
+    from .config import settings
+
+    if not settings.link_auto_resolve or _auto_runs >= AUTO_MAX_RUNS:
+        return False
+    with _lock:
+        if _state["running"]:
+            return False
+    from . import corroboration
+
+    db = session_factory()
+    try:
+        # Con una vigilancia en curso no se compite por la red ni por la base.
+        if corroboration.scan_in_progress(db):
+            return False
+        pending = pending_groups(db, untried=True)
+    finally:
+        db.close()
+    if not pending:
+        return False
+    _auto_runs += 1
+    log.info("Ubicacion automatica de senales: %s pagina(s) por revisar.", len(pending))
+    start(session_factory, actor=AUTO_ACTOR, untried=True)
+    return True
+
+
+# --------------------------------------------------------------------------- #
+#  Senales de registros oficiales: del buscador a la ficha del producto
+# --------------------------------------------------------------------------- #
+_REGISTRY_HOSTS = ("health-products.canada.ca", "accessdata.fda.gov")
+
+
+def registry_url(raw_payload: dict | None) -> str:
+    """Ficha propia de una senal de conector oficial, a partir de su registro original ('' si no aplica)."""
+    if not isinstance(raw_payload, dict):
+        return ""
+    row = raw_payload.get("payload") if isinstance(raw_payload.get("payload"), dict) else {}
+    connector = raw_payload.get("connector") or ""
+    if connector == "health_canada" and row.get("drug_code"):
+        from .ingest.health_canada import HealthCanadaConnector
+
+        return HealthCanadaConnector.drug_url(row.get("drug_code"))
+    if connector == "fda":
+        from .ingest import fda
+
+        if row.get("k_number"):
+            return fda.device_url(row, "device/510k")
+        if row.get("pma_number"):
+            return fda.device_url(row, "device/pma")
+        if row.get("application_number"):
+            return fda.drug_url(row.get("application_number"))
+    return ""
+
+
+def repair_registry_links(db: Session, *, actor: str = "sistema") -> dict:
+    """Corrige las senales de la FDA y de Health Canada que abrian el buscador o una pagina rota.
+
+    El identificador del producto esta en el registro original de cada senal: con
+    el se arma la URL de su ficha. La URL anterior queda en la evidencia. Las que
+    no tienen ficha propia dejan de presentarse como «enlace exacto». Es
+    idempotente: corre en cada arranque y solo toca lo que falta.
+    """
+    from sqlalchemy import or_
+
+    from .audit import record_action
+
+    rows = (
+        db.query(Technology, Finding)
+        .join(Finding, Finding.id == Technology.finding_id)
+        .filter(or_(*[Finding.url.like(f"%{host}%") for host in _REGISTRY_HOSTS]))
+        .all()
+    )
+    sources = {s.id: s for s in db.query(Source).filter(Source.id.in_({f.source_id for _t, f in rows} or {0})).all()}
+    fixed = reclassified = 0
+    for tech, finding in rows:
+        source = sources.get(finding.source_id)
+        target = registry_url(tech.raw_payload if isinstance(tech.raw_payload, dict) else None)
+        current = finding.url or ""
+        if target and signal_links.classify(target, source, finding.query_url or "") == "exacto" and not _same_page(target, current):
+            if (tech.url or "") in ("", current):
+                tech.url = target[:1024]
+            finding.url = target[:1024]
+            finding.link_type = "exacto"
+            finding.link_status = "sin_verificar"
+            _set_evidence(
+                finding,
+                resolved={
+                    "method": "enlace_del_registro",
+                    "label": METHOD_LABELS["enlace_del_registro"],
+                    "previous_url": current,
+                    "at": _now().isoformat(),
+                },
+            )
+            fixed += 1
+            continue
+        kind = signal_links.classify(current, source, finding.query_url or "")
+        if kind != (finding.link_type or ""):
+            finding.link_type = kind
+            reclassified += 1
+    if fixed or reclassified:
+        record_action(
+            db,
+            entity_type="findings",
+            entity_id="link_registry",
+            action="link_registry_repair",
+            new_value={"con_ficha_propia": fixed, "reclasificadas": reclassified, "ejecutado_por": actor},
+        )
+        db.commit()
+    return {"fixed": fixed, "reclassified": reclassified}
 
 
 # --------------------------------------------------------------------------- #

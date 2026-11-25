@@ -207,6 +207,14 @@ def guardian_tick() -> str:
     finally:
         db.close()
     if upcoming is None:
+        # Sistema libre: se ubican las senales que aun no tienen su punto exacto en la pagina (RF-001).
+        try:
+            from . import link_resolver
+
+            if link_resolver.auto_start(SessionLocal):
+                return "ubicando"
+        except Exception:  # noqa: BLE001
+            log.exception("Ubicacion automatica de senales")
         return ""
     _guardian_resumes += 1
     log.warning("Vigilante: hay cola de vigilancia sin atender; se reanuda el drenaje.")
@@ -315,6 +323,14 @@ def drain(*, wait_retries: bool = False, max_seconds: float = KICK_MAX_SECONDS) 
     finally:
         _drain_lock.release()
         if total:
+            # La bandeja no recalcula la corroboracion en cada consulta mientras hay
+            # vigilancia: se deja al dia aqui, al terminar.
+            try:
+                from . import corroboration
+
+                corroboration.refresh_after_scan(SessionLocal)
+            except Exception:  # noqa: BLE001
+                log.warning("No se pudo recalcular la corroboracion tras la vigilancia")
             # Corrida terminada: las senales nuevas van a Firestore ya, sin esperar
             # el minimo entre copias (un reinicio de Render las borraria del disco).
             try:

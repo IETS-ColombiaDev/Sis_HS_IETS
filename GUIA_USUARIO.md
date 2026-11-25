@@ -5,7 +5,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.3.0 · actualizada el 25 de noviembre de 2026 (vigilancia que se reanuda sola, base de conocimiento de búsqueda y respaldo por mapa del sitio) |
+| **Versión del sistema** | 7.3.1 · actualizada el 25 de noviembre de 2026 (II seguimiento del Módulo 0: bandeja que abre siempre, señales que se ubican solas y enlaces a la ficha de los registros oficiales) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
@@ -855,6 +855,8 @@ La barra de filtros de la bandeja permite combinar:
 | No deja asignar | Falta clúster o tipología | Clasifique primero |
 | “Ya estaban en el ciclo” | Duplicó la asignación | Normal; no crea duplicado de instancia |
 | No ve la señal | Filtro de búsqueda activo | Limpie filtros (incluidas las fechas «Desde / Hasta» y la casilla «Solo detectadas en varias fuentes») |
+| Aparece «No se pudo cargar la bandeja de entrada» | El servidor está iniciando (llevaba un rato sin uso) o está ocupado con una vigilancia | **La bandeja no está vacía**: las señales siguen guardadas. La pantalla reintenta sola cada 20 segundos; también puede pulsar (Reintentar ahora) |
+| Arriba de la lista dice «No se pudo actualizar la lista» | La última actualización no llegó | Se sigue mostrando la lista anterior. Pulse (Reintentar) |
 
 ### 10.7 Misma tecnología en varias fuentes (corroboración)
 
@@ -867,7 +869,7 @@ Cuando la misma tecnología aparece en fuentes distintas (por ejemplo FDA, EMA y
 - **Filtro:** casilla **Solo detectadas en varias fuentes**.
 - **No fusiona nada.** Si son la misma tecnología y quiere un solo registro, use **Filtrado y depuración › Duplicados** (la fusión siempre la confirma una persona).
 
-El cálculo se actualiza solo al abrir la bandeja cuando hubo capturas o cambios.
+El cálculo se actualiza solo al abrir la bandeja cuando hubo capturas o cambios. **Mientras corre una vigilancia** se actualiza como mucho cada 3 minutos y otra vez al terminar, para que la bandeja abra rápido: durante ese rato la etiqueta (En N fuentes) de las señales recién capturadas puede tardar en aparecer.
 
 ### 10.9 Enlace a la fuente original y evidencia de captura
 
@@ -881,7 +883,15 @@ En el panel (Origen de la señal) y en la ficha de la señal el enlace lleva una
 
 Si la verificación de enlaces encontró que la URL no responde o redirige a la portada, aparece además la marca (No responde) o (Redirige a otra página).
 
-**Cómo se ubica la señal exacta.** Al capturar, y cuando alguien pulsa (Ubicar señales exactas) en Señales capturadas (ver 14.3), el sistema busca cada señal de «página de consulta» en su página: si la página tiene un enlace con el nombre de la señal (o declara la URL del producto en sus datos estructurados, como los pipelines de Novartis), la señal pasa a **Enlace exacto** y la URL anterior queda en la evidencia; si no, y el nombre está en la página, arma el enlace que la resalta. Nunca inventa un enlace: si no encuentra la señal, lo dice y deja la evidencia.
+**Desde la lista de la bandeja.** El icono junto a la fecha de cada señal abre su fuente. Si es una **lupa**, el sistema ya ubicó la señal dentro de la página: al pulsarla, la página abre con la señal resaltada. Si es una flecha, abre la ficha o el artículo de la señal (o la página de consulta, si aún no se ubicó).
+
+**Qué resalta el navegador.** La cita textual de la fuente cuando la hay; si no, el nombre de la tecnología. Si la página no trae ese texto, abre normalmente, sin resaltado. No aplica a documentos PDF.
+
+**Registros oficiales.** Las señales de la FDA (medicamentos, 510(k), De Novo y PMA con suplemento) y de Health Canada (medicamentos) abren la **ficha del producto** en el registro, no el buscador. Las capturadas antes se corrigieron solas; la dirección anterior queda en la evidencia.
+
+**Enlaces por Google Noticias.** Algunas fuentes bloquean la lectura automática (revistas y portales de noticias) y se leen por su canal en Google Noticias. Ese enlace redirige al artículo original, pero no admite resaltado: en el artículo, busque el título de la señal con Ctrl+F. El detalle de la señal lo avisa.
+
+**Cómo se ubica la señal exacta.** Al capturar, **automáticamente cuando el sistema está libre** (sin que nadie pulse nada; cada señal se intenta una vez) y cuando alguien pulsa (Ubicar señales exactas) en Señales capturadas (ver 14.3), el sistema busca cada señal de «página de consulta» en su página: si la página tiene un enlace con el nombre de la señal (o declara la URL del producto en sus datos estructurados, como los pipelines de Novartis), la señal pasa a **Enlace exacto** y la URL anterior queda en la evidencia; si no, y el nombre está en la página, arma el enlace que la resalta. Nunca inventa un enlace: si no encuentra la señal, lo dice y deja la evidencia.
 
 ### 10.11 Fuentes de consulta manual (tipo E) por validar
 
@@ -1145,7 +1155,7 @@ Arriba de la lista está la tarjeta «Enlaces a la fuente original» con dos bot
 
 - (Clasificar señales): vuelve a clasificar todas las señales y guarda su evidencia de captura. No cambia ninguna URL. Queda en bitácora.
 - (Verificar enlaces): abre cada enlace en segundo plano y marca los que no responden o redirigen a la portada. Tarda unos minutos; el avance aparece en el mismo panel. Queda en bitácora.
-- (Ubicar señales exactas): busca cada señal de «página de consulta» en su página y la lleva a enlace exacto o a enlace que la resalta (ver 10.9). Corre en segundo plano y muestra cuántas ubicó. Queda en bitácora.
+- (Ubicar señales exactas): busca cada señal de «página de consulta» en su página y la lleva a enlace exacto o a enlace que la resalta (ver 10.9). Corre en segundo plano y muestra cuántas ubicó. Queda en bitácora. **Ya no hace falta pulsarlo para las señales nuevas o anteriores**: el sistema lo hace solo cuando está libre. Úselo para reintentar las que quedaron sin ubicar, por ejemplo después de corregir una URL en la matriz.
 - (Diagnóstico en Excel) y (CSV): el reporte por fuente para el equipo técnico.
 
 La pestaña **Diagnóstico para la matriz** dice, por fuente, si hay que **mejorar la matriz** y cómo:

@@ -204,7 +204,7 @@ def list_staging(
     Orden por defecto (`sort=puntaje`): puntaje de cribado + bono de corroboracion
     (RF-002), luego lo mas reciente. Con `sort=recientes`: fecha de captura descendente.
     """
-    corroboration.refresh(db)
+    corroboration.refresh_for_read(db)
     if view == "descartadas":
         query = db.query(Technology).filter(_inbox_discarded_filter())
     elif view == "legacy":
@@ -285,7 +285,7 @@ def staging_stats(db: Session = Depends(get_db), user: User = Depends(get_curren
     without_type = base.filter(Technology.tech_type_id.is_(None)).with_entities(
         func.count(Technology.id)
     ).scalar() or 0
-    corroboration.refresh(db)
+    corroboration.refresh_for_read(db)
     corroborated = base.filter(Technology.corroboration_count > 1).with_entities(
         func.count(Technology.id)
     ).scalar() or 0
