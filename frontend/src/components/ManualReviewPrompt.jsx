@@ -79,7 +79,7 @@ export default function ManualReviewPrompt({ suppressed = false }) {
           {pending.slice(0, 6).map((i) => (
             <li key={i.id}>
               {i.title}
-              <span style={{ color: "#64748b" }}> — {i.never_reviewed ? "nunca validada" : `vencida hace ${i.overdue_days} día(s)`}</span>
+              <span style={{ color: "#64748b" }}> - {i.never_reviewed ? "nunca validada" : `vencida hace ${i.overdue_days} día(s)`}</span>
             </li>
           ))}
           {pending.length > 6 && <li>… y {pending.length - 6} más.</li>}

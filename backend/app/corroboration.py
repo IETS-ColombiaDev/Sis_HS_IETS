@@ -26,6 +26,10 @@ sobre conteo y ultima actualizacion), y despues de cada vigilancia.
 """
 from __future__ import annotations
 
+import logging
+import threading
+import time
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -36,6 +40,13 @@ BONUS_PER_SOURCE = 5
 BONUS_MAX = 15
 STAGING_STATUS = "capturada_no_asignada"
 FINGERPRINT_KEY = "corroboration.fingerprint"
+# Con una vigilancia en curso el acervo cambia con cada senal: la bandeja no
+# recalcula en cada consulta, sino como mucho cada tanto (y al terminar la corrida).
+BUSY_REFRESH_SECONDS = 180
+# Sin vigilancia, la segunda consulta simultanea espera a la primera este tiempo.
+IDLE_WAIT_SECONDS = 20
+
+log = logging.getLogger(__name__)
 
 
 def bonus_params(db: Session | None = None) -> tuple[int, int]:
@@ -106,11 +117,88 @@ def _fingerprint(db: Session) -> str:
     return f"{RULES_VERSION}|{count}|{last.isoformat() if last else ''}|{merged}|{dedup.threshold(db)}|{per}|{top}"
 
 
+_refresh_lock = threading.Lock()
+
+
 def refresh(db: Session, *, force: bool = False) -> dict:
     """Recalcula la corroboracion de la bandeja. Devuelve un resumen.
 
     Sin `force`, no hace nada si el acervo no cambio desde el ultimo calculo.
+
+    Un solo calculo a la vez: la bandeja pide el listado y los indicadores al
+    mismo tiempo y ambos entraban aqui. En una base recien creada los dos
+    insertaban la misma clave de la huella y uno fallaba con error 500
+    (UNIQUE constraint failed: app_meta.key). El segundo espera y encuentra la
+    huella ya al dia.
     """
+    with _refresh_lock:
+        return _refresh(db, force=force)
+
+
+_STALE = {"refreshed": False, "staging": 0, "corroborated": 0, "stale": True}
+_last_refresh = float("-inf")
+
+
+def scan_in_progress(db: Session) -> bool:
+    """True si hay una vigilancia escribiendo senales (en este proceso o en el worker)."""
+    from . import worker
+    from .models import IngestJob
+
+    if worker.draining():
+        return True
+    return db.query(IngestJob.id).filter(IngestJob.status == "ejecutando").first() is not None
+
+
+def refresh_for_read(db: Session) -> dict:
+    """Corroboracion al dia para una consulta de la bandeja, sin tumbarla nunca.
+
+    La bandeja debe abrir siempre, tambien con una vigilancia en curso. Antes
+    cada consulta recalculaba todo (el acervo cambia con cada senal nueva) y
+    escribia en la base mientras la vigilancia tambien escribia: la consulta
+    tardaba, o fallaba con «database is locked» y la pantalla quedaba vacia.
+
+    - Con vigilancia en curso se recalcula como mucho cada `BUSY_REFRESH_SECONDS`
+      y, si otro calculo esta en marcha, no se espera: se sirve lo guardado.
+    - Si la base esta ocupada, se deshace y se sirve lo guardado.
+    - Al terminar la vigilancia el drenaje recalcula (`refresh_after_scan`).
+    """
+    global _last_refresh
+    from sqlalchemy.exc import SQLAlchemyError
+
+    try:
+        if settings_store.get_value(db, FINGERPRINT_KEY, "") == _fingerprint(db):
+            return {"refreshed": False, "staging": 0, "corroborated": 0}
+        busy = scan_in_progress(db)
+        if busy and time.monotonic() - _last_refresh < BUSY_REFRESH_SECONDS:
+            return dict(_STALE)
+        if not _refresh_lock.acquire(timeout=0 if busy else IDLE_WAIT_SECONDS):
+            return dict(_STALE)
+        try:
+            # Con vigilancia, el intento cuenta aunque falle: no se reintenta en cada consulta.
+            _last_refresh = time.monotonic()
+            return _refresh(db)
+        finally:
+            _refresh_lock.release()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        log.warning("Corroboracion: la base esta ocupada; la bandeja sirve el ultimo calculo (%s)", type(exc).__name__)
+        return dict(_STALE)
+
+
+def refresh_after_scan(session_factory) -> dict:
+    """Recalculo al terminar una vigilancia (lo llama el drenaje de la cola)."""
+    db = session_factory()
+    try:
+        return refresh(db)
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        log.exception("Corroboracion tras la vigilancia")
+        return dict(_STALE)
+    finally:
+        db.close()
+
+
+def _refresh(db: Session, *, force: bool = False) -> dict:
     fingerprint = _fingerprint(db)
     if not force and settings_store.get_value(db, FINGERPRINT_KEY, "") == fingerprint:
         return {"refreshed": False, "staging": 0, "corroborated": 0}

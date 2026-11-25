@@ -29,7 +29,7 @@ const TABS = [
 
 const submissionName = (row) => row.commercial_name || row.inn_name || `Postulación #${row.id}`;
 
-const show = (value) => (value && String(value).trim() ? value : "—");
+const show = (value) => (value && String(value).trim() ? value : "-");
 
 function SubmissionFields({ row }) {
   const links = row.evidence_links || [];
@@ -53,7 +53,7 @@ function SubmissionFields({ row }) {
           ))}
         </ul>
       ) : (
-        <p style={{ margin: "0 0 8px" }}>—</p>
+        <p style={{ margin: "0 0 8px" }}>-</p>
       )}
       <p style={{ fontSize: 13, fontWeight: 600, margin: "4px 0" }}>Información complementaria</p>
       <p style={{ margin: "0 0 8px" }}>
@@ -71,7 +71,7 @@ function SubmissionFields({ row }) {
         <br />
         <strong>Organización:</strong> {show(row.submitter_org)}
         <br />
-        <strong>Recibida:</strong> {row.created_at ? new Date(row.created_at).toLocaleString() : "—"}
+        <strong>Recibida:</strong> {row.created_at ? new Date(row.created_at).toLocaleString() : "-"}
       </p>
       <p style={{ fontSize: 13, background: row.has_conflict ? "#FEF3C7" : "#F1F5F9", padding: 10, borderRadius: 8 }}>
         <strong>Conflicto de interés:</strong>{" "}
@@ -217,7 +217,7 @@ export default function Submissions() {
       ) : (
         <div className="merge-list">
           {rows.map((row) => (
-            <Card key={row.id} title={submissionName(row)} hint={`${row.inn_name || "—"} · ${row.submitter_org || row.submitter_email}`}>
+            <Card key={row.id} title={submissionName(row)} hint={`${row.inn_name || "-"} · ${row.submitter_org || row.submitter_email}`}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }} data-testid={`submission-${row.id}`}>
                 <span title={GLOSSARY.fb_estado_postulacion}><Badge tone={TONE[row.status] || "neutral"}>{STATUS_LABEL[row.status] || row.status}</Badge></span>
                 {row.has_conflict ? (
@@ -230,7 +230,7 @@ export default function Submissions() {
               <SubmissionCrossCheck row={row} canRun={canReview} onUpdated={replaceRow} toast={toast} compact />
               {row.status !== "recibida" && (
                 <p style={{ fontSize: 12.5, color: "#64748B" }}>
-                  {row.status === "aceptada" ? "Aceptada" : "Rechazada"} por {row.reviewed_by || "—"}
+                  {row.status === "aceptada" ? "Aceptada" : "Rechazada"} por {row.reviewed_by || "-"}
                   {row.reviewed_at ? ` el ${new Date(row.reviewed_at).toLocaleString()}` : ""}
                   {row.review_note ? `. Nota: ${row.review_note}` : ""}
                 </p>

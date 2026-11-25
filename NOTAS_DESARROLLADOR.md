@@ -460,3 +460,486 @@ Sondeo de las 141 fuentes lanzado mientras corría la vigilancia: terminó sin b
 
 - El filtro sin IA es de reglas: prioriza no dejar entrar ruido. Puede perder algún titular legítimo redactado como pregunta o como frase larga sin nombre de producto. Con la IA activa, la IA decide.
 - Quedan señales de calidad media que no son ruido claro, como artículos de divulgación de noticias generales. Decidir si se conservan es criterio metodológico del equipo técnico.
+
+## Protección de datos y cierre de pendientes (24-11-2026, versión 7.2.0)
+
+**Estado:** CUMPLIDO PARCIAL, 24-11-2026. Todo está probado en local (suite de backend, suite de navegador y arranque real sobre una copia de la base). Falta la verificación en el sistema desplegado, que solo se puede hacer después del despliegue.
+
+**Qué se pidió:** que ningún cambio ni despliegue pueda borrar o dañar datos, cerrar lo que estaba a medias y comparar lo no tocado con los requerimientos de la raíz del repositorio.
+
+**Cómo se hizo:** dos auditorías de solo lectura sobre todo el código (pérdida de datos, y requerimientos contra código), verificación de cada hallazgo leyendo el código y con una prueba que lo reproduce, y corrección.
+
+### 1. Riesgos de pérdida de datos encontrados y corregidos
+
+**1.1 Una migración podía borrar las señales en cascada.** En SQLite, quitar o cambiar una columna reconstruye la tabla (copia y `DROP`). El arranque migraba con las llaves foráneas activas, así que reconstruir `sources` habría borrado en cascada todas las señales, y reconstruir `technologies` o `cycles`, los puntajes y evaluaciones. Hoy ninguna revisión (0001 a 0007) reconstruye tablas, por eso no había pasado, pero la siguiente revisión que quitara una columna lo habría hecho en producción, y el ensayo por línea de comandos (`alembic -x url=...`) no lo detecta porque corre sin ese ajuste. Ahora `migrations.schema_change_connection` migra con las llaves apagadas en esa conexión, comprueba al final que no quedaron referencias rotas y vuelve a activarlas. La prueba `test_rebuilding_a_table_with_foreign_keys_on_deletes_its_children` deja demostrado el riesgo y `test_schema_change_connection_keeps_the_children`, la protección.
+
+**1.2 Solo había una copia anterior y se pisaba en el arranque.** Firestore guardaba la copia vigente y la anterior. Cada arranque sube hasta tres copias en un minuto, así que un despliegue que dañara los datos restauraba la copia buena, la dañaba y borraba la buena antes de que alguien lo notara. Ahora hay **puntos de recuperación** que las copias siguientes no borran (`firebase_db.py`):
+
+| Punto | Cuándo se fija | Cuántos se guardan |
+|---|---|---|
+| Antes de un despliegue | La primera copia que hace una versión nueva del código fija la última de la versión anterior | 5 |
+| Cierre del día | La primera copia de un día fija la última del día anterior | 7 |
+| Otra instancia | Al subir, la nube trae una copia que este proceso no conocía (dos instancias durante un redespliegue) | 3 |
+| Antes de una restauración | Estado previo a cualquier restauración manual | 3 |
+| Fijada a mano | Botón del panel | 3 |
+
+El cupo es por motivo: las copias diarias nunca desplazan a la previa al despliegue. Se ven y se restauran en **Configuración → Copia de respaldo → Puntos de recuperación**. Cada copia guarda la versión del código que la hizo (`RENDER_GIT_COMMIT`) y el conteo de sus tablas principales.
+
+**1.3 Una base con menos datos podía pisar la copia buena.** La única guarda era el tamaño (menos del 50 %). Ahora cada copia lleva el conteo de sus tablas y la subida se bloquea si la bitácora local tiene menos registros que la guardada (la bitácora solo crece: si tiene menos, esa base no desciende de la copia) o si señales, tecnologías, fuentes, usuarios, postulaciones o notas caen a menos de la mitad. El bloqueo se ve en el panel y en `/api/health`. Si el superadministrador confirma que la base del servidor es la correcta, **Publicar de todos modos** la sube y deja la copia guardada como punto de recuperación (`backup:push_override` en la bitácora).
+
+**1.4 Dos instancias a la vez.** En un redespliegue la instancia nueva puede arrancar mientras la vieja sigue atendiendo, y su primera copia pisaba la última de la vieja. No se pueden fusionar dos bases, pero ahora esa copia ajena queda fijada como punto de recuperación en lugar de perderse. En ese caso la guarda por conteos no bloquea: la copia ajena puede traer más bitácora sin que la base local haya perdido nada, y bloquear dejaría a la instancia nueva sin poder guardar. Además, al apagar, primero se detiene la vigilancia y después se hace la copia final.
+
+**1.5 En qué base de Firestore viven los datos.** El arranque prefería la base nombrada `hs-iets` y, si lograba crearla, empezaba a trabajar en una base vacía dejando los datos reales huérfanos en `(default)`. Ahora, si la base nombrada no tiene copia y `(default)` sí, se usa `(default)`. Y si no se pudo determinar la base (fallo de red al arrancar), no se lee ni se sube nada: antes una base inexistente respondía «sin datos» y el sistema quedaba operando vacío.
+
+**1.6 Restaurar reemplazaba toda la base sin dejar rastro.** `POST /api/backup/restore?force=true` no quedaba en la bitácora ni guardaba el estado previo. Ahora, antes de reemplazar, el estado actual se sube y queda fijado; la acción queda en la bitácora de la base vigente (`backup:restore`, `backup:restore_checkpoint`, `backup:pin`).
+
+**1.7 Lo escrito después de una restauración se daba por inexistente.** «Sin cambios desde la restauración» se medía con un contador que solo algunas pantallas incrementan (no lo hacen usuarios, configuración ni postulaciones). Una restauración posterior podía descartar esos cambios, y era la causa de que la contraseña de `BOOTSTRAP_ADMIN_PASSWORD` a veces se aplicara y a veces no. Ahora también se mira la bitácora, que registra todas las escrituras.
+
+**1.8 La matriz cargada desde la interfaz se revertía al reiniciar.** El JSON de la matriz se escribía en el disco del servicio, que en Render es efímero. Tras el siguiente reinicio el arranque sincronizaba con la matriz de la imagen y revertía el inventario sin aviso. Ahora la matriz cargada se guarda también en la base (`matrix_store.py`) y el arranque la repone en disco antes de sincronizar. Si un despliegue trae una matriz nueva en la imagen, gana la de la imagen y queda aviso en el registro.
+
+**1.9 El arranque pisaba ediciones del equipo sobre las fuentes.** Solo se protegían los campos de la matriz (nivel, tipos, URL de entrada...). El nombre, la URL, «ingesta activa», la frecuencia, la descripción y las etiquetas volvían al valor de la matriz en cada reinicio. Ahora cualquier campo que una persona cambie en el panel queda marcado y la sincronización no lo toca; solo lo pisa la reimportación con «Sobrescribir lo editado». Tampoco se reactiva una fuente que el equipo sacó del catálogo ni una que la sonda suspendió por fallar.
+
+**1.10 La siembra de ciclos oficiales en el servicio desplegado.** La siembra reconstruye ciclos y solo estaba apagada con `ENVIRONMENT=production`. El servicio de Render trabaja sobre los datos reales aunque corra en `development`, así que ahora también se apaga cuando `RENDER=true`. `SEED_OFFICIAL_CYCLES=true` la vuelve a activar a propósito.
+
+**1.11 Carga de matriz por la API.** `POST /api/sources/matrix/import` pisaba lo editado por defecto. Ahora hay que pedirlo (`overwrite=true`); la interfaz ya lo enviaba de forma explícita.
+
+### 2. Pendientes funcionales cerrados
+
+- **RF20, alerta por cambio de fase.** La alerta «cambio de fase» solo miraba el estado del flujo. Ahora también avisa cuando cambia la fase clínica real de una tecnología de alto riesgo presupuestal (`clinical_phase_change_high_budget`), incluso si el cambio llega por la vigilancia en un registro ya capturado: antes la ingesta ignoraba la fase nueva de un registro ya visto. Conocer la fase por primera vez no cuenta como cambio.
+- **RF19, distribución del boletín.** El boletín publicado se envía a la alta dirección con el PDF adjunto (**Boletines → Enviar a la alta dirección**). La lista de destinatarios se recuerda; cada envío queda en el boletín y en la bitácora; un correo rechazado se informa sin ocultar los que sí salieron. Requiere SMTP configurado; sin él, la interfaz lo dice y ofrece descargar el PDF.
+- **RF18, buscador avanzado de expedientes.** La consulta pública filtra por clúster, tipo de tecnología, fase de desarrollo y año de publicación, busca también por indicación y pagina los resultados. Solo ofrece opciones con al menos una ficha visible, de modo que no revela publicaciones confidenciales.
+- **Notas del equipo.** Una respuesta tardía del servidor podía dejar en pantalla el contenido anterior de una nota recién editada. Solo se aplica la respuesta de la última consulta.
+- **Bandeja de entrada.** Error 500 con una base recién creada: dos peticiones simultáneas recalculaban «en varias fuentes» a la vez. Ahora hay un solo cálculo a la vez.
+- **Textos de la interfaz.** Sin rayas largas: se usan guiones normales.
+
+### 3. Lo que no se cambió y por qué
+
+Requiere decisión del equipo o infraestructura que no depende del código:
+
+| Tema | Situación | Qué se necesita |
+|---|---|---|
+| RNF12, acceso de desarrollo en el servicio desplegado | La imagen (`Dockerfile`) fija `ENVIRONMENT=production` y `ALLOW_DEV_LOGIN=false`. Si el panel de Render los cambia a `development`, el acceso sin contraseña queda abierto a cualquier correo del dominio | Confirmar en el panel de Render y, si el equipo aún entra por acceso de desarrollo, crear antes las cuentas con contraseña (`BOOTSTRAP_ADMIN_*`) |
+| RNF04, disponibilidad 99,5 % | Plan gratuito de Render con disco efímero | Plan de pago con disco persistente o PostgreSQL |
+| RNF03, cifrado AES-256 en reposo | No implementado; la copia en Firestore va comprimida, no cifrada | Definir manejo de llaves |
+| RNF06, API OAuth2 para EuroScan, NIHRIO y CONETEC | No implementado | Convenio y alcance con cada entidad |
+| RNF07, PostgreSQL con pgvector | El código es agnóstico del motor; el despliegue usa SQLite | Base PostgreSQL |
+| RF11, normas farmacológicas y carga del acta de Sala en PDF | Solo índice local y consulta en vivo de registros | Fuente oficial de normas y formato del acta |
+| RF13, editor enriquecido con comentarios en línea | Formulario estructurado con comentarios por campo | Decisión de alcance |
+| RF-006, criterios inactivos (implantables, equipos biomédicos, monitoreo) | Sin cambio | Decisión del equipo técnico |
+| Apagado en Render | La copia final puede no caber en los 30 s que da la plataforma | Evaluar `maxShutdownDelaySeconds` en el servicio |
+| Normalización ATC, CIE-10, MeSH y GMDN | El backend valida y normaliza; no hay pantalla para capturarlos | Diseño de la pantalla con el equipo técnico |
+
+El documento `Consolidado de observaciones SI EAA MOD 0.xlsx` es del equipo técnico y no se modificó. Tiene tres datos desactualizados frente al sistema: OBS-001 figura cumplida con «Prioridad sugerida» y esa función se retiró; cita los botones «Sondear A/B» y «Correr ahora», que hoy se llaman «Sondear todas» y «Ejecutar ahora»; y describe 11 categorías de búsqueda activas, cuando por RF-006 quedan 2.
+
+### 4. Pruebas
+
+- **Backend:** 871 aprobadas y 1 omitida. 46 son nuevas: 34 de protección de datos (`test_proteccion_datos.py`), 5 de RF20 (`test_rf20_cambio_de_fase.py`), 5 de RF19 y 2 de RF18.
+- **Verificación real sobre una copia de la base** (651 señales, 656 tecnologías, 141 fuentes), con el almacén de Firestore simulado en memoria y sin tocar la red:
+  - dos arranques completos seguidos no pierden ni una fila y conservan una fuente editada por el equipo;
+  - una base a la que se le borran todas las señales no logra sobrescribir la copia buena;
+  - la copia previa al «despliegue» sobrevive a las subidas siguientes y, al restaurarla, vuelven las 651 señales con la base íntegra (`integrity_check` y `foreign_key_check` en orden).
+- **Navegador (E2E):** 103 aprobadas y 1 omitida, con el código final y el frontend recién compilado (25-11-2026). Incluye las pruebas nuevas de puntos de recuperación (`backup_recovery.spec.js`), el envío del boletín y el buscador público. La omitida es `dashboards_tablero.spec.js` (mapa de calor presupuestal): se salta sola cuando la base de pruebas, que arranca vacía, no tiene ningún ciclo con montos presupuestales; no es un fallo ni cambió en esta entrega.
+
+### 5. Al desplegar
+
+1. No hay migración de esquema nueva: el arranque no cambia tablas.
+2. La primera copia después del despliegue fija sola la última copia de la versión anterior («Antes de un despliegue»). Compruébelo en **Configuración → Copia de respaldo**.
+3. Si algo se ve mal después de desplegar, restaure ese punto desde el mismo panel (pide escribir RESTAURAR). El estado dañado queda guardado, así que se puede deshacer.
+4. Las copias anteriores a esta versión no traen conteos: la guarda por conteos empieza a actuar desde la segunda copia.
+
+---
+
+## Vigilancia que se reanuda sola y búsqueda sin buscadores bloqueados (25-11-2026, versión 7.3.0)
+
+**Estado:** CUMPLIDO PARCIAL, 25-11-2026. Probado en local (suite de backend, suite de navegador y búsqueda real contra los sitios de las fuentes). Falta la verificación en el sistema desplegado, que solo se puede hacer después del despliegue.
+
+Responde a tres observaciones del equipo sobre el sistema en Render.
+
+### 1. La vigilancia quedó «en curso» 186 horas
+
+**Causa.** En Render solo corre el proceso web y el trabajador regular está apagado (la imagen trae `INGEST_WORKER_ENABLED=false`). La cola la atendía únicamente el hilo que lanzó la corrida. Cuando el servicio se reinició o se suspendió, ese hilo murió: los trabajos quedaron pendientes sin nadie que los tomara, y el servicio tampoco se mantenía despierto porque el aviso de actividad (keep-alive) solo arrancaba junto con el trabajador regular.
+
+**Corrección** (`worker.py`):
+
+- **Vigilante de la cola** (`start_guardian`, `guardian_tick`). Un hilo liviano revisa cada minuto. Si hay trabajo vencido y nadie lo atiende, devuelve a la cola lo que quedó a medias y relanza el drenaje. La primera revisión ocurre 10 segundos después de arrancar, así que tras un reinicio la vigilancia sigue sola.
+- El vigilante también hace el keep-alive cada 4 minutos mientras haya cola, con o sin trabajador regular.
+- El propio drenaje devuelve a la cola los trabajos huérfanos (antes solo lo hacía el trabajador regular).
+- Corre donde este proceso es el único que puede atender la cola: SQLite con un solo proceso (Render y equipos locales). Con PostgreSQL y varios procesos web no corre, porque allí la cola es del servicio `worker`. `INGEST_GUARDIAN=true|false` lo fuerza o lo apaga. Nunca corre dentro de las pruebas unitarias.
+- La pantalla de vigilancia ya no dice «el worker regular no está en marcha»: explica que la cola la cuida el vigilante y que se reanuda sola.
+
+**Lo que no cambia.** El vigilante no es un trabajador permanente: no lanza vigilancias programadas. Eso sigue siendo del trabajador regular, que en Render está apagado. Encenderlo es cuestión de dos variables en el panel (`INGEST_WORKER_ENABLED=true` e `INGEST_WORKER_FORCE=true`), pero implica vigilancias automáticas cada 6 horas con consumo de IA: es decisión del equipo. El servicio `worker` aparte sigue siendo la mejora prevista para cuando haya un plan de pago.
+
+### 2. La búsqueda web traía 0 resultados y cada fuente perdía cerca de un minuto
+
+**Causa medida.** Los buscadores gratuitos bloquean las consultas automáticas. Medido el 25-11-2026 desde un equipo de oficina (no desde la nube): DuckDuckGo respondió HTTP 202 (desafío) en todas las consultas, Bing ignoró `site:` y devolvió páginas ajenas, y Yahoo respondió bien las primeras consultas y luego HTTP 500. El minuto por fuente salía de sumar la redacción de consultas con IA (hasta 40 s) y la espera de motores que no contestaban, que se repetía en cada consulta porque un fallo de red no pausaba el motor.
+
+**Corrección** (`web_search.py`, `search_knowledge.py`, `sitemap_search.py`):
+
+- **Base de conocimiento de búsqueda** (tabla `search_knowledge`, migración `0008`). Guarda las páginas útiles de cada fuente. La vigilancia las visita sin consultar ningún buscador. No pertenece a un ciclo: la usan todas las corridas y todos los ciclos, y como vive en la base del sistema se respalda en Firestore y sobrevive a los reinicios.
+- **Aprende sola.** Cada visita anota si la página aportó señales. La que no aporta en 2 visitas deja de visitarse y se vuelve a probar a los 45 días. Las que ya aportaron van primero.
+- **Mapa del sitio como respaldo.** Si los buscadores no alcanzan, el sistema lee el `sitemap.xml` de la propia fuente (o el que declare su `robots.txt`) y elige las páginas por las palabras de la consulta y por lo recientes que son. Es una consulta a la fuente, no a un buscador: funciona desde la nube y no requiere llave. Lo que encuentra queda en la base.
+- **Sin esperas inútiles.** Con páginas recientes en la base (30 días por defecto) no se consulta ningún buscador ni se le pide a la IA redactar consultas. Si todos los motores están en pausa, se salta la búsqueda en vivo de inmediato. Dos fallos de red seguidos pausan el motor. Tras 4 bloqueos seguidos la pausa pasa a 3 horas. Hay un tope de tiempo de búsqueda por fuente (45 s).
+- **Paquete inicial.** `backend/app/data/base_busqueda_eh.json` viaja con el código y se carga solo al arrancar (una vez por versión del archivo). Se armó con `backend/scripts/build_search_knowledge.py`, que busca dentro del dominio de cada fuente, abre cada página y cuenta las señales que saca el extractor por reglas: 366 páginas de 47 sitios, 149 de ellas con señales (469 señales contadas). 326 salieron de los mapas de sitio y 40 de una búsqueda web asistida para fuentes sin mapa útil. De las 115 fuentes con ingesta activa, 83 tienen la búsqueda web encendida; sus sitios quedan marcados como ya buscados, así que la primera vigilancia no repite la búsqueda.
+- **Pantalla.** Configuración › Parámetros de fuentes › Base de conocimiento de búsqueda: totales, consulta por texto, descargar y cargar un paquete. El informe de la vigilancia muestra cuántas fuentes usaron la base.
+- **API.** `GET /api/search-knowledge` (cualquier perfil), `GET /api/search-knowledge/coverage`, `GET /api/search-knowledge/export` y `POST /api/search-knowledge/import` (solo quien administra la configuración; la carga queda en bitácora y nunca borra ni baja cuentas).
+
+**Sobre la llave de Brave.** Ya no es necesaria para que la vigilancia funcione. Sigue siendo útil para que el servidor descubra páginas nuevas por su cuenta: si el equipo la crea y la pega en Configuración › Parámetros de fuentes, lo que Brave encuentre también queda en la base. La llave se crea con una cuenta del IETS en el sitio de Brave Search API; no se creó ninguna desde el desarrollo.
+
+### 3. No se encontraban «Ubicar señales exactas» ni «Abrir la página y resaltar la señal»
+
+Los dos botones existían, pero escondidos:
+
+- **(Ubicar señales exactas)** estaba dentro del reporte plegado de Señales capturadas: había que pulsar primero (Reporte de enlaces). Ahora está siempre a la vista en la tarjeta «Enlaces a la fuente original», arriba de la lista de Señales capturadas.
+- **(Abrir la página y resaltar la señal)** aparece en el detalle de una señal solo cuando el sistema ya ubicó esa señal dentro de su página. Las señales capturadas antes de esa función no lo tienen hasta que alguien pulsa (Ubicar señales exactas). No depende de que termine la vigilancia.
+
+### 4. Pruebas
+
+- **Backend:** 900 aprobadas y 1 omitida. 29 son nuevas (`test_vigilancia_reanudable_y_base_busqueda.py`): base de conocimiento, paquete, búsqueda por fuente sin buscadores, mapa del sitio, vigilante de la cola y API.
+- **Navegador (E2E):** corrida completa con 105 aprobadas, 1 omitida (la del mapa de calor presupuestal, que se salta sola con la base vacía) y 1 fallida. La fallida era una aserción de la prueba nueva `search_knowledge.spec.js`, que esperaba una sola fila y la base ya trae las páginas del paquete; se corrigió y, al repetir ese archivo junto con `modulo0_pendientes.spec.js`, pasaron las 9. No se repitió la corrida completa después de ese ajuste, que solo tocó la prueba.
+- **Verificación real** sobre una copia de la base, con Firestore y la IA apagados y los buscadores simulados en bloqueo (HTTP 429): el paso de búsqueda de las 83 fuentes tardó 0,1 s en total, sin una sola consulta a buscadores, y 47 fuentes recibieron páginas de la base. Una cola abandonada hacía 186 horas (un trabajo «ejecutando» y dos pendientes) fue reanudada por el vigilante y quedó atendida en 10 segundos, visitando páginas de la base.
+- **Buscadores gratuitos**, medidos desde un equipo de oficina: no son utilizables de forma sostenida (ver punto 2).
+
+### 5. Al desplegar
+
+1. Hay una migración nueva (`0008`): solo crea la tabla `search_knowledge`. No toca ninguna otra.
+2. Al arrancar se carga el paquete de la base de búsqueda. Compruébelo en Configuración › Parámetros de fuentes.
+3. Si quedó una vigilancia a medias, el vigilante la reanuda sola a los pocos segundos. Si era la corrida atascada, también puede detenerla desde Vigilancia.
+4. En la primera vigilancia, revise en el informe la línea «Base de conocimiento de búsqueda» y el tiempo por fuente.
+
+### 6. Pendientes y limitaciones
+
+- El servicio `worker` permanente y las vigilancias programadas en Render siguen pendientes de decisión y de plan de pago.
+- El mapa del sitio no cubre todas las fuentes: hay sitios que no lo publican o que lo publican sin páginas relacionadas. Esas fuentes se siguen leyendo por su página principal y sus URL de entrada, como antes.
+- El conteo de señales del paquete inicial se hizo con el extractor por reglas, sin IA. Es una estimación para ordenar las páginas; la vigilancia real lo corrige con cada visita.
+- El paquete se debe refrescar cada cierto tiempo (el script se puede volver a correr) o complementar con una llave de buscador.
+
+## II seguimiento del Módulo 0: bandeja que no se cae y señal exacta sin botón (25-11-2026, versión 7.3.1)
+
+**Estado:** CUMPLIDO PARCIAL, 25-11-2026. Probado en local (suite de backend, suite de navegador y verificación contra los sitios reales sobre una copia de la base de la vigilancia: 141 fuentes y 651 señales). Falta la verificación en el sistema desplegado, que solo se puede hacer después del despliegue.
+
+Responde a la columna «II Seguimiento» del consolidado de observaciones del Módulo 0. Se revisó cada ítem marcado VALIDADO y se atendieron los PENDIENTES de RF-001-A.
+
+### 1. Ítems VALIDADO: se comprobó que siguen funcionando
+
+Comprobados por API sobre la copia de la base real (`scratchpad/seg2/verif.py`) y por las pruebas automáticas:
+
+| Ítem | Qué se comprobó | Resultado |
+|---|---|---|
+| OBS-001-B/C | Ninguna fuente expone prioridad; el CSV no trae la columna | 0 fuentes con valor; sin columna |
+| OBS-002-A | La matriz se compara y se carga desde Catálogo de fuentes | 142 filas leídas; 141 sin cambios, 0 nuevas, 0 faltantes |
+| RF-002-A | Misma tecnología en varias fuentes, con bono | 16 corroboradas; indicador y filtro coinciden; bono = 5 por fuente adicional, máximo 15 |
+| RF-003-A | Datos de producto en la bandeja | fabricante en 226 de 500, forma farmacéutica en 50, concentración en 40, marca en 31, vía en 31 |
+| RF-004-A | Descarte con motivo obligatorio y por grupo | sin motivo o en blanco: rechazo (422); lote de 3 con motivo: aceptado, queda en Descartadas y se restaura |
+| RF-005-A | Buscador con el estado de la tecnología | responde con nombre, fabricante, fuente y etapa |
+| RF-006-A | Criterios de búsqueda por categoría | panel y parámetros vigentes |
+| Pregunta 4 | CSV legible del catálogo | punto y coma, 21 columnas, UTF-8 con BOM; también en Excel |
+| Pregunta 5 | Recarga del catálogo por el equipo | misma comprobación de OBS-002-A |
+
+Nada de lo validado cambió de comportamiento.
+
+### 2. RF-001-A (25/11): bandeja de entrada vacía con error del servidor y bandeja de trabajo que no cargaba
+
+**Causas encontradas en el código** (no se puede ver el sistema desplegado desde el desarrollo; estas son las que explican el síntoma):
+
+1. La Bandeja de entrada recalculaba la corroboración entre fuentes **en cada consulta** mientras hubiera vigilancia, porque el acervo cambia con cada señal nueva, y **escribía en la base** al mismo tiempo que la vigilancia. En Render (un proceso, SQLite, CPU limitada) la consulta tardaba o fallaba con «database is locked».
+2. Cuando el listado fallaba, la pantalla mostraba **«La bandeja está vacía»** y solo un aviso pasajero. El listado y los indicadores se pedían juntos: si fallaba uno, se perdían los dos.
+3. Con el servicio recién despertado, la primera consulta supera el tiempo de espera del navegador.
+
+**Corrección:**
+
+- `corroboration.refresh_for_read` (nuevo). Con vigilancia en curso recalcula como mucho cada 3 minutos; si otro cálculo está en marcha no espera; si la base está ocupada, deshace y sirve el último cálculo. La Bandeja responde siempre.
+- Al terminar la vigilancia, el drenaje deja la corroboración al día (`refresh_after_scan`).
+- Bandeja de entrada (`Staging.jsx`): el listado y los indicadores van por separado. Si el listado no llega, la pantalla dice «No se pudo cargar la bandeja de entrada», aclara que **no está vacía**, reintenta sola cada 20 segundos (hasta 6 veces) y ofrece (Reintentar ahora). Si ya había señales en pantalla, las conserva y avisa.
+- El mensaje de tiempo agotado explica que el servidor puede estar iniciando.
+- La Bandeja de trabajo ya tenía pantalla de reintento; no cambió.
+
+### 3. RF-001-A (18/11): no se identificaba la señal exacta
+
+Se repitió la prueba aleatoria del equipo sobre la copia de la base (`scratchpad/seg2/muestra.py`, 50 señales con «enlace exacto», abriendo cada enlace). Hallazgos:
+
+| Hallazgo | Señales afectadas en la base | Corrección |
+|---|---|---|
+| Health Canada abría el buscador de la Drug Product Database, no la ficha | 36 | El conector arma la ficha con el código del producto: `…/dpd-bdpp/info?lang=eng&code=<drug_code>` |
+| FDA 510(k) abría el buscador de 510(k) | 10 | `…/cfPMN/pmn.cfm?ID=K…`; De Novo: `…/denovo.cfm?id=DEN…`; PMA con suplemento: `…/pma.cfm?id=P…S…` |
+| Genéricos de la FDA (ANDA) abrían una página vacía: la URL quedaba `ApplNo=A214272` | 22 | Solo los dígitos: `ApplNo=214272` |
+| El buscador de un registro oficial se presentaba como «Enlace exacto» | las anteriores | `signal_links.classify` reconoce esos buscadores como «página de consulta» |
+| El cruce de postulaciones enlazaba 510(k) con una ruta en minúsculas que el sitio rechaza (HTTP 400) | enlaces del cruce | Ruta corregida (`cfPMN`) |
+
+Los formatos se comprobaron contra los sitios el 25-11-2026.
+
+**Señales ya capturadas.** `link_resolver.repair_registry_links` corre en cada arranque: toma el identificador del registro original de cada señal y le pone la URL de su ficha. La URL anterior queda en `evidence.resolved.previous_url`. Es idempotente y deja una entrada en bitácora (`link_registry_repair`). En la copia de la base corrigió las 68 señales.
+
+**Sin botón.** `link_resolver.auto_start`, llamado por el vigilante de la cola cuando el sistema está libre, ubica solas las señales de «página de consulta» que nunca se intentaron ubicar. Cada señal se intenta una vez (un reinicio no repite descargas), máximo 3 corridas por proceso, nunca durante una vigilancia. `LINK_AUTO_RESOLVE=false` lo apaga. El botón (Ubicar señales exactas) sigue sirviendo para reintentar. En la copia de la base: 57 señales en 21 páginas, 8 segundos, 53 ubicadas con resaltado y 4 sin ubicar (2 de AIFA y 1 de Boehringer, que cargan con JavaScript, y 1 página que no respondió).
+
+**Menos memoria.** `resolve_all` descarga y procesa de a 8 páginas y suelta el HTML antes del lote siguiente (antes guardaba todas las páginas a la vez).
+
+**En pantalla.**
+
+- En la fila de la Bandeja de entrada, el icono del enlace abre la página **resaltando la señal** cuando ya está ubicada (icono de lupa).
+- Sin cita textual, el enlace pide resaltar el **nombre de la tecnología**. Si la página lo trae, el navegador lo marca; si no, abre igual. Con nombres del tipo «MARCA (principio activo)» se usa la marca.
+- El detalle muestra, para un enlace exacto con cita, el texto que se resalta; para una ficha de registro oficial, lo dice; y para un enlace que pasa por Google Noticias, avisa que redirige al artículo.
+
+**Resultado sobre las 651 señales de la copia:** 594 con enlace exacto, 53 abren la página resaltando la señal y 4 sin ubicar.
+
+### 4. Lo que la prueba aleatoria muestra y no se pudo cerrar
+
+De 50 señales con enlace exacto tomadas al azar después de las correcciones:
+
+- En 14 la página descargada trae el nombre de la señal (11 con resaltado).
+- 6 no se pudieron descargar desde el equipo de desarrollo (el sitio rechaza robots); en el navegador abren.
+- En 30 la página abre, pero el texto descargado no trae el nombre literal. No son enlaces rotos:
+  - 20 son enlaces de **Google Noticias** (181 de las 594 señales con enlace exacto). Se usan para fuentes que bloquean robots (Lancet, NEJM, Medscape, entre otras). El enlace redirige al artículo original, pero no admite resaltado y el sistema no puede comprobar el destino. Obtener la URL final exige un servicio interno de Google, no documentado; no se implementó.
+  - Las otras 10 son registros que arman la página con JavaScript (5 de ClinicalTrials.gov, 3 de CTIS y 2 de PCORI): en el navegador muestran el estudio o la ficha.
+
+**Decisión para el equipo técnico:** para las fuentes que hoy entran por Google Noticias, registrar en la matriz su canal RSS oficial (o una URL de listado) da enlaces directos al artículo.
+
+### 5. Otros pendientes del seguimiento
+
+- **RF-001-A, prueba piloto en URL de fabricantes (25/11, equipo técnico).** El sistema ya trae el insumo: Configuración › Parámetros de fuentes › Base de conocimiento de búsqueda lista, por fuente, las páginas de noticias y de pipeline que se visitan, y el Diagnóstico para la matriz dice en qué fabricantes conviene cambiar la URL. La prueba y la decisión sobre la matriz son del equipo técnico.
+- **Pregunta 2, fuentes tipo E.** El aviso y el panel de validación responden: 8 fuentes por validar en la copia de la base. Falta el ejercicio de validación del equipo técnico.
+- **Pregunta 8, términos del cribado.** Queda para después de la síntesis, como indicó el equipo.
+
+### 6. Pruebas
+
+- **Backend:** 930 aprobadas y 1 omitida. 30 son nuevas (`test_ii_seguimiento_modulo0.py`): bandeja con la base ocupada, sin recálculo en cada consulta durante la vigilancia, ubicación automática, lotes de páginas, resaltado por nombre, URL de registros oficiales y reparación de lo ya capturado. Se actualizó una aserción de `test_reliability.py` porque el enlace ahora pide resaltar el nombre.
+- **Navegador (E2E):** 109 pruebas en total (2 nuevas en `ii_seguimiento.spec.js`). La corrida completa se cortó por el límite de tiempo del comando, así que se hizo en dos partes, cada una con la base vacía: la primera (de `auth_admin` a `flow_deeplinks`) dio 68 aprobadas y 1 omitida; la segunda (de `flow_dissemination` a `ux_shell`) dio 37 aprobadas, 1 omitida y 2 fallidas. Las 2 fallidas eran las pruebas nuevas, por un dato de la propia prueba (la señal de ejemplo no traía URL); se corrigieron y pasaron al repetir su archivo junto con `flow_staging_screening.spec.js`. Total: 107 aprobadas y 2 omitidas (las dos se saltan solas según el estado de la base). No se repitió la corrida completa de una sola vez.
+- **Verificación real:** descrita en los puntos 1, 3 y 4.
+
+### 7. Al desplegar
+
+1. No hay migraciones nuevas.
+2. Al arrancar se corrigen solos los enlaces de la FDA y de Health Canada (queda en bitácora).
+3. Unos segundos después, con el sistema libre, se ubican solas las señales de «página de consulta».
+4. Repetir la prueba aleatoria desde la Bandeja de entrada: el icono de lupa de la fila abre la página con la señal resaltada.
+
+## Inteligencia del sistema: base de conocimiento de señales, clasificador que aprende y marco analítico (25-11-2026, versión 7.4.0)
+
+**Estado:** CUMPLIDO PARCIAL, 25-11-2026. Probado en local (suite de backend, pruebas de navegador y verificación sobre una copia de la base real: 656 señales). La consulta a la IA se probó con respuestas simuladas: la llave del proveedor en el equipo de desarrollo está vencida (HTTP 401), así que falta verla con el proveedor real en el sistema desplegado.
+
+### 1. Qué se pidió y cómo se entendió
+
+| Pedido | Cómo quedó |
+|---|---|
+| Al clasificar, mostrar la URL exacta de lo capturado, conservando la señal en la fuente y la fuente original | Recuadro (Direcciones de la señal) en Clasificar: URL exacta de captura, página consultada y fuente original, escritas completas y con (Copiar) |
+| Parametrizar el «ciclo de vida» de las fuentes por rango de años, general o por fuente, con todos los años por defecto | **Vigencia de las señales por año** (`signal_window.py`). Se interpretó como el rango de años de publicación que el sistema acepta. Si el equipo se refería a otra cosa (por ejemplo, la vida útil de la fuente en el catálogo), hay que ajustarlo |
+| Un RAG en Firestore con la primera búsqueda histórica y las señales posteriores | Tabla `signal_knowledge` en la base del sistema, que es la que se copia a Firestore. Distingue `historica`, `vigilancia` y `postulacion` |
+| Actualizar el prompt | Prompt de captura (URL exacta, fecha de publicación, exclusión de lo ya establecido) y prompts nuevos de clasificación y de analítica, editables |
+| Un modelo que aprenda de las clasificaciones y sugiera mejor | Clasificador de reglas + parecido con lo ya clasificado + arbitraje de la IA con esos ejemplos |
+| IA en la analítica y un marco analítico | Cuatro lentes calculados con reglas y lectura ejecutiva de la IA sobre esas cifras |
+| Que se calibre | Validación dejando una fuera, a demanda y automática |
+| Parametrizable y presente en todo el sistema | Pestaña Configuración › Inteligencia; aparece en Bandeja de entrada (Clasificar), Analítica, captura y vigilante de fondo |
+
+### 2. Base de conocimiento de señales
+
+- `SignalKnowledge` (migración `0009`, solo crea la tabla). Un documento por tecnología no fusionada: nombre, texto, términos, año, origen, clúster, tipología, condición, decisión (`pendiente`, `clasificada`, `descartada`) y motivo del descarte.
+- `intelligence.sync` compara `technologies.updated_at` con lo indexado y solo rehace lo que cambió. La llaman la sugerencia, la analítica y el vigilante de la cola cuando el sistema está libre. No hay ganchos en cada escritura: si la sincronización falla, la tabla se reconstruye entera con (Reconstruir).
+- **Origen.** La primera sincronización fija la línea base (`intelligence.baseline_until`): lo capturado hasta ese momento es `historica`. (Fijar línea base hoy) la mueve.
+- **Por qué no una colección aparte en Firestore.** Firestore guarda la copia de la base SQLite. Una colección aparte sería una segunda fuente de verdad que habría que mantener sincronizada, y un servidor local no debe escribir en la colección de producción. La tabla viaja con la copia de siempre y se puede reconstruir.
+- **Recuperación.** TF-IDF con coseno, en memoria, reconstruido cuando cambia la tabla. Con 656 señales el índice se arma en 0,3 s y una consulta tarda centésimas. No usa vectores de un modelo externo: no cabe en 512 MB ni funciona con la IA apagada. El parecido es léxico.
+
+### 3. Clasificador
+
+`intelligence.suggest` (lo usa `POST /api/technologies/{id}/suggest-classification`; el contrato anterior se conserva y se amplía):
+
+1. **Reglas** del catálogo (`classification.py`, sin cambios).
+2. **Aprendizaje**: las `neighbors` señales clasificadas más parecidas votan con su parecido. Confianza = parte del voto del ganador × fuerza del parecido más alto.
+3. **Combinación**: si coinciden, sube la confianza; si el aprendizaje supera `min_confidence`, gana; si no, mandan las reglas, con la confianza que les midió la calibración.
+4. **IA** según `ai_mode`: ve la señal, los catálogos, los ejemplos del equipo y las dos propuestas. Solo puede elegir nombres del catálogo. Una respuesta fuera del catálogo, sin JSON o con un error del proveedor se descarta.
+5. **Aviso de descarte**: si se parece a señales descartadas por encima de `discard_similarity`.
+
+Cada sugerencia queda en bitácora (`intelligence:suggest`); con eso `intelligence.acceptance` mide cuántas confirmó el evaluador.
+
+**Hallazgo durante la verificación.** El proveedor devolvió `[Error MiniMax HTTP 401: {...}]`. El cuerpo del error es JSON y se tomaba como respuesta válida: la sugerencia decía «con IA» sin haberla usado. Se corrigió y tiene prueba.
+
+### 4. Calibración
+
+`intelligence.calibrate`: predice cada señal clasificada sin verla, con 3, 5, 7 y 11 vecinos. Elige el mejor y la menor confianza (desde 0,30) que cumple `target_precision` con al menos 5 casos. Reporta el acierto de las reglas, del aprendizaje y del combinado, la tabla de confianza frente a acierto real y la referencia de decir siempre el clúster más frecuente.
+
+No calibra con menos de 20 señales clasificadas ni si casi todas están en un clúster. **Sobre la copia de la base real** hay 24 clasificadas, 21 de ellas en Cáncer: la calibración responde «datos insuficientes» y no cambia parámetros. Es el comportamiento correcto; la primera versión elegía una confianza mínima de 5 % con esos datos y se corrigió.
+
+### 5. Marco analítico
+
+`analytics_insights.py`. `facts` calcula las cifras; `framework` las convierte en hallazgos por lente; `narrative` pide a la IA la lectura con esas cifras y la guarda (`intelligence.analytics_narrative`). La lectura nunca se genera sola al abrir la pantalla: alguien pulsa el botón.
+
+### 6. Vigencia por año
+
+`signal_window.py`, clave `signals.window` en `app_meta` (general y por fuente). No se agregaron columnas a `sources`.
+
+- Captura por página: `scraper.py` filtra los candidatos antes de guardar.
+- Captura por conector: `ingest_service.persist_record` no crea la señal; el registro crudo queda y entra si después se amplía la vigencia.
+- Sobre lo capturado: `preview` y `apply`. El descarte usa el mismo mecanismo de la bandeja (`staging:discard`), así que se ve en Descartadas y se restaura.
+
+Sobre la copia real, de 638 señales en la bandeja: 380 de 2026, 20 de 2027 (fechas futuras de ensayos), 33 anteriores y 205 sin fecha. Con vigencia «desde 2026» quedarían fuera esas 33.
+
+### 7. Pruebas
+
+- **Backend:** 970 aprobadas y 1 omitida. 40 son nuevas (`test_inteligencia.py`): base de conocimiento, parecido, sugerencia con y sin ejemplos, IA simulada (acierto, respuesta fuera del catálogo, error del proveedor), calibración, mantenimiento de fondo, vigencia por año, API y marco analítico. Se ajustaron tres aserciones de `test_ii_seguimiento_modulo0.py`: el vigilante ahora también sincroniza la base de conocimiento.
+- **Navegador (E2E):** 114 pruebas, 5 nuevas (`inteligencia.spec.js`). Se corrieron en tres partes por el límite de tiempo del comando, cada una con la base vacía: 39, 33 y 39 aprobadas. Total: 111 aprobadas, 3 omitidas (se saltan solas según el estado de la base) y ninguna fallida.
+- **Verificación real** sobre la copia de la base, con la IA apagada: estado en 0,3 s la primera vez y 0,02 s después; sugerencia en 0,05 s; marco analítico en 0,05 s.
+
+### 8. Al desplegar
+
+1. Migración `0009`: solo crea `signal_knowledge`.
+2. A los pocos segundos de arrancar, con el sistema libre, el vigilante llena la base de conocimiento. Lo capturado hasta ese momento queda como primera búsqueda histórica.
+3. Revisar Configuración › Inteligencia: totales de la base y estado de la IA.
+4. Probar (Sugerir clasificación) en una señal y (Generar lectura con IA) en Analítica: es la primera vez que corren con el proveedor real.
+
+### 9. Pendientes y límites
+
+- La IA real no se pudo probar en desarrollo (llave vencida).
+- El clasificador aprende poco mientras haya pocas clasificaciones y casi todas en un clúster. Mejora sola a medida que el equipo clasifica.
+- El parecido es léxico: no relaciona sinónimos ni idiomas distintos. Pasar a vectores semánticos exige un servicio de embeddings o más memoria que la del plan gratuito.
+- 205 señales no tienen fecha de publicación: la vigencia no las puede juzgar y por defecto las conserva.
+- El prompt de captura cambió en su texto de fábrica. Si en producción hay un prompt propio guardado, ese sigue mandando hasta que alguien pulse (Restaurar) en Prompts de vigilancia.
+
+## Búsqueda a fondo, vigilancia que no se queda y enlaces verificados (25-11-2026, versión 7.4.1)
+
+**Estado:** CUMPLIDO PARCIAL, 25-11-2026. Probado con tres vigilancias reales completas contra los sitios de las fuentes, sobre una copia de la base (141 fuentes, 115 con ingesta activa), y con las suites de backend y de navegador. Dos cosas no se pudieron verificar en desarrollo: la extracción con IA (la llave local del proveedor está vencida, HTTP 401) y el comportamiento en Render.
+
+### 1. Lo que encontró la vigilancia real
+
+La primera corrida real con el código de la 7.4.0 **se quedó en 38 %**. Las causas, tomadas del registro del servidor:
+
+| Síntoma | Causa | Corrección |
+|---|---|---|
+| Una fuente (AMGEN) quedó «en curso» con «PendingRollbackError» | La base respondió «database is locked» al anotar las páginas de búsqueda; con la sesión rota, registrar el fallo también falló y el hilo murió sin cerrar el job | El fallo se deshace antes de registrarse (`ingest_service._run_job`, `scraper.scrape_source`). Si aun así el hilo muere, `_abandon_job` cierra el job en una sesión nueva y lo deja para reintento en un minuto |
+| «database is locked» | Una escritura quedaba abierta mientras se esperaba a la red, y SQLite tiene un solo escritor | Se cierra la escritura antes de salir a la red (`_run_job`, `_run_adapter`). Las señales se guardan primero; la anotación de páginas de búsqueda y la traza van después, cada una en su propia escritura |
+| Tres fuentes de la FDA llevaban minutos «recorriendo» | Tres fuentes a la vez abrían doce fichas de `fda.gov`; el sitio dejaba de responder | Tope de dos descargas simultáneas por sitio, sumando todas las fuentes (`scraper._host_slot`) |
+
+Además queda un **detector de escrituras largas** (`database.py`): si una sesión mantiene una escritura abierta más de 5 segundos, el log dice en qué hilo. Sirve para encontrar el culpable en producción sin adivinar.
+
+**Resultado con las correcciones** (dos corridas reales completas):
+
+| Corrida | Fuentes | Completas | Parciales | Con error | Tiempo | Detectadas | Nuevas | «database is locked» |
+|---|---|---|---|---|---|---|---|---|
+| 2 | 115 de 115 | 54 | 61 | 0 | 6 min 1 s | 810 | 206 | 0 |
+| 3 | 115 de 115 | 54 | 61 | 0 | 6 min 43 s | 847 | 233 | 0 |
+
+Durante la corrida la Bandeja de entrada respondió en 0,19 s y el avance por fuente se actualizó todo el tiempo (etapa y detalle de cada fuente en curso).
+
+**Parciales.** De las 61: 25 se leyeron por Google Noticias porque el sitio no respondió, 1 por el RSS oficial y 35 se visitaron sin detectar señales.
+
+### 2. Calidad de la extracción: lo que se puede afirmar y lo que no
+
+- **Sin IA** (como corrieron estas pruebas), 41 de las 115 fuentes no dieron ninguna señal aunque el sistema entró y recorrió sus páginas (por ejemplo Abbott: 12 a 15 páginas visitadas, 0 señales). El extractor por reglas es conservador: solo toma lo que reconoce como producto o tecnología nominada.
+- **Con IA** el resultado debe ser mejor, pero **no se pudo medir**: la llave del proveedor en el equipo de desarrollo responde 401. Hay que medirlo en el sistema desplegado, donde la llave es válida, comparando el informe de la vigilancia por fuente.
+- Las 233 señales nuevas de la corrida 3 llegaron con enlace exacto: 50 de ClinicalTrials.gov, 48 de la FDA, 17 de AbbVie, 15 de BMJ, 14 de DocGuide y el resto de otras fuentes.
+
+### 3. Contenido plegado y tablas
+
+El texto de cada página salía del extractor de «artículo principal», que descartaba lo que la página muestra plegado. Con una página de prueba se comprobó que se perdían un acordeón cerrado, una pestaña oculta y una tabla.
+
+`scraper.folded_text` agrega al texto de la página lo que el HTML trae en `details`, acordeones, pestañas, bloques ocultos, «ver más» y tablas (hasta 80 filas y 6.000 caracteres), sin repetir lo ya leído y sin tomar menús, pies ni avisos de cookies. Equivale a desplegar la página.
+
+**Límite.** No ejecuta JavaScript. Lo que un sitio pide al servidor después de un clic no está en el HTML y no se puede leer así (AIFA, Boehringer). Un navegador sin interfaz no cabe en los 512 MB del plan gratuito de Render.
+
+### 4. Enlaces de las señales
+
+**Botones.** En Clasificar las tres direcciones son botones como los demás: (URL exacta de la señal), (Página consultada) y (Fuente original), cada uno con un icono para copiar. El recuadro de tipo de enlace ya no repite sus propios botones.
+
+**«Not found» y 404.** Se revisaron los enlaces en un navegador real:
+
+| Fuente | Hallazgo | Corrección |
+|---|---|---|
+| CTIS (ensayos europeos), 40 señales | El enlace abría el buscador sin el ensayo | `ctis-public/view/<número>` abre la ficha. Las ya capturadas se corrigen al arrancar |
+| PCORI, ClinicalTrials.gov | Abren bien y muestran la señal | Ninguna |
+| Google Noticias | En el navegador redirigen al artículo de la fuente | Ninguna |
+
+**Verificación automática** (`signal_links.check_links`, `auto_check`). El vigilante de la cola verifica solos los enlaces sin verificar, en tandas de 150.
+
+- **Roto** solo es 404, 410 o una página cuyo título dice «no encontrado». En ese caso la señal deja de ofrecer ese enlace: pasa a su página consultada, queda lista para ubicarse allí y la dirección rota se guarda en `evidence.broken_url`.
+- **Bloqueado** (401, 403, 429 y también 400) es un sitio que rechaza visitas automáticas. En el navegador abre.
+- **Sin respuesta** se reintenta al día siguiente.
+
+**Dos errores del verificador anterior**, medidos sobre 651 señales:
+
+1. Pedía 40 páginas a la vez a un mismo sitio: PCORI y `fda.gov` dejaban de contestar y 54 señales salían como caídas sin estarlo. Ahora cada sitio se visita de a una página, con pausa, máximo 25 por tanda, y si rechaza tres seguidas se le deja hasta el día siguiente.
+2. Usaba un cliente distinto al del rastreador y PCORI no le respondía. Ahora usa el mismo.
+
+Con el verificador corregido, de las 651 señales de la copia: 620 abren, 31 bloquean la verificación automática y ninguna está rota.
+
+**Aviso operativo.** Tras dos vigilancias y varias verificaciones seguidas, `accessdata.fda.gov` bloqueó temporalmente la IP del equipo de desarrollo (HTTP 400 a todo, también en el navegador). Es la razón de los topes de cortesía. En producción, lanzar varias vigilancias completas seguidas puede provocar lo mismo.
+
+### 5. Base de conocimiento sincronizada
+
+- Al terminar cada vigilancia, el drenaje sincroniza la base de conocimiento (y recalibra si toca) sin esperar al vigilante.
+- La línea base se fija al arrancar el sistema, no en la primera sincronización: lo que capture la vigilancia que se reanuda tras el despliegue cuenta como señal posterior. En la corrida 3: 656 históricas y 233 posteriores.
+
+### 6. Pruebas
+
+- **Backend:** 1000 aprobadas y 1 omitida. 30 son nuevas (`test_busqueda_a_fondo.py`).
+- **Navegador (E2E):** 115 pruebas en tres partes por el límite de tiempo del comando (39, 33 y 40 aprobadas). Total: 112 aprobadas, 3 omitidas y ninguna fallida.
+- **Vigilancias reales:** las tres descritas en el punto 1.
+- **Navegador real:** 18 enlaces de señales de 10 sitios, abiertos uno por uno.
+
+### 7. Pendientes y límites
+
+- Medir la extracción con IA en el sistema desplegado.
+- Verificar todo en Render: allí la CPU es mucho menor y los tiempos serán más largos.
+- Las 41 fuentes sin señales en la corrida sin IA deben revisarse con el informe de la vigilancia con IA; las que sigan en cero necesitan una URL más específica en la matriz o consulta manual.
+- Sitios que arman su contenido con JavaScript: no se leen (punto 3).
+
+## Prueba real con IA: vigilancia completa, calidad de la extracción y prompt de captura (25-11-2026, versión 7.4.2)
+
+**Estado:** CUMPLIDO PARCIAL, 25-11-2026. Con una llave válida del proveedor (MiniMax-M3) se corrió una vigilancia real completa sobre una copia de la base, con Firestore apagado. Falta la verificación en Render.
+
+### 1. Vigilancia real completa con IA
+
+| | Sin IA (corrida 3) | Con IA (corrida 4) |
+|---|---|---|
+| Fuentes atendidas | 115 de 115 | 115 de 115 |
+| Completas / parciales / con error | 54 / 61 / 0 | 70 / 45 / 0 |
+| Tiempo | 6 min 43 s | 19 min 13 s |
+| Señales detectadas | 847 | 1.152 |
+| Señales nuevas | 233 | 812 |
+| Fuentes sin ninguna señal | 41 | 25 |
+| «database is locked» y escrituras largas | 0 | 0 |
+
+De las 45 parciales con IA: 25 se leyeron por Google Noticias porque el sitio no respondió y 20 se visitaron sin detectar señales. Entre estas últimas están las que arman su contenido con JavaScript (AIFA, Boehringer) y varios registros de ensayos (ChiCTR, CRiS, DRKS, EUDAMED).
+
+### 2. Calidad de lo extraído con IA
+
+De las 812 señales nuevas, 707 salieron de la lectura de páginas (las demás llegaron por API: ClinicalTrials.gov, FDA y CTIS):
+
+- 534 con enlace exacto y 173 con página de consulta; de estas, 146 ya abren la página resaltando la señal.
+- 683 de 707 traen la cita textual de la fuente.
+- 428 de 707 traen fecha de publicación.
+- 132 entran por Google Noticias.
+
+**¿La URL exacta contiene la señal?** Muestra aleatoria de 80 señales con enlace exacto fuera de Google Noticias, abriendo cada página:
+
+- En 63 la página trae la señal.
+- En 12 no se encontró el nombre. Al revisarlas, casi todas son temas genéricos que la IA tradujo («Hemodiálisis», «Inmunoterapia», «Oxígeno hiperbárico») tomados de páginas índice: el problema es la señal, no el enlace.
+- 5 no se pudieron descargar desde el equipo de desarrollo.
+
+**Ruido.** La IA toma como tecnología temas de salud y procedimientos en general cuando la fuente es una página índice (MedlinePlus, Noticias Médicas, la página de tecnologías de GSK).
+
+### 3. Prompt de captura reforzado
+
+Se agregó al prompt de fábrica la regla de que un tema de salud, un procedimiento o una clase terapéutica no es una señal salvo que el texto nombre un producto, marca, código, DCI o fabricante concreto, y que tampoco lo son los artículos de historia o de perfil de la empresa.
+
+Medido repitiendo con IA las mismas 8 fuentes que más ruido dieron (Abbott, GSK, MedlinePlus, Noticias Médicas, ReBEC, Science Daily, DocGuide y JAMA): **de 76 señales a 47**. Desaparecieron «Colonoscopia», «Artroscopia», «Hemodiálisis», «Implantes dentales», «Brackets metálicos» y similares.
+
+**Lo que sigue entrando.** Rótulos de páginas índice («MedlinePlus», «CT Scans», «Diagnostic Imaging»), contenido ajeno de un sitio de noticias («SSSTik», «fGet») y productos de nutrición de Abbott. La respuesta de la IA varía entre corridas, así que la cifra exacta no es fija.
+
+**Qué hacer con ese ruido.** Para MedlinePlus y Noticias Médicas conviene registrar en la matriz una URL de novedades en lugar de la página índice, o pasarlas a consulta manual. Lo que el equipo descarte en la bandeja alimenta la base de conocimiento, y la sugerencia avisa cuando una señal nueva se parece a algo descartado.
+
+### 4. Sugerencia de clasificación y lectura analítica con el proveedor real
+
+- **Sugerencia:** 8 señales, entre 1,0 y 2,8 s cada una. Para una terapia génica propuso «Enfermedades huérfanas o raras» y «Terapias avanzadas y génicas» con motivo tomado del texto. Para títulos de artículos que no son una tecnología no propuso clúster, que es lo correcto.
+- **Lectura analítica:** 2,4 s. Usó solo las cifras entregadas, en los cuatro párrafos del marco.
+
+### 5. Verificación de enlaces después de la vigilancia
+
+Arranca sola un minuto después de terminar la vigilancia y trabaja por tandas de 150. Con la cortesía por sitio, una tanda tarda unos 10 minutos y el resultado se escribe al terminar cada tanda: con 1.463 señales, verificarlas todas toma cerca de dos horas en segundo plano.
+
+### 6. Pruebas
+
+- **Backend:** 1000 aprobadas y 1 omitida. Con la llave válida en el `.env`, una prueba antigua de captura llamó a la IA real y falló: la suite no aislaba al proveedor. `conftest.py` ahora lo aísla siempre (`_hermetic_ai_provider`); las pruebas no gastan cupo ni dependen de la llave.
+- **Navegador:** sin cambios desde la 7.4.1 (112 aprobadas y 3 omitidas de 115); esta versión solo cambia el texto del prompt.
+
+### 7. Pendientes
+
+- Verificar en Render, donde la CPU es mucho menor: la vigilancia con IA tardará bastante más de 19 minutos.
+- Si en producción hay un prompt de captura propio guardado, el reforzado no aplica hasta pulsar (Restaurar) en Prompts de vigilancia.
+- Revisar con el equipo técnico las 25 fuentes que no dan señales ni con IA.

@@ -99,9 +99,26 @@ export default function LinkReport({ canWrite, toast }) {
             matriz.
           </div>
         </div>
-        <Button size="sm" variant="secondary" onClick={() => setOpen((o) => !o)} data-testid="link-report-toggle">
-          <Icon name="link" size={14} /> {open ? "Ocultar reporte" : "Reporte de enlaces"}
-        </Button>
+        <div className="fb-toolbar">
+          {/* Siempre a la vista: antes quedaba dentro del reporte plegado y no se encontraba. */}
+          <HintButton
+            size="sm"
+            disabled={!canWrite || res.running}
+            disabledHint={res.running ? "Ya se están ubicando las señales" : "Requiere permiso de edición de señales"}
+            hint="Busca cada señal de página de consulta en su página: si la página la enlaza, guarda el enlace exacto; si la fuente no tiene enlace por ítem, arma un enlace que abre la página y resalta la señal. La URL anterior queda en la evidencia. Al terminar, el botón «Abrir la página y resaltar la señal» aparece en el detalle de cada señal ubicada."
+            loading={busy === "resolve"}
+            onClick={() => {
+              setOpen(true);
+              resolve();
+            }}
+            data-testid="link-resolve"
+          >
+            <Icon name="search" size={14} /> Ubicar señales exactas
+          </HintButton>
+          <Button size="sm" variant="secondary" onClick={() => setOpen((o) => !o)} data-testid="link-report-toggle">
+            <Icon name="link" size={14} /> {open ? "Ocultar reporte" : "Reporte de enlaces"}
+          </Button>
+        </div>
       </div>
       {open && data && (
         <div style={{ marginTop: 12 }}>
@@ -114,17 +131,6 @@ export default function LinkReport({ canWrite, toast }) {
             {t.sin_clasificar ? <span className="sl-badge sl-badge--warn">Sin clasificar: {t.sin_clasificar}</span> : null}
           </div>
           <div className="fb-toolbar" style={{ marginBottom: 10 }}>
-            <HintButton
-              size="sm"
-              disabled={!canWrite || res.running}
-              disabledHint={res.running ? "Ya se están ubicando las señales" : "Requiere permiso de edición de señales"}
-              hint="Busca cada señal de página de consulta en su página: si la página la enlaza, guarda el enlace exacto; si la fuente no tiene enlace por ítem, arma un enlace que abre la página y resalta la señal. La URL anterior queda en la evidencia."
-              loading={busy === "resolve"}
-              onClick={resolve}
-              data-testid="link-resolve"
-            >
-              <Icon name="search" size={14} /> Ubicar señales exactas
-            </HintButton>
             <HintButton size="sm" variant="outline" disabled={!canWrite} disabledHint="Requiere permiso de edición de señales" hint="Clasifica de nuevo todas las señales y guarda la evidencia de captura. No cambia ninguna URL." loading={busy === "classify"} onClick={classify}>
               Clasificar señales
             </HintButton>

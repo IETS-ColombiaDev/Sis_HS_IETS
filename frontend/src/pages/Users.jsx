@@ -316,7 +316,7 @@ function PermissionMatrix({ roles, permissions }) {
                 const has = r.permissions.includes(p.code);
                 return (
                   <td key={r.code} className={has ? "perm-yes" : "perm-no"} aria-label={`${r.label}: ${has ? "sí" : "no"}`}>
-                    {has ? "✓" : "—"}
+                    {has ? "✓" : "-"}
                   </td>
                 );
               })}

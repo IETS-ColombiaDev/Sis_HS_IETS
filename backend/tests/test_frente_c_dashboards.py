@@ -1013,3 +1013,75 @@ def test_public_stats_use_the_same_criterion_as_the_public_list(db):
         in_stats = {i["label"]: i["value"] for i in stats["by_cluster"]}.get(cluster.name, 0)
         assert in_list == in_stats
     assert "Confidencial B" not in str(stats)
+
+
+# --------------------------------------------------------------------------- #
+#  RF18: buscador avanzado de expedientes publicos
+# --------------------------------------------------------------------------- #
+def _public_set(db):
+    c1 = _cycle(db, "Ciclo RF18", status="cerrado_consolidado")
+    clusters = db.query(Cluster).order_by(Cluster.id).all()
+    from app.models import TechType
+
+    types = db.query(TechType).order_by(TechType.id).all()
+    y25 = dt.datetime(2025, 6, 1, tzinfo=dt.timezone.utc)
+    y26 = dt.datetime(2026, 3, 1, tzinfo=dt.timezone.utc)
+    specs = [
+        ("Alfa oncológico", clusters[0].id, types[0].id, "Fase III", y26, False),
+        ("Beta cardiaco", clusters[1].id, types[0].id, "Phase 2", y26, False),
+        ("Gamma dispositivo", clusters[1].id, types[1].id, "", y25, False),
+        ("Delta autorizado", clusters[0].id, types[1].id, "Autorizado por FDA", y25, False),
+        ("Secreto confidencial", clusters[0].id, types[0].id, "Fase III", y26, True),
+    ]
+    out = {}
+    for name, cluster_id, type_id, phase, when, secret in specs:
+        tech = Technology(
+            commercial_name=name, cluster_id=cluster_id, tech_type_id=type_id,
+            development_phase=phase, status="publicada",
+        )
+        db.add(tech)
+        db.flush()
+        db.add(EvaluationDoc(cycle_id=c1.id, technology_id=tech.id, status="publicado",
+                             confidential=secret, published_at=when, body={}))
+        out[name.split()[0]] = tech
+    db.commit()
+    return out, clusters, types
+
+
+def _names(items):
+    return sorted(i["commercial_name"].split()[0] for i in items)
+
+
+def test_public_search_filters_by_type_phase_year_and_paginates(db):
+    techs, clusters, types = _public_set(db)
+
+    everything, total = strategy_service.search_public_fiches(db)
+    assert total == 4 and "Secreto" not in _names(everything)
+
+    by_type, n = strategy_service.search_public_fiches(db, tech_type_id=types[1].id)
+    assert (_names(by_type), n) == (["Delta", "Gamma"], 2)
+    assert _names(strategy_service.search_public_fiches(db, phase="fase_iii")[0]) == ["Alfa"]
+    assert _names(strategy_service.search_public_fiches(db, phase="fase_ii")[0]) == ["Beta"]
+    assert _names(strategy_service.search_public_fiches(db, phase="autorizada")[0]) == ["Delta"]
+    assert _names(strategy_service.search_public_fiches(db, phase="sin_fase")[0]) == ["Gamma"]
+    assert _names(strategy_service.search_public_fiches(db, year=2025)[0]) == ["Delta", "Gamma"]
+    combined = strategy_service.search_public_fiches(db, cluster_id=clusters[0].id, year=2026, phase="fase_iii")
+    assert (_names(combined[0]), combined[1]) == (["Alfa"], 1)  # la confidencial nunca aparece
+
+    page1, total = strategy_service.search_public_fiches(db, limit=3, offset=0)
+    page2, _ = strategy_service.search_public_fiches(db, limit=3, offset=3)
+    assert total == 4 and len(page1) == 3 and len(page2) == 1
+    assert not {i["id"] for i in page1} & {i["id"] for i in page2}
+
+
+def test_public_filters_only_offer_options_that_have_a_visible_fiche(db):
+    techs, clusters, types = _public_set(db)
+
+    opts = strategy_service.public_fiche_filters(db)
+
+    assert opts["total"] == 4
+    assert {c["id"] for c in opts["clusters"]} == {clusters[0].id, clusters[1].id}
+    assert {t["id"] for t in opts["tech_types"]} == {types[0].id, types[1].id}
+    assert [p["code"] for p in opts["phases"]] == ["fase_ii", "fase_iii", "autorizada", "sin_fase"]
+    assert opts["years"] == [2026, 2025]
+    assert "Secreto" not in str(opts)

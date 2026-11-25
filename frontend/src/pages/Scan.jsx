@@ -49,12 +49,12 @@ function daysSince(iso) {
 }
 
 function when(iso) {
-  return iso ? new Date(iso).toLocaleString() : "—";
+  return iso ? new Date(iso).toLocaleString() : "-";
 }
 
 /** Proxima ejecucion; si ya vencio, corre en la siguiente vuelta del worker. */
 function nextRun(iso) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).getTime() <= Date.now() ? "En la próxima vuelta del worker" : when(iso);
 }
 
@@ -355,7 +355,7 @@ export default function Scan() {
                 <dt>Cada</dt>
                 <dd>{scanTask.interval_hours} h <InfoTip text={GLOSSARY.fb_intervalo_vigilancia} /></dd>
                 <dt>Próxima</dt>
-                <dd>{scanTask.enabled ? nextRun(scanTask.next_run_at) : "—"}</dd>
+                <dd>{scanTask.enabled ? nextRun(scanTask.next_run_at) : "-"}</dd>
                 <dt>Última</dt>
                 <dd>
                   {scanTask.last_run ? (

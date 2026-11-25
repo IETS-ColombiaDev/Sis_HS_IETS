@@ -64,18 +64,61 @@ def cooldown_status() -> dict[str, int]:
 _strikes: dict[str, int] = {}
 
 
+# Bloqueos seguidos (sin un solo acierto) tras los que el motor se da por
+# inalcanzable desde este servidor y la pausa pasa a ser larga. Desde la nube los
+# motores gratuitos bloquean siempre: reintentarlos cada pocos minutos solo le
+# quitaba tiempo a cada fuente.
+LONG_COOLDOWN_STRIKES = 4
+LONG_COOLDOWN_MINUTES = 180
+# Fallos de red seguidos (tiempo agotado, conexion rechazada) que pausan el motor:
+# antes no contaban y cada consulta volvia a esperar el tiempo maximo completo.
+ERROR_STRIKES = 2
+_errors: dict[str, int] = {}
+
+
 def _cool(engine: str, minutes: int) -> None:
-    """Pausa el motor. Escalonada: 2, 4, 8... minutos hasta el tope configurado."""
+    """Pausa el motor. Escalonada: 2, 4, 8... minutos hasta el tope configurado.
+
+    Tras `LONG_COOLDOWN_STRIKES` bloqueos seguidos la pausa es larga.
+    """
     with _lock:
         strikes = _strikes.get(engine, 0) + 1
         _strikes[engine] = strikes
         wait = min(max(1, minutes), 2 ** strikes)
+        if strikes > LONG_COOLDOWN_STRIKES:
+            wait = max(wait, LONG_COOLDOWN_MINUTES)
         _cooldown[engine] = time.time() + wait * 60
+
+
+def _network_error(engine: str, minutes: int) -> None:
+    """Cuenta un fallo de red; al segundo seguido el motor entra en pausa."""
+    with _lock:
+        count = _errors.get(engine, 0) + 1
+        _errors[engine] = count
+    if count >= ERROR_STRIKES:
+        with _lock:
+            _errors.pop(engine, None)
+        _cool(engine, minutes)
 
 
 def _clear_strikes(engine: str) -> None:
     with _lock:
         _strikes.pop(engine, None)
+        _errors.pop(engine, None)
+
+
+def available_engines(cfg: dict, brave_key: str = "") -> list[str]:
+    """Motores que se pueden consultar ahora: configurados y fuera de pausa."""
+    out: list[str] = []
+    for engine in cfg.get("engines") or source_profile.DEFAULT_SEARCH["engines"]:
+        if engine == "brave_api" and not brave_key:
+            continue
+        if engine == "searxng" and not (cfg.get("searxng_url") or "").strip():
+            continue
+        if _is_cooling(engine):
+            continue
+        out.append(engine)
+    return out
 
 
 def _is_cooling(engine: str) -> bool:
@@ -87,6 +130,7 @@ def reset_cooldowns() -> None:
     with _lock:
         _cooldown.clear()
         _strikes.clear()
+        _errors.clear()
 
 
 # --------------------------------------------------------------------------- #
@@ -305,6 +349,8 @@ def search(query: str, *, cfg: dict, brave_key: str = "", domain: str = "") -> d
             attempts.append({"engine": engine, "status": "bloqueado", "ms": _ms(started), "detail": str(exc)[:120]})
             continue
         except (httpx.HTTPError, ValueError) as exc:
+            if isinstance(exc, httpx.HTTPError):
+                _network_error(engine, int(cfg.get("cooldown_minutes") or 20))
             attempts.append({"engine": engine, "status": "error", "ms": _ms(started), "detail": type(exc).__name__})
             continue
         except Exception as exc:  # noqa: BLE001
@@ -470,11 +516,21 @@ def ai_queries(source, profile: dict, cfg: dict, context: str = "") -> list[str]
 
 
 def search_for_source(db, source, profile: dict | None = None, *, context: str = "") -> dict:
-    """Busqueda web completa de una fuente: consultas, resultados filtrados y traza."""
+    """Busqueda web completa de una fuente: consultas, resultados filtrados y traza.
+
+    Primero mira la base de conocimiento (`search_knowledge`): si ya tiene paginas
+    recientes del dominio, no se consulta ningun buscador. La busqueda en vivo
+    solo corre si hay un motor fuera de pausa, y lo que encuentra queda guardado
+    en la base para las corridas siguientes y para todos los ciclos.
+    """
+    from . import scan_progress, search_knowledge
+
     cfg = source_profile.load_search(db)
     profile = profile or source_profile.effective_profile(source)
-    out = {"enabled": False, "domain": "", "queries": [], "query_origin": "", "results": [], "steps": []}
-    from . import scan_progress
+    out = {
+        "enabled": False, "domain": "", "queries": [], "query_origin": "", "results": [], "steps": [],
+        "from_knowledge": 0, "live": False,
+    }
 
     if not cfg.get("enabled"):
         out["steps"].append({"action": "busqueda", "url": "", "status": "omitido", "ms": 0, "detail": "Búsqueda web apagada en Parámetros de fuentes"})
@@ -489,66 +545,179 @@ def search_for_source(db, source, profile: dict | None = None, *, context: str =
     if not domain:
         out["steps"].append({"action": "busqueda", "url": "", "status": "omitido", "ms": 0, "detail": "La fuente no tiene dominio"})
         return out
-    from . import scan_progress
 
     started = time.perf_counter()
-    scan_progress.stage("buscando", f"Redactando consultas de búsqueda para {domain}")
-    queries = ai_queries(source, profile, cfg, context=context)
-    origin = "ia" if queries else "reglas"
-    if not queries:
-        queries = rule_queries(source, profile, cfg)
-    out["queries"], out["query_origin"] = queries, origin
-    out["steps"].append(
-        {"action": "busqueda", "url": domain, "status": "ok", "ms": _ms(started), "detail": f"{len(queries)} consulta(s) redactadas por {'la IA' if origin == 'ia' else 'reglas'}"}
-    )
-    brave_key = source_profile.brave_api_key(db)
     limit = int(cfg.get("max_results") or 6)
     known = {(getattr(source, "url", "") or "").rstrip("/")} | {u.rstrip("/") for u in profile.get("entry_urls") or []}
-    seen: set[str] = set()
-    pause = int(cfg.get("pause_ms") or 0) / 1000.0
-    for idx, query in enumerate(queries):
-        if len(out["results"]) >= limit:
-            break
-        if idx and pause:
-            time.sleep(pause)
-        t0 = time.perf_counter()
-        scan_progress.stage("buscando", f"Consulta {idx + 1}/{len(queries)}: {query[:120]}")
-        res = search(query, cfg=cfg, brave_key=brave_key, domain=domain if cfg.get("same_domain_only") else "")
-        kept = 0
-        for row in res["results"]:
-            url = (row.get("url") or "").split("#")[0]
-            key = url.rstrip("/")
-            if not url or key in seen or key in known:
-                continue
-            if cfg.get("same_domain_only") and not in_domain(url, domain):
-                continue
-            seen.add(key)
-            out["results"].append(
+    brave_key = source_profile.brave_api_key(db)
+
+    # 1. Lo que ya se sabe de este dominio.
+    use_kb = search_knowledge.enabled(cfg)
+    kb: list[dict] = []
+    recent = False
+    if use_kb:
+        try:
+            kb = search_knowledge.pages_for(db, source, domain, limit=limit, exclude=known)
+            recent = search_knowledge.searched_recently(db, domain, int(cfg.get("knowledge_fresh_days") or 30))
+        except Exception:  # noqa: BLE001 - la base de conocimiento nunca tumba el escaneo
+            kb = []
+
+    # 2. Busqueda en vivo: solo si hace falta y hay a quien preguntar.
+    engines = available_engines(cfg, brave_key)
+    live_results: list[dict] = []
+    # Alguien contesto (un buscador o el mapa del sitio): la busqueda de este dominio
+    # queda hecha y no se repite hasta que venza el plazo. Si todos bloquearon, no.
+    answered = False
+    tried: list[str] = []
+    origin = ""
+    queries: list[str] = []
+    if recent:
+        skip_reason = "este dominio ya se buscó hace poco y lo encontrado está en la base de conocimiento"
+    elif not engines:
+        skip_reason = "los buscadores están en pausa por bloqueo y no hay un motor con llave"
+    else:
+        skip_reason = ""
+    if not skip_reason:
+        out["live"] = True
+        scan_progress.stage("buscando", f"Redactando consultas de búsqueda para {domain}")
+        queries = ai_queries(source, profile, cfg, context=context)
+        origin = "ia" if queries else "reglas"
+        if not queries:
+            queries = rule_queries(source, profile, cfg)
+        out["steps"].append(
+            {"action": "busqueda", "url": domain, "status": "ok", "ms": _ms(started), "detail": f"{len(queries)} consulta(s) redactadas por {'la IA' if origin == 'ia' else 'reglas'}"}
+        )
+        budget = float(cfg.get("time_budget_s") or 45)
+        seen: set[str] = set()
+        pause = int(cfg.get("pause_ms") or 0) / 1000.0
+        search_started = time.perf_counter()
+        for idx, query in enumerate(queries):
+            if len(live_results) >= limit:
+                break
+            # Un motor bloqueado no se arregla en la consulta siguiente: sin motores
+            # disponibles o agotado el tiempo de busqueda, se sigue con lo que hay.
+            if idx and (not available_engines(cfg, brave_key) or time.perf_counter() - search_started > budget):
+                out["steps"].append(
+                    {"action": "busqueda", "url": query, "status": "omitido", "ms": 0,
+                     "detail": "Sin motores disponibles o tiempo de búsqueda agotado: se omiten las consultas restantes"}
+                )
+                break
+            if idx and pause:
+                time.sleep(pause)
+            t0 = time.perf_counter()
+            scan_progress.stage("buscando", f"Consulta {idx + 1}/{len(queries)}: {query[:120]}")
+            res = search(query, cfg=cfg, brave_key=brave_key, domain=domain if cfg.get("same_domain_only") else "")
+            kept = 0
+            for row in res["results"]:
+                url = (row.get("url") or "").split("#")[0]
+                key = url.rstrip("/")
+                if not url or key in seen or key in known:
+                    continue
+                if cfg.get("same_domain_only") and not in_domain(url, domain):
+                    continue
+                seen.add(key)
+                live_results.append(
+                    {
+                        "url": url,
+                        "title": (row.get("title") or "")[:300],
+                        "snippet": (row.get("snippet") or "")[:500],
+                        "query": query,
+                        "engine": res["engine"],
+                    }
+                )
+                kept += 1
+                if len(live_results) >= limit:
+                    break
+            if any(a["status"] in {"ok", "sin_resultados", "fuera_de_dominio"} for a in res["attempts"]):
+                answered = True
+            attempts = ", ".join(f"{a['engine']}:{a['status']}" for a in res["attempts"]) or "sin motores"
+            tried.append(attempts)
+            out["steps"].append(
                 {
-                    "url": url,
-                    "title": (row.get("title") or "")[:300],
-                    "snippet": (row.get("snippet") or "")[:500],
-                    "query": query,
-                    "engine": res["engine"],
+                    "action": "busqueda",
+                    "url": query,
+                    "status": "ok" if kept else ("sin_resultados" if res["engine"] else "sin_motor"),
+                    "ms": _ms(t0),
+                    "detail": f"{kept} resultado(s) del dominio · {attempts}",
                 }
             )
-            kept += 1
-            if len(out["results"]) >= limit:
-                break
-        tried = ", ".join(f"{a['engine']}:{a['status']}" for a in res["attempts"]) or "sin motores"
+    else:
         out["steps"].append(
-            {
-                "action": "busqueda",
-                "url": query,
-                "status": "ok" if kept else ("sin_resultados" if res["engine"] else "sin_motor"),
-                "ms": _ms(t0),
-                "detail": f"{kept} resultado(s) del dominio · {tried}",
-            }
+            {"action": "busqueda", "url": domain, "status": "omitido", "ms": 0,
+             "detail": f"No se consultó ningún buscador: {skip_reason}"}
         )
+
+    # 2b. Respaldo sin buscadores: el mapa del sitio de la propia fuente. Corre
+    # cuando los buscadores no alcanzaron (bloqueados, en pausa o sin resultados).
+    if cfg.get("sitemap_fallback", True) and not recent and len(live_results) < limit:
+        from . import sitemap_search
+
+        scan_progress.stage("buscando", f"Leyendo el mapa del sitio de {domain}")
+        words = sitemap_search.query_words(
+            queries or rule_queries(source, profile, cfg),
+            list(profile.get("search_terms") or []) + list(profile.get("follow_keywords") or []),
+        )
+        try:
+            found = sitemap_search.discover(
+                domain, words, limit=limit - len(live_results),
+                timeout=float(cfg.get("timeout") or 15), base_url=getattr(source, "url", "") or "",
+            )
+        except Exception as exc:  # noqa: BLE001
+            found = {"results": [], "detail": type(exc).__name__, "ms": 0}
+        have = {r["url"].rstrip("/") for r in live_results} | known
+        added = 0
+        for row in found["results"]:
+            url = (row.get("url") or "").split("#")[0]
+            if not url or url.rstrip("/") in have or not in_domain(url, domain):
+                continue
+            have.add(url.rstrip("/"))
+            live_results.append({**row, "url": url, "query": f"mapa del sitio de {domain}", "engine": "sitemap"})
+            added += 1
+        out["live"] = answered = True
+        tried.append(f"sitemap:{'ok' if added else 'sin_resultados'}")
+        out["steps"].append(
+            {"action": "busqueda", "url": f"mapa del sitio de {domain}", "status": "ok" if added else "sin_resultados",
+             "ms": int(found.get("ms") or 0), "detail": f"{added} página(s) del mapa del sitio · {found.get('detail') or ''}"}
+        )
+
+    if use_kb and answered:
+        try:
+            if live_results:
+                search_knowledge.remember(db, source, domain, live_results, commit=False)
+            # Se busco (con o sin resultados): no se repite hasta que venza el plazo.
+            search_knowledge.mark_searched(db, domain, commit=False)
+            db.commit()
+        except Exception:  # noqa: BLE001
+            db.rollback()
+    out["queries"], out["query_origin"] = queries, origin
+
+    # 3. Se juntan: primero las paginas que ya dieron senales, luego lo nuevo, luego el resto.
+    merged: list[dict] = []
+    keys: set[str] = set()
+    for row in [r for r in kb if r.get("signals")] + live_results + [r for r in kb if not r.get("signals")]:
+        key = search_knowledge.url_hash(row["url"])
+        if key in keys:
+            continue
+        keys.add(key)
+        merged.append({k: v for k, v in row.items() if k != "signals"})
+        if len(merged) >= limit:
+            break
+    out["results"] = merged
+    out["from_knowledge"] = sum(1 for r in merged if r.get("engine") == search_knowledge.ENGINE_LABEL)
+    if kb:
+        out["steps"].append(
+            {"action": "busqueda", "url": domain, "status": "ok", "ms": 0,
+             "detail": f"{out['from_knowledge']} página(s) tomadas de la base de conocimiento de búsqueda"}
+        )
+    elif skip_reason:
+        out["steps"].append(
+            {"action": "busqueda", "url": domain, "status": "sin_resultados", "ms": 0,
+             "detail": "La base de conocimiento no tiene páginas de este dominio"}
+        )
+
     if cfg.get("prefer_documents"):
         out["results"].sort(key=lambda r: 0 if is_document_url(r["url"]) else 1)
     engines_used = sorted({r["engine"] for r in out["results"] if r.get("engine")})
-    tried = [st["detail"].split(" · ", 1)[-1] for st in out["steps"][1:]]
     scan_progress.note(
         "search",
         enabled=True,
@@ -556,6 +725,9 @@ def search_for_source(db, source, profile: dict | None = None, *, context: str =
         query_origin=origin,
         queries=queries[:8],
         results=len(out["results"]),
+        from_knowledge=out["from_knowledge"],
+        live=out["live"],
+        skipped=skip_reason,
         engines=engines_used,
         engine_attempts=tried[:8],
         urls=[r["url"] for r in out["results"][:8]],

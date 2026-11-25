@@ -53,6 +53,15 @@ test.describe("boletines del ciclo", () => {
       page.getByTestId(`bulletin-pdf-${bulletin.id}`).click(),
     ]);
     expect(download.suggestedFilename()).toBe(`boletin-${bulletin.id}.pdf`);
+
+    // Distribucion a la alta direccion (RF19): solo con el boletin publicado. Las
+    // pruebas corren sin correo saliente: la ventana lo avisa y no deja enviar.
+    await page.getByTestId(`bulletin-send-${bulletin.id}`).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("Enviar el boletín a la alta dirección");
+    await expect(dialog.getByRole("alert")).toContainText("correo institucional no está configurado");
+    await expect(dialog.getByRole("button", { name: "Enviar boletín" })).toBeDisabled();
+    await dialog.getByRole("button", { name: "Cancelar" }).click();
     expectClean(errors);
   });
 

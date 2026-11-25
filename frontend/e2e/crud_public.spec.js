@@ -16,6 +16,19 @@ test("buscador de expedientes, ficha y transparencia sin datos restringidos", as
     for (const key of RESTRICTED) expect(Object.keys(item)).not.toContain(key);
   }
 
+  // Buscador avanzado: el total viaja en la cabecera y los filtros solo ofrecen
+  // opciones con fichas visibles.
+  const paged = await request.get("/api/public/technologies?limit=1&offset=0");
+  expect(Number(paged.headers()["x-total-count"])).toBe(list.length);
+  expect((await paged.json()).length).toBe(Math.min(1, list.length));
+  const filters = await (await request.get("/api/public/technologies/filters")).json();
+  expect(Object.keys(filters).sort()).toEqual(["clusters", "phases", "tech_types", "total", "years"]);
+  expect(filters.total).toBe(list.length);
+  expect((await request.get("/api/public/technologies?phase=inventada")).status()).toBe(422);
+  if (list.length) {
+    await expect(page.getByTestId("public-count")).toContainText(list.length === 1 ? "1 expediente" : `${list.length} expedientes`);
+  }
+
   // Busqueda sin resultados: mensaje claro.
   await page.getByLabel("Buscar expediente").fill("zzzz-no-existe-zzzz");
   await page.getByRole("button", { name: "Buscar" }).click();

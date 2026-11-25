@@ -12,7 +12,7 @@ import time
 from collections.abc import Generator
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import settings
@@ -63,6 +63,36 @@ if IS_SQLITE:
 
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# SQLite admite un solo escritor. Una sesion que escribe y luego espera a la red
+# con la transaccion abierta deja a todas las demas esperando: la vigilancia se
+# frena y la pantalla responde «database is locked». Este aviso deja en el log
+# quien tuvo abierta la escritura mas de la cuenta, para encontrarlo sin adivinar.
+LONG_WRITE_SECONDS = 5.0
+_db_log = logging.getLogger("app.database")
+
+
+def _write_started(session, _flush_context) -> None:
+    if "write_since" not in session.info and (session.new or session.dirty or session.deleted):
+        session.info["write_since"] = time.monotonic()
+
+
+def _write_finished(session, *_args) -> None:
+    since = session.info.pop("write_since", None)
+    if since is None:
+        return
+    held = time.monotonic() - since
+    if held >= LONG_WRITE_SECONDS:
+        _db_log.warning(
+            "Transaccion de escritura abierta %.1f s en el hilo %s: bloquea a las demas escrituras.",
+            held, threading.current_thread().name,
+        )
+
+
+if IS_SQLITE:
+    event.listen(SessionLocal, "before_flush", lambda session, ctx, instances: _write_started(session, ctx))
+    event.listen(SessionLocal, "after_commit", _write_finished)
+    event.listen(SessionLocal, "after_rollback", _write_finished)
 
 
 class Base(DeclarativeBase):

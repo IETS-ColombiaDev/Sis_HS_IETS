@@ -60,6 +60,7 @@ def _to_out(db: Session, tech: Technology, entry: CycleTechnology | None = None)
     if tech.source_id:
         source = db.get(Source, tech.source_id)
         out.source_title = source.title if source else ""
+        out.source_url = (source.url or "") if source else ""
     payload = tech.raw_payload if isinstance(tech.raw_payload, dict) else {}
     out.has_raw = bool(payload)
     out.raw_origin = str(payload.get("origin") or "")
@@ -204,7 +205,7 @@ def list_staging(
     Orden por defecto (`sort=puntaje`): puntaje de cribado + bono de corroboracion
     (RF-002), luego lo mas reciente. Con `sort=recientes`: fecha de captura descendente.
     """
-    corroboration.refresh(db)
+    corroboration.refresh_for_read(db)
     if view == "descartadas":
         query = db.query(Technology).filter(_inbox_discarded_filter())
     elif view == "legacy":
@@ -285,7 +286,7 @@ def staging_stats(db: Session = Depends(get_db), user: User = Depends(get_curren
     without_type = base.filter(Technology.tech_type_id.is_(None)).with_entities(
         func.count(Technology.id)
     ).scalar() or 0
-    corroboration.refresh(db)
+    corroboration.refresh_for_read(db)
     corroborated = base.filter(Technology.corroboration_count > 1).with_entities(
         func.count(Technology.id)
     ).scalar() or 0
@@ -640,35 +641,15 @@ def suggest_classification(
     db: Session = Depends(get_db),
     user: User = Depends(require_permission(P_TECHNOLOGY_WRITE)),
 ):
-    """Propuesta de cluster y tipologia. El evaluador siempre confirma."""
+    """Propuesta de cluster, tipologia y condicion, con confianza y evidencia.
+
+    Combina las reglas del catalogo con lo que el equipo ya clasifico (base de
+    conocimiento de senales) y, si esta encendida, la IA. El evaluador siempre confirma.
+    """
+    from .. import intelligence
+
     tech = _get(db, technology_id)
-    cluster_id, cluster_reason = suggest_cluster(
-        db,
-        indication=tech.indication,
-        summary=tech.summary,
-        title=tech.commercial_name,
-        icd10_codes=tech.icd10_codes,
-        mesh_terms=tech.mesh_terms,
-    )
-    finding = db.get(Finding, tech.finding_id) if tech.finding_id else None
-    type_id, type_reason = suggest_tech_type(
-        db,
-        # El tipo que declaro el conector (EMA = medicamento, MDALL = dispositivo).
-        legacy_type=finding.technology_type if finding else "",
-        title=tech.commercial_name,
-        summary=tech.summary,
-        technology=tech.inn_name,
-    )
-    cluster = db.get(Cluster, cluster_id) if cluster_id else None
-    tech_type = db.get(TechType, type_id) if type_id else None
-    return {
-        "cluster_id": cluster_id,
-        "cluster_name": cluster.name if cluster else "",
-        "cluster_reason": cluster_reason,
-        "tech_type_id": type_id,
-        "tech_type_name": tech_type.name if tech_type else "",
-        "tech_type_reason": type_reason,
-    }
+    return intelligence.suggest(db, tech)
 
 
 @router.get("/{technology_id}/reliability")

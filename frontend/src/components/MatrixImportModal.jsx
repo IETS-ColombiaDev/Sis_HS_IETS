@@ -26,8 +26,8 @@ const DETECTION_FALLBACK = {
 const MATCH_LABEL = { codigo: "código de catálogo", url: "URL", nombre: "nombre", dominio: "dominio" };
 
 function show(value) {
-  if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
-  if (value === null || value === undefined || value === "") return "—";
+  if (Array.isArray(value)) return value.length ? value.join(", ") : "-";
+  if (value === null || value === undefined || value === "") return "-";
   if (value === true) return "Sí";
   if (value === false) return "No";
   return String(value);

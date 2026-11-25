@@ -38,7 +38,7 @@ export function PriorityGauge({ state }) {
           </>
         ) : (
           <>
-            <strong className="pm-gauge-pending">—</strong>
+            <strong className="pm-gauge-pending">-</strong>
             <span>
               {state.rated} de {state.total_criteria} calificados
             </span>

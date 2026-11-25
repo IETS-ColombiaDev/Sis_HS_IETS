@@ -1,4 +1,4 @@
-/** Metodologia IETS de escaneo de horizonte — fases operativas del sistema.
+/** Metodologia IETS de escaneo de horizonte - fases operativas del sistema.
  *
  *  Alineado con el Plan de actualizacion por fases: el ciclo operativo es el eje
  *  y la priorizacion usa la matriz oficial P1 a P6 (no la heuristica de cribado).
@@ -57,15 +57,15 @@ export const DEFAULT_WATCH_POINTS = 3;
 export const PRIORITY_CRITERIA_TOTAL = 6;
 
 export const HORIZON_LABELS = {
-  emergente: "Emergente — fases muy tempranas (preclínica / fase I)",
-  transicional: "Transicional — desarrollo clínico o evaluación (fase II/III)",
-  inminente: "Inminente — próxima a autorización o lanzamiento",
+  emergente: "Emergente - fases muy tempranas (preclínica / fase I)",
+  transicional: "Transicional - desarrollo clínico o evaluación (fase II/III)",
+  inminente: "Inminente - próxima a autorización o lanzamiento",
 };
 
 /** Condicion del glosario de la especificacion: dimension distinta del horizonte. */
 export const CONDITION_LABELS = {
-  emergente: "Emergente — en fases clínicas avanzadas (II o III), previa a aprobación",
-  nueva: "Nueva — aprobada en agencia de referencia hace 12 meses o menos",
+  emergente: "Emergente - en fases clínicas avanzadas (II o III), previa a aprobación",
+  nueva: "Nueva - aprobada en agencia de referencia hace 12 meses o menos",
 };
 
 /** Vias del criterio de novedad (RF10). El backend es la fuente de verdad;
@@ -82,10 +82,10 @@ export const INVIMA_STALE_DAYS = 30;
 
 /** Estados de la senal capturada (modelo heredado, cola de cribado). */
 export const STATUS_LABELS = {
-  nuevo: "Señal nueva — pendiente de revisión",
-  revisado: "Revisado — en evaluación de prioridad",
-  priorizado: "Priorizado — pasa a caracterización profunda",
-  descartado: "Descartado — bajo impacto o fuera de alcance",
+  nuevo: "Señal nueva - pendiente de revisión",
+  revisado: "Revisado - en evaluación de prioridad",
+  priorizado: "Priorizado - pasa a caracterización profunda",
+  descartado: "Descartado - bajo impacto o fuera de alcance",
 };
 
 /** Estados metodologicos de la tecnologia dentro de un ciclo. */

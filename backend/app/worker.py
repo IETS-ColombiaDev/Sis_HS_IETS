@@ -42,6 +42,17 @@ RETRY_POLL_SECONDS = 30
 # haya cola, el propio servicio se visita por su URL publica cada 4 min.
 KEEPALIVE_SECONDS = 240
 _keepalive_thread: threading.Thread | None = None
+# Vigilante de la cola. En Render solo corre el proceso web y el worker regular
+# suele estar apagado: la cola la atendia unicamente el hilo que lanzo la corrida.
+# Si el servicio se reiniciaba (despliegue, memoria, suspension), ese hilo moria,
+# los jobs quedaban pendientes sin nadie que los tomara y la pantalla mostraba
+# "vigilancia en curso" durante dias. El vigilante revisa cada minuto: si hay
+# trabajo vencido y nadie lo atiende, devuelve a la cola lo que quedo a medias y
+# relanza el drenaje. Tambien mantiene despierto el servicio mientras haya cola.
+GUARDIAN_SECONDS = 60
+GUARDIAN_FIRST_SECONDS = 10
+_guardian_thread: threading.Thread | None = None
+_guardian_resumes = 0
 
 
 _libc = None
@@ -72,8 +83,34 @@ def release_memory() -> None:
         _libc = False
 
 
+_TRUE = {"1", "true", "yes", "on"}
+_FALSE = {"0", "false", "no", "off"}
+
+
 def _force_worker_on_sqlite() -> bool:
-    return os.environ.get("INGEST_WORKER_FORCE", "").strip().lower() in {"1", "true", "yes", "on"}
+    return os.environ.get("INGEST_WORKER_FORCE", "").strip().lower() in _TRUE
+
+
+def guardian_enabled() -> bool:
+    """El vigilante corre cuando este proceso es el unico que puede atender la cola.
+
+    `INGEST_GUARDIAN` lo fuerza o lo apaga. Sin esa variable: encendido con SQLite
+    y un solo proceso (Render, equipo local), donde no existe un servicio `worker`
+    aparte; apagado con PostgreSQL y varios procesos web, donde la cola es del
+    servicio `worker`. Nunca corre dentro de las pruebas unitarias.
+    """
+    if "pytest" in sys.modules:
+        return False
+    raw = os.environ.get("INGEST_GUARDIAN", "").strip().lower()
+    if raw in _TRUE:
+        return True
+    if raw in _FALSE:
+        return False
+    try:
+        single = int(os.environ.get("WEB_CONCURRENCY", "1") or 1) <= 1
+    except ValueError:
+        single = False
+    return IS_SQLITE and single
 
 
 def start_worker() -> None:
@@ -155,6 +192,81 @@ def _start_keepalive() -> None:
     log.info("Keep-alive activo mientras haya vigilancia en cola: %s", keepalive_url())
 
 
+def guardian_tick() -> str:
+    """Una revision del vigilante. Devuelve "reanudada" si relanzo el drenaje."""
+    global _guardian_resumes
+    if draining() or is_running():
+        return ""
+    from .ingest_service import job_timeout_seconds, next_pending_at, recover_stale
+
+    db = SessionLocal()
+    try:
+        # Nadie esta drenando: un job `ejecutando` es huerfano si paso su tiempo maximo.
+        recover_stale(db, minutes=max(5, int(job_timeout_seconds(db) // 60) + 2))
+        upcoming = next_pending_at(db)
+    finally:
+        db.close()
+    if upcoming is None:
+        # Sistema libre: se ubican las senales que aun no tienen su punto exacto en la pagina (RF-001).
+        try:
+            from . import link_resolver
+
+            if link_resolver.auto_start(SessionLocal):
+                return "ubicando"
+        except Exception:  # noqa: BLE001
+            log.exception("Ubicacion automatica de senales")
+        # Se verifican los enlaces de las senales que aun no se han verificado.
+        try:
+            from . import signal_links
+
+            if signal_links.auto_check(SessionLocal):
+                return "verificando"
+        except Exception:  # noqa: BLE001
+            log.exception("Verificacion automatica de enlaces")
+        # Y se pone al dia la base de conocimiento de senales (y su calibracion).
+        from . import intelligence
+
+        return intelligence.auto_maintain(SessionLocal)
+    _guardian_resumes += 1
+    log.warning("Vigilante: hay cola de vigilancia sin atender; se reanuda el drenaje.")
+    kick()
+    return "reanudada"
+
+
+def guardian_running() -> bool:
+    return bool(_guardian_thread and _guardian_thread.is_alive())
+
+
+def guardian_status() -> dict:
+    return {"running": guardian_running(), "resumes": _guardian_resumes, "keepalive": bool(keepalive_url())}
+
+
+def start_guardian() -> None:
+    """Arranca el vigilante de la cola y el keep-alive, con o sin worker regular."""
+    global _guardian_thread
+    if not guardian_enabled() or guardian_running():
+        return
+    _stop.clear()
+
+    def loop() -> None:
+        wait = GUARDIAN_FIRST_SECONDS
+        since_ping = 0.0
+        while not _stop.wait(wait):
+            since_ping += wait
+            wait = GUARDIAN_SECONDS
+            try:
+                guardian_tick()
+                if since_ping >= KEEPALIVE_SECONDS:
+                    since_ping = 0.0
+                    keepalive_tick()
+            except Exception:  # noqa: BLE001
+                log.exception("Vigilante de la cola de ingesta")
+
+    _guardian_thread = threading.Thread(target=loop, name="ingest-guardian", daemon=True)
+    _guardian_thread.start()
+    log.info("Vigilante de la cola en marcha (keep-alive: %s).", keepalive_url() or "sin URL pública")
+
+
 def stop_worker() -> None:
     _stop.set()
 
@@ -190,7 +302,7 @@ def drain(*, wait_retries: bool = False, max_seconds: float = KICK_MAX_SECONDS) 
     total = 0
     deadline = time.monotonic() + max_seconds
     try:
-        from .ingest_service import next_pending_at, parallel_jobs
+        from .ingest_service import job_timeout_seconds, next_pending_at, parallel_jobs, recover_stale
         from .scheduler_service import finalize_scan_runs
 
         while not _stop.is_set() and time.monotonic() < deadline:
@@ -203,6 +315,10 @@ def drain(*, wait_retries: bool = False, max_seconds: float = KICK_MAX_SECONDS) 
             total += done
             db = SessionLocal()
             try:
+                # Sin worker regular nadie mas devuelve a la cola un job que quedo
+                # `ejecutando` (hilo cortado): lo hace el propio drenaje.
+                if recover_stale(db, minutes=max(30, int(job_timeout_seconds(db) // 60) + 10)):
+                    done += 1
                 finalize_scan_runs(db)
                 upcoming = next_pending_at(db) if wait_retries else None
             finally:
@@ -218,6 +334,22 @@ def drain(*, wait_retries: bool = False, max_seconds: float = KICK_MAX_SECONDS) 
     finally:
         _drain_lock.release()
         if total:
+            # La bandeja no recalcula la corroboracion en cada consulta mientras hay
+            # vigilancia: se deja al dia aqui, al terminar.
+            try:
+                from . import corroboration
+
+                corroboration.refresh_after_scan(SessionLocal)
+            except Exception:  # noqa: BLE001
+                log.warning("No se pudo recalcular la corroboracion tras la vigilancia")
+            # Las senales nuevas entran a la base de conocimiento (y se recalibra si toca)
+            # sin esperar a la siguiente revision del vigilante.
+            try:
+                from . import intelligence
+
+                intelligence.auto_maintain(SessionLocal)
+            except Exception:  # noqa: BLE001
+                log.warning("No se pudo sincronizar la base de conocimiento tras la vigilancia")
             # Corrida terminada: las senales nuevas van a Firestore ya, sin esperar
             # el minimo entre copias (un reinicio de Render las borraria del disco).
             try:

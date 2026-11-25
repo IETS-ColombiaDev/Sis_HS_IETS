@@ -104,7 +104,7 @@ export default function NoiseCleanup({ onDone, toast }) {
                 <ul className="mr-steps" style={{ marginTop: 6 }}>
                   {items.slice(0, 12).map((c) => (
                     <li key={c.technology_id}>
-                      {c.titulo} <span style={{ color: "#64748b" }}>— {c.fuente}</span>
+                      {c.titulo} <span style={{ color: "#64748b" }}>- {c.fuente}</span>
                     </li>
                   ))}
                   {items.length > 12 && <li>… y {items.length - 12} más.</li>}

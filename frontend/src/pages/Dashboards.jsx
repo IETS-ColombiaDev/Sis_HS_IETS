@@ -31,6 +31,7 @@ import ModuleHeader from "../components/ModuleHeader";
 import InfoTip, { TermLabel } from "../components/InfoTip";
 import ClampText from "../components/ClampText";
 import StrategyGraph from "../components/StrategyGraph";
+import AnalyticsInsights from "../components/AnalyticsInsights";
 import { PERM, TECH_STATUS_LABELS } from "../constants/methodology";
 import "./dashboards.css";
 
@@ -206,7 +207,7 @@ function fmtDate(iso) {
 
 function moneyShort(value) {
   const n = Number(value || 0);
-  if (!n) return "—";
+  if (!n) return "-";
   if (n >= 1e12) return `$${fmt1.format(n / 1e12)} billones`;
   if (n >= 1e9) return `$${fmt1.format(n / 1e9)} mil M`;
   if (n >= 1e6) return `$${fmt0.format(n / 1e6)} M`;
@@ -541,8 +542,8 @@ function ArrivalChart({ rows, thresholds, activeBand, onPick }) {
   const eme = Number(thresholds?.emergente ?? 36);
   const range = {
     inminente: `≤ ${fmt0.format(inm)} m`,
-    transicion: `${fmt0.format(inm)}–${fmt0.format(tra)} m`,
-    emergente: `${fmt0.format(tra)}–${fmt0.format(eme)} m`,
+    transicion: `${fmt0.format(inm)}-${fmt0.format(tra)} m`,
+    emergente: `${fmt0.format(tra)}-${fmt0.format(eme)} m`,
     lejano: `> ${fmt0.format(eme)} m`,
     desconocido: "sin fecha",
   };
@@ -1144,7 +1145,7 @@ function RecorteTable({ rows, focusTech, onClearFocus }) {
       </div>
       {filtered.length > PAGE_SIZE && (
         <div className="dc-pager">
-          <span>{showAll ? `Mostrando las ${filtered.length}` : `Mostrando ${start + 1}–${Math.min(end, filtered.length)} de ${filtered.length}`}</span>
+          <span>{showAll ? `Mostrando las ${filtered.length}` : `Mostrando ${start + 1}-${Math.min(end, filtered.length)} de ${filtered.length}`}</span>
           <div className="eval-actions">
             {!showAll && (
               <>
@@ -1482,7 +1483,7 @@ export default function Dashboards() {
       />
 
       <div className="dc-print-head">
-        <h1>Tablero estratégico — {data.cycle_code}</h1>
+        <h1>Tablero estratégico - {data.cycle_code}</h1>
         <div>
           Filtros: {chips.length ? chips.map((c) => c.text).join(" · ") : "sin filtros"} · {rows.length} tecnología(s) ·{" "}
           {data.from_cache ? "Datamart al cierre" : "Cálculo en vivo"} · {restricted ? "Capa restringida" : "Vista agregada"} · Impreso{" "}
@@ -1704,7 +1705,7 @@ export default function Dashboards() {
                 <DecisionTile
                   testId="tile-presupuesto"
                   label="Impacto a 3 años"
-                  value={hasBudget ? moneyShort(budget3) : "—"}
+                  value={hasBudget ? moneyShort(budget3) : "-"}
                   sub={hasBudget ? `en ${plural(withBudget, "expediente con monto", "expedientes con monto")}` : "sin montos registrados"}
                   tone="amber"
                   hint="Suma del impacto presupuestal estimado en los años 1, 2 y 3 de los expedientes del recorte (COP)."
@@ -1721,6 +1722,8 @@ export default function Dashboards() {
                 />
               )}
             </div>
+
+            <AnalyticsInsights toast={toast} />
 
             <Card padding={18} style={{ marginTop: 14 }}>
               <SectionTitle hint={HELP.embudo}>Embudo del ciclo</SectionTitle>

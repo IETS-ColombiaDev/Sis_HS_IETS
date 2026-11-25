@@ -17,6 +17,8 @@ MDALL_URL = "https://health-products.canada.ca/api/medical-devices/device/"
 LICENCE_URL = "https://health-products.canada.ca/api/medical-devices/licence/"
 COMPANY_URL = "https://health-products.canada.ca/api/medical-devices/company/"
 DPD_URL = "https://health-products.canada.ca/api/drug/drugproduct/"
+# Consulta publica de la Drug Product Database (la ficha es info?lang=eng&code=<drug_code>).
+DPD_HOME = "https://health-products.canada.ca/dpd-bdpp/"
 INGREDIENT_URL = "https://health-products.canada.ca/api/drug/activeingredient/"
 # Clases de riesgo III y IV: implantes, soporte vital, diagnostico critico. Las
 # clases I-II (vendas, jeringas, brocas) no son objeto de escaneo de horizonte.
@@ -208,6 +210,12 @@ class HealthCanadaConnector(Connector):
             endpoint=endpoint,
         )
 
+    @staticmethod
+    def drug_url(drug_code) -> str:
+        """Ficha del producto en la Drug Product Database; el buscador si no hay codigo."""
+        code = re.sub(r"\D", "", str(drug_code or ""))
+        return f"{DPD_HOME}info?lang=eng&code={code}" if code else DPD_HOME
+
     def _device_record(self, row: dict) -> CanonicalRecord | None:
         ident = clean_text(
             row.get("device_identifier")
@@ -253,7 +261,7 @@ class HealthCanadaConnector(Connector):
         return CanonicalRecord(
             external_id=ident or brand[:80],
             title=brand or ident,
-            url="https://health-products.canada.ca/dpd-bdpp/",
+            url=self.drug_url(row.get("drug_code")),
             summary=clean_text(
                 ". ".join(
                     p

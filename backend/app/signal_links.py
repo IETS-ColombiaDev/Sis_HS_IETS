@@ -24,6 +24,7 @@ from __future__ import annotations
 import logging
 import re
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from urllib.parse import parse_qsl, urlsplit, urlunsplit
@@ -46,6 +47,7 @@ LINK_STATUS_LABELS = {
     "caido": "No responde",
     "bloqueado": "El sitio bloquea la verificación automática",
     "sin_verificar": "Sin verificar",
+    "sin_respuesta": "El sitio no respondió a la verificación (se reintenta)",
 }
 # Parametros que delatan una pagina de resultados de busqueda o de formulario.
 _SEARCH_PARAMS = {
@@ -54,7 +56,7 @@ _SEARCH_PARAMS = {
 }
 _SEARCH_PATH = re.compile(r"/(search|buscar|busqueda|results?|resultados|find)(/|$|\.)", re.I)
 _FRAGMENT_ROUTE = re.compile(r"^/")
-CHECK_TIMEOUT_S = 12
+CHECK_TIMEOUT_S = 20
 CHECK_WORKERS = 6
 EVIDENCE_SNIPPET_CHARS = 600
 
@@ -70,6 +72,23 @@ def _norm(url: str) -> str:
     fragment = parts.fragment if _FRAGMENT_ROUTE.match(parts.fragment or "") else ""
     path = parts.path.rstrip("/") or "/"
     return urlunsplit(("", host, path, "&".join(f"{k}={v}" for k, v in query), fragment)).lower()
+
+
+# Buscadores de registros oficiales: sin identificador en la URL son el formulario
+# de consulta, no la ficha de un producto, aunque la ruta no sea la portada.
+_SEARCH_HOMES = {
+    _norm(u)
+    for u in (
+        "https://health-products.canada.ca/dpd-bdpp/",
+        "https://health-products.canada.ca/mdall-limh/",
+        "https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm",
+        "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfPMN/pmn.cfm",
+        "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfPMN/denovo.cfm",
+        "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpma/pma.cfm",
+        "https://euclinicaltrials.eu/ctis-public/search",
+        "https://euclinicaltrials.eu/search-for-clinical-trials/",
+    )
+}
 
 
 def source_query_urls(source: Source | None) -> list[str]:
@@ -97,6 +116,8 @@ def classify(url: str, source: Source | None = None, query_url: str = "") -> str
         return "consulta"
     route = parts.fragment if _FRAGMENT_ROUTE.match(parts.fragment or "") else ""
     if (parts.path in ("", "/")) and not parts.query and not route:
+        return "consulta"
+    if key in _SEARCH_HOMES:
         return "consulta"
     params = {k.lower() for k, _ in parse_qsl(parts.query, keep_blank_values=True)}
     if params & _SEARCH_PARAMS or _SEARCH_PATH.search(parts.path or "") or _SEARCH_PATH.search(route):
@@ -178,29 +199,97 @@ def backfill(db: Session, *, actor: str = "sistema", only_missing: bool = False)
 # --------------------------------------------------------------------------- #
 #  Verificacion de enlaces
 # --------------------------------------------------------------------------- #
-def check_url(url: str) -> tuple[str, int, str]:
-    """(estado, codigo HTTP, URL final). Usa el mismo cliente que el rastreador."""
+# Titulo o encabezado de una pagina que dice que el contenido no existe. Hay sitios
+# que responden 200 con una pagina de «no encontrado» (404 blando).
+_SOFT_404 = re.compile(
+    r"\b(404|page not found|not found|p[aá]gina no encontrada|no se encontr[oó]|no encontrad[ao]|page introuvable|"
+    r"seite nicht gefunden|pagina non trovata|no longer available|has been (removed|moved)|does not exist|error 404)\b",
+    re.I,
+)
+_TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
+_H1 = re.compile(r"<h1[^>]*>(.*?)</h1>", re.I | re.S)
+CHECK_BODY_BYTES = 120_000
+CHECK_HOST_PAUSE_S = 1.0
+# Por tanda, a un mismo sitio no se le piden mas paginas que estas, y si rechaza
+# o no contesta varias seguidas se le deja en paz hasta el dia siguiente.
+CHECK_MAX_PER_HOST = 25
+CHECK_HOST_GIVE_UP = 3
+CHECK_RETRY_PAUSE_S = 2.0
+AUTO_CHECK_BATCH = 150
+RECHECK_SILENT_HOURS = 24
+GONE = (404, 410)
+
+
+def soft_404(html: str) -> bool:
+    """True si el titulo o el encabezado de la pagina dicen que no existe."""
+    head = html[:CHECK_BODY_BYTES] if html else ""
+    for pattern in (_TITLE, _H1):
+        match = pattern.search(head)
+        if match:
+            text = re.sub(r"<[^>]+>", " ", match.group(1))
+            text = re.sub(r"\s+", " ", text).strip()
+            if text and len(text) <= 120 and _SOFT_404.search(text):
+                return True
+    return False
+
+
+def _get(url: str) -> tuple[int, str, str]:
+    """(codigo, URL final, inicio del cuerpo si es HTML). Lanza si no hay respuesta.
+
+    Usa el mismo cliente del rastreador: hay sitios que le responden a el y no a
+    un cliente distinto, y un enlace que el sistema si pudo leer no debe salir
+    como «sin respuesta».
+    """
     import httpx
 
-    from .ingest.base import shared_ssl_context
-    from .scraper import BROWSER_HEADERS, is_internal_url
+    from .ingest.base import tls_get
+    from .scraper import BROWSER_HEADERS
+
+    cfg = httpx.Timeout(CHECK_TIMEOUT_S, connect=min(10.0, CHECK_TIMEOUT_S), read=CHECK_TIMEOUT_S, write=CHECK_TIMEOUT_S)
+    resp = tls_get(url, timeout=cfg, headers=BROWSER_HEADERS)
+    body = ""
+    if "html" in (resp.headers.get("content-type") or "").lower():
+        body = (resp.content or b"")[:CHECK_BODY_BYTES].decode(resp.encoding or "utf-8", errors="replace")
+    return resp.status_code, str(resp.url), body
+
+
+def check_url(url: str) -> tuple[str, int, str]:
+    """(estado, codigo HTTP, URL final).
+
+    - `ok`: la pagina responde y no dice que el contenido no existe.
+    - `caido`: 404, 410 u otro error del sitio, o una pagina de «no encontrado».
+    - `redirigido`: lleva a la portada (el item ya no esta en esa direccion).
+    - `bloqueado`: el sitio rechaza la verificacion automatica (en el navegador abre).
+    - `sin_respuesta`: no contesto a tiempo. No es un enlace roto: se reintenta.
+    """
+    from .scraper import is_internal_url
 
     if not url.lower().startswith(("http://", "https://")) or is_internal_url(url):
         return "caido", 0, ""
+    target = url.split("#:~:text=", 1)[0]
     try:
-        with httpx.Client(follow_redirects=True, timeout=CHECK_TIMEOUT_S, headers=BROWSER_HEADERS, verify=shared_ssl_context()) as client:
-            resp = client.get(url)
+        code, final, body = _get(target)
     except Exception:  # noqa: BLE001
-        return "caido", 0, ""
-    final = str(resp.url)
-    code = resp.status_code
-    if code in (401, 403, 429, 999):
-        return "bloqueado", code, final
-    if code >= 400:
+        # Un fallo de red suele ser pasajero (el sitio limita las visitas seguidas).
+        time.sleep(CHECK_RETRY_PAUSE_S)
+        try:
+            code, final, body = _get(target)
+        except Exception:  # noqa: BLE001
+            return "sin_respuesta", 0, ""
+    if code >= 500:
+        return "sin_respuesta", code, final
+    if code in GONE:
         return "caido", code, final
-    if _norm(final) != _norm(url) and urlsplit(final).path in ("", "/") and urlsplit(url).path not in ("", "/"):
+    if code >= 400:
+        # 401, 403, 429 y tambien 400: asi responden los sitios que rechazan visitas
+        # automaticas (la FDA devuelve 400 a todo cuando considera que hay demasiadas).
+        # No dice que la pagina no exista: en el navegador abre.
+        return "bloqueado", code, final
+    if _norm(final) != _norm(target) and urlsplit(final).path in ("", "/") and urlsplit(target).path not in ("", "/"):
         # Redirige a la portada: el item ya no existe en esa direccion.
         return "redirigido", code, final
+    if body and soft_404(body):
+        return "caido", 404, final
     return "ok", code, final
 
 
@@ -213,8 +302,43 @@ def check_state() -> dict:
         return dict(_check_state)
 
 
-def check_links(session_factory, *, ids: list[int] | None = None, limit: int = 2000, actor: str = "sistema") -> dict:
-    """Verifica los enlaces (en paralelo). Pensado para correr en un hilo aparte."""
+def _fall_back(db: Session, finding: Finding, sources: dict) -> bool:
+    """Un enlace que ya no existe deja de presentarse como «enlace exacto».
+
+    La senal pasa a su pagina consultada (que si abre) y queda lista para que el
+    sistema la ubique alli. La direccion rota se conserva en la evidencia.
+    """
+    source = sources.get(finding.source_id)
+    fallback = finding.query_url or (source.url if source else "") or ""
+    broken = finding.url or ""
+    if not fallback or _norm(fallback) == _norm(broken):
+        return False
+    evidence = dict(finding.evidence or {}) if isinstance(finding.evidence, dict) else {}
+    evidence["broken_url"] = broken
+    for key in ("resolved", "locator_url", "locator_text"):
+        evidence.pop(key, None)
+    finding.evidence = evidence
+    finding.url = fallback[:1024]
+    finding.link_type = classify(finding.url, source, finding.query_url or "")
+    from .models import Technology
+
+    for tech in db.query(Technology).filter(Technology.finding_id == finding.id).all():
+        if (tech.url or "") in ("", broken):
+            tech.url = finding.url
+    return True
+
+
+def check_links(
+    session_factory, *, ids: list[int] | None = None, limit: int = 2000, actor: str = "sistema", pending_only: bool = False,
+) -> dict:
+    """Verifica los enlaces de las senales. Pensado para correr en un hilo aparte.
+
+    Los sitios se visitan en paralelo, pero cada sitio de a una pagina y con pausa:
+    pedirle 40 paginas a la vez a un mismo sitio hacia que dejara de responder y
+    las senales quedaban marcadas como caidas sin estarlo.
+    """
+    from datetime import timedelta
+
     from .audit import record_action
 
     with _check_lock:
@@ -226,37 +350,72 @@ def check_links(session_factory, *, ids: list[int] | None = None, limit: int = 2
         query = db.query(Finding.id, Finding.url).filter(Finding.url != "")
         if ids:
             query = query.filter(Finding.id.in_(ids))
+        if pending_only:
+            stale = datetime.now(timezone.utc) - timedelta(hours=RECHECK_SILENT_HOURS)
+            query = query.filter(
+                (Finding.link_status.in_(["", "sin_verificar"]))
+                | (Finding.link_status.is_(None))
+                | ((Finding.link_status == "sin_respuesta") & ((Finding.link_checked_at.is_(None)) | (Finding.link_checked_at < stale)))
+            )
         rows = query.order_by(Finding.id.desc()).limit(limit).all()
         with _check_lock:
             _check_state["total"] = len(rows)
+        by_host: dict[str, list] = {}
+        for row in rows:
+            by_host.setdefault((urlsplit(row.url).hostname or "").lower(), []).append(row)
         results: dict[int, tuple[str, int]] = {}
 
-        def work(row):
-            status, code, _final = check_url(row.url)
-            with _check_lock:
-                _check_state["done"] += 1
-            return row.id, status, code
+        def work(host_rows):
+            out = []
+            refused = 0
+            for i, row in enumerate(host_rows):
+                if refused >= CHECK_HOST_GIVE_UP or i >= CHECK_MAX_PER_HOST:
+                    # El sitio esta rechazando visitas (o ya se le pidio bastante): insistir
+                    # solo empeora el bloqueo. Lo que falta se reintenta mas tarde.
+                    status, code = "sin_respuesta", 0
+                else:
+                    if i:
+                        time.sleep(CHECK_HOST_PAUSE_S)
+                    status, code, _final = check_url(row.url)
+                    refused = refused + 1 if status in ("bloqueado", "sin_respuesta") else 0
+                with _check_lock:
+                    _check_state["done"] += 1
+                out.append((row.id, status, code))
+            return out
 
         with ThreadPoolExecutor(max_workers=CHECK_WORKERS, thread_name_prefix="link-check") as pool:
-            for fid, status, code in pool.map(work, rows):
-                results[fid] = (status, code)
+            for batch in pool.map(work, list(by_host.values())):
+                for fid, status, code in batch:
+                    results[fid] = (status, code)
         now = datetime.now(timezone.utc)
         counts: dict[str, int] = {}
+        moved = 0
+        sources = {s.id: s for s in db.query(Source).all()}
         for finding in db.query(Finding).filter(Finding.id.in_(list(results) or [0])).all():
             status, code = results[finding.id]
-            finding.link_status = status
             finding.link_http = code
             finding.link_checked_at = now
             counts[status] = counts.get(status, 0) + 1
-        record_action(
-            db,
-            entity_type="findings",
-            entity_id="link_check",
-            action="link_check",
-            new_value={"verificadas": len(results), "por_estado": counts, "ejecutado_por": actor},
-        )
+            if status == "caido" and code in GONE and _fall_back(db, finding, sources):
+                # Ahora apunta a su pagina consultada: ese enlace esta sin verificar.
+                finding.link_status = "sin_verificar"
+                moved += 1
+            else:
+                finding.link_status = status
+        if results:
+            record_action(
+                db,
+                entity_type="findings",
+                entity_id="link_check",
+                action="link_check",
+                new_value={"verificadas": len(results), "por_estado": counts, "pasadas_a_pagina_consultada": moved, "ejecutado_por": actor},
+            )
         db.commit()
-        return {"checked": len(results), "por_estado": counts}
+        if moved:
+            from .events import bump_state_version
+
+            bump_state_version(db)
+        return {"checked": len(results), "por_estado": counts, "moved": moved}
     except Exception:  # noqa: BLE001
         log.exception("Verificacion de enlaces")
         db.rollback()
@@ -265,6 +424,47 @@ def check_links(session_factory, *, ids: list[int] | None = None, limit: int = 2
         db.close()
         with _check_lock:
             _check_state.update(running=False, finished_at=datetime.now(timezone.utc).isoformat())
+
+
+AUTO_CHECK_ACTOR = "sistema (automático)"
+
+
+def auto_check(session_factory) -> bool:
+    """Verifica solos los enlaces que aun no se han verificado. True si lanzo una tanda.
+
+    Lo llama el vigilante de la cola con el sistema libre, por tandas de
+    `AUTO_CHECK_BATCH`, hasta que no quede ninguno. `LINK_AUTO_CHECK=false` lo apaga.
+    """
+    from datetime import timedelta
+
+    from .config import settings
+
+    if not settings.link_auto_check or check_state()["running"]:
+        return False
+    db = session_factory()
+    try:
+        stale = datetime.now(timezone.utc) - timedelta(hours=RECHECK_SILENT_HOURS)
+        pending = (
+            db.query(Finding.id)
+            .filter(Finding.url != "")
+            .filter(
+                (Finding.link_status.in_(["", "sin_verificar"]))
+                | (Finding.link_status.is_(None))
+                | ((Finding.link_status == "sin_respuesta") & ((Finding.link_checked_at.is_(None)) | (Finding.link_checked_at < stale)))
+            )
+            .first()
+        )
+    finally:
+        db.close()
+    if pending is None:
+        return False
+    _spawn(check_links, {"session_factory": session_factory, "limit": AUTO_CHECK_BATCH, "actor": AUTO_CHECK_ACTOR, "pending_only": True})
+    return True
+
+
+def _spawn(target, kwargs: dict) -> None:
+    """Lanza la tanda en un hilo aparte (punto unico, para correrla en linea en las pruebas)."""
+    threading.Thread(target=target, kwargs=kwargs, name="link-check-auto", daemon=True).start()
 
 
 # --------------------------------------------------------------------------- #

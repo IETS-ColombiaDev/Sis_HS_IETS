@@ -19,6 +19,18 @@ from .base import (
 )
 
 DEFAULT_URL = "https://euclinicaltrials.eu/ctis-public-api/search"
+CTIS_HOME = "https://euclinicaltrials.eu/ctis-public/search"
+
+
+def trial_url(trial_id: str) -> str:
+    """Ficha publica del ensayo en CTIS.
+
+    Comprobado en navegador el 25-11-2026: `ctis-public/view/<numero>` abre el
+    ensayo. La forma anterior (`search-for-clinical-trials/?EUCT=`) abre el
+    buscador sin el ensayo.
+    """
+    trial_id = (trial_id or "").strip()
+    return f"https://euclinicaltrials.eu/ctis-public/view/{trial_id}?lang=en" if trial_id else CTIS_HOME
 EXPECTED_ID_KEYS = ("ctNumber", "euCtNumber", "eu_ct_number", "applicationNumber")
 
 
@@ -133,7 +145,7 @@ class CtisConnector(Connector):
         return CanonicalRecord(
             external_id=trial_id or title[:80],
             title=title or trial_id,
-            url=clean_text(row.get("url") or f"https://euclinicaltrials.eu/search-for-clinical-trials/?lang=en&EUCT={trial_id}", 1000),
+            url=clean_text(row.get("url") or trial_url(trial_id), 1000),
             summary=clean_text(
                 ". ".join(
                     p

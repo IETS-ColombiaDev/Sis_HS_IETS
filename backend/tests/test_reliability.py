@@ -93,7 +93,7 @@ def test_the_url_falls_back_to_the_finding_and_a_dead_page_counts_against(h, pag
 
     body = h.client.post(f"/api/technologies/{tech.id}/reliability").json()
 
-    assert body["url"] == "https://medio-x.com/betanib"
+    assert body["url"] == "https://medio-x.com/betanib#:~:text=Betanib"  # sin cita: resalta el nombre
     pagina = next(c for c in body["assessment"]["checks"] if c["key"] == "pagina")
     assert pagina["ok"] is False and "404" in pagina["detail"]
 

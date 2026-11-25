@@ -165,7 +165,7 @@ def ingest_progress(
     """
     from .. import scan_eta, scan_progress
     from ..ingest_service import job_timeout_seconds, parallel_jobs, run_started_at
-    from ..worker import is_running, keepalive_url
+    from ..worker import guardian_running, is_running, keepalive_url
 
     since = datetime.now(timezone.utc) - timedelta(hours=PROGRESS_WINDOW_HOURS)
     rows = (
@@ -285,6 +285,7 @@ def ingest_progress(
         "finished": finished,
         "run_started_at": run_start + timedelta(seconds=5) if run_start is not None else None,
         "worker_running": is_running(),
+        "guardian_running": guardian_running(),
         "parallel": lanes,
         "job_timeout_minutes": int(timeout_s // 60),
         "keepalive": bool(keepalive_url()),
@@ -386,14 +387,22 @@ def _search_health(db: Session, rows: list[dict]) -> dict:
     searched = [r for r in rows if (r.get("search") or {}).get("enabled")]
     with_results = sum(1 for r in searched if (r.get("search") or {}).get("results"))
     has_api = bool(source_profile.brave_api_key(db)) or bool(cfg.get("searxng_url"))
+    from .. import search_knowledge
+
+    knowledge = search_knowledge.stats(db)
+    from_knowledge = sum(1 for r in searched if (r.get("search") or {}).get("from_knowledge"))
     note = ""
     if searched and with_results < max(1, len(searched) // 3) and not has_api:
         note = (
             "Los buscadores gratuitos (Yahoo, Bing, DuckDuckGo) bloquean o devuelven vacío cuando se les "
-            "consulta en volumen, y más desde servidores en la nube. Para una búsqueda web confiable, configure "
-            "una llave de Brave Search API (plan gratuito) o un SearXNG propio en Configuración › Parámetros de fuentes."
+            "consulta en volumen, y más desde servidores en la nube. La vigilancia usa las páginas de la base de "
+            "conocimiento de búsqueda y no espera a esos buscadores. Para sumar páginas nuevas desde el servidor, "
+            "configure una llave de Brave Search API o un SearXNG propio en Configuración › Parámetros de fuentes, "
+            "o cargue un paquete actualizado de la base de conocimiento."
         )
     return {
+        "knowledge": knowledge,
+        "sources_from_knowledge": from_knowledge,
         "enabled": bool(cfg.get("enabled")),
         "engines": list(cfg.get("engines") or []),
         "cooling": web_search.cooldown_status(),

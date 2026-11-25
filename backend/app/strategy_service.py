@@ -1,6 +1,7 @@
 """Datamart estrategico, ficha publica, boletines y alertas (fase 6)."""
 from __future__ import annotations
 
+import logging
 import re
 from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
@@ -917,9 +918,18 @@ def sanitize_public_body(doc: EvaluationDoc) -> dict:
     return {k: v for k, v in (doc.body or {}).items() if k not in hidden and str(v or "").strip()}
 
 
-def list_public_fiches(
-    db: Session, *, q: str = "", cluster_id: int | None = None, limit: int = 50
-) -> list[dict]:
+PUBLIC_PHASE_LABELS = {
+    "fase_i": "Fase I",
+    "fase_ii": "Fase II",
+    "fase_iii": "Fase III",
+    "fase_iv": "Fase IV",
+    "autorizada": "Autorizada",
+    "sin_fase": "Sin fase declarada",
+}
+
+
+def _public_rows(db: Session, *, q: str = "", cluster_id: int | None = None) -> list[tuple]:
+    """(documento, tecnologia) de cada ficha publica, la publicacion mas reciente primero."""
     query = (
         db.query(EvaluationDoc, Technology)
         .join(Technology, Technology.id == EvaluationDoc.technology_id)
@@ -935,30 +945,93 @@ def list_public_fiches(
                 Technology.commercial_name.ilike(like),
                 Technology.inn_name.ilike(like),
                 EvaluationDoc.title.ilike(like),
+                Technology.indication.ilike(like),
             )
         )
-    items = []
-    cap = max(1, min(int(limit or 50), 50))
+    rows: list[tuple] = []
     seen: set[int] = set()
     for doc, tech in query.order_by(EvaluationDoc.published_at.desc()).all():
         if tech.id in seen:
             continue
         seen.add(tech.id)
-        items.append(
-            {
-                "id": tech.id,
-                "doc_id": doc.id,
-                "title": doc.title or _tech_name(tech),
-                "commercial_name": tech.commercial_name,
-                "inn_name": tech.inn_name,
-                "nct_ids": list(tech.nct_ids or []),
-                "product_level": doc.product_level,
-                "published_at": doc.published_at,
-            }
-        )
-        if len(items) >= cap:
-            break
-    return items
+        rows.append((doc, tech))
+    return rows
+
+
+def search_public_fiches(
+    db: Session,
+    *,
+    q: str = "",
+    cluster_id: int | None = None,
+    tech_type_id: int | None = None,
+    phase: str = "",
+    year: int | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[dict], int]:
+    """Buscador avanzado de expedientes publicos (RF18): (pagina, total).
+
+    Filtra por texto, cluster, tipologia, fase de desarrollo y ano de
+    publicacion. Solo ve fichas publicadas y no confidenciales.
+    """
+    phase = (phase or "").strip().lower()
+    rows = []
+    for doc, tech in _public_rows(db, q=q, cluster_id=cluster_id):
+        if tech_type_id and tech.tech_type_id != tech_type_id:
+            continue
+        if phase and _phase_bucket(tech.development_phase or "") != phase:
+            continue
+        if year and (doc.published_at is None or doc.published_at.year != year):
+            continue
+        rows.append((doc, tech))
+    total = len(rows)
+    cap = max(1, min(int(limit or 50), 50))
+    start = max(0, int(offset or 0))
+    items = [
+        {
+            "id": tech.id,
+            "doc_id": doc.id,
+            "title": doc.title or _tech_name(tech),
+            "commercial_name": tech.commercial_name,
+            "inn_name": tech.inn_name,
+            "nct_ids": list(tech.nct_ids or []),
+            "product_level": doc.product_level,
+            "published_at": doc.published_at,
+            "development_phase": tech.development_phase or "",
+            "cluster_id": tech.cluster_id,
+            "tech_type_id": tech.tech_type_id,
+        }
+        for doc, tech in rows[start : start + cap]
+    ]
+    return items, total
+
+
+def list_public_fiches(
+    db: Session, *, q: str = "", cluster_id: int | None = None, limit: int = 50
+) -> list[dict]:
+    return search_public_fiches(db, q=q, cluster_id=cluster_id, limit=limit)[0]
+
+
+def public_fiche_filters(db: Session) -> dict:
+    """Opciones del buscador publico: solo las que tienen al menos una ficha visible."""
+    rows = _public_rows(db)
+    clusters = {tech.cluster_id for _doc, tech in rows if tech.cluster_id}
+    types = {tech.tech_type_id for _doc, tech in rows if tech.tech_type_id}
+    phases = {_phase_bucket(tech.development_phase or "") for _doc, tech in rows}
+    years = sorted({doc.published_at.year for doc, _tech in rows if doc.published_at}, reverse=True)
+    return {
+        "clusters": [
+            {"id": c.id, "name": c.name}
+            for c in db.query(Cluster).filter(Cluster.id.in_(clusters)).order_by(Cluster.name).all()
+        ] if clusters else [],
+        "tech_types": [
+            {"id": t.id, "name": t.name}
+            for t in db.query(TechType).filter(TechType.id.in_(types)).order_by(TechType.name).all()
+        ] if types else [],
+        "phases": [{"code": code, "name": name} for code, name in PUBLIC_PHASE_LABELS.items() if code in phases],
+        "years": years,
+        "total": len(rows),
+    }
 
 
 def render_public_fiche_html(data: dict) -> str:
@@ -1077,6 +1150,121 @@ def publish_bulletin(db: Session, bulletin: Bulletin, *, actor: str) -> Bulletin
     return bulletin
 
 
+log = logging.getLogger(__name__)
+BULLETIN_RECIPIENTS_KEY = "bulletins.recipients"
+MAX_BULLETIN_RECIPIENTS = 40
+_EMAIL_RE = re.compile(r"^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]{2,}$")
+
+
+def parse_recipients(raw) -> tuple[list[str], list[str]]:
+    """(correos validos sin repetir, entradas rechazadas). Acepta lista o texto con comas."""
+    if isinstance(raw, str):
+        parts = re.split(r"[,;\s]+", raw)
+    else:
+        parts = [str(p) for p in (raw or [])]
+    good: list[str] = []
+    bad: list[str] = []
+    for part in parts:
+        email = part.strip().lower()
+        if not email:
+            continue
+        if _EMAIL_RE.match(email) and len(email) <= 254:
+            if email not in good:
+                good.append(email)
+        else:
+            bad.append(part.strip()[:80])
+    return good, bad
+
+
+def bulletin_recipients(db: Session) -> list[str]:
+    from . import settings_store
+
+    good, _bad = parse_recipients(settings_store.get_value(db, BULLETIN_RECIPIENTS_KEY, ""))
+    return good
+
+
+def distribute_bulletin(db: Session, bulletin: Bulletin, recipients, *, actor: str) -> dict:
+    """Envia el boletin publicado a la alta direccion (RF19) y deja constancia.
+
+    Solo se distribuye un boletin publicado (es decir, aprobado por el lider).
+    La lista de destinatarios se recuerda para el siguiente boletin. Cada envio
+    queda en el propio boletin (`body.distribution`) y en la bitacora.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from . import mailer, settings_store
+
+    if bulletin.status != "publicado":
+        raise StrategyRuleError("Solo se distribuye un boletín publicado: apruébelo y publíquelo primero.")
+    good, bad = parse_recipients(recipients)
+    if bad:
+        raise StrategyRuleError("Correos no válidos: " + ", ".join(bad[:5]))
+    if not good:
+        raise StrategyRuleError("Indique al menos un destinatario.")
+    if len(good) > MAX_BULLETIN_RECIPIENTS:
+        raise StrategyRuleError(f"Máximo {MAX_BULLETIN_RECIPIENTS} destinatarios por envío.")
+    if not mailer.is_configured():
+        raise StrategyRuleError(
+            "El correo institucional no está configurado (SMTP). Descargue el PDF y envíelo por su correo."
+        )
+
+    html = render_bulletin_html(bulletin)
+    try:
+        from .pdf_export import html_to_pdf
+
+        pdf = html_to_pdf(html, bulletin.title or "Boletín")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("No se pudo generar el PDF del boletín %s: %s", bulletin.id, exc)
+        pdf = None
+    body = dict(bulletin.body or {})
+    funnel = body.get("funnel") or {}
+    summary = [
+        "Cifras del ciclo: "
+        f"{funnel.get('captured', funnel.get('assigned', 0))} tecnologías asignadas, "
+        f"{funnel.get('filtered', 0)} filtradas, "
+        f"{funnel.get('prioritized', body.get('prioritized', 0))} priorizadas y "
+        f"{funnel.get('published', body.get('published', 0))} publicadas."
+    ]
+    base = (get_settings_public_base_url() or "").rstrip("/")
+    sent: list[str] = []
+    failed: list[dict] = []
+    for email in good:
+        result = mailer.bulletin_distribution(
+            to=email,
+            title=bulletin.title or "Boletín de tecnologías emergentes",
+            summary=summary,
+            pdf=pdf,
+            filename=f"boletin-{bulletin.id}.pdf",
+            link=f"{base}/boletines" if base else "",
+        )
+        if result.sent:
+            sent.append(email)
+        else:
+            failed.append({"email": email, "detail": result.detail})
+
+    entry = {
+        "at": _utcnow().isoformat(),
+        "by": actor,
+        "sent": sent,
+        "failed": failed,
+        "with_pdf": pdf is not None,
+    }
+    history = list(body.get("distribution") or [])
+    history.append(entry)
+    body["distribution"] = history[-20:]
+    bulletin.body = body
+    flag_modified(bulletin, "body")
+    settings_store._upsert(db, BULLETIN_RECIPIENTS_KEY, ", ".join(good))
+    audit.record_action(
+        db,
+        entity_type="bulletins",
+        entity_id=bulletin.id,
+        action="bulletin:distribute",
+        new_value={"sent": sent, "failed": [f["email"] for f in failed], "with_pdf": pdf is not None},
+    )
+    return entry
+
+
 def render_bulletin_html(bulletin: Bulletin) -> str:
     from .report_html import render_bulletin_html as _render
 
@@ -1170,6 +1358,42 @@ def watch_technology(db: Session, tech: Technology, *, previous_phase: str = "",
             body=f"Paso de {previous_status} a {tech.status} con {points} puntos de priorización.",
             tech=tech,
         )
+
+    # RF20: la fase clinica (no solo el estado del flujo) cambio en una tecnologia
+    # de alto riesgo presupuestal. Solo cuenta un cambio real entre dos fases
+    # conocidas: la primera vez que se conoce la fase no es un cambio.
+    if points >= threshold and _phase_changed(previous_phase, now_phase):
+        _notify(
+            db,
+            kind="clinical_phase_change_high_budget",
+            title=f"Cambio de fase clínica en tecnología de alto riesgo: {_tech_name(tech)}",
+            body=(
+                f"La fase de desarrollo pasó de «{previous_phase.strip()}» a «{now_phase.strip()}» "
+                f"con {points} puntos de priorización."
+            ),
+            tech=tech,
+        )
+
+
+def _phase_changed(previous: str, current: str) -> bool:
+    before = " ".join((previous or "").lower().split())
+    after = " ".join((current or "").lower().split())
+    return bool(before) and bool(after) and before != after
+
+
+def update_development_phase(db: Session, tech: Technology, new_phase: str) -> bool:
+    """Actualiza la fase clinica de una tecnologia y dispara las alertas de RF20.
+
+    Devuelve True si la fase cambio. Una fase vacia nunca borra la que ya habia.
+    """
+    new_phase = (new_phase or "").strip()[:120]
+    previous = tech.development_phase or ""
+    if not new_phase or " ".join(new_phase.lower().split()) == " ".join(previous.lower().split()):
+        return False
+    tech.development_phase = new_phase
+    db.flush()
+    watch_technology(db, tech, previous_phase=previous, previous_status="")
+    return True
 
 
 def subscribe(db: Session, user: User, cluster_id: int | None) -> AlertSubscription:

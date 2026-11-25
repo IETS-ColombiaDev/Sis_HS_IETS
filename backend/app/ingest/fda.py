@@ -6,6 +6,8 @@ dominio publico. La llave de api.data.gov multiplica el cupo.
 """
 from __future__ import annotations
 
+import re
+
 from ..config import settings
 from .base import (
     CanonicalRecord,
@@ -112,10 +114,7 @@ class FdaConnector(Connector):
         return CanonicalRecord(
             external_id=app_no or clean_text(brand).lower()[:80],
             title=clean_text(brand, 590),
-            url=(
-                "https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm"
-                + (f"?event=overview.process&ApplNo={app_no[3:]}" if app_no else "")
-            ),
+            url=drug_url(app_no),
             summary=clean_text(
                 f"{brand}. {inn}. Titular: {makers[0] if makers else 'n/d'}. "
                 f"Forma: {clean_text(product.get('dosage_form'))}. Via: {clean_text(product.get('route')) or 'n/d'}."
@@ -179,9 +178,7 @@ class FdaConnector(Connector):
         return CanonicalRecord(
             external_id=ident or name[:80],
             title=name or ident,
-            url="https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfPMN/pmn.cfm"
-            if "510k" in dataset
-            else "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpma/pma.cfm",
+            url=device_url(row, dataset),
             summary=clean_text(f"{name}. {kind}. Titular: {maker or 'n/d'}.", 1500),
             commercial_name=clean_text(name, 400),
             manufacturer=maker,
@@ -194,6 +191,43 @@ class FdaConnector(Connector):
             details={"brand": clean_text(row.get("trade_name"), 200), "manufacturer": maker},
             raw=row,
         )
+
+
+# Paginas del registro de la FDA. La pagina sin identificador es el buscador, no la ficha.
+DRUGS_HOME = "https://www.accessdata.fda.gov/scripts/cder/daf/index.cfm"
+K510_HOME = "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfPMN/pmn.cfm"
+DENOVO_HOME = "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfPMN/denovo.cfm"
+PMA_HOME = "https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpma/pma.cfm"
+
+
+def drug_url(app_no: str) -> str:
+    """Ficha de Drugs@FDA de una solicitud (NDA, ANDA o BLA).
+
+    El sitio espera solo los digitos. Antes se quitaban tres letras fijas y un
+    generico (`ANDA214272`) quedaba como `A214272`: el enlace abria una pagina vacia.
+    """
+    digits = re.sub(r"\D", "", str(app_no or ""))
+    return f"{DRUGS_HOME}?event=overview.process&ApplNo={digits}" if digits else DRUGS_HOME
+
+
+def device_url(row: dict, dataset: str) -> str:
+    """Ficha del dispositivo en el registro (510(k), De Novo o PMA); el buscador si no hay identificador.
+
+    Formatos comprobados contra el sitio el 25-11-2026: `pmn.cfm?ID=K…`,
+    `denovo.cfm?id=DEN…` y `pma.cfm?id=P…S…` (una PMA solo abre con su suplemento).
+    """
+    if "510k" in dataset:
+        number = re.sub(r"\s+", "", str(row.get("k_number") or "")).upper()
+        if re.fullmatch(r"DEN\d+", number):
+            return f"{DENOVO_HOME}?id={number}"
+        if re.fullmatch(r"B?K\d+", number):
+            return f"{K510_HOME}?ID={number}"
+        return K510_HOME
+    number = re.sub(r"\s+", "", str(row.get("pma_number") or "")).upper()
+    supplement = re.sub(r"\s+", "", str(row.get("supplement_number") or "")).upper()
+    if re.fullmatch(r"[A-Z]+\d+", number) and re.fullmatch(r"S\d+", supplement):
+        return f"{PMA_HOME}?id={number}{supplement}"
+    return PMA_HOME
 
 
 def _sort_for(dataset: str) -> str:

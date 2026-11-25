@@ -54,11 +54,11 @@ export default function PublicFiche() {
           <div className="public-fiche-meta">
             <div>
               <b>Clúster</b>
-              <span>{data.cluster || "—"}</span>
+              <span>{data.cluster || "-"}</span>
             </div>
             <div>
               <b>Horizonte</b>
-              <span>{data.ttm_band_label || "—"}</span>
+              <span>{data.ttm_band_label || "-"}</span>
             </div>
             <div>
               <b>Producto</b>

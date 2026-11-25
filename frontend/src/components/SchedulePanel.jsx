@@ -34,12 +34,12 @@ const TASK_META = {
 };
 
 function when(iso) {
-  return iso ? new Date(iso).toLocaleString() : "—";
+  return iso ? new Date(iso).toLocaleString() : "-";
 }
 
 /** Proxima ejecucion; si ya vencio, corre en la siguiente vuelta del worker. */
 function nextRun(iso) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).getTime() <= Date.now() ? "En la próxima vuelta del worker" : when(iso);
 }
 

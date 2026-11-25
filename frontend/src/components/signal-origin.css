@@ -374,3 +374,25 @@
   color: #64748b;
   font-size: 12.5px;
 }
+
+/* Direcciones de la señal (URL exacta de captura, página consultada y fuente original) */
+.su-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 6px; }
+.su-btn { display: inline-flex; align-items: center; gap: 4px; }
+.su-box { margin: 10px 0 6px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+.su-title { font-size: 12px; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px; }
+.su-row { padding: 6px 0; border-top: 1px dashed #e2e8f0; }
+.su-row:first-of-type { border-top: none; }
+.su-label { font-size: 13px; font-weight: 600; color: #0f172a; }
+.su-hint { display: block; font-size: 12px; font-weight: 400; color: #64748b; }
+.su-value { display: flex; gap: 8px; align-items: flex-start; margin-top: 3px; }
+.su-value a { flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; word-break: break-all; }
+
+/* Sugerencia de clasificación con confianza y evidencia */
+.cs-box { margin-top: 10px; padding: 10px 12px; border: 1px solid #c7d2fe; border-radius: 10px; background: #eef2ff; font-size: 13px; }
+.cs-title { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-weight: 700; color: #312e81; margin-bottom: 6px; }
+.cs-line { margin: 5px 0; color: #0f172a; }
+.cs-warning { margin: 8px 0; padding: 8px 10px; border-radius: 8px; background: #fef3c7; color: #92400e; display: flex; gap: 6px; align-items: flex-start; }
+.cs-similar { margin: 6px 0; }
+.cs-similar summary { cursor: pointer; color: #3730a3; font-weight: 600; }
+.cs-similar ul { margin: 6px 0 0; padding-left: 18px; }
+.cs-similar li { margin: 4px 0; }
