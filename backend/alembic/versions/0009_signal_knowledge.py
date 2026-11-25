@@ -13,6 +13,7 @@ from typing import Sequence, Union
 
 from alembic import context, op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 revision: str = '0009'
 down_revision: Union[str, Sequence[str], None] = '0008'
@@ -20,6 +21,8 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 TABLE = 'signal_knowledge'
+# El mismo tipo que el modelo (JSONType): JSONB en PostgreSQL, JSON en SQLite.
+_JSON = sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql')
 
 
 def _exists() -> bool:
@@ -40,7 +43,7 @@ def upgrade() -> None:
         sa.Column('origin', sa.String(length=20), nullable=False),
         sa.Column('name', sa.String(length=400), nullable=False),
         sa.Column('text', sa.Text(), nullable=False),
-        sa.Column('terms', sa.JSON(), nullable=True),
+        sa.Column('terms', _JSON, nullable=True),
         sa.Column('year', sa.Integer(), nullable=True),
         sa.Column('cluster_id', sa.Integer(), nullable=True),
         sa.Column('tech_type_id', sa.Integer(), nullable=True),

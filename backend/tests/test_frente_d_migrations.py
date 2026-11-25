@@ -295,3 +295,18 @@ def test_upgrade_database_on_copy_of_real_db(tmp_path):
 
     assert _run_upgrade(db) == "current"
     assert counts() == after
+
+
+def test_json_columns_in_migrations_match_the_model_type():
+    """Los modelos usan JSONB en PostgreSQL: una migracion con `sa.JSON()` a secas
+    crea la columna como JSON y `alembic check` falla en PostgreSQL (ocurrio con la 0009)."""
+    import re
+    from pathlib import Path
+
+    versions = Path(__file__).resolve().parents[1] / "alembic" / "versions"
+    bare = []
+    for path in sorted(versions.glob("*.py")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if re.search(r"\bsa\.JSON\(", line) and "with_variant" not in line:
+                bare.append(f"{path.name}: {line.strip()}")
+    assert not bare, bare
