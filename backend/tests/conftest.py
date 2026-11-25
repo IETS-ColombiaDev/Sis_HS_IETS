@@ -63,6 +63,22 @@ def _hermetic_link_auto_resolve(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _hermetic_ai_provider(monkeypatch):
+    """Ninguna prueba llama al proveedor de IA real, aunque el equipo tenga una llave valida en su .env.
+
+    Con una llave vencida las pruebas pasaban porque el proveedor respondia con error; con una
+    llave valida, una prueba de captura consulto a la IA real, gasto cupo y fallo. Aqui el
+    proveedor responde siempre como «no disponible». La prueba que cubre la IA simula
+    `ai_service.generate` (o el `generate` del proveedor) con su propia respuesta.
+    """
+    from app import gemini_service, minimax_service
+
+    monkeypatch.setattr(minimax_service, "generate", lambda *a, **k: ("[Error MiniMax: IA apagada en las pruebas]", "prueba"))
+    monkeypatch.setattr(gemini_service, "_generate", lambda *a, **k: ("", ""))
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _hermetic_intelligence(monkeypatch):
     """La sugerencia de clasificacion y la analitica no consultan a la IA en red durante las pruebas.
 

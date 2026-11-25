@@ -84,6 +84,11 @@ Incluya: medicamentos, biologicos, terapias avanzadas, vacunas, dispositivos, di
 Excluya: navegacion, cookies, 'horizon scanning', el nombre de la agencia, eventos, empleos, boletines sin tecnologia.
 Excluya tambien tecnologias de uso amplio y establecido cuando el texto no anuncia nada nuevo sobre ellas
 (nueva indicacion, formulacion, poblacion, evidencia o decision regulatoria).
+No son senales los temas de salud, procedimientos, especialidades o clases terapeuticas en general
+(por ejemplo «hemodialisis», «inmunoterapia», «implantes dentales», «anticuerpos monoclonales»,
+«monitorizacion continua de glucosa»): solo cuentan si el texto nombra un producto, marca, codigo de
+desarrollo, DCI o fabricante concreto, y entonces la senal es ese producto, no la clase.
+Tampoco lo son los articulos de historia, aniversarios o perfiles de la empresa.
 Cada senal debe poder verificarse: la URL y la fecha son las del texto donde aparece, no las de otra senal.
 No copie el esquema de ejemplo. No invente identificadores NCT ni tecnologias que no esten en el texto.
 Los datos de producto (forma, concentracion, via, marca, modelo, fabricante) van solo si el texto los dice.

@@ -878,3 +878,68 @@ Con el verificador corregido, de las 651 señales de la copia: 620 abren, 31 blo
 - Verificar todo en Render: allí la CPU es mucho menor y los tiempos serán más largos.
 - Las 41 fuentes sin señales en la corrida sin IA deben revisarse con el informe de la vigilancia con IA; las que sigan en cero necesitan una URL más específica en la matriz o consulta manual.
 - Sitios que arman su contenido con JavaScript: no se leen (punto 3).
+
+## Prueba real con IA: vigilancia completa, calidad de la extracción y prompt de captura (25-11-2026, versión 7.4.2)
+
+**Estado:** CUMPLIDO PARCIAL, 25-11-2026. Con una llave válida del proveedor (MiniMax-M3) se corrió una vigilancia real completa sobre una copia de la base, con Firestore apagado. Falta la verificación en Render.
+
+### 1. Vigilancia real completa con IA
+
+| | Sin IA (corrida 3) | Con IA (corrida 4) |
+|---|---|---|
+| Fuentes atendidas | 115 de 115 | 115 de 115 |
+| Completas / parciales / con error | 54 / 61 / 0 | 70 / 45 / 0 |
+| Tiempo | 6 min 43 s | 19 min 13 s |
+| Señales detectadas | 847 | 1.152 |
+| Señales nuevas | 233 | 812 |
+| Fuentes sin ninguna señal | 41 | 25 |
+| «database is locked» y escrituras largas | 0 | 0 |
+
+De las 45 parciales con IA: 25 se leyeron por Google Noticias porque el sitio no respondió y 20 se visitaron sin detectar señales. Entre estas últimas están las que arman su contenido con JavaScript (AIFA, Boehringer) y varios registros de ensayos (ChiCTR, CRiS, DRKS, EUDAMED).
+
+### 2. Calidad de lo extraído con IA
+
+De las 812 señales nuevas, 707 salieron de la lectura de páginas (las demás llegaron por API: ClinicalTrials.gov, FDA y CTIS):
+
+- 534 con enlace exacto y 173 con página de consulta; de estas, 146 ya abren la página resaltando la señal.
+- 683 de 707 traen la cita textual de la fuente.
+- 428 de 707 traen fecha de publicación.
+- 132 entran por Google Noticias.
+
+**¿La URL exacta contiene la señal?** Muestra aleatoria de 80 señales con enlace exacto fuera de Google Noticias, abriendo cada página:
+
+- En 63 la página trae la señal.
+- En 12 no se encontró el nombre. Al revisarlas, casi todas son temas genéricos que la IA tradujo («Hemodiálisis», «Inmunoterapia», «Oxígeno hiperbárico») tomados de páginas índice: el problema es la señal, no el enlace.
+- 5 no se pudieron descargar desde el equipo de desarrollo.
+
+**Ruido.** La IA toma como tecnología temas de salud y procedimientos en general cuando la fuente es una página índice (MedlinePlus, Noticias Médicas, la página de tecnologías de GSK).
+
+### 3. Prompt de captura reforzado
+
+Se agregó al prompt de fábrica la regla de que un tema de salud, un procedimiento o una clase terapéutica no es una señal salvo que el texto nombre un producto, marca, código, DCI o fabricante concreto, y que tampoco lo son los artículos de historia o de perfil de la empresa.
+
+Medido repitiendo con IA las mismas 8 fuentes que más ruido dieron (Abbott, GSK, MedlinePlus, Noticias Médicas, ReBEC, Science Daily, DocGuide y JAMA): **de 76 señales a 47**. Desaparecieron «Colonoscopia», «Artroscopia», «Hemodiálisis», «Implantes dentales», «Brackets metálicos» y similares.
+
+**Lo que sigue entrando.** Rótulos de páginas índice («MedlinePlus», «CT Scans», «Diagnostic Imaging»), contenido ajeno de un sitio de noticias («SSSTik», «fGet») y productos de nutrición de Abbott. La respuesta de la IA varía entre corridas, así que la cifra exacta no es fija.
+
+**Qué hacer con ese ruido.** Para MedlinePlus y Noticias Médicas conviene registrar en la matriz una URL de novedades en lugar de la página índice, o pasarlas a consulta manual. Lo que el equipo descarte en la bandeja alimenta la base de conocimiento, y la sugerencia avisa cuando una señal nueva se parece a algo descartado.
+
+### 4. Sugerencia de clasificación y lectura analítica con el proveedor real
+
+- **Sugerencia:** 8 señales, entre 1,0 y 2,8 s cada una. Para una terapia génica propuso «Enfermedades huérfanas o raras» y «Terapias avanzadas y génicas» con motivo tomado del texto. Para títulos de artículos que no son una tecnología no propuso clúster, que es lo correcto.
+- **Lectura analítica:** 2,4 s. Usó solo las cifras entregadas, en los cuatro párrafos del marco.
+
+### 5. Verificación de enlaces después de la vigilancia
+
+Arranca sola un minuto después de terminar la vigilancia y trabaja por tandas de 150. Con la cortesía por sitio, una tanda tarda unos 10 minutos y el resultado se escribe al terminar cada tanda: con 1.463 señales, verificarlas todas toma cerca de dos horas en segundo plano.
+
+### 6. Pruebas
+
+- **Backend:** 1000 aprobadas y 1 omitida. Con la llave válida en el `.env`, una prueba antigua de captura llamó a la IA real y falló: la suite no aislaba al proveedor. `conftest.py` ahora lo aísla siempre (`_hermetic_ai_provider`); las pruebas no gastan cupo ni dependen de la llave.
+- **Navegador:** sin cambios desde la 7.4.1 (112 aprobadas y 3 omitidas de 115); esta versión solo cambia el texto del prompt.
+
+### 7. Pendientes
+
+- Verificar en Render, donde la CPU es mucho menor: la vigilancia con IA tardará bastante más de 19 minutos.
+- Si en producción hay un prompt de captura propio guardado, el reforzado no aplica hasta pulsar (Restaurar) en Prompts de vigilancia.
+- Revisar con el equipo técnico las 25 fuentes que no dan señales ni con IA.
