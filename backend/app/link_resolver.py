@@ -525,7 +525,8 @@ def auto_start(session_factory) -> bool:
 # --------------------------------------------------------------------------- #
 #  Senales de registros oficiales: del buscador a la ficha del producto
 # --------------------------------------------------------------------------- #
-_REGISTRY_HOSTS = ("health-products.canada.ca", "accessdata.fda.gov")
+_REGISTRY_HOSTS = ("health-products.canada.ca", "accessdata.fda.gov", "euclinicaltrials.eu")
+_CTIS_ID = re.compile(r"^\d{4}-\d{6}-\d{2}-\d{2}$")
 
 
 def registry_url(raw_payload: dict | None) -> str:
@@ -547,6 +548,10 @@ def registry_url(raw_payload: dict | None) -> str:
             return fda.device_url(row, "device/pma")
         if row.get("application_number"):
             return fda.drug_url(row.get("application_number"))
+    if connector == "ctis" and _CTIS_ID.match(str(raw_payload.get("external_id") or "")):
+        from .ingest.ctis import trial_url
+
+        return trial_url(str(raw_payload["external_id"]))
     return ""
 
 

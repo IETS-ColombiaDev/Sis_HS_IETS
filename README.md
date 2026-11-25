@@ -25,7 +25,7 @@ Inspirado en el modelo operativo del [NIHR Innovation Observatory](https://io.ni
 ## Nombre y descripción del proyecto
 
 **Sistema de Escaneo de Horizonte del IETS (Sis_HS_IETS)**  
-**Versión actual:** `7.4.0` (25 de noviembre de 2026)
+**Versión actual:** `7.4.1` (25 de noviembre de 2026)
 
 El sistema automatiza el ciclo de vida del monitoreo proactivo y reactivo de tecnologías sanitarias (medicamentos, dispositivos médicos, procedimientos, biológicos, salud digital) antes o durante su llegada al mercado y al Sistema General de Seguridad Social en Salud (SGSSS) de Colombia.
 
@@ -42,6 +42,7 @@ El sistema automatiza el ciclo de vida del monitoreo proactivo y reactivo de tec
 - **Priorización metodológica oficial %P:** Evaluación sobre 6 criterios binarios ponderados (P1 a P6) según el Manual Metodológico del IETS, calculando el indicador porcentual oficial `%P = (suma / 6) * 100` y asignando la clasificación en tres franjas (Priorizada ≥ 60 %, Bajo vigilancia 33–59 %, No priorizada < 33 %).
 - **Evaluación temprana y revisión colegiada:** Elaboración de fichas técnicas, informes rápidos o Mini-HTA con control de versiones, revisión por pares internos y externos mediante token temporal sin cuenta requerida, y firma de COI previa.
 - **Diseminación institucional:** Generación de expedientes, fichas públicas y boletines consolidados en **PDF nativo** mediante ReportLab, tablero estratégico con grafo interactivo de gobernanza, y exportación masiva de paquetes ZIP de diseminación.
+- **Búsqueda a fondo y vigilancia que no se queda (7.4.1):** El rastreador lee el contenido plegado u oculto de cada página (acordeones, pestañas, «ver más») y las tablas, además del cuerpo y de los PDF. Entre todas las fuentes abre como mucho dos páginas a la vez de un mismo sitio. Ninguna escritura queda abierta mientras se espera a la red, una fuente que falla al guardar se cierra y se reintenta sola, y el log avisa de cualquier escritura abierta más de 5 segundos. Los enlaces de las señales se verifican solos: un 404 (o una página de «no encontrado») deja de ofrecerse como enlace exacto.
 - **Inteligencia del sistema (7.4.0):** Una **base de conocimiento de señales** guarda cada señal capturada con su origen (primera búsqueda histórica o vigilancia posterior), su año y la decisión del equipo (clasificada o descartada con su motivo). Con ella, (Sugerir clasificación) combina las reglas del catálogo con lo que el equipo ya clasificó y, si la IA está encendida, con su arbitraje sobre esos mismos ejemplos; siempre muestra confianza y evidencia, y avisa cuando una señal se parece a otras descartadas. La **calibración** mide con los datos reales cuánto acierta cada método y ajusta los parámetros. Funciona con la IA apagada.
 - **Marco analítico con IA (7.4.0):** Analítica muestra cuatro lentes sobre todo el sistema (descriptivo, diagnóstico, predictivo y prescriptivo) calculados con reglas, y una lectura ejecutiva que la IA redacta usando solo esas cifras.
 - **Vigencia de las señales por año (7.4.0):** Por defecto entran todos los años. El rango se fija de manera general o para fuentes específicas, se revisa qué señales de la bandeja quedan fuera y, si se confirma, pasan a Descartadas (reversible).
@@ -193,6 +194,7 @@ El archivo de configuración principal se ubica en `backend/.env`. Copie `backen
 | `INGEST_WORKER_FORCE` | `false` | Fuerza la activación del worker de ingesta incluso con motor SQLite. |
 | `INGEST_GUARDIAN` | *Automático* | Vigilante de la cola: reanuda una vigilancia que quedó a medias tras un reinicio y mantiene despierto el servicio mientras haya cola. Sin definir, corre con SQLite y un solo proceso (Render, equipo local). `true` o `false` lo fuerza o lo apaga. |
 | `LINK_AUTO_RESOLVE` | `true` | RF-001: ubica solas, en segundo plano y con el sistema libre, las señales de «página de consulta» que aún no se han ubicado en su página. Cada señal se intenta una vez. `false` lo apaga (el botón «Ubicar señales exactas» sigue disponible). |
+| `LINK_AUTO_CHECK` | `true` | RF-001: verifica solos, en segundo plano y por tandas, los enlaces de las señales. Un 404 deja de ofrecerse como enlace exacto. `false` lo apaga (el botón «Verificar enlaces» sigue disponible). |
 | `RECAPTCHA_SECRET` | *Vacío* | Llave secreta de Google reCAPTCHA v3 para validación en backend del formulario `/postular`. |
 | `RECAPTCHA_SITE_KEY` | *Vacío* | Llave de sitio de Google reCAPTCHA v3 entregada al frontend. |
 | `RECAPTCHA_MIN_SCORE` | `0.5` | Puntaje mínimo de confianza (0.0 a 1.0) para admitir una postulación ciudadana. |
@@ -333,7 +335,7 @@ cd backend
 .\.venv\Scripts\Activate.ps1
 python -m pytest -q
 ```
-*Cubre motores de priorización, máquinas de estados de ciclos, desduplicación difusa, cruce INVIMA, conectores de ingesta, auditoría, RBAC, persistencia en Firestore, avance de la vigilancia, enlaces de señales, buscador, matriz por enlace, bandeja Legacy protección de datos, vigilancia reanudable, base de conocimiento de búsqueda, II seguimiento del Módulo 0 e inteligencia del sistema (970 pruebas al 25-11-2026). Las pruebas de la matriz por enlace usan el Excel de `backend/tests/fixtures/matriz_fuentes_escaneo_eh.xlsx`.*
+*Cubre motores de priorización, máquinas de estados de ciclos, desduplicación difusa, cruce INVIMA, conectores de ingesta, auditoría, RBAC, persistencia en Firestore, avance de la vigilancia, enlaces de señales, buscador, matriz por enlace, bandeja Legacy protección de datos, vigilancia reanudable, base de conocimiento de búsqueda, II seguimiento del Módulo 0 inteligencia del sistema y búsqueda a fondo (1000 pruebas al 25-11-2026). Las pruebas de la matriz por enlace usan el Excel de `backend/tests/fixtures/matriz_fuentes_escaneo_eh.xlsx`.*
 
 #### Pruebas de navegador de extremo a extremo (Playwright)
 ```powershell

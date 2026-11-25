@@ -5,7 +5,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.4.0 · actualizada el 25 de noviembre de 2026 (inteligencia del sistema: base de conocimiento de señales, sugerencia que aprende, calibración, marco analítico con IA y vigencia por año) |
+| **Versión del sistema** | 7.4.1 · actualizada el 25 de noviembre de 2026 (búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
@@ -726,8 +726,14 @@ Desde Vigilancia o desde Fuentes › **Ingerir**:
 2. Si falla → prueba URLs de entrada (**respaldo**).  
 3. Si el flujo lo permite → **búsqueda web** en el dominio.  
 4. Recorrido: principal → entradas → resultados de búsqueda → fichas internas guiadas por la ruta.  
-5. OCR / IA según casillas globales y de la fuente.  
-6. Huella: si el contenido ya existía, no crea señal duplicada.
+5. De cada página lee el cuerpo y, además, lo que la página trae **plegado u oculto**: acordeones, pestañas, bloques «ver más» y **tablas**. No toma menús, pies de página ni avisos de cookies.  
+6. Abre los **documentos PDF** que encuentra y lee su texto.  
+7. OCR / IA según casillas globales y de la fuente.  
+8. Huella: si el contenido ya existía, no crea señal duplicada.
+
+**Lo que no puede leer.** Los sitios que arman su contenido con JavaScript después de cargar (por ejemplo AIFA o Boehringer) o que exigen pulsar para pedir más datos al servidor: ese contenido no está en la página descargada. El Diagnóstico para la matriz (14.3) los señala para registrar una URL más específica o pasarlos a consulta manual.
+
+**Cortesía con los sitios.** Entre todas las fuentes en curso, el sistema abre como mucho dos páginas a la vez de un mismo sitio. El inventario tiene varios enlaces de un mismo sitio (FDA, BD, Abbott): sin ese tope el sitio dejaba de responder y la vigilancia se quedaba esperando.
 
 Detalle de pasos: Configuración › Integración con IA › bitácora de entrada a sitios.
 
@@ -750,6 +756,7 @@ El **rango** sale de la variación de cada fuente. Medido sobre 4 corridas reale
 - **Una fuente «sin novedades hace X min»**: se cerrará sola al llegar al tiempo máximo por fuente.
 - En el servidor de Render (plan gratuito), mientras haya fuentes en cola, el propio servicio se mantiene despierto, aunque nadie tenga la página abierta.
 - **Si el servidor se reinicia o se suspende a mitad de una vigilancia**, un vigilante de la cola la reanuda sola a los pocos segundos de volver: no hay que relanzarla. La pantalla lo indica con el aviso «la cola la cuida un vigilante».
+- **Si una fuente falla al guardar** (por ejemplo, con la base ocupada), no queda «en curso»: se cierra sola y se reintenta un minuto después.
 - **Si una corrida vieja sigue marcada «en curso»**, pulse (Detener): cancela lo que quedaba en cola. Lo ya capturado se conserva.
 
 **Búsqueda web sin esperas.** La vigilancia ya no espera a los buscadores gratuitos, que bloquean las consultas hechas desde la nube. Primero visita las páginas de la **base de conocimiento de búsqueda** (ver 25.6); si faltan, lee el **mapa del sitio** de la propia fuente. En el detalle de cada fuente verá de dónde salieron los resultados: «base de conocimiento», «mapa del sitio» o el nombre del buscador.
@@ -812,11 +819,11 @@ Las señales/tecnologías **recién capturadas** esperan aquí **sin ciclo**. Us
 
 1. Pulse la fila o **Clasificar**.  
 2. Revise título, fuente, resumen, enlace (botón **↗ Abrir la fuente original**).
-   - El recuadro **Direcciones de la señal** escribe completas las tres direcciones, cada una con (Copiar):
-     - **URL exacta de captura**: la ficha, noticia o registro donde está la señal. Si la fuente no da enlace por ítem, es la dirección que abre la página con la señal resaltada.
+   - Debajo del tipo de enlace hay **tres botones**, cada uno con un icono para copiar la dirección:
+     - **URL exacta de la señal**: abre la ficha, noticia o registro donde está la señal. Si la fuente no da enlace por ítem, el botón se llama (Página donde está la señal) y abre la página con la señal resaltada.
      - **Página consultada**: el listado, buscador o canal que el sistema recorrió para encontrarla.
      - **Fuente original**: la dirección de la fuente en el catálogo.
-   - Debajo aparece la fecha y hora de captura.
+   - El sistema **verifica solo** cada enlace. Si la URL exacta ya no existe en el sitio (error 404 o página de «no encontrado»), no se ofrece como exacta: la señal pasa a su página consultada y un texto lo explica, con la dirección que dejó de existir.
 3. (Recomendado) **Sugerir clasificación**: propone clúster, tipología y condición, cada uno con su **confianza** y de dónde sale:
    - **Reglas del catálogo**: palabras clave, CIE-10 y MeSH de los clústeres y tipologías.
    - **Aprendido de clasificaciones anteriores**: señales parecidas que el equipo ya clasificó. (Ver las señales parecidas) las lista con su parecido.
@@ -1163,7 +1170,7 @@ No use esta pantalla como sustituto de `/priorizacion`.
 Arriba de la lista está la tarjeta «Enlaces a la fuente original» con dos botones siempre visibles: (Ubicar señales exactas) y (Reporte de enlaces). Pulse (Reporte de enlaces). Muestra, por fuente, cuántas señales tienen enlace exacto, cuántas solo página de consulta (con evidencia), cuántas no tienen enlace y cuántas no responden.
 
 - (Clasificar señales): vuelve a clasificar todas las señales y guarda su evidencia de captura. No cambia ninguna URL. Queda en bitácora.
-- (Verificar enlaces): abre cada enlace en segundo plano y marca los que no responden o redirigen a la portada. Tarda unos minutos; el avance aparece en el mismo panel. Queda en bitácora.
+- (Verificar enlaces): abre cada enlace en segundo plano. **Ya no hace falta pulsarlo**: el sistema verifica solo los enlaces nuevos cuando está libre, por tandas. Distingue cuatro casos: **Responde**; **No responde** (error 404 o página de «no encontrado»: la señal pasa a su página consultada); **El sitio bloquea la verificación automática** (en el navegador abre); y **sin respuesta** (se reintenta al día siguiente). A un mismo sitio le pide las páginas de a una y con pausa, y si el sitio rechaza varias seguidas lo deja en paz hasta el día siguiente. Antes marcaba los que no responden o redirigen a la portada. Tarda unos minutos; el avance aparece en el mismo panel. Queda en bitácora.
 - (Ubicar señales exactas): busca cada señal de «página de consulta» en su página y la lleva a enlace exacto o a enlace que la resalta (ver 10.9). Corre en segundo plano y muestra cuántas ubicó. Queda en bitácora. **Ya no hace falta pulsarlo para las señales nuevas o anteriores**: el sistema lo hace solo cuando está libre. Úselo para reintentar las que quedaron sin ubicar, por ejemplo después de corregir una URL en la matriz.
 - (Diagnóstico en Excel) y (CSV): el reporte por fuente para el equipo técnico.
 

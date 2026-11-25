@@ -255,6 +255,20 @@ def backfill_signal_links() -> None:
         db.close()
 
 
+def ensure_intelligence_baseline() -> None:
+    """Marca desde cuando una senal cuenta como «posterior» en la base de conocimiento."""
+    from . import intelligence
+
+    db = SessionLocal()
+    try:
+        intelligence.ensure_baseline(db)
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        log.warning("No se pudo fijar la linea base de la base de conocimiento: %s", exc)
+    finally:
+        db.close()
+
+
 def seed_search_knowledge() -> None:
     """Carga el paquete de la base de conocimiento de busqueda que viaja con el codigo."""
     from . import search_knowledge
@@ -334,6 +348,7 @@ async def lifespan(app: FastAPI):
         seed_api_sources()
         backfill_signal_links()
         seed_search_knowledge()
+        ensure_intelligence_baseline()
     load_runtime_config()
 
     from .settings_store import load_ingest_keys

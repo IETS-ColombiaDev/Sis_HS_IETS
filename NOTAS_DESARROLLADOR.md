@@ -791,3 +791,90 @@ Sobre la copia real, de 638 señales en la bandeja: 380 de 2026, 20 de 2027 (fec
 - El parecido es léxico: no relaciona sinónimos ni idiomas distintos. Pasar a vectores semánticos exige un servicio de embeddings o más memoria que la del plan gratuito.
 - 205 señales no tienen fecha de publicación: la vigencia no las puede juzgar y por defecto las conserva.
 - El prompt de captura cambió en su texto de fábrica. Si en producción hay un prompt propio guardado, ese sigue mandando hasta que alguien pulse (Restaurar) en Prompts de vigilancia.
+
+## Búsqueda a fondo, vigilancia que no se queda y enlaces verificados (25-11-2026, versión 7.4.1)
+
+**Estado:** CUMPLIDO PARCIAL, 25-11-2026. Probado con tres vigilancias reales completas contra los sitios de las fuentes, sobre una copia de la base (141 fuentes, 115 con ingesta activa), y con las suites de backend y de navegador. Dos cosas no se pudieron verificar en desarrollo: la extracción con IA (la llave local del proveedor está vencida, HTTP 401) y el comportamiento en Render.
+
+### 1. Lo que encontró la vigilancia real
+
+La primera corrida real con el código de la 7.4.0 **se quedó en 38 %**. Las causas, tomadas del registro del servidor:
+
+| Síntoma | Causa | Corrección |
+|---|---|---|
+| Una fuente (AMGEN) quedó «en curso» con «PendingRollbackError» | La base respondió «database is locked» al anotar las páginas de búsqueda; con la sesión rota, registrar el fallo también falló y el hilo murió sin cerrar el job | El fallo se deshace antes de registrarse (`ingest_service._run_job`, `scraper.scrape_source`). Si aun así el hilo muere, `_abandon_job` cierra el job en una sesión nueva y lo deja para reintento en un minuto |
+| «database is locked» | Una escritura quedaba abierta mientras se esperaba a la red, y SQLite tiene un solo escritor | Se cierra la escritura antes de salir a la red (`_run_job`, `_run_adapter`). Las señales se guardan primero; la anotación de páginas de búsqueda y la traza van después, cada una en su propia escritura |
+| Tres fuentes de la FDA llevaban minutos «recorriendo» | Tres fuentes a la vez abrían doce fichas de `fda.gov`; el sitio dejaba de responder | Tope de dos descargas simultáneas por sitio, sumando todas las fuentes (`scraper._host_slot`) |
+
+Además queda un **detector de escrituras largas** (`database.py`): si una sesión mantiene una escritura abierta más de 5 segundos, el log dice en qué hilo. Sirve para encontrar el culpable en producción sin adivinar.
+
+**Resultado con las correcciones** (dos corridas reales completas):
+
+| Corrida | Fuentes | Completas | Parciales | Con error | Tiempo | Detectadas | Nuevas | «database is locked» |
+|---|---|---|---|---|---|---|---|---|
+| 2 | 115 de 115 | 54 | 61 | 0 | 6 min 1 s | 810 | 206 | 0 |
+| 3 | 115 de 115 | 54 | 61 | 0 | 6 min 43 s | 847 | 233 | 0 |
+
+Durante la corrida la Bandeja de entrada respondió en 0,19 s y el avance por fuente se actualizó todo el tiempo (etapa y detalle de cada fuente en curso).
+
+**Parciales.** De las 61: 25 se leyeron por Google Noticias porque el sitio no respondió, 1 por el RSS oficial y 35 se visitaron sin detectar señales.
+
+### 2. Calidad de la extracción: lo que se puede afirmar y lo que no
+
+- **Sin IA** (como corrieron estas pruebas), 41 de las 115 fuentes no dieron ninguna señal aunque el sistema entró y recorrió sus páginas (por ejemplo Abbott: 12 a 15 páginas visitadas, 0 señales). El extractor por reglas es conservador: solo toma lo que reconoce como producto o tecnología nominada.
+- **Con IA** el resultado debe ser mejor, pero **no se pudo medir**: la llave del proveedor en el equipo de desarrollo responde 401. Hay que medirlo en el sistema desplegado, donde la llave es válida, comparando el informe de la vigilancia por fuente.
+- Las 233 señales nuevas de la corrida 3 llegaron con enlace exacto: 50 de ClinicalTrials.gov, 48 de la FDA, 17 de AbbVie, 15 de BMJ, 14 de DocGuide y el resto de otras fuentes.
+
+### 3. Contenido plegado y tablas
+
+El texto de cada página salía del extractor de «artículo principal», que descartaba lo que la página muestra plegado. Con una página de prueba se comprobó que se perdían un acordeón cerrado, una pestaña oculta y una tabla.
+
+`scraper.folded_text` agrega al texto de la página lo que el HTML trae en `details`, acordeones, pestañas, bloques ocultos, «ver más» y tablas (hasta 80 filas y 6.000 caracteres), sin repetir lo ya leído y sin tomar menús, pies ni avisos de cookies. Equivale a desplegar la página.
+
+**Límite.** No ejecuta JavaScript. Lo que un sitio pide al servidor después de un clic no está en el HTML y no se puede leer así (AIFA, Boehringer). Un navegador sin interfaz no cabe en los 512 MB del plan gratuito de Render.
+
+### 4. Enlaces de las señales
+
+**Botones.** En Clasificar las tres direcciones son botones como los demás: (URL exacta de la señal), (Página consultada) y (Fuente original), cada uno con un icono para copiar. El recuadro de tipo de enlace ya no repite sus propios botones.
+
+**«Not found» y 404.** Se revisaron los enlaces en un navegador real:
+
+| Fuente | Hallazgo | Corrección |
+|---|---|---|
+| CTIS (ensayos europeos), 40 señales | El enlace abría el buscador sin el ensayo | `ctis-public/view/<número>` abre la ficha. Las ya capturadas se corrigen al arrancar |
+| PCORI, ClinicalTrials.gov | Abren bien y muestran la señal | Ninguna |
+| Google Noticias | En el navegador redirigen al artículo de la fuente | Ninguna |
+
+**Verificación automática** (`signal_links.check_links`, `auto_check`). El vigilante de la cola verifica solos los enlaces sin verificar, en tandas de 150.
+
+- **Roto** solo es 404, 410 o una página cuyo título dice «no encontrado». En ese caso la señal deja de ofrecer ese enlace: pasa a su página consultada, queda lista para ubicarse allí y la dirección rota se guarda en `evidence.broken_url`.
+- **Bloqueado** (401, 403, 429 y también 400) es un sitio que rechaza visitas automáticas. En el navegador abre.
+- **Sin respuesta** se reintenta al día siguiente.
+
+**Dos errores del verificador anterior**, medidos sobre 651 señales:
+
+1. Pedía 40 páginas a la vez a un mismo sitio: PCORI y `fda.gov` dejaban de contestar y 54 señales salían como caídas sin estarlo. Ahora cada sitio se visita de a una página, con pausa, máximo 25 por tanda, y si rechaza tres seguidas se le deja hasta el día siguiente.
+2. Usaba un cliente distinto al del rastreador y PCORI no le respondía. Ahora usa el mismo.
+
+Con el verificador corregido, de las 651 señales de la copia: 620 abren, 31 bloquean la verificación automática y ninguna está rota.
+
+**Aviso operativo.** Tras dos vigilancias y varias verificaciones seguidas, `accessdata.fda.gov` bloqueó temporalmente la IP del equipo de desarrollo (HTTP 400 a todo, también en el navegador). Es la razón de los topes de cortesía. En producción, lanzar varias vigilancias completas seguidas puede provocar lo mismo.
+
+### 5. Base de conocimiento sincronizada
+
+- Al terminar cada vigilancia, el drenaje sincroniza la base de conocimiento (y recalibra si toca) sin esperar al vigilante.
+- La línea base se fija al arrancar el sistema, no en la primera sincronización: lo que capture la vigilancia que se reanuda tras el despliegue cuenta como señal posterior. En la corrida 3: 656 históricas y 233 posteriores.
+
+### 6. Pruebas
+
+- **Backend:** 1000 aprobadas y 1 omitida. 30 son nuevas (`test_busqueda_a_fondo.py`).
+- **Navegador (E2E):** 115 pruebas en tres partes por el límite de tiempo del comando (39, 33 y 40 aprobadas). Total: 112 aprobadas, 3 omitidas y ninguna fallida.
+- **Vigilancias reales:** las tres descritas en el punto 1.
+- **Navegador real:** 18 enlaces de señales de 10 sitios, abiertos uno por uno.
+
+### 7. Pendientes y límites
+
+- Medir la extracción con IA en el sistema desplegado.
+- Verificar todo en Render: allí la CPU es mucho menor y los tiempos serán más largos.
+- Las 41 fuentes sin señales en la corrida sin IA deben revisarse con el informe de la vigilancia con IA; las que sigan en cero necesitan una URL más específica en la matriz o consulta manual.
+- Sitios que arman su contenido con JavaScript: no se leen (punto 3).

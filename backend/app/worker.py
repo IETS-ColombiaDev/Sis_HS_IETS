@@ -215,6 +215,14 @@ def guardian_tick() -> str:
                 return "ubicando"
         except Exception:  # noqa: BLE001
             log.exception("Ubicacion automatica de senales")
+        # Se verifican los enlaces de las senales que aun no se han verificado.
+        try:
+            from . import signal_links
+
+            if signal_links.auto_check(SessionLocal):
+                return "verificando"
+        except Exception:  # noqa: BLE001
+            log.exception("Verificacion automatica de enlaces")
         # Y se pone al dia la base de conocimiento de senales (y su calibracion).
         from . import intelligence
 
@@ -334,6 +342,14 @@ def drain(*, wait_retries: bool = False, max_seconds: float = KICK_MAX_SECONDS) 
                 corroboration.refresh_after_scan(SessionLocal)
             except Exception:  # noqa: BLE001
                 log.warning("No se pudo recalcular la corroboracion tras la vigilancia")
+            # Las senales nuevas entran a la base de conocimiento (y se recalibra si toca)
+            # sin esperar a la siguiente revision del vigilante.
+            try:
+                from . import intelligence
+
+                intelligence.auto_maintain(SessionLocal)
+            except Exception:  # noqa: BLE001
+                log.warning("No se pudo sincronizar la base de conocimiento tras la vigilancia")
             # Corrida terminada: las senales nuevas van a Firestore ya, sin esperar
             # el minimo entre copias (un reinicio de Render las borraria del disco).
             try:

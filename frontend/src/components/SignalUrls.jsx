@@ -6,34 +6,40 @@ export function cleanUrl(url) {
   return (url || "").replace(/#:~:text=.*$/, "");
 }
 
-function Row({ label, hint, url, href, testId, onCopy }) {
-  if (!url) return null;
+function host(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+function LinkButton({ href, label, icon = "external", testId, title, onCopy, tone }) {
   return (
-    <div className="su-row" data-testid={testId}>
-      <div className="su-label">
-        {label}
-        {hint && <span className="su-hint">{hint}</span>}
-      </div>
-      <div className="su-value">
-        <a href={href || url} target="_blank" rel="noopener noreferrer" title="Abrir en una pestaña nueva">
-          {url}
-        </a>
-        <button type="button" className="so-copy" onClick={() => onCopy(url)} aria-label={`Copiar ${label}`}>
-          <Icon name="doc" size={13} /> Copiar
-        </button>
-      </div>
-    </div>
+    <span className="su-btn">
+      <a className={`so-link${tone ? ` so-link--${tone}` : ""}`} href={href} target="_blank" rel="noopener noreferrer" title={title || cleanUrl(href)} data-testid={testId}>
+        <Icon name={icon} size={15} />
+        <span>{label}</span>
+        {host(href) && <span className="so-host">{host(href)}</span>}
+      </a>
+      <button type="button" className="so-copy" onClick={() => onCopy(cleanUrl(href))} aria-label={`Copiar la dirección: ${label}`} title="Copiar la dirección">
+        <Icon name="doc" size={13} />
+      </button>
+    </span>
   );
 }
 
 /**
- * Las tres direcciones de una señal, escritas completas para poder leerlas,
- * copiarlas y citarlas: la URL exacta de lo que el sistema capturó, la página
- * que consultó y la fuente original del catálogo.
+ * Los tres enlaces de una señal, cada uno como botón: la URL exacta de lo que
+ * el sistema capturó, la página que consultó y la fuente original del catálogo.
+ * El de la URL exacta lleva a la ficha, noticia o registro; si la fuente no da
+ * enlace por ítem, abre la página con la señal resaltada. Un enlace que el
+ * sistema verificó que ya no existe no se ofrece como exacto.
  */
-export default function SignalUrls({ url, linkType, queryUrl, sourceUrl, sourceTitle, evidence, toast }) {
+export default function SignalUrls({ url, linkType, linkStatus, queryUrl, sourceUrl, sourceTitle, evidence, toast }) {
   const exact = cleanUrl(url);
   const located = linkType !== "exacto" ? evidence?.locator_url || "" : "";
+  const broken = linkStatus === "caido" || linkStatus === "redirigido";
   const copy = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -44,54 +50,55 @@ export default function SignalUrls({ url, linkType, queryUrl, sourceUrl, sourceT
   };
   if (!exact && !queryUrl && !sourceUrl) return null;
   const same = (a, b) => cleanUrl(a).replace(/\/$/, "") === cleanUrl(b).replace(/\/$/, "");
+  const exactHref = located || url;
+  const isExact = linkType === "exacto" || Boolean(located);
   return (
-    <div className="su-box" data-testid="signal-urls">
-      <div className="su-title">Direcciones de la señal</div>
-      {!exact && !located && (
-        <div className="su-row" data-testid="signal-url-exact">
-          <div className="su-label">
-            URL exacta de captura
-            <span className="su-hint">
-              Esta señal no trae dirección propia (llegó por un registro o una carga sin enlace). Use la página consultada o la
-              fuente original.
-            </span>
-          </div>
-        </div>
+    <div className="su-actions" data-testid="signal-urls">
+      {exactHref && !broken ? (
+        <LinkButton
+          href={exactHref}
+          label={isExact ? "URL exacta de la señal" : "Página donde está la señal"}
+          icon={located ? "search" : "external"}
+          testId="signal-url-exact"
+          onCopy={copy}
+          title={
+            linkType === "exacto"
+              ? `Ficha, noticia o registro de la señal: ${exact}`
+              : located
+                ? `La fuente no da enlace por ítem: abre la página con la señal resaltada. ${cleanUrl(located)}`
+                : `La fuente no da enlace por ítem: es la página donde el sistema leyó la señal. ${exact}`
+          }
+        />
+      ) : (
+        <span className="so-nolink" data-testid="signal-url-exact">
+          <Icon name="alert" size={15} />{" "}
+          {broken
+            ? "La URL exacta ya no responde en el sitio: use la página consultada"
+            : "Esta señal no trae URL exacta: use la página consultada o la fuente original"}
+        </span>
       )}
-      <Row
-        label="URL exacta de captura"
-        hint={
-          linkType === "exacto"
-            ? "Dirección de la ficha, noticia o registro donde está la señal."
-            : located
-              ? "La fuente no da enlace por ítem: esta dirección abre la página con la señal resaltada."
-              : "La fuente no da enlace por ítem: es la página donde el sistema leyó la señal."
-        }
-        url={located ? cleanUrl(located) : exact}
-        href={located || url}
-        testId="signal-url-exact"
-        onCopy={copy}
-      />
-      {queryUrl && !same(queryUrl, located || exact) && (
-        <Row
+      {queryUrl && !same(queryUrl, exactHref) && (
+        <LinkButton
+          href={queryUrl}
           label="Página consultada"
-          hint="Listado, buscador o canal que el sistema recorrió para encontrarla."
-          url={queryUrl}
           testId="signal-url-query"
           onCopy={copy}
+          title={`Listado, buscador o canal que el sistema recorrió: ${queryUrl}`}
         />
       )}
-      <Row
-        label="Fuente original"
-        hint={sourceTitle ? `Dirección de «${sourceTitle}» en el catálogo de fuentes.` : "Dirección de la fuente en el catálogo."}
-        url={sourceUrl}
-        testId="signal-url-source"
-        onCopy={copy}
-      />
-      {evidence?.captured_at && (
-        <div className="sl-muted" data-testid="signal-url-captured">
-          Capturada el {new Date(evidence.captured_at).toLocaleString("es-CO")}.
-          {evidence.resolved?.label ? ` ${evidence.resolved.label}.` : ""}
+      {sourceUrl && (
+        <LinkButton
+          href={sourceUrl}
+          label="Fuente original"
+          icon="globe"
+          testId="signal-url-source"
+          onCopy={copy}
+          title={`${sourceTitle ? `«${sourceTitle}» en el catálogo de fuentes: ` : ""}${sourceUrl}`}
+        />
+      )}
+      {evidence?.broken_url && (
+        <div className="sl-muted" data-testid="signal-url-broken">
+          El enlace capturado ({evidence.broken_url}) ya no existe en el sitio. La señal se abre en su página consultada.
         </div>
       )}
     </div>

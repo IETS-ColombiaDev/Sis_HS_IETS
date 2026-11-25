@@ -111,7 +111,11 @@ def test_link_check_marks_dead_links(api, monkeypatch):  # noqa: F811
     assert out["por_estado"] == {"ok": 1, "caido": 1}
     with api.db() as db:
         dead = db.query(Finding).filter(Finding.title == "Caida").one()
-        assert dead.link_status == "caido" and dead.link_http == 404 and dead.link_checked_at
+        # Un 404 ya no se deja como enlace de la senal: pasa a la pagina de la fuente, que si abre,
+        # y la direccion rota queda en la evidencia (version 7.4.1).
+        assert dead.link_http == 404 and dead.link_checked_at
+        assert dead.url == "https://chk.example.org/" and dead.link_status == "sin_verificar"
+        assert dead.evidence["broken_url"] == "https://chk.example.org/404"
 
 
 # --------------------------------------------------------------------------- #

@@ -137,10 +137,12 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
         linkStatus={tech.link_status}
         queryUrl={tech.query_url}
         evidence={tech.evidence}
+        hideLinks
       />
       <SignalUrls
         url={url}
         linkType={tech.link_type}
+        linkStatus={tech.link_status}
         queryUrl={tech.query_url}
         sourceUrl={tech.source_url}
         sourceTitle={tech.source_title}
@@ -162,11 +164,7 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
             <span>Abrir fuente original</span>
             {host && <span className="so-host">{host}</span>}
           </a>
-        ) : (
-          <span className="so-nolink" data-testid="signal-url-missing">
-            <Icon name="link" size={15} /> La señal no trae URL
-          </span>
-        )}
+        ) : null}
         {tech.has_raw && (
           <Button variant="outline" size="sm" onClick={toggleRaw} loading={rawLoading} data-testid="signal-json-toggle">
             <Icon name="doc" size={15} /> {rawOpen ? "Ocultar JSON" : "Ver JSON original"}

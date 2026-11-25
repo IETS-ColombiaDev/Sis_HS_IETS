@@ -323,8 +323,12 @@ def run_job_guarded(job_id: int, timeout_s: float) -> str:
             run_job(db, job_id)
         except scan_progress.JobAborted:
             db.rollback()
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             log.exception("Job de ingesta %s", job_id)
+            db.rollback()
+            # El hilo no puede morir dejando la fuente «en curso»: ocuparia su lugar
+            # en pantalla hasta el tiempo maximo y la corrida pareceria detenida.
+            _abandon_job(job_id, f"{type(exc).__name__}: {exc}")
         finally:
             scan_progress.disarm(token)
             db.close()
@@ -354,6 +358,36 @@ def run_job_guarded(job_id: int, timeout_s: float) -> str:
     if not closed:
         close_job()
     return "timeout"
+
+
+def _abandon_job(job_id: int, reason: str) -> None:
+    """Cierra en una sesion nueva un job cuyo hilo fallo sin dejar desenlace."""
+    from . import scan_progress
+    from .database import SessionLocal, run_with_db_retry
+
+    db = SessionLocal()
+    try:
+        def close() -> None:
+            job = db.get(IngestJob, job_id)
+            if job is None or job.status != "ejecutando":
+                return
+            job.message = f"La fuente falló al guardar y se reintentará: {reason}"[:2000]
+            job.finished_at = datetime.now(timezone.utc)
+            if (job.attempts or 0) < (job.max_attempts or 3):
+                job.status = "pendiente"
+                job.scheduled_for = datetime.now(timezone.utc) + timedelta(minutes=1)
+            else:
+                job.status = "error"
+            db.commit()
+            if job.source_id:
+                scan_progress.finish(job.source_id, ok=False, detail=job.message[:240])
+
+        run_with_db_retry(db, close)
+    except Exception:  # noqa: BLE001
+        log.warning("No se pudo cerrar el job %s tras su fallo", job_id, exc_info=True)
+        db.rollback()
+    finally:
+        db.close()
 
 
 def _expire_job(db: Session, job_id: int, timeout_s: float) -> None:
@@ -470,6 +504,9 @@ def _run_job(db: Session, job: IngestJob) -> IngestJob:
                 f"Sonda {probe.get('status')}: {probe.get('message')}. Ingesta no arrancada.",
                 retry=probe.get("status") == "rojo",
             )
+    # Nada queda a medio escribir antes de salir a la red: una escritura abierta
+    # durante la descarga bloquea a las demas fuentes (SQLite tiene un solo escritor).
+    db.commit()
     try:
         if used_html:
             found, new, message, partial = _run_html(db, source, job.triggered_by)
@@ -490,6 +527,9 @@ def _run_job(db: Session, job: IngestJob) -> IngestJob:
         return _fail(db, job, str(exc), retry=True)
     except Exception as exc:  # noqa: BLE001
         log.exception("Fallo inesperado en el job %s (%s)", job.id, connector_code)
+        # La sesion puede venir rota (p. ej. base ocupada a mitad de una escritura):
+        # sin deshacer primero, registrar el fallo tambien fallaria.
+        db.rollback()
         _trip_failure(db, source, str(exc))
         return _fail(db, job, f"{type(exc).__name__}: {exc}", retry=True)
 
@@ -709,6 +749,7 @@ def _run_adapter(
 
     max_records = int(get_param(db, "ingest.max_records_per_run", 50) or 50)
     scan_progress.stage("conectando", f"Consultando la API ({adapter.label or connector_code})")
+    db.commit()  # sin escritura abierta mientras responde la API
     result = adapter.fetch(config=source.connector_config or {}, url=source.url or "")
     scan_progress.attempt(source.url or "", "ok", f"{len(result.records)} registro(s)", route="api")
     scan_progress.accessed("api", 200, f"API respondió: {len(result.records)} registro(s)")

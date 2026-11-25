@@ -56,6 +56,7 @@ def _hermetic_link_auto_resolve(monkeypatch):
     from app.config import settings
 
     monkeypatch.setattr(settings, "link_auto_resolve", False)
+    monkeypatch.setattr(settings, "link_auto_check", False)
     monkeypatch.setattr(link_resolver, "_auto_runs", 0)
     monkeypatch.setattr(corroboration, "_last_refresh", float("-inf"))
     yield

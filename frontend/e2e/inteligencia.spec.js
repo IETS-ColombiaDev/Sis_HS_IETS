@@ -93,9 +93,11 @@ test("al clasificar se ven las tres direcciones de la señal y la sugerencia tra
 
   const urls = page.getByTestId("signal-urls");
   await expect(urls).toBeVisible();
-  await expect(urls.getByTestId("signal-url-exact")).toContainText("URL exacta de captura");
+  // La señal de prueba llega sin dirección propia: se dice, y no se inventa un enlace.
+  await expect(urls.getByTestId("signal-url-exact")).toContainText("no trae URL exacta");
   await expect(urls.getByTestId("signal-url-source")).toContainText("Fuente original");
-  await expect(urls.getByTestId("signal-url-source").getByRole("link")).toHaveAttribute("href", /^https:\/\/fixture\.example\//);
+  await expect(urls.getByTestId("signal-url-source")).toHaveAttribute("href", /^https:\/\/fixture\.example\//);
+  await expect(urls.getByTestId("signal-url-source")).toHaveAttribute("target", "_blank");
 
   await page.getByRole("button", { name: "Sugerir clasificación" }).click();
   const box = page.getByTestId("classification-suggestion");
@@ -125,4 +127,45 @@ test("Analítica muestra el marco analítico con sus cuatro lentes aunque la IA 
   await expect(box.getByTestId("insights-note")).toContainText("La IA no está configurada");
   await expect(box.getByTestId("insights-generate")).toHaveCount(0);
   expectClean(errors);
+});
+
+test("la URL exacta de la señal es un botón como los demás, y un enlace que ya no existe no se ofrece", async ({ page }) => {
+  const api = await apiAs(page.request);
+  const tag = uid("Botones");
+  const [ok, gone] = await seedTechs(api, [{ name: `${tag} vigente` }, { name: `${tag} retirada` }]);
+  const exact = "https://agencia.example.org/ficha/vigente";
+  const listing = "https://agencia.example.org/novedades";
+  await page.route(/\/api\/technologies\/staging(\?|$)/, async (route) => {
+    const response = await route.fetch();
+    const rows = (await response.json()).map((row) => {
+      if (row.id === ok.id) return { ...row, signal_url: `${exact}#:~:text=Vigente`, link_type: "exacto", link_status: "ok", query_url: listing };
+      if (row.id === gone.id) {
+        return { ...row, signal_url: listing, link_type: "consulta", link_status: "sin_verificar", query_url: listing,
+          evidence: { ...(row.evidence || {}), broken_url: "https://agencia.example.org/ficha/retirada" } };
+      }
+      return row;
+    });
+    await route.fulfill({ response, json: rows });
+  });
+  await loginAs(page, "superadmin", "/bandeja-entrada");
+  await settle(page);
+  await page.getByLabel("Buscar señales").fill(tag);
+
+  await page.getByTestId(`staging-row-${ok.id}`).getByRole("button", { name: "Clasificar" }).click();
+  const urls = page.getByTestId("signal-urls");
+  const button = urls.getByTestId("signal-url-exact");
+  await expect(button).toContainText("URL exacta de la señal");
+  await expect(button).toHaveAttribute("href", `${exact}#:~:text=Vigente`);
+  await expect(button).toHaveAttribute("target", "_blank");
+  await expect(button).toHaveClass(/so-link/);
+  await expect(urls.getByTestId("signal-url-query")).toHaveAttribute("href", listing);
+  await expect(urls.getByTestId("signal-url-source")).toContainText("Fuente original");
+  // Un solo juego de botones: el recuadro de tipo de enlace ya no repite los suyos.
+  await expect(page.getByTestId("signal-link-open")).toHaveCount(0);
+  await page.getByRole("button", { name: "Cerrar" }).first().click();
+
+  await page.getByTestId(`staging-row-${gone.id}`).getByRole("button", { name: "Clasificar" }).click();
+  await expect(page.getByTestId("signal-url-exact")).toContainText("Página donde está la señal");
+  await expect(page.getByTestId("signal-url-exact")).toHaveAttribute("href", listing);
+  await expect(page.getByTestId("signal-url-broken")).toContainText("ya no existe en el sitio");
 });

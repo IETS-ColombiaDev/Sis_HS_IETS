@@ -376,6 +376,8 @@
 }
 
 /* Direcciones de la señal (URL exacta de captura, página consultada y fuente original) */
+.su-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 6px; }
+.su-btn { display: inline-flex; align-items: center; gap: 4px; }
 .su-box { margin: 10px 0 6px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
 .su-title { font-size: 12px; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px; }
 .su-row { padding: 6px 0; border-top: 1px dashed #e2e8f0; }

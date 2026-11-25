@@ -283,6 +283,21 @@ def baseline_until(db: Session) -> datetime | None:
         return None
 
 
+def ensure_baseline(db: Session) -> datetime:
+    """Fija la linea base si aun no existe (al arrancar el sistema con esta funcion por primera vez).
+
+    Lo que ya estaba capturado en ese momento es la primera busqueda historica; lo
+    que capture cualquier vigilancia posterior, incluida la que se reanude justo
+    despues del arranque, cuenta como senal posterior.
+    """
+    current = baseline_until(db)
+    if current is not None:
+        return current
+    now = datetime.now(timezone.utc)
+    settings_store.set_value(db, BASELINE_KEY, now.isoformat())
+    return now
+
+
 def set_baseline(db: Session, when: datetime | None = None) -> datetime:
     """Fija hasta cuando una senal cuenta como «primera busqueda historica»."""
     when = _aware(when) or datetime.now(timezone.utc)
