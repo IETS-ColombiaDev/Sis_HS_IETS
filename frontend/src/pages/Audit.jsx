@@ -65,7 +65,7 @@ function ValueDiff({ oldValue, newValue }) {
 }
 
 function format(value) {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined) return "-";
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
@@ -262,7 +262,7 @@ export default function Audit() {
                       <td>
                         <Badge tone={ACTION_TONE[entry.action] || "info"}>{entry.action}</Badge>
                       </td>
-                      <td className="audit-ip">{entry.ip_address || "—"}</td>
+                      <td className="audit-ip">{entry.ip_address || "-"}</td>
                       <td style={{ whiteSpace: "nowrap" }}>
                         <Button
                           variant="ghost"
@@ -281,7 +281,7 @@ export default function Audit() {
                         <td colSpan={6} className="audit-detail">
                           <div className="audit-detail-head">
                             <span>{entry.request_path || "Sin ruta"}</span>
-                            <span>Petición {entry.request_id || "—"}</span>
+                            <span>Petición {entry.request_id || "-"}</span>
                           </div>
                           <div className="audit-diff-legend">
                             <span>Campo</span>

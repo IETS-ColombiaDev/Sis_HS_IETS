@@ -44,7 +44,7 @@ def _no_network(monkeypatch, tmp_path):
     )
     # La matriz empaquetada (y su copia .prev) no se toca desde las pruebas.
     monkeypatch.setattr(source_matrix, "DATA_FILE", tmp_path / "matriz_fuentes_eh.json")
-    monkeypatch.setattr(source_matrix, "write_data_file", lambda parsed, path=None: path)
+    monkeypatch.setattr(source_matrix, "write_data_file", lambda parsed, path=None, **kw: path)
 
 
 def _compare(api, content: bytes, **form):

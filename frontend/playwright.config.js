@@ -8,6 +8,7 @@
 // Se usa el Chrome instalado en el equipo (channel "chrome") para no descargar
 // navegadores; en CI se puede cambiar con E2E_CHANNEL=chromium.
 import { defineConfig } from "@playwright/test";
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -16,6 +17,20 @@ const port = Number(process.env.E2E_PORT) || 8799;
 const baseURL = external || `http://127.0.0.1:${port}`;
 const python = process.env.E2E_PYTHON || (process.platform === "win32" ? ".venv\\Scripts\\python.exe" : ".venv/bin/python");
 const dbFile = path.join(os.tmpdir(), `iets_e2e_${port}.db`).replace(/\\/g, "/");
+
+// Cada corrida autocontenida arranca con la base vacia, como en CI. Si se reutiliza
+// la de una corrida anterior, las pruebas que consumen estado (por ejemplo validar
+// una fuente tipo E) dejan sin datos a las siguientes. Solo lo hace el proceso
+// principal (los workers recargan esta configuracion con el servidor ya arriba).
+if (!external && !process.env.TEST_WORKER_INDEX) {
+  for (const suffix of ["", "-wal", "-shm"]) {
+    try {
+      fs.rmSync(dbFile + suffix, { force: true });
+    } catch {
+      // En uso: lo reutiliza el servidor que ya esta arriba.
+    }
+  }
+}
 
 export default defineConfig({
   testDir: "./e2e",
@@ -48,6 +63,9 @@ export default defineConfig({
           ENVIRONMENT: "development",
           ALLOW_DEV_LOGIN: "true",
           INGEST_WORKER_ENABLED: "false",
+          // Las senales de prueba apuntan a sitios ficticios: no se ubican solas en red.
+          LINK_AUTO_RESOLVE: "false",
+          LINK_AUTO_CHECK: "false",
           // Las pruebas envian varias postulaciones seguidas desde la misma IP.
           PUBLIC_SUBMISSIONS_PER_WINDOW: "50",
           SECRET_KEY: "e2e-secret-key-not-for-production-0123456789",

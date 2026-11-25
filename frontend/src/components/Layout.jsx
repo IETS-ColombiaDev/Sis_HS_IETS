@@ -270,7 +270,7 @@ function CycleOption({ cycle, selected, onPick }) {
         {cycle.is_historic && <span className="cycle-option-hist">Histórico</span>}
       </div>
       <div className="cycle-option-dates">
-        Apertura {cycle.opened_on || "—"} · Corte {cycle.data_cutoff_on || "—"}
+        Apertura {cycle.opened_on || "-"} · Corte {cycle.data_cutoff_on || "-"}
         {cycle.bulletin_due_on ? ` · Boletín ${cycle.bulletin_due_on}` : ""}
       </div>
     </button>

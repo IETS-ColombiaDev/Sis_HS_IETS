@@ -102,6 +102,32 @@ ADMIN_FIELDS = (
     "usage_restrictions",
     "scan_profile",
 )
+# Datos basicos de la fuente que el equipo tambien puede cambiar desde el panel
+# (nombre, URL, ingesta activa, frecuencia...). Si una persona los edita, la
+# sincronizacion del arranque ya no los devuelve al valor de la matriz; solo la
+# reimportacion con "Sobrescribir lo editado".
+TEAM_FIELDS = (
+    "title",
+    "url",
+    "category",
+    "entity_type",
+    "description",
+    "relation_iets",
+    "language",
+    "resource_type",
+    "link_status",
+    "scrape_enabled",
+    "tags",
+    "connector",
+    "access_level",
+    "country",
+    "sync_frequency",
+    "scan_interval_hours",
+    "aliases",
+    "catalog_note",
+    "catalog_active",
+    "is_contrast",
+)
 MATRIX_IMPORT_MARK = "matriz_importada"
 
 
@@ -128,7 +154,15 @@ def sync_catalog(db: Session, *, triggered_by: str = "sistema") -> dict:
     (`link_matrix`, una fuente por fila del Excel). El catalogo D-06 solo se
     aplica si esa matriz no esta empaquetada.
     """
-    from . import link_matrix
+    from . import link_matrix, matrix_store
+
+    # La matriz que el equipo cargo desde la interfaz se repone en disco antes de
+    # sincronizar: el disco del servicio vuelve al de la imagen en cada reinicio.
+    try:
+        matrix_store.rehydrate_all(db)
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        log.warning("No se pudo reponer la matriz cargada desde la interfaz: %s", exc)
 
     packaged = link_matrix.load_packaged()
     if not packaged.get("rows") and link_matrix.current_mode(db) == link_matrix.MODE_LINKS:
@@ -323,7 +357,7 @@ def import_matrix(
         prev = source_matrix.DATA_FILE.with_suffix(".prev.json")
         if source_matrix.DATA_FILE.exists():
             prev.write_text(source_matrix.DATA_FILE.read_text(encoding="utf-8"), encoding="utf-8")
-        source_matrix.write_data_file(parsed)
+        source_matrix.write_data_file(parsed, db=db, actor=triggered_by)
     summary = {
         "rows": len(rows),
         "updated": updated,
@@ -399,7 +433,7 @@ def mark_edited(source: Source, data: dict) -> dict:
             continue
         changes[key] = [before, value]
     edited = set(source.edited_fields or [])
-    edited |= {k for k in changes if k in ADMIN_FIELDS}
+    edited |= {k for k in changes if k in ADMIN_FIELDS or k in TEAM_FIELDS}
     if source.edited_fields is not None or edited:
         source.edited_fields = sorted(edited)
     return changes
@@ -494,6 +528,10 @@ def _apply_catalog_fields(
                     edited.add(key)
             elif key in edited:
                 continue
+        elif key in TEAM_FIELDS and key in edited:
+            if not overwrite_admin:
+                continue  # lo cambio una persona: la matriz no lo revierte
+            edited.discard(key)
         if key == "connector_config":
             current = source.connector_config if isinstance(source.connector_config, dict) else {}
             incoming = value if isinstance(value, dict) else {}

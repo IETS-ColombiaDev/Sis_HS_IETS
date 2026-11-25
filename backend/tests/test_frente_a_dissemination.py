@@ -177,3 +177,101 @@ def test_invitation_mail_escapes_user_text(monkeypatch):
     html = sent[0].get_body(("html",)).get_content()
     assert "<script>" not in html and "&lt;script&gt;" in html
     assert "10 días" in sent[0].get_body(("plain",)).get_content()
+
+
+# --------------------------------------------------------------------------- #
+#  RF19: distribucion del boletin publicado a la alta direccion
+# --------------------------------------------------------------------------- #
+def _published(h):
+    cycle = h.cycle(status="en_evaluacion")
+    bid = h.client.post(f"/api/bulletins/compile/{cycle.id}").json()["id"]
+    assert h.client.post(f"/api/bulletins/{bid}/approve", json={"publish": True}).status_code == 200
+    return bid
+
+
+@pytest.fixture()
+def outbox(monkeypatch):
+    sent = []
+    monkeypatch.setattr(settings, "smtp_host", "smtp.iets.test")
+    monkeypatch.setattr(mailer, "_deliver", lambda msg: sent.append(msg))
+    return sent
+
+
+def test_published_bulletin_is_sent_with_its_pdf_and_leaves_a_record(h, outbox):
+    bid = _published(h)
+
+    res = h.client.post(
+        f"/api/bulletins/{bid}/distribute",
+        json={"recipients": ["Direccion@iets.org.co", "ministerio@minsalud.gov.co", "direccion@iets.org.co"]},
+    )
+
+    assert res.status_code == 200, res.text
+    entry = res.json()
+    assert entry["sent"] == ["direccion@iets.org.co", "ministerio@minsalud.gov.co"]  # sin repetidos
+    assert entry["failed"] == [] and entry["with_pdf"] is True
+    assert [m["To"] for m in outbox] == entry["sent"]
+    attachment = next(part for part in outbox[0].iter_attachments())
+    assert attachment.get_content_type() == "application/pdf"
+    assert attachment.get_payload(decode=True).startswith(b"%PDF")
+    assert outbox[0]["Subject"].startswith("[Boletín IETS]")
+
+    # Queda en el boletin, en la bitacora y la lista se recuerda.
+    bulletin = next(b for b in h.client.get("/api/bulletins").json() if b["id"] == bid)
+    assert bulletin["body"]["distribution"][-1]["sent"] == entry["sent"]
+    saved = h.client.get("/api/bulletins/distribution").json()
+    assert saved["recipients"] == entry["sent"] and saved["email"] is True
+    from app.models import AuditLog
+
+    assert h.db.query(AuditLog).filter(AuditLog.action == "bulletin:distribute").count() == 1
+
+
+def test_a_bulletin_that_is_not_published_is_never_distributed(h, outbox):
+    cycle = h.cycle(status="en_evaluacion")
+    bid = h.client.post(f"/api/bulletins/compile/{cycle.id}").json()["id"]
+
+    res = h.client.post(f"/api/bulletins/{bid}/distribute", json={"recipients": ["direccion@iets.org.co"]})
+
+    assert res.status_code == 409 and "publicado" in res.json()["detail"]
+    assert outbox == []
+
+
+def test_distribution_rejects_bad_addresses_and_missing_mail_server(h, outbox, monkeypatch):
+    bid = _published(h)
+
+    bad = h.client.post(f"/api/bulletins/{bid}/distribute", json={"recipients": ["no-es-correo", "a@b.co"]})
+    empty = h.client.post(f"/api/bulletins/{bid}/distribute", json={"recipients": []})
+    monkeypatch.setattr(settings, "smtp_host", "")
+    no_smtp = h.client.post(f"/api/bulletins/{bid}/distribute", json={"recipients": ["a@b.co"]})
+
+    assert bad.status_code == 409 and "no-es-correo" in bad.json()["detail"]
+    assert empty.status_code == 409
+    assert no_smtp.status_code == 409 and "SMTP" in no_smtp.json()["detail"]
+    assert outbox == []
+
+
+def test_a_rejected_recipient_is_reported_without_hiding_the_ones_that_went_out(h, monkeypatch):
+    bid = _published(h)
+    monkeypatch.setattr(settings, "smtp_host", "smtp.iets.test")
+
+    def deliver(msg):
+        if "rebota" in msg["To"]:
+            raise OSError("buzón inexistente")
+
+    monkeypatch.setattr(mailer, "_deliver", deliver)
+
+    entry = h.client.post(
+        f"/api/bulletins/{bid}/distribute", json={"recipients": ["ok@iets.org.co", "rebota@iets.org.co"]}
+    ).json()
+
+    assert entry["sent"] == ["ok@iets.org.co"]
+    assert [f["email"] for f in entry["failed"]] == ["rebota@iets.org.co"]
+
+
+def test_only_cycle_writers_distribute(h):
+    bid = _published(h)
+
+    res = h.as_role("tomador_decisiones").client.post(
+        f"/api/bulletins/{bid}/distribute", json={"recipients": ["a@b.co"]}
+    )
+
+    assert res.status_code == 403

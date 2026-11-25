@@ -49,7 +49,7 @@ function pct(value) {
 }
 
 function techLabel(tech) {
-  if (!tech) return "—";
+  if (!tech) return "-";
   return tech.inn_name || tech.commercial_name || `Tecnología #${tech.id}`;
 }
 
@@ -462,14 +462,14 @@ function InvimaPanel({ canSync, onChanged }) {
           },
           {
             label: "Antigüedad",
-            value: status.age_days === null ? "—" : `${status.age_days} d`,
+            value: status.age_days === null ? "-" : `${status.age_days} d`,
             sub: `Máximo ${status.stale_after_days} d`,
             color: status.stale ? "#EF4444" : "#059669",
             hint: "Días desde la última sincronización. Un índice viejo da falsos 'sin registro' en silencio.",
           },
           {
             label: "Última sincronización",
-            value: status.last_source || "—",
+            value: status.last_source || "-",
             sub: status.last_status || "sin ejecutar",
             hint: "Origen y resultado de la última carga: datos.gov.co (Socrata) o archivo plano.",
           },
@@ -1156,11 +1156,11 @@ function UniqueListTab({ focusId }) {
                           <ClampText className="muted-note" text={item.commercial_name} lines={2} />
                         )}
                       </td>
-                      <td>{item.manufacturer || "—"}</td>
-                      <td>{item.tech_type_name || "—"}</td>
-                      <td>{item.atc_code || "—"}</td>
+                      <td>{item.manufacturer || "-"}</td>
+                      <td>{item.tech_type_name || "-"}</td>
+                      <td>{item.atc_code || "-"}</td>
                       <td>{TECH_STATUS_LABELS[item.status] || item.status}</td>
-                      <td>{item.priority_pct === null ? "—" : pct(item.priority_pct)}</td>
+                      <td>{item.priority_pct === null ? "-" : pct(item.priority_pct)}</td>
                     </tr>
                   ))}
                 </tbody>

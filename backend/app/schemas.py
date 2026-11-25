@@ -852,6 +852,8 @@ class TechnologyOut(BaseModel):
     raw_origin: str = ""
     # URL mas especifica de la senal (propia, del hallazgo o del crudo).
     signal_url: str = ""
+    # URL de la fuente en el catalogo (la «fuente original» de la senal).
+    source_url: str = ""
     legacy: bool | None = False
     # Tipo de enlace de la senal (RF-001): exacto | consulta | sin_enlace, y evidencia de captura.
     link_type: str = ""
@@ -1681,6 +1683,9 @@ class PublicFicheListItem(BaseModel):
     nct_ids: list[str] = []
     product_level: str = ""
     published_at: datetime | None = None
+    development_phase: str = ""
+    cluster_id: int | None = None
+    tech_type_id: int | None = None
 
 
 class PublicFicheOut(BaseModel):
@@ -1716,6 +1721,10 @@ class BulletinOut(BaseModel):
 
 class BulletinDecisionIn(BaseModel):
     publish: bool = False
+
+
+class BulletinDistributeIn(BaseModel):
+    recipients: list[str] = Field(default_factory=list, max_length=60)
 
 
 class AlertSubscriptionIn(BaseModel):

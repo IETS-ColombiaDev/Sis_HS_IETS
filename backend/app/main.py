@@ -51,6 +51,8 @@ from .routers import (
     recommendations,
     review_portal,
     scan,
+    search_knowledge as search_knowledge_router,
+    intelligence as intelligence_router,
     screening,
     sources,
     strategy,
@@ -165,7 +167,11 @@ def seed_official_cycles() -> None:
     """
     # En produccion los ciclos los gobierna la coordinacion: la siembra solo corre
     # si se pide expresamente (SEED_OFFICIAL_CYCLES=true). En desarrollo, por defecto.
-    default = "false" if settings.is_production else "true"
+    # El servicio desplegado (Render) trabaja sobre los datos reales aunque corra
+    # con ENVIRONMENT=development: la siembra reconstruye ciclos y no debe correr
+    # ahi salvo que se pida.
+    deployed = settings.is_production or os.environ.get("RENDER", "").strip().lower() == "true"
+    default = "false" if deployed else "true"
     if os.environ.get("SEED_OFFICIAL_CYCLES", default).strip().lower() in {"0", "false", "no"}:
         log.info("Siembra de ciclos oficiales desactivada (SEED_OFFICIAL_CYCLES=false).")
         return
@@ -237,9 +243,42 @@ def backfill_signal_links() -> None:
         out = signal_links.backfill(db, actor="sistema", only_missing=True)
         if out.get("procesadas"):
             log.info("Enlaces de senales clasificados: %s", out.get("por_tipo"))
+        from . import link_resolver
+
+        repaired = link_resolver.repair_registry_links(db)
+        if repaired["fixed"] or repaired["reclassified"]:
+            log.info("Enlaces de registros oficiales corregidos: %s", repaired)
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         log.warning("No se pudieron clasificar los enlaces de las senales: %s", exc)
+    finally:
+        db.close()
+
+
+def ensure_intelligence_baseline() -> None:
+    """Marca desde cuando una senal cuenta como «posterior» en la base de conocimiento."""
+    from . import intelligence
+
+    db = SessionLocal()
+    try:
+        intelligence.ensure_baseline(db)
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        log.warning("No se pudo fijar la linea base de la base de conocimiento: %s", exc)
+    finally:
+        db.close()
+
+
+def seed_search_knowledge() -> None:
+    """Carga el paquete de la base de conocimiento de busqueda que viaja con el codigo."""
+    from . import search_knowledge
+
+    db = SessionLocal()
+    try:
+        search_knowledge.seed_from_package(db)
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        log.warning("No se pudo cargar el paquete de la base de busqueda: %s", exc)
     finally:
         db.close()
 
@@ -308,6 +347,8 @@ async def lifespan(app: FastAPI):
         seed_official_cycles()
         seed_api_sources()
         backfill_signal_links()
+        seed_search_knowledge()
+        ensure_intelligence_baseline()
     load_runtime_config()
 
     from .settings_store import load_ingest_keys
@@ -323,7 +364,7 @@ async def lifespan(app: FastAPI):
             settings.ncbi_email = keys["ncbi_email"]
     finally:
         db.close()
-    from .worker import start_worker, stop_worker
+    from .worker import start_guardian, start_worker, stop_worker
 
     firebase_db.enable_autosync()
 
@@ -336,9 +377,13 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=_boot_push, name="firebase-boot-push", daemon=True).start()
     _recover_orphan_jobs()
     start_worker()
+    # Con o sin worker regular: si quedo cola de una corrida anterior, se reanuda sola.
+    start_guardian()
     yield
-    firebase_db.flush_on_shutdown()
+    # Primero se detiene la vigilancia: asi la copia final no compite con sus
+    # escrituras y se lleva el ultimo estado.
     stop_worker()
+    firebase_db.flush_on_shutdown()
 
 
 app = FastAPI(
@@ -473,6 +518,8 @@ ROUTERS = (
     review_portal,
     strategy,
     public_catalog,
+    search_knowledge_router,
+    intelligence_router,
 )
 
 for r in ROUTERS:
@@ -481,7 +528,31 @@ for r in ROUTERS:
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "iets-horizon-scanning", "version": __version__}
+    return {
+        "status": "ok",
+        "service": "iets-horizon-scanning",
+        "version": __version__,
+        "backup": _backup_health(),
+    }
+
+
+def _backup_health() -> dict:
+    """Estado de la copia en Firestore, sin datos sensibles (para monitoreo)."""
+    from . import firebase_db
+
+    try:
+        if not firebase_db.enabled():
+            return {"enabled": False}
+        st = firebase_db.status()
+        return {
+            "enabled": True,
+            "synced": bool(st.get("synced")),
+            "last_copy_at": st.get("taken_at") or "",
+            "blocked": bool(st.get("blocked_shrink")),
+            "error": bool(st.get("error")),
+        }
+    except Exception:  # noqa: BLE001
+        return {"enabled": False}
 
 
 # --------------------------------------------------------------------------- #

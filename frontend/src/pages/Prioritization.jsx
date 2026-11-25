@@ -600,7 +600,7 @@ export default function Prioritization() {
         title="Pasar a evaluación temprana"
         confirmVariant="primary"
         confirmLabel="Pasar a evaluación"
-        message={`${(sending?.name || "").slice(0, 120)} sale de la matriz con ${sending?.points ?? "—"} puntos y se abre su expediente. Su calificación queda fija para este ciclo.`}
+        message={`${(sending?.name || "").slice(0, 120)} sale de la matriz con ${sending?.points ?? "-"} puntos y se abre su expediente. Su calificación queda fija para este ciclo.`}
       />
 
       <Modal

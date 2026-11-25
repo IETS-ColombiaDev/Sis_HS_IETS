@@ -136,7 +136,9 @@ export function apiError(error, fallback = "Ocurrió un error") {
   }
   const status = error?.response?.status;
   if (status && STATUS_MESSAGES[status]) return STATUS_MESSAGES[status];
-  if (error?.code === "ECONNABORTED") return "El servidor tardó demasiado en responder. Intente de nuevo.";
+  if (error?.code === "ECONNABORTED") {
+    return "El servidor tardó demasiado en responder. Si llevaba un rato sin uso, está iniciando: espere un minuto e intente de nuevo.";
+  }
   if (error?.request && !error?.response) {
     return "No hay conexión con el servidor. Verifique su red e intente de nuevo.";
   }

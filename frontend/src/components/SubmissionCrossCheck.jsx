@@ -101,7 +101,7 @@ export default function SubmissionCrossCheck({ row, canRun, onUpdated, toast, co
                     <li key={m.technology_id}>
                       <div>
                         <strong>{m.name}</strong>
-                        {m.manufacturer ? ` · ${m.manufacturer}` : ""} — {m.source_title || "Sin fuente"}{" "}
+                        {m.manufacturer ? ` · ${m.manufacturer}` : ""} - {m.source_title || "Sin fuente"}{" "}
                         <span className="xc-muted">
                           ({Math.round(m.score)}% por {(m.matched_on || []).map((k) => MATCHED_ON[k] || k).join(", ") || "nombre"}
                           {m.status_label ? ` · ${m.status_label}` : ""})

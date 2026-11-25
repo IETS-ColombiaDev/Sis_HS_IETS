@@ -14,6 +14,7 @@ import { LoadingBlock } from "../components/Spinner";
 import MethodologyPanel from "../components/MethodologyPanel";
 import SchedulePanel from "../components/SchedulePanel";
 import SourceParamsPanel from "../components/SourceParamsPanel";
+import IntelligencePanel from "../components/IntelligencePanel";
 import BackupPanel from "../components/BackupPanel";
 import HorizonRulesPanel from "../components/HorizonRulesPanel";
 
@@ -25,6 +26,7 @@ const TABS = [
   { id: "fuentes", label: "Llaves de fuentes", icon: "globe" },
   { id: "parametros_fuentes", label: "Parámetros de fuentes", icon: "layers" },
   { id: "reglas_horizonte", label: "Reglas de horizonte", icon: "sliders" },
+  { id: "inteligencia", label: "Inteligencia", icon: "spark" },
   { id: "copia_local", label: "Persistencia (Firebase)", icon: "save" },
 ];
 
@@ -345,6 +347,7 @@ export default function Settings() {
 
       {tab === "parametros_fuentes" && <SourceParamsPanel toast={toast} />}
       {tab === "reglas_horizonte" && <HorizonRulesPanel toast={toast} />}
+      {tab === "inteligencia" && <IntelligencePanel toast={toast} />}
 
       {tab === "copia_local" && <BackupPanel />}
 

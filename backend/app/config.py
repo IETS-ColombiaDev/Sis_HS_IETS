@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     firebase_rrhh_env_file: str = ""
     # Base Firestore propia de Horizonte (NO la (default) de RRHH).
     firebase_db_enabled: bool = True
+    # RF-001: ubicar solas, en segundo plano, las senales que aun no se han ubicado en su pagina.
+    link_auto_resolve: bool = True
+    # RF-001: verificar solos, en segundo plano, los enlaces de las senales (404, redirecciones).
+    link_auto_check: bool = True
     firebase_db_database: str = "hs-iets"
     firebase_db_collection: str = "hs_iets_db"
     # Solo para soporte: un entorno no productivo lee/escribe la copia de produccion.

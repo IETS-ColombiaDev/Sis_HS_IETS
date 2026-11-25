@@ -20,6 +20,7 @@ from ..schemas import (
     AlertSubscriptionIn,
     AlertSubscriptionOut,
     BulletinDecisionIn,
+    BulletinDistributeIn,
     BulletinOut,
     StrategyDashboardOut,
     StrategyGraphIn,
@@ -264,6 +265,42 @@ def approve_bulletin(
     db.refresh(row)
     bump_state_version(db)
     return row
+
+
+@router.get("/api/bulletins/distribution")
+def bulletin_distribution_settings(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CYCLE_WRITE)),
+):
+    """Destinatarios recordados y si hay correo institucional para distribuir (RF19)."""
+    from .. import mailer
+
+    return {
+        "recipients": strategy_service.bulletin_recipients(db),
+        "email": mailer.is_configured(),
+        "max_recipients": strategy_service.MAX_BULLETIN_RECIPIENTS,
+    }
+
+
+@router.post("/api/bulletins/{bulletin_id}/distribute")
+def distribute_bulletin(
+    bulletin_id: int,
+    payload: BulletinDistributeIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CYCLE_WRITE)),
+):
+    """Envia el boletin publicado, con su PDF, a la alta direccion (RF19)."""
+    row = db.get(Bulletin, bulletin_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Boletín no encontrado")
+    try:
+        entry = strategy_service.distribute_bulletin(db, row, payload.recipients, actor=user.email)
+    except StrategyRuleError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    db.commit()
+    bump_state_version(db)
+    return entry
 
 
 @router.get("/api/bulletins/{bulletin_id}/export")

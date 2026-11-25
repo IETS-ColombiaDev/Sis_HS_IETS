@@ -1090,13 +1090,13 @@ Los cuatro RF de la fase están entregados. Queda lo que depende de infraestruct
 |---|---|---|---|---|---|
 | P3-1 | RF13 | Editor enriquecido TipTap | El cuerpo es formulario estructurado, no ProseMirror | Adoptar TipTap cuando haya tiempo de UX | M |
 | P3-2 | RF16 | Envío de correo | ~~El enlace se copia~~ | **Hecho v7.0**: `mailer.py` envía la invitación cuando `SMTP_HOST` está configurado; sin SMTP se sigue ofreciendo copiar el enlace. Falta el servidor institucional | S |
-| P3-3 | RF13 | PDF nativo WeasyPrint/Playwright | En Windows WeasyPrint es frágil; hoy se exporta HTML institucional | Renderizar PDF en el entorno Linux de despliegue | M |
+| P3-3 | RF13 | PDF nativo | **Hecho** con reportlab (`pdf_export.py`), sin dependencias del sistema | | M |
 
 ### P4 — Cierre pendiente de la fase 6
 
 | ID | RF | Item | Problema | Solución | Esfuerzo |
 |---|---|---|---|---|---|
-| P4-1 | RF19 | PDF nativo del boletín | Hoy se exporta HTML ejecutivo | Playwright/WeasyPrint en el entorno Linux | M |
+| P4-1 | RF19 | PDF nativo del boletín | **Hecho** (`pdf_export.py`). Desde la versión 7.2.0 el boletín publicado también se envía por correo con el PDF adjunto | | M |
 | P4-2 | RF20 | Correo de alertas | ~~No hay canal de correo~~ | **Hecho v7.0**: alertas por correo con SMTP configurado; se agregó la alerta por cambio de franja de alto riesgo presupuestal | S |
 
 ### P5 — Transversales y mejora continua
@@ -1162,7 +1162,7 @@ Bloquean fases futuras. Ninguna se resolvió por supuesto del equipo de desarrol
 - ~~Sin migraciones Alembic~~ (resuelto en v7.0). `run_schema_migrations` se conserva como red de seguridad; todo cambio de esquema nuevo va en una revisión de Alembic.
 - ~~Sin pruebas de navegador~~ (resuelto en v7.0 con Playwright). Sigue sin haber pruebas unitarias de componentes React.
 - ~~El escaneo es síncrono~~ (resuelto): corre en segundo plano y de forma programada; la cola vive en la base, sin Redis.
-- El PDF institucional sigue siendo HTML imprimible (P3-3, P4-1).
+- El PDF institucional ya es nativo (P3-3 y P4-1 cerrados; ver `pdf_export.py`).
 - El límite de intentos por IP vive en memoria de cada proceso: con N procesos de uvicorn el tope efectivo se multiplica por N (el bloqueo por cuenta no se ve afectado).
 - El chat RAG recupera por coincidencia simple, sin embeddings vectoriales.
 - Rutas heredadas mantenidas por compatibilidad con enlaces existentes.

@@ -21,7 +21,7 @@ test.describe("notas · tomador de decisiones (note:write)", () => {
 
     // Nota general.
     const general = uid("Nota general");
-    await page.getByRole("button", { name: "Nueva nota" }).click();
+    await page.getByRole("button", { name: "Nueva nota" }).first().click();
     await page.locator("#note-title").fill(general);
     await page.getByRole("button", { name: "Guardar nota" }).click();
     await expect(page.locator(".public-submit-error")).toContainText("contenido");
@@ -31,7 +31,7 @@ test.describe("notas · tomador de decisiones (note:write)", () => {
 
     // Nota vinculada a una fuente.
     const linked = uid("Nota fuente");
-    await page.getByRole("button", { name: "Nueva nota" }).click();
+    await page.getByRole("button", { name: "Nueva nota" }).first().click();
     await page.locator("#note-entity-type").selectOption("source");
     await expect(page.locator("#note-entity-id option", { hasText: source.title })).toHaveCount(1);
     await page.locator("#note-entity-id").selectOption({ label: source.title });

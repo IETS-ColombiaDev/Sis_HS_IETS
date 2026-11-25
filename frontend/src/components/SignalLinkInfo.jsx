@@ -14,6 +14,7 @@ export const LINK_STATUS = {
   caido: "No responde",
   bloqueado: "El sitio bloquea la verificación automática",
   sin_verificar: "Sin verificar",
+  sin_respuesta: "El sitio no respondió a la verificación (se reintenta)",
 };
 
 function fmt(value) {
@@ -26,7 +27,7 @@ function fmt(value) {
  * Enlace de la señal con su tipo, su estado y, cuando la fuente no ofrece
  * enlace directo, la evidencia de captura (título, fragmento, fecha y hora, URL consultada).
  */
-export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, evidence, compact = false }) {
+export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, evidence, compact = false, hideLinks = false }) {
   const type = LINK_TYPE[linkType] || (url ? null : LINK_TYPE.sin_enlace);
   const broken = linkStatus === "caido" || linkStatus === "redirigido";
   const showEvidence = evidence && linkType !== "exacto";
@@ -34,6 +35,8 @@ export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, ev
   // señal está en la página: el enlace abre la página y el navegador la resalta.
   const locatorUrl = linkType !== "exacto" ? evidence?.locator_url : "";
   const resolved = evidence?.resolved || null;
+  // Fuentes que bloquean robots se leen por su canal en Google Noticias: el enlace redirige al artículo.
+  const viaNews = /^https?:\/\/news\.google\.com\//i.test(url || "");
   return (
     <div className="sl-box" data-testid="signal-link-info">
       <div className="sl-row">
@@ -42,12 +45,12 @@ export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, ev
             <Icon name={linkType === "exacto" ? "check" : "alert"} size={13} /> {type.label}
           </span>
         )}
-        {linkStatus && linkStatus !== "sin_verificar" && (
+        {linkStatus && linkStatus !== "sin_verificar" && linkStatus !== "sin_respuesta" && (
           <span className={`sl-badge sl-badge--${broken ? "bad" : linkStatus === "ok" ? "ok" : "warn"}`} data-testid="signal-link-status">
             {LINK_STATUS[linkStatus] || linkStatus}
           </span>
         )}
-        {locatorUrl && (
+        {locatorUrl && !hideLinks && (
           <a
             className="so-link"
             href={locatorUrl}
@@ -59,7 +62,7 @@ export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, ev
             <Icon name="search" size={14} /> Abrir la página y resaltar la señal
           </a>
         )}
-        {url && (
+        {url && !hideLinks && (
           <a
             className={locatorUrl ? "sl-query" : "so-link"}
             href={url}
@@ -71,7 +74,7 @@ export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, ev
             {!locatorUrl && <Icon name="external" size={14} />} {type?.button || "Abrir enlace"}
           </a>
         )}
-        {queryUrl && linkType === "exacto" && !compact && (
+        {queryUrl && linkType === "exacto" && !compact && !hideLinks && (
           <a className="sl-query" href={queryUrl} target="_blank" rel="noopener noreferrer" title={queryUrl}>
             Página consultada
           </a>
@@ -89,6 +92,22 @@ export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, ev
               .
             </>
           )}
+        </div>
+      )}
+      {viaNews && !compact && (
+        <div className="sl-muted" data-testid="signal-link-news">
+          Este enlace pasa por Google Noticias y redirige al artículo original de la fuente. Allí, busque el título de la
+          señal (Ctrl+F) para ubicarla.
+        </div>
+      )}
+      {linkType === "exacto" && resolved?.method === "enlace_del_registro" && !compact && (
+        <div className="sl-muted" data-testid="signal-link-registry">
+          Enlace exacto a la ficha del producto en el registro oficial.
+        </div>
+      )}
+      {linkType === "exacto" && evidence?.snippet && evidence.is_quote && !compact && (
+        <div className="sl-muted" data-testid="signal-link-quote">
+          Texto de la señal en la fuente: «{evidence.snippet}». El enlace abre la página y el navegador resalta ese texto.
         </div>
       )}
       {showEvidence && (

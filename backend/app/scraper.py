@@ -14,6 +14,7 @@ import html as html_lib
 import re
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urljoin, urlparse, urlunparse
+import threading
 import time
 import unicodedata
 import warnings
@@ -296,7 +297,34 @@ def _decode_body(raw: bytes, content_type: str, declared: str = "") -> str:
     return raw.decode("utf-8", errors="replace")
 
 
+# Descargas simultaneas a un mismo sitio, sumando todas las fuentes en curso. El
+# inventario tiene varios enlaces de un mismo sitio (FDA, BD, Abbott): tres fuentes
+# a la vez abrian doce fichas de fda.gov, el sitio dejaba de responder y las tres
+# se quedaban minutos esperando.
+HOST_MAX_CONCURRENT = 2
+_host_slots: dict[str, threading.BoundedSemaphore] = {}
+_host_slots_lock = threading.Lock()
+
+
+def _host_slot(url: str) -> threading.BoundedSemaphore:
+    host = (urlparse(url or "").hostname or "").lower().removeprefix("www.")
+    # fda.gov y accessdata.fda.gov son el mismo proveedor: comparten el tope.
+    labels = host.split(".")
+    key = ".".join(labels[-2:]) if len(labels) > 2 and len(labels[-1]) > 2 else host
+    with _host_slots_lock:
+        slot = _host_slots.get(key)
+        if slot is None:
+            slot = _host_slots[key] = threading.BoundedSemaphore(HOST_MAX_CONCURRENT)
+        return slot
+
+
 def fetch_url(url: str, timeout: float | None = None, retries: int | None = None) -> tuple[int, str, str, bytes]:
+    """Descarga con reintentos y con tope de descargas simultaneas por sitio."""
+    with _host_slot(url):
+        return _fetch_url(url, timeout, retries)
+
+
+def _fetch_url(url: str, timeout: float | None = None, retries: int | None = None) -> tuple[int, str, str, bytes]:
     """Descarga con reintentos. Nunca lanza: si falla, status 0 y cuerpo vacio.
 
     `retries` limita los reintentos de esta descarga (las paginas internas del
@@ -497,6 +525,85 @@ def collect_pagination_urls(html: str, base_url: str, limit: int = 2) -> list[st
     return found
 
 
+# Contenedores que una pagina muestra plegados u ocultos hasta que el lector pulsa:
+# acordeones, pestanas, «ver mas». El texto esta en el HTML, pero el extractor de
+# articulo lo descarta por no ser parte del cuerpo visible.
+_FOLDED_CLASS = re.compile(r"accordion|collaps|tab-?pane|tab-?content|tabpanel|toggle|expand|panel-body|faq|read-?more|show-?more", re.I)
+_CHROME_CLASS = re.compile(r"cookie|consent|gdpr|modal|menu|navbar|nav-|breadcrumb|footer|header|search|share|social|login|banner|skip", re.I)
+FOLDED_MAX_CHARS = 6000
+TABLE_MAX_ROWS = 80
+
+
+def _is_chrome(tag) -> bool:
+    """El bloque es parte del marco del sitio (menu, pie, aviso de cookies), no del contenido."""
+    for node in [tag, *tag.parents]:
+        if getattr(node, "name", None) in ("nav", "header", "footer", "form", "aside"):
+            return True
+        classes = " ".join(node.get("class") or []) if hasattr(node, "get") else ""
+        ident = (node.get("id") or "") if hasattr(node, "get") else ""
+        if _CHROME_CLASS.search(f"{classes} {ident}"):
+            return True
+    return False
+
+
+def folded_text(html: str, already: str = "") -> str:
+    """Texto de acordeones, pestanas, bloques ocultos y tablas que no esta ya en `already`.
+
+    Equivale a desplegar la pagina: se lee lo que el sitio trae en el HTML aunque
+    lo muestre plegado. No ejecuta JavaScript: lo que el sitio carga despues de
+    un clic con una consulta aparte no esta en el HTML y no se puede leer asi.
+    """
+    if not html:
+        return ""
+    soup = BeautifulSoup(html, "lxml")
+    for tag in soup(["script", "style", "noscript", "template", "svg"]):
+        tag.decompose()
+    have = re.sub(r"\s+", " ", already or "").lower()
+    chunks: list[str] = []
+    seen: set[str] = set()
+
+    def add(text: str, minimum: int = 25) -> None:
+        text = _clean(text)
+        if len(text) < minimum:
+            return
+        flat = re.sub(r"\s+", " ", text).lower()
+        key = flat[:70]
+        # Ya leido: coincide el inicio o un tramo del medio (el rotulo del acordeon puede ir delante).
+        middle = flat[max(0, len(flat) // 2 - 20) : len(flat) // 2 + 20]
+        if key in seen or key in have or (len(middle) >= 30 and middle in have):
+            return
+        seen.add(key)
+        chunks.append(text[:1500])
+
+    def folded(tag) -> bool:
+        if tag.name == "details" or tag.has_attr("hidden"):
+            return True
+        if (tag.get("aria-hidden") or "").lower() == "true" or (tag.get("role") or "").lower() == "tabpanel":
+            return True
+        if re.search(r"display\s*:\s*none", tag.get("style") or "", re.I):
+            return True
+        return bool(_FOLDED_CLASS.search(" ".join(tag.get("class") or [])))
+
+    blocks = [t for t in soup.find_all(True) if t.name in ("details", "div", "section", "article", "li", "dd") and folded(t)]
+    for tag in blocks:
+        # Solo el bloque plegado mas externo: sus hijos plegados ya van dentro.
+        if any(p in blocks for p in tag.parents) or _is_chrome(tag):
+            continue
+        add(tag.get_text(" ", strip=True))
+    rows = 0
+    for table in soup.find_all("table"):
+        if _is_chrome(table):
+            continue
+        for tr in table.find_all("tr"):
+            cells = [_clean(c.get_text(" ", strip=True)) for c in tr.find_all(["th", "td"])]
+            cells = [c for c in cells if c]
+            if len(cells) >= 2 and rows < TABLE_MAX_ROWS:
+                rows += 1
+                add(" | ".join(cells), 8)
+    out = "\n".join(chunks)
+    return out[:FOLDED_MAX_CHARS]
+
+
 def _page_payload(url: str, html: str = "", content_type: str = "", raw: bytes | None = None) -> dict:
     title = ""
     text = ""
@@ -514,6 +621,10 @@ def _page_payload(url: str, html: str = "", content_type: str = "", raw: bytes |
             text = _clean(soup.get_text(" ", strip=True))
         if text and _BLOCK.search(text[:400]):
             text = ""
+        if text:
+            extra = folded_text(html, text)
+            if extra:
+                text = f"{text}\n[Contenido plegado y tablas de la pagina]\n{extra}"
     return {"url": url, "title": title, "text": text, "html": html}
 
 
@@ -1785,6 +1896,32 @@ def _crawl_with_profile(db: Session, source: Source, landing_url: str, html: str
     return crawl
 
 
+def _note_search_pages(db: Session, source: Source, crawl: dict | None, findings_data: list[dict]) -> None:
+    """Anota en la base de conocimiento si cada pagina de busqueda visitada aporto senales.
+
+    La que no aporta deja de visitarse en las corridas siguientes; la que el sitio
+    ya no sirve (404, 410) cuenta como visita sin senal. En un punto de guardado:
+    un fallo aqui nunca deshace las senales recien capturadas.
+    """
+    if not isinstance(crawl, dict):
+        return
+    pages = [p for p in crawl.get("pages") or [] if p.get("role") == "busqueda" and p.get("url")]
+    gone = [
+        {"url": st.get("url"), "text": ""}
+        for st in crawl.get("steps") or []
+        if st.get("action") == "busqueda" and st.get("status") in {"http_404", "http_410"} and st.get("url")
+    ]
+    if not pages and not gone:
+        return
+    try:
+        from . import search_knowledge
+
+        search_knowledge.record_visits(db, source, pages + gone, findings_data, commit=True)
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        logging.getLogger(__name__).warning("No se pudo anotar la base de búsqueda de %s", source.title, exc_info=True)
+
+
 def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") -> ScrapeLog:
     """Ejecuta el escaneo de una fuente y persiste hallazgos nuevos."""
     # Reglas de horizonte vigentes (otro proceso pudo cambiarlas en Configuracion).
@@ -2024,6 +2161,12 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
         weights = screening_weights(db)
         pipeline = is_pipeline_source(source)
         siblings = sibling_source_ids(db, source)
+        # Vigencia por anos (Configuracion › Inteligencia): lo publicado fuera del rango no entra.
+        from . import signal_window
+
+        findings_data, out_of_window = signal_window.filter_items(db, source, findings_data)
+        if out_of_window:
+            scan_progress.note("window", dropped=out_of_window)
         for data in findings_data:
             row = data["title"]
             # La huella se calcula sobre la fila original: estable entre corridas
@@ -2122,6 +2265,12 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
         relinked_note = f" {relinked} con enlace corregido a la página exacta." if relinked else ""
         log.message = f"{len(findings_data)} items detectados, {new_count} nuevos.{relinked_note}{visited}{fallback_note} {elapsed} ms."
         source.last_scraped_at = datetime.now(timezone.utc)
+        # Primero se guardan las senales. La bitacora de paginas de busqueda y la traza
+        # van despues, cada una en su propia escritura: si la base esta ocupada en ese
+        # momento, se pierde una anotacion, no las senales de la fuente.
+        log.finished_at = datetime.now(timezone.utc)
+        db.commit()
+        _note_search_pages(db, source, crawl, findings_data)
         finish_trace(ok=bool(findings_data), items_found=len(findings_data), items_new=new_count)
     except scan_progress.JobAborted:
         # Cortada por el tiempo maximo por fuente: se cierra el registro y se suelta el hilo.
@@ -2135,11 +2284,14 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             db.rollback()
         raise
     except httpx.HTTPError as exc:
+        db.rollback()
         log.status = "error"
         log.message = f"Error de red: {exc}"[:500]
         source.last_scraped_at = datetime.now(timezone.utc)
         finish_trace(ok=False)
     except Exception as exc:  # noqa: BLE001 - se registra cualquier fallo de parseo
+        # Se deshace lo que quedo a medias: con la sesion rota, anotar el error tambien fallaria.
+        db.rollback()
         log.status = "error"
         log.message = f"Error inesperado: {exc}"[:500]
         source.last_scraped_at = datetime.now(timezone.utc)

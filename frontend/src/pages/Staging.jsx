@@ -14,6 +14,7 @@ import Icon from "../components/Icon";
 import InfoTip, { TermLabel } from "../components/InfoTip";
 import Modal from "../components/Modal";
 import SignalOrigin from "../components/SignalOrigin";
+import ClassificationSuggestion from "../components/ClassificationSuggestion";
 import ManualReviewPanel from "../components/ManualReviewPanel";
 import NoiseCleanup from "../components/NoiseCleanup";
 import useManualReview from "../scan/useManualReview";
@@ -72,12 +73,17 @@ export default function Staging() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const firstLoad = useRef(true);
+  // Si el listado no llega (servidor iniciando u ocupado), la bandeja lo dice y
+  // reintenta sola: nunca se presenta como vacia una bandeja que no se pudo leer.
+  const [loadError, setLoadError] = useState("");
+  const retries = useRef(0);
   const [selected, setSelected] = useState(() => new Set());
   const [filters, setFilters] = useState({ q: "", source_id: "", channel: "", date_from: "", date_to: "", corroborated: false, sort: "puntaje" });
   const [query, setQuery] = useState({ q: "", source_id: "", channel: "", date_from: "", date_to: "", corroborated: false, sort: "puntaje" });
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
+  const [suggestion, setSuggestion] = useState(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [result, setResult] = useState(null);
   const [view, setView] = useState("pendientes");
@@ -135,26 +141,45 @@ export default function Staging() {
   );
 
   const load = useCallback(async () => {
-    try {
-      const [list, st] = await Promise.all([
-        api.get("/technologies/staging", { params: params(0) }),
-        api.get("/technologies/staging/stats"),
-      ]);
-      setItems(list.data);
-      setTotal(Number(list.headers?.["x-total-count"] ?? list.data.length));
-      setStats(st.data);
-    } catch (e) {
-      if (firstLoad.current) toast.error(apiError(e, "No se pudo cargar la bandeja de entrada"));
-    } finally {
-      firstLoad.current = false;
-      setLoading(false);
+    // El listado y los indicadores van por separado: si fallan los indicadores,
+    // las señales se muestran igual.
+    const [list, st] = await Promise.allSettled([
+      api.get("/technologies/staging", { params: params(0) }),
+      api.get("/technologies/staging/stats"),
+    ]);
+    if (list.status === "fulfilled") {
+      setItems(list.value.data);
+      setTotal(Number(list.value.headers?.["x-total-count"] ?? list.value.data.length));
+      setLoadError("");
+      retries.current = 0;
+    } else {
+      setLoadError(apiError(list.reason, "No se pudo cargar la bandeja de entrada"));
     }
+    if (st.status === "fulfilled") setStats(st.value.data);
+    firstLoad.current = false;
+    setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
 
   useEffect(() => {
     load();
   }, [load, version]);
+
+  // Reintento automático mientras el listado no llegue (hasta 6 veces, cada 20 s).
+  useEffect(() => {
+    if (!loadError || retries.current >= 6) return undefined;
+    const timer = setTimeout(() => {
+      retries.current += 1;
+      load();
+    }, 20000);
+    return () => clearTimeout(timer);
+  }, [loadError, load]);
+
+  const retryLoad = () => {
+    retries.current = 0;
+    setLoading(true);
+    load();
+  };
 
   const loadMore = async () => {
     setLoadingMore(true);
@@ -286,6 +311,7 @@ export default function Staging() {
   }, [techId, loading, invalidParam]);
 
   const openEdit = (item, { readOnly = false } = {}) => {
+    setSuggestion(null);
     handledLink.current = item.id;
     setTechId(item.id);
     setEditing({
@@ -301,11 +327,14 @@ export default function Staging() {
     setSuggesting(true);
     try {
       const { data } = await api.post(`/technologies/${editing.id}/suggest-classification`);
+      setSuggestion(data);
       setEditing((prev) => ({
         ...prev,
         cluster_id: data.cluster_id || prev.cluster_id,
         tech_type_id: data.tech_type_id || prev.tech_type_id,
-        suggested_cluster_reason: [data.cluster_reason, data.tech_type_reason].filter(Boolean).join(" · "),
+        // La condición solo se propone si el evaluador aún no la eligió.
+        condition: prev.condition || data.condition || "",
+        suggested_cluster_reason: "",
       }));
       if (!data.cluster_id && !data.tech_type_id) {
         toast.info("El clasificador no encontró evidencia suficiente. Clasifique manualmente.");
@@ -737,7 +766,24 @@ export default function Staging() {
         </p>
       )}
 
-      {items.length === 0 && view === "legacy" ? (
+      {loadError && items.length > 0 && (
+        <p className="sl-muted" role="status" data-testid="staging-load-stale">
+          No se pudo actualizar la lista ({loadError}). Se muestra la última que llegó.{" "}
+          <button type="button" className="so-linkbtn" onClick={retryLoad}>Reintentar</button>
+        </p>
+      )}
+      {loadError && items.length === 0 ? (
+        <Card>
+          <div data-testid="staging-load-error" role="alert">
+            <EmptyState
+              icon="⚠️"
+              title="No se pudo cargar la bandeja de entrada"
+              message={`${loadError} Las señales capturadas siguen guardadas: la bandeja no está vacía, solo no se pudo leer. Si el sistema llevaba un rato sin uso o hay una vigilancia en curso, puede tardar un par de minutos. Se reintenta sola cada 20 segundos.`}
+              action={<Button onClick={retryLoad}>Reintentar ahora</Button>}
+            />
+          </div>
+        </Card>
+      ) : items.length === 0 && view === "legacy" ? (
         <Card>
           <EmptyState icon="🗄️" title="Bandeja Legacy vacía" message="No hay señales pendientes de fuentes del inventario anterior." />
         </Card>
@@ -828,18 +874,31 @@ export default function Staging() {
                           ·{" "}
                           {item.source_channel === "reactiva" ? "Reactiva" : "Proactiva"}
                           <span className="staging-links">
-                            {item.signal_url && (
+                            {item.signal_url && item.link_type !== "exacto" && item.evidence?.locator_url ? (
+                              <a
+                                className="staging-extlink"
+                                href={item.evidence.locator_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                data-testid="staging-open-located"
+                                title={`Abre la página y resalta la señal «${item.evidence.locator_text || name.slice(0, 60)}» (la fuente no tiene enlace por ítem)`}
+                                aria-label={`Abrir la página y resaltar la señal ${name.slice(0, 60)}`}
+                              >
+                                <Icon name="search" size={13} />
+                              </a>
+                            ) : item.signal_url ? (
                               <a
                                 className="staging-extlink"
                                 href={item.signal_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
+                                data-testid="staging-open-source"
                                 title={`${item.link_type === "exacto" ? "Enlace exacto" : item.link_type === "consulta" ? "Página de consulta (la fuente no ofrece enlace directo)" : "Abrir la fuente original"}: ${item.signal_url}`}
                                 aria-label={`${item.link_type === "consulta" ? "Abrir la página de consulta" : "Abrir la fuente original"} de ${name.slice(0, 60)}`}
                               >
                                 <Icon name="external" size={13} />
                               </a>
-                            )}
+                            ) : null}
                             {item.corroboration_count > 1 && (
                               <span
                                 className="staging-corro"
@@ -877,7 +936,7 @@ export default function Staging() {
                         {item.condition ? (
                           <Badge tone={item.condition}>{item.condition}</Badge>
                         ) : (
-                          <span className="staging-missing">—</span>
+                          <span className="staging-missing">-</span>
                         )}
                       </td>
                       <td>
@@ -999,11 +1058,12 @@ export default function Staging() {
               >
                 <Icon name="pulse" size={15} /> Sugerir clasificación
               </HintButton>
-              {editing.suggested_cluster_reason && (
+              {editing.suggested_cluster_reason && !suggestion && (
                 <div style={{ fontSize: 12, color: "#64748B", marginTop: 6 }}>
                   {editing.suggested_cluster_reason}
                 </div>
               )}
+              <ClassificationSuggestion data={suggestion} />
             </div>
 
             <Input

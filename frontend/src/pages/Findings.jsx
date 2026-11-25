@@ -215,7 +215,7 @@ export default function Findings() {
       ),
     },
     { key: "type", width: 110, label: "Tipo", render: (f) => <Badge>{f.technology_type || "otro"}</Badge> },
-    { key: "horizon", width: 120, label: "Horizonte", tip: <InfoTip text={GLOSSARY.horizonte} label="Qué es el horizonte" />, render: (f) => (f.horizon ? <Badge>{f.horizon}</Badge> : "—") },
+    { key: "horizon", width: 120, label: "Horizonte", tip: <InfoTip text={GLOSSARY.horizonte} label="Qué es el horizonte" />, render: (f) => (f.horizon ? <Badge>{f.horizon}</Badge> : "-") },
     { key: "status", width: 110, label: "Estado", tip: <InfoTip text={GLOSSARY.fb_estado_senal} label="Qué es el estado" />, render: (f) => <Badge tone={f.status}>{f.status}</Badge> },
     { key: "source", width: 160, label: "Fuente", render: (f) => <span style={{ fontSize: 13, color: "#64748B" }}>{f.source_title}</span> },
     {

@@ -208,7 +208,7 @@ export function WebSearchResult({ data }) {
   return (
     <div className="web-search-result" data-testid="web-search-result">
       <p className="source-section-note">
-        Dominio: <strong>{data.domain || "—"}</strong> · Consultas redactadas por {data.query_origin === "ia" ? "la IA" : data.query_origin === "reglas" ? "reglas (sin IA)" : "—"}
+        Dominio: <strong>{data.domain || "-"}</strong> · Consultas redactadas por {data.query_origin === "ia" ? "la IA" : data.query_origin === "reglas" ? "reglas (sin IA)" : "-"}
       </p>
       {(data.queries || []).length > 0 && (
         <ul className="web-search-queries">

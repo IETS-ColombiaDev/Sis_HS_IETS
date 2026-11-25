@@ -523,7 +523,7 @@ export default function Cycles() {
                 Ventana operativa: {formCheck.window} semanas
                 <InfoTip text={GLOSSARY.fa_ventana} label="Qué es la ventana operativa" />
               </span>
-              {windowOk ? " (dentro del rango metodológico)" : ` — el sistema exige entre ${wmin} y ${wmax} semanas`}
+              {windowOk ? " (dentro del rango metodológico)" : ` - el sistema exige entre ${wmin} y ${wmax} semanas`}
             </div>
             {formCheck.year && (
               <div
@@ -538,7 +538,7 @@ export default function Cycles() {
                   Ciclos formales en {formCheck.year}: {formCheck.yearCount} de {quota}
                   <InfoTip text={GLOSSARY.fa_cuota} label="Qué es la cuota anual" />
                 </span>
-                {formCheck.errors.quota ? ` — ${formCheck.errors.quota}` : ""}
+                {formCheck.errors.quota ? ` - ${formCheck.errors.quota}` : ""}
               </div>
             )}
             <Textarea

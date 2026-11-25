@@ -7,6 +7,7 @@ import { Card, SectionTitle } from "./Card";
 import Button from "./Button";
 import Badge from "./Badge";
 import Icon from "./Icon";
+import RecoveryPoints from "./RecoveryPoints";
 
 function fmtSize(bytes) {
   if (!bytes) return "0 KB";
@@ -15,7 +16,7 @@ function fmtSize(bytes) {
 }
 
 function fmtDate(value) {
-  return value ? new Date(value).toLocaleString("es-CO") : "—";
+  return value ? new Date(value).toLocaleString("es-CO") : "Sin fecha";
 }
 
 const STATUS = {
@@ -23,6 +24,13 @@ const STATUS = {
   saving: { tone: "warning", label: "Guardando…" },
   restoring: { tone: "warning", label: "Restaurando…" },
   error: { tone: "error", label: "Con error" },
+};
+
+const PUSH_REASONS = {
+  shrink_guard: "Copia bloqueada: la base del servidor es mucho menor que la guardada en Firebase. No se sobrescribió.",
+  count_guard: "Copia bloqueada: la base del servidor tiene menos datos que la guardada en Firebase. No se sobrescribió.",
+  pull_pending: "Aún no se pudo leer Firebase; la copia queda en pausa y se reintenta sola.",
+  busy: "Hay otra copia en curso. Intente de nuevo en un momento.",
 };
 
 export default function BackupPanel() {
@@ -49,10 +57,33 @@ export default function BackupPanel() {
   const pushFirebase = () =>
     run(async () => {
       const { data } = await api.post("/backup/firebase/push");
-      if (!data?.ok) throw new Error(data?.reason || "Firestore no aceptó la copia");
+      if (!data?.ok) {
+        await backup.refreshFirebase?.();
+        throw new Error(PUSH_REASONS[data?.reason] || data?.reason || "Firestore no aceptó la copia");
+      }
       await backup.refreshFirebase?.();
       await refreshStatus?.();
     }, "Base publicada en Firebase.");
+
+  // Una guarda bloqueo la copia y el superadministrador decide que la base del
+  // servidor es la correcta. La copia guardada queda como punto de recuperacion.
+  const overrideFirebase = () => {
+    const typed = window.prompt(
+      "La base del servidor tiene menos datos que la copia guardada en Firebase.\n" +
+        "Si publica de todos modos, la copia guardada queda como punto de recuperación y se puede restaurar.\n\n" +
+        "Para continuar escriba PUBLICAR:"
+    );
+    if (typed == null) return;
+    if (typed.trim().toUpperCase() !== "PUBLICAR") {
+      toast.warning("No se publicó: debía escribir PUBLICAR.");
+      return;
+    }
+    run(async () => {
+      const { data } = await api.post("/backup/firebase/push", null, { params: { override: true }, timeout: 240000 });
+      await backup.refreshFirebase?.();
+      if (!data?.ok) throw new Error(PUSH_REASONS[data?.reason] || data?.reason || "Firestore no aceptó la copia");
+    }, "Base publicada. La copia anterior quedó como punto de recuperación.");
+  };
 
   const pullFirebase = () => {
     const ok = window.confirm(
@@ -78,7 +109,8 @@ export default function BackupPanel() {
       <p style={{ color: "#475569", fontSize: 13.5, lineHeight: 1.6, marginBottom: 12 }}>
         Este proyecto tiene su propio espacio en Firestore: colección <strong>hs_iets_db</strong>,
         aparte del directorio RRHH. SQLite solo es el motor local; al arrancar se restaura y
-        cada cambio se publica. El disco de Render puede borrarse sin perder el trabajo.
+        cada cambio se publica. El disco de Render puede borrarse sin perder el trabajo. Una base
+        con menos datos que la guardada nunca la sobrescribe.
       </p>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
         <Badge tone={fb?.enabled ? (fb?.synced ? "ok" : fb?.error ? "error" : "warning") : "default"}>
@@ -106,11 +138,17 @@ export default function BackupPanel() {
         <Button variant="outline" onClick={pullFirebase} disabled={working || !fb?.configured}>
           <Icon name="refresh" size={16} /> Restaurar desde Firebase
         </Button>
+        {fb?.blocked_shrink ? (
+          <Button variant="outline" onClick={overrideFirebase} disabled={working} data-testid="firebase-override">
+            Publicar de todos modos
+          </Button>
+        ) : null}
       </div>
+      {fb?.enabled ? <RecoveryPoints disabled={working} /> : null}
       {!fb?.configured ? (
         <p style={{ fontSize: 13, color: "#92400E", marginTop: 10 }}>
-          Defina <code>FIREBASE_SERVICE_ACCOUNT_KEY</code> en el servidor. La persistencia usa la base
-          nombrada <code>hs-iets</code>, no la base <code>(default)</code> del directorio RRHH.
+          Defina <code>FIREBASE_SERVICE_ACCOUNT_KEY</code> en el servidor. La copia vive en la colección
+          exclusiva <code>hs_iets_db</code>, aparte de la colección de usuarios del directorio RRHH.
         </p>
       ) : null}
     </Card>

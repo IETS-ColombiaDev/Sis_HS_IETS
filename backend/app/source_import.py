@@ -559,7 +559,7 @@ def apply(
         chosen = {str(c.get("key")) for c in create or []} | {str(k) for k in update or []}
         summary = link_matrix.apply(db, parsed, actor=actor, overwrite=overwrite, only_codes=chosen, retire_others=True)
         if persist:
-            link_matrix.write_packaged(parsed)
+            link_matrix.write_packaged(parsed, db, actor=actor)
         summary.update(persisted=bool(persist), origin=entry["origin"], skipped=[], created_titles=[], updated_titles=[])
         return summary
     rows = parsed.get("rows") or []
@@ -658,7 +658,7 @@ def apply(
         prev = source_matrix.DATA_FILE.with_suffix(".prev.json")
         if source_matrix.DATA_FILE.exists():
             prev.write_text(source_matrix.DATA_FILE.read_text(encoding="utf-8"), encoding="utf-8")
-        source_matrix.write_data_file(parsed)
+        source_matrix.write_data_file(parsed, db=db, actor=actor)
     summary = {
         "validation": source_matrix.validation_summary(parsed),
         "created": len(created),

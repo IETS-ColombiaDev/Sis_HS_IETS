@@ -653,7 +653,7 @@ export default function Sources() {
   };
 
   const tableColumns = [
-    { key: "code", width: 100, label: "Código", render: (s) => <span className="catalog-code">{s.catalog_code || "—"}</span> },
+    { key: "code", width: 100, label: "Código", render: (s) => <span className="catalog-code">{s.catalog_code || "-"}</span> },
     {
       key: "title",
       label: "Fuente",
@@ -663,9 +663,9 @@ export default function Sources() {
         </button>
       ),
     },
-    { key: "level", width: 80, label: "Acceso", tip: <InfoTip text={GLOSSARY.fb_nivel} label="Qué es el nivel de acceso" />, render: (s) => <Badge tone={s.access_level}>{s.access_level || "—"}</Badge> },
+    { key: "level", width: 80, label: "Acceso", tip: <InfoTip text={GLOSSARY.fb_nivel} label="Qué es el nivel de acceso" />, render: (s) => <Badge tone={s.access_level}>{s.access_level || "-"}</Badge> },
     { key: "tier", width: 100, label: "Nivel de fuente", tip: <InfoTip text={GLOSSARY.fb_nivel_fuente} label="Qué es el nivel de fuente" />, render: (s) => optionLabel(options, "source_level", s.source_level || "por_definir") },
-    { key: "tech", width: 110, label: "Tecnologías", render: (s) => (s.tech_types || []).join(", ") || "—" },
+    { key: "tech", width: 110, label: "Tecnologías", render: (s) => (s.tech_types || []).join(", ") || "-" },
     { key: "connector", width: 120, label: "Adaptador", tip: <InfoTip text={GLOSSARY.fb_adaptador} label="Qué es el adaptador" />, render: (s) => s.connector || "html" },
     { key: "health", width: 100, label: "Salud", tip: <InfoTip text={GLOSSARY.fb_salud} label="Qué es la salud" />, render: (s) => <Badge tone={healthTone(s.health_status)}>{HEALTH_LABELS[s.health_status || "sin_sonda"] || s.health_status}</Badge> },
     {
@@ -873,7 +873,7 @@ export default function Sources() {
                       <Card key={s.id} padding={16} className={`registry-card catalog-card catalog-card--${s.access_level || "D"}`}>
                         <div className="registry-card-top" data-testid={`source-card-${s.id}`}>
                           <span className="catalog-code">{s.catalog_code || "sin código"}</span>
-                          <span title={GLOSSARY.fb_nivel}><Badge tone={s.access_level}>Acceso {s.access_level || "—"}</Badge></span>
+                          <span title={GLOSSARY.fb_nivel}><Badge tone={s.access_level}>Acceso {s.access_level || "-"}</Badge></span>
                           <MatrixBadges source={s} options={options} />
                           <span title={GLOSSARY.fb_salud}><Badge tone={healthTone(s.health_status)}>{HEALTH_LABELS[s.health_status || "sin_sonda"] || s.health_status}</Badge></span>
                           {s.is_contrast && <span title={GLOSSARY.fb_contraste}><Badge tone="info">Contraste</Badge></span>}
@@ -890,7 +890,7 @@ export default function Sources() {
                         <p>{s.description?.slice(0, 140) || "Sin descripción."}</p>
                         <div className="registry-card-stats">
                           <span title={GLOSSARY.fb_adaptador}>{s.connector}</span>
-                          <span title={GLOSSARY.fb_frecuencia}>{s.sync_frequency || "—"}</span>
+                          <span title={GLOSSARY.fb_frecuencia}>{s.sync_frequency || "-"}</span>
                           <span>{s.country || s.language}</span>
                           <span>{s.findings_count || 0} señales</span>
                           {(s.tech_types || []).length > 0 && <span title={GLOSSARY.fb_tipos_tecnologia}>{s.tech_types.join(" · ")}</span>}
@@ -981,11 +981,11 @@ export default function Sources() {
           <DataTable
             stack
             columns={[
-              { key: "code", width: 100, label: "Código", render: (s) => s.catalog_code || "—" },
+              { key: "code", width: 100, label: "Código", render: (s) => s.catalog_code || "-" },
               { key: "title", label: "Fuente", render: (s) => s.title },
               { key: "level", width: 80, label: "Acceso", tip: <InfoTip text={GLOSSARY.fb_nivel} />, render: (s) => <Badge tone={s.access_level}>{s.access_level}</Badge> },
               { key: "status", width: 100, label: "Estado", render: (s) => <Badge tone={healthTone(s.health_status)}>{HEALTH_LABELS[s.health_status || "sin_sonda"] || s.health_status}</Badge> },
-              { key: "msg", label: "Detalle", render: (s) => s.message || "—" },
+              { key: "msg", label: "Detalle", render: (s) => s.message || "-" },
               {
                 key: "act",
                 width: 110,
@@ -1018,7 +1018,7 @@ export default function Sources() {
           </p>
           <ModuleStatsRow
             items={[
-              { label: "Ciclo", value: coverage?.cycle_code || "—", sub: `${coverage?.cycle_size || 0} tecnologías`, hint: "Ciclo contra el que se mide la cobertura (el activo)." },
+              { label: "Ciclo", value: coverage?.cycle_code || "-", sub: `${coverage?.cycle_size || 0} tecnologías`, hint: "Ciclo contra el que se mide la cobertura (el activo)." },
               { label: "Captadas en contraste", value: coverage?.contrast_captured || 0, hint: GLOSSARY.fb_contraste },
               { label: "Huecos", value: coverage?.gap_count || 0, color: coverage?.gap_count ? "#F59E0B" : undefined, hint: GLOSSARY.fb_cobertura },
             ]}
@@ -1035,8 +1035,8 @@ export default function Sources() {
               columns={[
                 { key: "name", label: "Tecnología", render: (g) => <strong>{g.commercial_name || g.inn_name}</strong> },
                 { key: "src", label: "Fuente", render: (g) => `${g.catalog_code} · ${g.source_title}` },
-                { key: "nct", label: "NCT", render: (g) => (g.nct_ids || []).join(", ") || "—" },
-                { key: "ind", label: "Indicación", render: (g) => g.indication || "—" },
+                { key: "nct", label: "NCT", render: (g) => (g.nct_ids || []).join(", ") || "-" },
+                { key: "ind", label: "Indicación", render: (g) => g.indication || "-" },
               ]}
               rows={(coverage?.gaps || []).map((g) => ({ key: g.technology_id, data: g }))}
               minWidth={820}
@@ -1163,7 +1163,7 @@ export default function Sources() {
                           <a href={c.url} target="_blank" rel="noreferrer" className="registry-url">{c.url.replace(/^https?:\/\//, "").slice(0, 80)}</a>
                           <p style={{ margin: "4px 0", fontSize: 13 }}>{c.justification || "Sin justificación."}</p>
                           <p style={{ margin: 0, fontSize: 12, color: "#64748B" }}>
-                            {blockLabel(c.category)} · {c.country || "País sin determinar"} · {(c.tech_types || []).join(", ") || "—"}
+                            {blockLabel(c.category)} · {c.country || "País sin determinar"} · {(c.tech_types || []).join(", ") || "-"}
                           </p>
                         </div>
                         <div style={{ flex: "0 0 auto" }}>
@@ -1308,7 +1308,7 @@ export default function Sources() {
           <div className="source-fiche">
             <div className="registry-card-top" style={{ marginBottom: 12 }}>
               <span className="catalog-code">{detailSource.catalog_code || "sin código"}</span>
-              <Badge tone={detailSource.access_level}>Acceso {detailSource.access_level || "—"}</Badge>
+              <Badge tone={detailSource.access_level}>Acceso {detailSource.access_level || "-"}</Badge>
               <MatrixBadges source={detailSource} options={options} />
               <Badge tone={healthTone(detailSource.health_status)}>{HEALTH_LABELS[detailSource.health_status || "sin_sonda"] || detailSource.health_status}</Badge>
               {detailSource.verification_status && <Badge tone={detailSource.verification_status}>{detailSource.verification_status}</Badge>}
@@ -1316,17 +1316,17 @@ export default function Sources() {
             <p>{detailSource.description}</p>
             <dl className="fiche-grid">
               <div><dt><TermLabel tip={GLOSSARY.fb_adaptador}>Adaptador</TermLabel></dt><dd>{detailSource.connector}</dd></div>
-              <div><dt><TermLabel tip={GLOSSARY.fb_frecuencia}>Frecuencia</TermLabel></dt><dd>{detailSource.sync_frequency || "—"}</dd></div>
-              <div><dt>País</dt><dd>{detailSource.country || "—"}</dd></div>
+              <div><dt><TermLabel tip={GLOSSARY.fb_frecuencia}>Frecuencia</TermLabel></dt><dd>{detailSource.sync_frequency || "-"}</dd></div>
+              <div><dt>País</dt><dd>{detailSource.country || "-"}</dd></div>
               <div><dt>Señales capturadas</dt><dd>{detailSource.findings_count || 0}</dd></div>
               <div><dt>Última consulta</dt><dd>{detailSource.last_scraped_at ? new Date(detailSource.last_scraped_at).toLocaleString() : "Nunca"}</dd></div>
-              <div><dt>Campos que aporta</dt><dd>{(detailSource.provides_fields || []).join(", ") || "—"}</dd></div>
-              <div><dt>Alias</dt><dd>{(detailSource.aliases || []).join(", ") || "—"}</dd></div>
+              <div><dt>Campos que aporta</dt><dd>{(detailSource.provides_fields || []).join(", ") || "-"}</dd></div>
+              <div><dt>Alias</dt><dd>{(detailSource.aliases || []).join(", ") || "-"}</dd></div>
               <div><dt>Términos</dt><dd>{detailSource.terms_accepted_at ? `Aceptados ${new Date(detailSource.terms_accepted_at).toLocaleDateString()}` : (detailSource.terms_url || "No aplican")}</dd></div>
               {detailSource.last_error && <div><dt>Último error</dt><dd>{detailSource.last_error.slice(0, 300)}</dd></div>}
               <div><dt><TermLabel tip={GLOSSARY.fb_nivel_fuente}>Nivel de fuente</TermLabel></dt><dd>{optionLabel(options, "source_level", detailSource.source_level || "por_definir")}</dd></div>
-              <div><dt><TermLabel tip={GLOSSARY.fb_tipos_tecnologia}>Tipos de tecnología</TermLabel></dt><dd>{(detailSource.tech_types || []).map((t) => optionLabel(options, "tech_type", t)).join(", ") || "—"}</dd></div>
-              <div><dt>Origen en la matriz</dt><dd>{[detailSource.matrix_ref, detailSource.matrix_origin].filter(Boolean).join(" · ") || "—"}</dd></div>
+              <div><dt><TermLabel tip={GLOSSARY.fb_tipos_tecnologia}>Tipos de tecnología</TermLabel></dt><dd>{(detailSource.tech_types || []).map((t) => optionLabel(options, "tech_type", t)).join(", ") || "-"}</dd></div>
+              <div><dt>Origen en la matriz</dt><dd>{[detailSource.matrix_ref, detailSource.matrix_origin].filter(Boolean).join(" · ") || "-"}</dd></div>
               <div>
                 <dt><TermLabel tip={GLOSSARY.fb_flujo_fuente}>Flujo</TermLabel></dt>
                 <dd>
@@ -1363,7 +1363,7 @@ export default function Sources() {
             {detailSource.catalog_note && <p className="catalog-note">{detailSource.catalog_note}</p>}
             <div className="url-origin-detail">
               <strong>URL principal:</strong>{" "}
-              {detailSource.url ? <a href={detailSource.url} target="_blank" rel="noreferrer">{detailSource.url}</a> : "—"}
+              {detailSource.url ? <a href={detailSource.url} target="_blank" rel="noreferrer">{detailSource.url}</a> : "-"}
               <UrlOriginTag source={detailSource} detailed />
               {detailSource.matrix_url && detailSource.url_origin !== "matriz" && (
                 <p style={{ margin: "4px 0 0" }}>

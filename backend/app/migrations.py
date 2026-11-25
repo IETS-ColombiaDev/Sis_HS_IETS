@@ -178,11 +178,54 @@ def upgrade_database() -> str:
             action = "created"
             log.info("Base vacia: se crea el esquema con Alembic.")
 
-        with engine.begin() as conn:
-            command.upgrade(alembic_config(conn), "head")
+        _upgrade_to_head(engine)
 
     log.info("Esquema en la revision %s (%s).", head, action)
     return action
+
+
+@contextmanager
+def schema_change_connection(engine: Engine) -> Iterator:
+    """Conexion para cambiar el esquema sin que SQLite borre filas en cascada.
+
+    En SQLite, cambiar o quitar una columna reconstruye la tabla (se crea una
+    copia y se elimina la original). Con las llaves foraneas activas ese DROP
+    dispara los ON DELETE CASCADE y se lleva las filas hijas: reconstruir
+    `sources` borraria todas las senales. Por eso se migra con las llaves
+    apagadas en esa conexion (lo que indica la documentacion de SQLite) y al
+    final se comprueba que no quedo ninguna referencia rota nueva.
+    """
+    if engine.dialect.name != "sqlite":
+        with engine.begin() as conn:
+            yield conn
+        return
+    with engine.connect() as conn:
+        # El PRAGMA no tiene efecto dentro de una transaccion: va antes de abrirla.
+        conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
+        conn.commit()
+        try:
+            if conn.exec_driver_sql("PRAGMA foreign_keys").scalar() not in (0, None):
+                raise RuntimeError("No se pudieron apagar las llaves foráneas para migrar.")
+            before = {r[0] for r in conn.exec_driver_sql("PRAGMA foreign_key_check").fetchall()}
+            conn.commit()
+            with conn.begin():
+                yield conn
+            broken = {r[0] for r in conn.exec_driver_sql("PRAGMA foreign_key_check").fetchall()} - before
+            conn.commit()
+            if broken:
+                log.error(
+                    "La migración dejó referencias rotas en: %s. Revise la revisión antes de seguir.",
+                    ", ".join(sorted(broken)),
+                )
+        finally:
+            conn.rollback()
+            conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+            conn.commit()
+
+
+def _upgrade_to_head(engine: Engine) -> None:
+    with schema_change_connection(engine) as conn:
+        command.upgrade(alembic_config(conn), "head")
 
 
 def _bootstrap() -> None:

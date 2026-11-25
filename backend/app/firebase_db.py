@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import logging
 import os
 import threading
@@ -43,6 +44,34 @@ SHRINK_GUARD_RATIO = 0.5
 # Hasta leer Firestore con exito al arrancar no se sube nada: si la lectura fallo
 # (red, cuota), la base local es la sembrada vacia y pisaria la buena.
 _pull_ok = False
+# Huella de la copia de la nube que este proceso conoce (la que leyo al arrancar o
+# la ultima que subio). Si al subir la nube trae otra, la escribio otra instancia:
+# esa copia se fija como punto de recuperacion en vez de perderse. None: aun no
+# se ha leido la nube; "": se leyo y estaba vacia.
+_known_cloud_sha: str | None = None
+
+# --- Puntos de recuperacion ------------------------------------------------- #
+# Ademas de la copia actual y la anterior, se conservan copias fijadas que las
+# subidas siguientes no borran. Motivo -> cuantas se guardan (las mas recientes).
+PIN_DEPLOY = "antes_despliegue"  # ultima copia hecha con la version anterior del codigo
+PIN_DAILY = "diaria"  # ultima copia de cada dia
+PIN_FOREIGN = "otra_instancia"  # la escribio otro proceso (dos instancias a la vez)
+PIN_RESTORE = "antes_restauracion"  # estado previo a una restauracion manual
+PIN_MANUAL = "manual"  # fijada a mano desde el panel
+PIN_RETENTION = {PIN_DEPLOY: 5, PIN_DAILY: 7, PIN_FOREIGN: 3, PIN_RESTORE: 3, PIN_MANUAL: 3}
+PIN_LABELS = {
+    PIN_DEPLOY: "Antes de un despliegue",
+    PIN_DAILY: "Cierre del día",
+    PIN_FOREIGN: "Escrita por otra instancia",
+    PIN_RESTORE: "Antes de una restauración",
+    PIN_MANUAL: "Fijada a mano",
+}
+# Tablas cuyo conteo se guarda con cada copia. La bitacora es inmutable (solo
+# crece): si la base local trae menos filas que la copia guardada, no desciende
+# de ella y subirla borraria trabajo. Las demas no pueden caer a menos de la mitad.
+GUARD_LINEAGE_TABLE = "audit_log"
+GUARD_TABLES = ("findings", "technologies", "sources", "users", "submissions", "notes")
+GUARD_MIN_ROWS = 20
 
 
 def _min_interval() -> float:
@@ -308,6 +337,16 @@ def ensure_database(*, probe_write: bool = True) -> dict:
             _resolved_db = "(default)"
     else:
         _resolved_db = "(default)"
+    if named and _data_lives_in_default():
+        log.warning(
+            "La base nombrada %s no tiene copia y (default)/%s sí: se usa (default) "
+            "para no arrancar vacío ni dividir los datos.",
+            preferred,
+            _collection(),
+        )
+        _resolved_db = "(default)"
+        named = False
+        created = False
     probed = False
     if probe_write:
         probed = bool(probe().get("ok"))
@@ -320,6 +359,86 @@ def ensure_database(*, probe_write: bool = True) -> dict:
         "project_id": firebase_auth.project_id(),
         "probed": probed,
     }
+
+
+def _data_lives_in_default() -> bool:
+    """La base resuelta no tiene copia pero `(default)` si la tiene."""
+    global _resolved_db
+    chosen = _resolved_db
+    try:
+        here = _get_doc(META_ID) or {}
+        if _read_i(here, "chunk_count"):
+            return False
+        _resolved_db = "(default)"
+        there = _get_doc(META_ID) or {}
+        return bool(_read_i(there, "chunk_count"))
+    except Exception as exc:  # noqa: BLE001
+        log.warning("No se pudo comparar la base nombrada con (default): %s", exc)
+        return False
+    finally:
+        _resolved_db = chosen
+
+
+def list_checkpoints() -> list[dict]:
+    """Copias recuperables: la actual, la anterior y los puntos fijados."""
+    cloud = fetch_meta() or {}
+    out: list[dict] = []
+    if cloud.get("chunk_count"):
+        out.append({**_checkpoint_of(cloud, "actual"), "pinned_at": "", "current": True})
+    pinned = [c for c in (cloud.get("checkpoints") or []) if isinstance(c, dict)]
+    pinned_gens = {str(c.get("gen") or "") for c in pinned}
+    prev = _previous_meta(cloud)
+    # Si la copia anterior ya esta fijada, se muestra una sola vez, con su motivo.
+    if prev and str(prev.get("gen") or "") not in pinned_gens:
+        out.append({**prev, "reason": "anterior", "code": "", "counts": {}, "pinned_at": ""})
+    seen = {str(item.get("gen") or "") for item in out}
+    out.extend(c for c in pinned if str(c.get("gen") or "") not in seen)
+    for item in out:
+        item["label"] = {"actual": "Copia actual", "anterior": "Copia anterior"}.get(
+            item.get("reason"), PIN_LABELS.get(item.get("reason"), item.get("reason"))
+        )
+    return out
+
+
+def restore_checkpoint(gen: str) -> dict:
+    """Restaura una copia recuperable. El estado actual queda fijado antes."""
+    global _last_sha, _known_cloud_sha
+    if not enabled():
+        return {"ok": False, "reason": "disabled"}
+    if not _sync_lock.acquire(timeout=SYNC_WAIT_S):
+        return {"ok": False, "reason": "busy"}
+    try:
+        target = next((c for c in list_checkpoints() if str(c.get("gen") or "") == gen), None)
+        if target is None:
+            return {"ok": False, "reason": "not_found"}
+        payload = _fetch_payload(target)
+        # Primero se sube y se fija el estado actual: la restauracion se puede deshacer.
+        saved = _push_locked(force=True) if _pull_ok else {"ok": False}
+        browser_backup.restore_snapshot(payload, force=True)
+        pushed = _push_locked(force=True, allow_shrink=True, pin=PIN_RESTORE)
+        return {
+            "ok": True,
+            "restored": True,
+            "taken_at": target.get("taken_at"),
+            "saved_previous": bool(saved.get("ok")),
+            "pushed": bool(pushed.get("ok")),
+        }
+    finally:
+        _sync_lock.release()
+
+
+def pin_current() -> dict:
+    """Sube el estado actual y fija la copia que habia como punto de recuperacion."""
+    return push_now(force=True, pin=PIN_MANUAL)
+
+
+def push_override() -> dict:
+    """Sube la base local aunque tenga menos datos que la copia guardada.
+
+    Decision expresa del superadministrador cuando una copia quedo bloqueada y la
+    base local es la correcta. La copia que estaba en la nube queda fijada.
+    """
+    return push_now(force=True, allow_shrink=True, pin=PIN_MANUAL)
 
 
 def probe() -> dict:
@@ -353,7 +472,113 @@ def fetch_meta() -> dict | None:
         "prev_chunk_count": _read_i(fields, "prev_chunk_count"),
         "prev_taken_at": _read_s(fields, "prev_taken_at"),
         "prev_raw_size": _read_i(fields, "prev_raw_size"),
+        "code": _read_s(fields, "code"),
+        "counts": _load_json(_read_s(fields, "counts"), {}),
+        "checkpoints": _load_json(_read_s(fields, "checkpoints"), []),
     }
+
+
+def _load_json(raw: str, default):
+    if not raw:
+        return default
+    try:
+        value = json.loads(raw)
+    except (TypeError, ValueError):
+        return default
+    return value if isinstance(value, type(default)) else default
+
+
+def code_id() -> str:
+    """Version del codigo que hace la copia: version + commit desplegado (Render)."""
+    from . import __version__
+
+    commit = (os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT") or "").strip()[:12]
+    return f"{__version__}+{commit}" if commit else str(__version__)
+
+
+def _day(taken_at: str) -> str:
+    return (taken_at or "")[:10]
+
+
+def _guard_counts(local: dict, cloud: dict) -> str:
+    """Motivo por el que la base local no debe pisar la copia guardada ('' si puede)."""
+    if not local or not cloud:
+        return ""
+    try:
+        mine = int(local.get(GUARD_LINEAGE_TABLE, -1))
+        theirs = int(cloud.get(GUARD_LINEAGE_TABLE, -1))
+    except (TypeError, ValueError):
+        mine = theirs = -1
+    if mine >= 0 and theirs >= 0 and mine < theirs:
+        return (
+            f"la bitácora local tiene {mine} registros y la copia guardada {theirs}: "
+            "la base local no desciende de la copia guardada"
+        )
+    for table in GUARD_TABLES:
+        try:
+            mine = int(local.get(table, -1))
+            theirs = int(cloud.get(table, -1))
+        except (TypeError, ValueError):
+            continue
+        if mine >= 0 and theirs >= GUARD_MIN_ROWS and mine < theirs * SHRINK_GUARD_RATIO:
+            return f"la tabla {table} pasaría de {theirs} a {mine} filas"
+    return ""
+
+
+def _checkpoint_of(cloud: dict, reason: str) -> dict:
+    return {
+        "gen": cloud.get("gen") or "",
+        "sha256": cloud.get("sha256") or "",
+        "chunk_count": int(cloud.get("chunk_count") or 0),
+        "taken_at": cloud.get("taken_at") or "",
+        "raw_size": int(cloud.get("raw_size") or 0),
+        "code": cloud.get("code") or "",
+        "counts": cloud.get("counts") or {},
+        "reason": reason,
+        "pinned_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _trim_checkpoints(items: list[dict]) -> list[dict]:
+    """Sin repetidos por generacion y con el cupo de cada motivo (las mas recientes)."""
+    seen: set[str] = set()
+    unique: list[dict] = []
+    for item in sorted(items, key=lambda c: (str(c.get("pinned_at") or ""), str(c.get("taken_at") or "")), reverse=True):
+        gen = str(item.get("gen") or "")
+        if not item.get("chunk_count") or not item.get("sha256") or gen in seen:
+            continue
+        seen.add(gen)
+        unique.append(item)
+    kept: list[dict] = []
+    used: dict[str, int] = {}
+    for item in unique:
+        reason = str(item.get("reason") or PIN_MANUAL)
+        used[reason] = used.get(reason, 0) + 1
+        if used[reason] <= PIN_RETENTION.get(reason, 3):
+            kept.append(item)
+    return sorted(kept, key=lambda c: str(c.get("taken_at") or ""), reverse=True)
+
+
+def _is_foreign(cloud: dict) -> bool:
+    """La copia de la nube no es la que este proceso leyo ni la ultima que subio."""
+    if _known_cloud_sha is None or not cloud.get("chunk_count"):
+        return False
+    return (cloud.get("sha256") or "") != _known_cloud_sha
+
+
+def _pin_reason(cloud: dict, new_taken_at: str, forced: str) -> str:
+    """Por que la copia que hoy esta en la nube debe quedar fijada ('' si no)."""
+    if not cloud.get("chunk_count"):
+        return ""
+    if forced:
+        return forced
+    if _is_foreign(cloud):
+        return PIN_FOREIGN
+    if (cloud.get("code") or "") != code_id():
+        return PIN_DEPLOY
+    if _day(cloud.get("taken_at") or "") and _day(cloud.get("taken_at") or "") != _day(new_taken_at):
+        return PIN_DAILY
+    return ""
 
 
 def _chunk_id(gen: str, i: int) -> str:
@@ -406,7 +631,13 @@ def _fetch_payload(meta: dict) -> bytes:
     return payload
 
 
-def push_now(*, force: bool = False, allow_shrink: bool = False) -> dict:
+def push_now(*, force: bool = False, allow_shrink: bool = False, pin: str = "") -> dict:
+    """Copia la base a Firestore.
+
+    `allow_shrink` salta las guardas de tamano y de conteos (restauracion manual
+    deliberada). `pin` fija la copia que hoy esta en la nube con ese motivo antes
+    de reemplazarla.
+    """
     if not enabled():
         return {"ok": False, "reason": "disabled"}
     if not firebase_auth.configured():
@@ -421,13 +652,13 @@ def push_now(*, force: bool = False, allow_shrink: bool = False) -> dict:
                 _status["error"] = "Copia en pausa: aún no se pudo leer Firestore; se reintenta sola."
                 _status["synced"] = False
                 return {"ok": False, "reason": "pull_pending"}
-        return _push_locked(force=force, allow_shrink=allow_shrink)
+        return _push_locked(force=force, allow_shrink=allow_shrink, pin=pin)
     finally:
         _sync_lock.release()
 
 
-def _push_locked(*, force: bool, allow_shrink: bool = False) -> dict:
-    global _last_sha, _status, _busy, _last_push_at
+def _push_locked(*, force: bool, allow_shrink: bool = False, pin: str = "") -> dict:
+    global _last_sha, _status, _busy, _last_push_at, _known_cloud_sha
     _last_push_at = time.monotonic()
     _busy = True
     try:
@@ -450,6 +681,19 @@ def _push_locked(*, force: bool, allow_shrink: bool = False) -> dict:
         log.error(msg)
         _status = {**_status, "synced": False, "error": msg, "blocked_shrink": True}
         return {"ok": False, "reason": "shrink_guard", "local_raw_size": raw_size, "cloud_raw_size": cloud_raw}
+    counts = snap.get("counts") or {}
+    # Si la copia de la nube la escribio otra instancia (redespliegue con dos
+    # procesos a la vez), su bitacora puede ir por delante de la local sin que la
+    # local haya perdido nada. Bloquear dejaria a esta instancia sin poder guardar
+    # nunca: se sube, y la copia ajena queda fijada como punto de recuperacion.
+    lost = "" if allow_shrink or _is_foreign(cloud) else _guard_counts(counts, cloud.get("counts") or {})
+    if lost:
+        msg = (
+            f"Copia bloqueada: {lost}. Se conserva la copia de Firestore para no perder información."
+        )
+        log.error(msg)
+        _status = {**_status, "synced": False, "error": msg, "blocked_shrink": True}
+        return {"ok": False, "reason": "count_guard", "detail": lost}
 
     gen = digest[:12]
     chunks = [payload[i : i + CHUNK_BYTES] for i in range(0, len(payload), CHUNK_BYTES)] or [b""]
@@ -465,7 +709,19 @@ def _push_locked(*, force: bool, allow_shrink: bool = False) -> dict:
         "chunk_count": _iv(len(chunks)),
         "gen": _sv(gen),
         "updated_at": _sv(datetime.now(timezone.utc).isoformat()),
+        "code": _sv(code_id()),
+        "counts": _sv(json.dumps(counts, sort_keys=True)),
     }
+    # Puntos de recuperacion: la copia que se va a reemplazar queda fijada si es la
+    # ultima de la version anterior del codigo, la ultima del dia, la de otra
+    # instancia o el estado previo a una restauracion.
+    checkpoints = [c for c in (cloud.get("checkpoints") or []) if isinstance(c, dict)]
+    reason = _pin_reason(cloud, str(snap.get("taken_at") or ""), pin)
+    if reason and (cloud.get("gen") or "") != gen:
+        checkpoints.append(_checkpoint_of(cloud, reason))
+        log.info("Punto de recuperación fijado (%s): copia del %s.", reason, cloud.get("taken_at"))
+    checkpoints = [c for c in _trim_checkpoints(checkpoints) if str(c.get("gen") or "") != gen]
+    meta_fields["checkpoints"] = _sv(json.dumps(checkpoints, sort_keys=True))
     # La copia anterior queda de respaldo: si la nueva no se puede leer, se restaura esa.
     if cloud.get("chunk_count") and (cloud.get("gen") or "") != gen:
         prev = {
@@ -492,6 +748,8 @@ def _push_locked(*, force: bool, allow_shrink: bool = False) -> dict:
     keep = {gen: len(chunks)}
     if prev and prev["gen"] != gen:
         keep[prev["gen"]] = int(prev["chunk_count"] or 0)
+    for item in checkpoints:
+        keep.setdefault(str(item.get("gen") or ""), int(item.get("chunk_count") or 0))
     for doc_id in _list_ids():
         owner = _chunk_owner(doc_id)
         if owner is None:
@@ -500,6 +758,7 @@ def _push_locked(*, force: bool, allow_shrink: bool = False) -> dict:
         if doc_gen not in keep or idx >= keep[doc_gen]:
             _delete_doc(doc_id)
     _last_sha = digest
+    _known_cloud_sha = digest
     _status = {
         "configured": True,
         "synced": True,
@@ -510,6 +769,8 @@ def _push_locked(*, force: bool, allow_shrink: bool = False) -> dict:
         "chunk_count": len(chunks),
         "sha256": digest,
         "error": "",
+        "checkpoints": len(checkpoints),
+        "pushed_at": datetime.now(timezone.utc).isoformat(),
     }
     log.info(
         "Base copiada a Firestore (%s, %s bytes gzip, %s fragmentos).",
@@ -545,11 +806,17 @@ def _pull_locked() -> dict:
 
 
 def _pull_inner() -> dict:
-    global _last_sha, _status, _busy
+    global _last_sha, _status, _busy, _known_cloud_sha
     if not enabled():
         _status = {"configured": firebase_auth.configured(), "enabled": False}
         return {"ok": False, "reason": "disabled"}
     try:
+        if _resolved_db is None:
+            # Sin saber en que base vive la copia no se lee ni se sube: una base
+            # inexistente responde "sin datos" y el sistema arrancaria vacio.
+            ensure_database(probe_write=False)
+        if _resolved_db is None:
+            raise RuntimeError("no se pudo determinar la base de Firestore")
         cloud = fetch_meta()
     except Exception as exc:  # noqa: BLE001
         log.warning("No se pudo leer la base en Firestore: %s", exc)
@@ -557,8 +824,10 @@ def _pull_inner() -> dict:
         return {"ok": False, "reason": "fetch_failed"}
     if not cloud or not cloud.get("chunk_count"):
         _status = {"configured": True, "synced": False, "empty": True}
+        _known_cloud_sha = ""
         return {"ok": True, "restored": False, "empty": True}
 
+    _known_cloud_sha = cloud.get("sha256") or ""
     local = browser_backup.info()
     if not _cloud_should_win(cloud, local):
         _status = {"configured": True, "synced": True, "taken_at": cloud.get("taken_at"), "kept_local": True}

@@ -1038,7 +1038,7 @@ class AlertEvent(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    # phase_change_high_budget | new_phase3_colombia
+    # phase_change_high_budget | clinical_phase_change_high_budget | new_phase3_colombia
     kind: Mapped[str] = mapped_column(String(60), index=True)
     title: Mapped[str] = mapped_column(String(400), default="")
     body: Mapped[str] = mapped_column(Text, default="")
@@ -1087,3 +1087,82 @@ class ScheduledRun(Base):
     items_new: Mapped[int] = mapped_column(Integer, default=0)
     message: Mapped[str] = mapped_column(Text, default="")
     detail: Mapped[dict | None] = mapped_column(JSONType, default=dict)
+
+
+# --------------------------------------------------------------------------- #
+#  Base de conocimiento de busqueda (paginas utiles de cada fuente)
+# --------------------------------------------------------------------------- #
+class SearchKnowledge(Base):
+    """Pagina de una fuente que la busqueda web encontro y que vale la pena visitar.
+
+    Los buscadores gratuitos bloquean las consultas hechas desde la nube. Lo que
+    una busqueda encontro (en el servidor, en un equipo del IETS o en el paquete
+    que viaja con el codigo) queda aqui y sirve a todas las corridas y a todos
+    los ciclos: la vigilancia visita estas paginas sin volver a preguntar a un
+    buscador. `visits` y `signals` llevan la cuenta de si la pagina aporto
+    senales; la que no aporta deja de visitarse (`status = sin_senal`).
+    """
+
+    __tablename__ = "search_knowledge"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Sin llave foranea: el paquete se arma en otro equipo y la fila sobrevive a
+    # que la fuente se recree; se empareja por dominio.
+    source_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    domain: Mapped[str] = mapped_column(String(200), default="", index=True)
+    url: Mapped[str] = mapped_column(String(1020), default="")
+    url_hash: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(300), default="")
+    snippet: Mapped[str] = mapped_column(Text, default="")
+    query: Mapped[str] = mapped_column(String(300), default="")
+    engine: Mapped[str] = mapped_column(String(40), default="")
+    # busqueda (la encontro un buscador en este servidor) | paquete (llego en el
+    # paquete del codigo o cargado a mano)
+    origin: Mapped[str] = mapped_column(String(20), default="busqueda")
+    # activa | sin_senal
+    status: Mapped[str] = mapped_column(String(20), default="activa", index=True)
+    visits: Mapped[int] = mapped_column(Integer, default=0)
+    signals: Mapped[int] = mapped_column(Integer, default=0)
+    found_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_visit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_signal_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SignalKnowledge(Base):
+    """Base de conocimiento de senales: un documento por tecnologia capturada.
+
+    Es la memoria con la que el sistema aprende: guarda el texto de cada senal,
+    de donde salio (la primera busqueda historica o una vigilancia posterior) y
+    que decidio el equipo sobre ella (clasificada con su cluster y tipologia, o
+    descartada con su motivo). Con ella se buscan senales parecidas para sugerir
+    clasificaciones y avisar de un probable descarte (ver `intelligence`).
+
+    No pertenece a un ciclo. Vive en la base del sistema, que es la que se copia
+    a Firestore. Se reconstruye entera desde `technologies`: nunca es la unica
+    copia de un dato.
+    """
+
+    __tablename__ = "signal_knowledge"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    technology_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    finding_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    # historica (primera busqueda) | vigilancia (senales posteriores) | postulacion
+    origin: Mapped[str] = mapped_column(String(20), default="vigilancia", index=True)
+    name: Mapped[str] = mapped_column(String(400), default="")
+    text: Mapped[str] = mapped_column(Text, default="")
+    terms: Mapped[list | None] = mapped_column(JSONType, default=list)
+    year: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    cluster_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tech_type_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    condition: Mapped[str] = mapped_column(String(20), default="")
+    # pendiente | clasificada | descartada
+    decision: Mapped[str] = mapped_column(String(20), default="pendiente", index=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    url: Mapped[str] = mapped_column(String(1024), default="")
+    captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # `updated_at` de la tecnologia cuando se indexo: si cambia, se reindexa.
+    source_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    indexed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

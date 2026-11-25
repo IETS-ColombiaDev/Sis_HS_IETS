@@ -87,8 +87,18 @@ DEFAULT_SEARCH: dict = {
     "generic_terms": ["horizon scanning", "emerging technology", "new approval", "innovation"],
     "terms_by_category": [],
     "searxng_url": "",
+    # Base de conocimiento de busqueda: paginas ya encontradas que se visitan sin
+    # consultar un buscador. Con paginas mas recientes que `knowledge_fresh_days`
+    # no se busca en vivo; `time_budget_s` es el tope de la busqueda en vivo por fuente.
+    "knowledge_enabled": True,
+    # Respaldo sin buscadores: leer el mapa del sitio de la propia fuente.
+    "sitemap_fallback": True,
+    "knowledge_fresh_days": 30,
+    "time_budget_s": 45,
 }
 SEARCH_LIMITS = {
+    "knowledge_fresh_days": (1, 365),
+    "time_budget_s": (10, 300),
     "max_queries": (1, 8),
     "max_results": (1, 20),
     "fetch_results": (0, 10),
@@ -385,7 +395,7 @@ def _clean_terms_by_category(value) -> list[dict]:
 
 def save_search(db: Session, payload: dict) -> dict:
     current = _read_json(db, SEARCH_KEY)
-    for key in ("enabled", "ai_queries", "same_domain_only", "prefer_documents"):
+    for key in ("enabled", "ai_queries", "same_domain_only", "prefer_documents", "knowledge_enabled", "sitemap_fallback"):
         if key in payload and payload[key] is not None:
             current[key] = bool(payload[key])
     for key, (lo, hi) in SEARCH_LIMITS.items():

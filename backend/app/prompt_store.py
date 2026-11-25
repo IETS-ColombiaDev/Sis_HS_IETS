@@ -34,7 +34,9 @@ SCAN_SYSTEM_PROMPT = (
     "4. Si el texto es menu, cookie, error, login o la pagina institucional de la fuente "
     "sin tecnologias, devuelves [].\n"
     "5. Una senal = una tecnologia o producto nominado (INN, marca, plataforma o dispositivo), "
-    "no un titular generico de seccion."
+    "no un titular generico de seccion.\n"
+    "6. Trazabilidad: cada senal lleva la URL exacta y la fecha del texto donde aparece; si el texto no "
+    "las da, el campo queda vacio."
 )
 
 DEFAULT_USER_PROMPT = """Extrae senales de horizonte sanitario para el IETS Colombia.
@@ -59,12 +61,12 @@ Devuelve SOLO un JSON array (maximo {max_items} items). Cada item:
   "title": "nombre concreto de la tecnologia + indicacion si consta",
   "technology": "nombre corto (INN o marca; no la fuente)",
   "summary": "que se anuncia, en que fase o tramite, y por que importa al SGSSS (2-4 frases, solo del texto)",
-  "url": "URL de la ficha si aparece; si no, la URL de la fuente",
+  "url": "URL EXACTA de la ficha, noticia o registro de esa tecnologia, copiada tal cual del texto (encabezado '## Pagina: URL' o enlace del item); solo si no hay ninguna, la URL de la fuente",
   "technology_type": "medicamento|dispositivo|digital|otro",
   "horizon": "emergente|transicional|inminente",
   "therapeutic_area": "oncologia|neurologia|cardiologia|enf. raras|endocrinologia|inmunologia|infectologia u otra del texto",
   "phase": "preclinica|I|II|III|IV|autorizada o vacio",
-  "published_date": "fecha del texto o vacio",
+  "published_date": "fecha de publicacion que da el texto, en formato AAAA-MM-DD (al menos el ano) o vacio; nunca la fecha de hoy",
   "dosage_form": "forma farmaceutica si es medicamento (tableta, solucion inyectable...) o vacio",
   "strength": "concentracion o dosis (ej. 100 mg, 2,5 mg/ml) o vacio",
   "route": "via de administracion (oral, intravenosa, subcutanea...) o vacio",
@@ -80,6 +82,14 @@ Definiciones de horizonte (use la mas avanzada que el texto soporte):
 
 Incluya: medicamentos, biologicos, terapias avanzadas, vacunas, dispositivos, diagnosticos y salud digital nominados.
 Excluya: navegacion, cookies, 'horizon scanning', el nombre de la agencia, eventos, empleos, boletines sin tecnologia.
+Excluya tambien tecnologias de uso amplio y establecido cuando el texto no anuncia nada nuevo sobre ellas
+(nueva indicacion, formulacion, poblacion, evidencia o decision regulatoria).
+No son senales los temas de salud, procedimientos, especialidades o clases terapeuticas en general
+(por ejemplo «hemodialisis», «inmunoterapia», «implantes dentales», «anticuerpos monoclonales»,
+«monitorizacion continua de glucosa»): solo cuentan si el texto nombra un producto, marca, codigo de
+desarrollo, DCI o fabricante concreto, y entonces la senal es ese producto, no la clase.
+Tampoco lo son los articulos de historia, aniversarios o perfiles de la empresa.
+Cada senal debe poder verificarse: la URL y la fecha son las del texto donde aparece, no las de otra senal.
 No copie el esquema de ejemplo. No invente identificadores NCT ni tecnologias que no esten en el texto.
 Los datos de producto (forma, concentracion, via, marca, modelo, fabricante) van solo si el texto los dice.
 Si dos menciones son la misma tecnologia, unifique en un item.

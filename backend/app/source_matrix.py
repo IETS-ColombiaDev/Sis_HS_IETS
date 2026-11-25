@@ -603,12 +603,22 @@ def validation_summary(parsed: dict) -> dict:
     }
 
 
-def write_data_file(parsed: dict, path: Path | None = None) -> Path:
+def write_data_file(parsed: dict, path: Path | None = None, db=None, *, actor: str = "") -> Path:
+    """Escribe la matriz por fuente. Con `db` (y sin `path` propio) tambien se guarda
+    en la base, porque el disco del servicio es efimero. No hace commit: lo hace
+    el llamador junto con el resto de la importacion."""
+    from . import matrix_store
+
+    remember = db is not None and path is None
     path = path or DATA_FILE
+    base = matrix_store.base_sha(db, "fuentes", Path(path)) if remember else ""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(parsed, ensure_ascii=False, indent=1), encoding="utf-8")
-    global _cache
+    global _cache, _legacy_cache
     _cache = None
+    _legacy_cache = None
+    if remember:
+        matrix_store.remember(db, "fuentes", Path(path), base, actor=actor, commit=False)
     return path
 
 

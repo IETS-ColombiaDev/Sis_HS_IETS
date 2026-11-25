@@ -499,7 +499,7 @@ function ScreeningFormula({ values, saved }) {
         ))}
       </ul>
       <p className="muted" style={{ margin: 0 }}>
-        En la bandeja el orden suma además el bono de corroboración. El cribado no es el %P: la priorización oficial es la matriz P1–P6.
+        En la bandeja el orden suma además el bono de corroboración. El cribado no es el %P: la priorización oficial es la matriz P1-P6.
       </p>
     </div>
   );

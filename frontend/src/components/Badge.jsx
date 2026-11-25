@@ -87,7 +87,7 @@ export default function Badge({ children, tone, style }) {
         ...style,
       }}
     >
-      {children || "—"}
+      {children || "-"}
     </span>
   );
 }

@@ -218,14 +218,15 @@ def source_options(db: Session = Depends(get_db), user: User = Depends(get_curre
 @router.post("/matrix/import")
 async def import_matrix_file(
     file: UploadFile | None = File(None),
-    overwrite: bool = Form(True),
+    overwrite: bool = Form(False),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission(P_SOURCE_WRITE)),
 ):
     """Importa la matriz EH (Excel). Sin archivo, reaplica la matriz empaquetada.
 
-    `overwrite=True` pisa lo editado en el panel con lo del Excel; `False` solo
-    completa los campos vacios.
+    `overwrite=True` pisa lo editado en el panel con lo del Excel; `False` (por
+    defecto: pisar lo editado debe pedirse de forma expresa) solo completa los
+    campos vacios.
     """
     from .. import catalog_service, source_matrix
 
@@ -250,7 +251,7 @@ async def import_matrix_file(
 
         summary = link_matrix.apply(db, parsed, actor=user.email, overwrite=overwrite)
         if persist:
-            link_matrix.write_packaged(parsed)
+            link_matrix.write_packaged(parsed, db, actor=user.email)
         bump_state_version(db)
         return summary
     summary = catalog_service.import_matrix(

@@ -193,7 +193,7 @@ def attempt(url: str, status: str, detail: str = "", *, route: str = "") -> None
 def note(section: str, **data) -> None:
     """Guarda el resumen de la busqueda web (`search`) o de la IA (`ai`)."""
     sid = _current.get()
-    if sid is None or section not in ("search", "ai"):
+    if sid is None or section not in ("search", "ai", "window"):
         return
     try:
         with _lock:

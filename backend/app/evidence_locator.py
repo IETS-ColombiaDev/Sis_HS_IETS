@@ -22,6 +22,9 @@ _SEARCH_HEADER = "## Resultados de busqueda web"
 # Enlaces que no conservan el fragmento: redirecciones y visores.
 _NO_FRAGMENT_HOSTS = ("news.google.com",)
 MIN_QUOTE_CHARS = 12
+# Nombre de la tecnologia usado como resaltado cuando la senal no trae cita textual.
+MIN_NAME_CHARS = 4
+MAX_NAME_CHARS = 80
 FRAGMENT_WORDS = 5
 
 
@@ -198,5 +201,21 @@ def quote_from_raw(raw_content: str, name: str = "") -> str:
 
 
 def signal_link(url: str, raw_content: str = "", name: str = "") -> str:
-    """URL precisa de la senal con el resaltado de su cita (si la hay)."""
-    return with_fragment(url, quote_from_raw(raw_content, name)) if url else ""
+    """URL precisa de la senal con el resaltado de su cita o, si no hay cita, de su nombre.
+
+    Sin cita textual el enlace igual abre la ficha, pero el evaluador no veia donde
+    estaba la senal (RF-001-A). El nombre de la tecnologia se pide como resaltado:
+    si la pagina lo trae, el navegador lo marca; si no, abre la pagina como siempre.
+    """
+    if not url:
+        return ""
+    quote_text = quote_from_raw(raw_content, name)
+    if not quote_text:
+        name = re.sub(r"\s+", " ", name or "").strip()
+        # "TECELRA (afamitresgene autoleucel)": la pagina puede escribir la aclaracion
+        # de otra forma; la marca sola si esta.
+        head = name.split(" (", 1)[0].strip()
+        if len(head) >= MIN_NAME_CHARS:
+            name = head
+        quote_text = name if MIN_NAME_CHARS <= len(name) <= MAX_NAME_CHARS else ""
+    return with_fragment(url, quote_text)

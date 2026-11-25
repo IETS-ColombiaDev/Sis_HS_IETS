@@ -49,7 +49,9 @@ def _sender() -> str:
     return sender or "no-responder@iets.org.co"
 
 
-def _build(to: str, subject: str, text: str, html_body: str | None) -> EmailMessage:
+def _build(
+    to: str, subject: str, text: str, html_body: str | None, attachments: list | None = None
+) -> EmailMessage:
     msg = EmailMessage()
     msg["From"] = formataddr(("Escaneo de Horizonte IETS", _sender()))
     msg["To"] = to
@@ -58,6 +60,9 @@ def _build(to: str, subject: str, text: str, html_body: str | None) -> EmailMess
     msg.set_content(text)
     if html_body:
         msg.add_alternative(html_body, subtype="html")
+    for filename, content, mime in attachments or []:
+        maintype, _, subtype = (mime or "application/octet-stream").partition("/")
+        msg.add_attachment(content, maintype=maintype, subtype=subtype or "octet-stream", filename=filename)
     return msg
 
 
@@ -86,15 +91,20 @@ def _remember(to: str, subject: str) -> None:
     del _SENT[:-_SENT_LIMIT]
 
 
-def send_mail(to: str, subject: str, text: str, html_body: str | None = None) -> MailResult:
-    """Envio sincrono. Devuelve el resultado en lugar de lanzar excepciones."""
+def send_mail(
+    to: str, subject: str, text: str, html_body: str | None = None, attachments: list | None = None
+) -> MailResult:
+    """Envio sincrono. Devuelve el resultado en lugar de lanzar excepciones.
+
+    `attachments`: lista de (nombre, bytes, tipo MIME).
+    """
     to = (to or "").strip()
     if not to:
         return MailResult(False, "Sin destinatario.")
     if not is_configured():
         return MailResult(False, "SMTP no configurado: comparta el enlace manualmente.")
     try:
-        _deliver(_build(to, subject, text, html_body))
+        _deliver(_build(to, subject, text, html_body, attachments))
     except Exception as exc:  # noqa: BLE001 - el correo nunca rompe la operacion
         logger.warning("No se pudo enviar el correo a %s: %s", to, exc)
         return MailResult(False, f"El servidor de correo rechazó el envío: {exc.__class__.__name__}.")
@@ -157,6 +167,23 @@ def alert_notification(*, to: str, title: str, body: str, link: str = "") -> boo
     lines = [body or title, "Consulte el detalle en la bandeja de alertas de la plataforma."]
     text = "\n\n".join([title, *lines, link]).strip()
     return send_mail_async(to, f"[Alerta IETS] {title}"[:180], text, _layout(title, lines, link, "Ver alertas"))
+
+
+def bulletin_distribution(
+    *, to: str, title: str, summary: list[str], pdf: bytes | None, filename: str, link: str = ""
+) -> MailResult:
+    """Boletin aprobado y publicado para la alta direccion (RF19), con el PDF adjunto."""
+    lines = [
+        "El IETS comparte el boletín epidemiológico y financiero de tecnologías emergentes "
+        "del Sistema de Escaneo de Horizonte.",
+        *summary,
+        "El boletín completo va adjunto en PDF." if pdf else "Consulte el boletín completo en la plataforma.",
+    ]
+    text = "\n\n".join([title, *lines, link]).strip()
+    attachments = [(filename, pdf, "application/pdf")] if pdf else None
+    return send_mail(
+        to, f"[Boletín IETS] {title}"[:180], text, _layout(title, lines, link, "Abrir la plataforma"), attachments
+    )
 
 
 def sent_log() -> list[dict]:

@@ -8,6 +8,7 @@ import Icon from "./Icon";
 import { Input, Textarea } from "./Field";
 import { LoadingBlock } from "./Spinner";
 import { TermLabel } from "./InfoTip";
+import SearchKnowledgePanel from "./SearchKnowledgePanel";
 
 const LISTS = [
   { key: "source_level", title: "Nivel de fuente (primaria, secundaria...)", tip: GLOSSARY.fb_nivel_fuente },
@@ -22,6 +23,8 @@ const NUMBERS = [
   { key: "timeout", label: "Tiempo por consulta (s)" },
   { key: "pause_ms", label: "Pausa entre consultas (ms)" },
   { key: "cooldown_minutes", label: "Pausa de un motor bloqueado (min)" },
+  { key: "time_budget_s", label: "Tiempo máximo de búsqueda por fuente (s)" },
+  { key: "knowledge_fresh_days", label: "Días que la base cuenta como reciente" },
 ];
 
 const SWITCHES = [
@@ -29,6 +32,8 @@ const SWITCHES = [
   { key: "ai_queries", title: "Consultas redactadas por la IA", text: "La IA escribe las consultas con el contexto de la matriz. Si la IA no responde se usan reglas." },
   { key: "same_domain_only", title: "Solo resultados del dominio de la fuente", text: "Descarta resultados de otros sitios (recomendado)." },
   { key: "prefer_documents", title: "Priorizar documentos", text: "PDF, informes y publicaciones se leen primero." },
+  { key: "knowledge_enabled", title: "Usar la base de conocimiento de búsqueda", text: "Visita las páginas ya encontradas sin consultar buscadores. Si son recientes, no se busca en vivo." },
+  { key: "sitemap_fallback", title: "Respaldo por mapa del sitio", text: "Si los buscadores bloquean o no traen nada, lee el mapa del sitio de la propia fuente. No requiere llave." },
 ];
 
 const splitList = (t) => String(t || "").split(/[\n,;]/).map((x) => x.trim()).filter(Boolean);
@@ -430,6 +435,8 @@ export default function SourceParamsPanel({ toast }) {
           </div>
         )}
       </Card>
+
+      <SearchKnowledgePanel toast={toast} />
     </div>
   );
 }

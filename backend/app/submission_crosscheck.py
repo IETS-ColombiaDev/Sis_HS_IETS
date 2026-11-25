@@ -337,7 +337,7 @@ def _openfda_devices(name: str) -> list[dict]:
         if k:
             out.append({
                 "title": f"{item.get('device_name') or term} ({k})",
-                "url": f"https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpmn/pmn.cfm?ID={k}",
+                "url": f"https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfPMN/pmn.cfm?ID={k}",  # el sitio distingue mayusculas
                 "snippet": f"FDA 510(k) · {item.get('applicant') or ''} · {item.get('decision_date') or ''}".strip(" ·"),
             })
     return out

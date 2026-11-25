@@ -5,7 +5,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.1.1 · actualizada el 24 de noviembre de 2026 (vigilancia más rápida y estable en el sitio desplegado) |
+| **Versión del sistema** | 7.4.2 · actualizada el 25 de noviembre de 2026 (búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
@@ -96,7 +96,7 @@ El escaneo de horizonte (EH) busca **tecnologías sanitarias emergentes** antes 
 
 El sistema:
 
-1. **Vigila** de forma automática (y manual) cerca de **97 fuentes** internacionales.
+1. **Vigila** de forma automática (y manual) **141 fuentes** internacionales (una por enlace de la matriz de escaneo).
 2. **Recibe** postulaciones externas con conflicto de interés declarado.
 3. **Clasifica** lo capturado (clúster, tipología, condición).
 4. **Filtra** duplicados y verifica novedad frente al INVIMA.
@@ -726,8 +726,14 @@ Desde Vigilancia o desde Fuentes › **Ingerir**:
 2. Si falla → prueba URLs de entrada (**respaldo**).  
 3. Si el flujo lo permite → **búsqueda web** en el dominio.  
 4. Recorrido: principal → entradas → resultados de búsqueda → fichas internas guiadas por la ruta.  
-5. OCR / IA según casillas globales y de la fuente.  
-6. Huella: si el contenido ya existía, no crea señal duplicada.
+5. De cada página lee el cuerpo y, además, lo que la página trae **plegado u oculto**: acordeones, pestañas, bloques «ver más» y **tablas**. No toma menús, pies de página ni avisos de cookies.  
+6. Abre los **documentos PDF** que encuentra y lee su texto.  
+7. OCR / IA según casillas globales y de la fuente.  
+8. Huella: si el contenido ya existía, no crea señal duplicada.
+
+**Lo que no puede leer.** Los sitios que arman su contenido con JavaScript después de cargar (por ejemplo AIFA o Boehringer) o que exigen pulsar para pedir más datos al servidor: ese contenido no está en la página descargada. El Diagnóstico para la matriz (14.3) los señala para registrar una URL más específica o pasarlos a consulta manual.
+
+**Cortesía con los sitios.** Entre todas las fuentes en curso, el sistema abre como mucho dos páginas a la vez de un mismo sitio. El inventario tiene varios enlaces de un mismo sitio (FDA, BD, Abbott): sin ese tope el sitio dejaba de responder y la vigilancia se quedaba esperando.
 
 Detalle de pasos: Configuración › Integración con IA › bitácora de entrada a sitios.
 
@@ -749,6 +755,11 @@ El **rango** sale de la variación de cada fuente. Medido sobre 4 corridas reale
 - **Esperando reintentos**: una fuente falló y se reintenta a la hora indicada.
 - **Una fuente «sin novedades hace X min»**: se cerrará sola al llegar al tiempo máximo por fuente.
 - En el servidor de Render (plan gratuito), mientras haya fuentes en cola, el propio servicio se mantiene despierto, aunque nadie tenga la página abierta.
+- **Si el servidor se reinicia o se suspende a mitad de una vigilancia**, un vigilante de la cola la reanuda sola a los pocos segundos de volver: no hay que relanzarla. La pantalla lo indica con el aviso «la cola la cuida un vigilante».
+- **Si una fuente falla al guardar** (por ejemplo, con la base ocupada), no queda «en curso»: se cierra sola y se reintenta un minuto después.
+- **Si una corrida vieja sigue marcada «en curso»**, pulse (Detener): cancela lo que quedaba en cola. Lo ya capturado se conserva.
+
+**Búsqueda web sin esperas.** La vigilancia ya no espera a los buscadores gratuitos, que bloquean las consultas hechas desde la nube. Primero visita las páginas de la **base de conocimiento de búsqueda** (ver 25.6); si faltan, lee el **mapa del sitio** de la propia fuente. En el detalle de cada fuente verá de dónde salieron los resultados: «base de conocimiento», «mapa del sitio» o el nombre del buscador.
 
 ### 9.7 Vista previa de URL
 
@@ -807,10 +818,19 @@ Las señales/tecnologías **recién capturadas** esperan aquí **sin ciclo**. Us
 ### 10.3 Clasificar una señal (paso a paso)
 
 1. Pulse la fila o **Clasificar**.  
-2. Revise título, fuente, resumen, enlace (botón **↗ Abrir la fuente original**).  
-3. (Recomendado) **Sugerir clasificación**: la IA/reglas proponen clúster, tipología y condición con motivo.  
-   - Si no hay evidencia: “Clasifique manualmente”.  
-   - Si hay sugerencia: **revísela**; no es decisión final hasta guardar.  
+2. Revise título, fuente, resumen, enlace (botón **↗ Abrir la fuente original**).
+   - Debajo del tipo de enlace hay **tres botones**, cada uno con un icono para copiar la dirección:
+     - **URL exacta de la señal**: abre la ficha, noticia o registro donde está la señal. Si la fuente no da enlace por ítem, el botón se llama (Página donde está la señal) y abre la página con la señal resaltada.
+     - **Página consultada**: el listado, buscador o canal que el sistema recorrió para encontrarla.
+     - **Fuente original**: la dirección de la fuente en el catálogo.
+   - El sistema **verifica solo** cada enlace. Si la URL exacta ya no existe en el sitio (error 404 o página de «no encontrado»), no se ofrece como exacta: la señal pasa a su página consultada y un texto lo explica, con la dirección que dejó de existir.
+3. (Recomendado) **Sugerir clasificación**: propone clúster, tipología y condición, cada uno con su **confianza** y de dónde sale:
+   - **Reglas del catálogo**: palabras clave, CIE-10 y MeSH de los clústeres y tipologías.
+   - **Aprendido de clasificaciones anteriores**: señales parecidas que el equipo ya clasificó. (Ver las señales parecidas) las lista con su parecido.
+   - **IA**: si está encendida, arbitra viendo esos mismos ejemplos.
+   - Si la señal se parece a otras que el equipo **descartó**, un aviso amarillo lo dice con el motivo de aquel descarte.
+   - Si no hay evidencia: “Clasifique manualmente”.
+   - La sugerencia **no es decisión final hasta guardar**. Lo que usted guarda es de lo que el sistema aprende.
 4. Complete o corrija:
    - Nombre comercial
    - DCI / INN (mejora desduplicación e INVIMA)
@@ -851,6 +871,8 @@ La barra de filtros de la bandeja permite combinar:
 | No deja asignar | Falta clúster o tipología | Clasifique primero |
 | “Ya estaban en el ciclo” | Duplicó la asignación | Normal; no crea duplicado de instancia |
 | No ve la señal | Filtro de búsqueda activo | Limpie filtros (incluidas las fechas «Desde / Hasta» y la casilla «Solo detectadas en varias fuentes») |
+| Aparece «No se pudo cargar la bandeja de entrada» | El servidor está iniciando (llevaba un rato sin uso) o está ocupado con una vigilancia | **La bandeja no está vacía**: las señales siguen guardadas. La pantalla reintenta sola cada 20 segundos; también puede pulsar (Reintentar ahora) |
+| Arriba de la lista dice «No se pudo actualizar la lista» | La última actualización no llegó | Se sigue mostrando la lista anterior. Pulse (Reintentar) |
 
 ### 10.7 Misma tecnología en varias fuentes (corroboración)
 
@@ -863,7 +885,7 @@ Cuando la misma tecnología aparece en fuentes distintas (por ejemplo FDA, EMA y
 - **Filtro:** casilla **Solo detectadas en varias fuentes**.
 - **No fusiona nada.** Si son la misma tecnología y quiere un solo registro, use **Filtrado y depuración › Duplicados** (la fusión siempre la confirma una persona).
 
-El cálculo se actualiza solo al abrir la bandeja cuando hubo capturas o cambios.
+El cálculo se actualiza solo al abrir la bandeja cuando hubo capturas o cambios. **Mientras corre una vigilancia** se actualiza como mucho cada 3 minutos y otra vez al terminar, para que la bandeja abra rápido: durante ese rato la etiqueta (En N fuentes) de las señales recién capturadas puede tardar en aparecer.
 
 ### 10.9 Enlace a la fuente original y evidencia de captura
 
@@ -877,7 +899,15 @@ En el panel (Origen de la señal) y en la ficha de la señal el enlace lleva una
 
 Si la verificación de enlaces encontró que la URL no responde o redirige a la portada, aparece además la marca (No responde) o (Redirige a otra página).
 
-**Cómo se ubica la señal exacta.** Al capturar, y cuando alguien pulsa (Ubicar señales exactas) en Señales capturadas (ver 14.3), el sistema busca cada señal de «página de consulta» en su página: si la página tiene un enlace con el nombre de la señal (o declara la URL del producto en sus datos estructurados, como los pipelines de Novartis), la señal pasa a **Enlace exacto** y la URL anterior queda en la evidencia; si no, y el nombre está en la página, arma el enlace que la resalta. Nunca inventa un enlace: si no encuentra la señal, lo dice y deja la evidencia.
+**Desde la lista de la bandeja.** El icono junto a la fecha de cada señal abre su fuente. Si es una **lupa**, el sistema ya ubicó la señal dentro de la página: al pulsarla, la página abre con la señal resaltada. Si es una flecha, abre la ficha o el artículo de la señal (o la página de consulta, si aún no se ubicó).
+
+**Qué resalta el navegador.** La cita textual de la fuente cuando la hay; si no, el nombre de la tecnología. Si la página no trae ese texto, abre normalmente, sin resaltado. No aplica a documentos PDF.
+
+**Registros oficiales.** Las señales de la FDA (medicamentos, 510(k), De Novo y PMA con suplemento) y de Health Canada (medicamentos) abren la **ficha del producto** en el registro, no el buscador. Las capturadas antes se corrigieron solas; la dirección anterior queda en la evidencia.
+
+**Enlaces por Google Noticias.** Algunas fuentes bloquean la lectura automática (revistas y portales de noticias) y se leen por su canal en Google Noticias. Ese enlace redirige al artículo original, pero no admite resaltado: en el artículo, busque el título de la señal con Ctrl+F. El detalle de la señal lo avisa.
+
+**Cómo se ubica la señal exacta.** Al capturar, **automáticamente cuando el sistema está libre** (sin que nadie pulse nada; cada señal se intenta una vez) y cuando alguien pulsa (Ubicar señales exactas) en Señales capturadas (ver 14.3), el sistema busca cada señal de «página de consulta» en su página: si la página tiene un enlace con el nombre de la señal (o declara la URL del producto en sus datos estructurados, como los pipelines de Novartis), la señal pasa a **Enlace exacto** y la URL anterior queda en la evidencia; si no, y el nombre está en la página, arma el enlace que la resalta. Nunca inventa un enlace: si no encuentra la señal, lo dice y deja la evidencia.
 
 ### 10.11 Fuentes de consulta manual (tipo E) por validar
 
@@ -1137,11 +1167,11 @@ No use esta pantalla como sustituto de `/priorizacion`.
 
 ### 14.3 Reporte de enlaces por fuente
 
-Arriba de la lista pulse (Reporte de enlaces). Muestra, por fuente, cuántas señales tienen enlace exacto, cuántas solo página de consulta (con evidencia), cuántas no tienen enlace y cuántas no responden.
+Arriba de la lista está la tarjeta «Enlaces a la fuente original» con dos botones siempre visibles: (Ubicar señales exactas) y (Reporte de enlaces). Pulse (Reporte de enlaces). Muestra, por fuente, cuántas señales tienen enlace exacto, cuántas solo página de consulta (con evidencia), cuántas no tienen enlace y cuántas no responden.
 
 - (Clasificar señales): vuelve a clasificar todas las señales y guarda su evidencia de captura. No cambia ninguna URL. Queda en bitácora.
-- (Verificar enlaces): abre cada enlace en segundo plano y marca los que no responden o redirigen a la portada. Tarda unos minutos; el avance aparece en el mismo panel. Queda en bitácora.
-- (Ubicar señales exactas): busca cada señal de «página de consulta» en su página y la lleva a enlace exacto o a enlace que la resalta (ver 10.9). Corre en segundo plano y muestra cuántas ubicó. Queda en bitácora.
+- (Verificar enlaces): abre cada enlace en segundo plano. **Ya no hace falta pulsarlo**: el sistema verifica solo los enlaces nuevos cuando está libre, por tandas. Distingue cuatro casos: **Responde**; **No responde** (error 404 o página de «no encontrado»: la señal pasa a su página consultada); **El sitio bloquea la verificación automática** (en el navegador abre); y **sin respuesta** (se reintenta al día siguiente). A un mismo sitio le pide las páginas de a una y con pausa, y si el sitio rechaza varias seguidas lo deja en paz hasta el día siguiente. Antes marcaba los que no responden o redirigen a la portada. Tarda unos minutos; el avance aparece en el mismo panel. Queda en bitácora.
+- (Ubicar señales exactas): busca cada señal de «página de consulta» en su página y la lleva a enlace exacto o a enlace que la resalta (ver 10.9). Corre en segundo plano y muestra cuántas ubicó. Queda en bitácora. **Ya no hace falta pulsarlo para las señales nuevas o anteriores**: el sistema lo hace solo cuando está libre. Úselo para reintentar las que quedaron sin ubicar, por ejemplo después de corregir una URL en la matriz.
 - (Diagnóstico en Excel) y (CSV): el reporte por fuente para el equipo técnico.
 
 La pestaña **Diagnóstico para la matriz** dice, por fuente, si hay que **mejorar la matriz** y cómo:
@@ -1255,7 +1285,18 @@ Desde administración / API de paquete: ZIP con Listado Único, informes aprobad
 2. **Compilar** borrador a partir de lo publicado/priorizado según reglas del módulo.  
 3. Revisar contenido.  
 4. **Aprobar** (líder / perfil habilitado).  
-5. **Publicar** y exportar: **Ver HTML ejecutivo** (pestaña nueva) o **Descargar PDF** (A4, listo para distribuir).  
+5. **Publicar** y exportar: **Ver HTML ejecutivo** (pestaña nueva) o **Descargar PDF** (A4, listo para distribuir).
+6. **Enviar a la alta dirección**: aparece cuando el boletín ya está publicado (ver 18.2).
+
+### 18.2 Enviar el boletín a la alta dirección
+
+1. En el boletín publicado pulse **Enviar a la alta dirección**.
+2. Escriba los correos separados por coma. La lista se recuerda para el siguiente boletín.
+3. Pulse **Enviar boletín**. Cada destinatario recibe un correo con las cifras del ciclo y el PDF adjunto.
+
+Bajo el título del boletín queda la línea **Último envío** con fecha, número de destinatarios y quién lo envió; el envío también queda en la bitácora. Si un correo es rechazado, el sistema lo dice y los demás igual salen.
+
+Solo se puede enviar un boletín **publicado**. Si el servidor no tiene correo institucional configurado, la ventana lo avisa: descargue el PDF y envíelo por su correo.
 
 Coordine con la fecha de boletín definida al crear el ciclo.
 
@@ -1282,6 +1323,12 @@ Solo el autor o un superadmin edita/elimina.
 
 ### 20.1 Bloques principales
 
+0. **Marco analítico del sistema**: cuatro preguntas sobre los datos de todo el sistema (no solo del ciclo):
+   - **Descriptivo** (¿qué pasa?): señales capturadas, por clasificar, captura de 30 días y clúster con más señales.
+   - **Diagnóstico** (¿por qué?): porcentaje de descarte, enlaces exactos, fuentes sin señales, antigüedad de la bandeja y fuentes con mucho ruido.
+   - **Predictivo** (¿qué puede pasar?): tendencia de la captura, tiempo estimado para evacuar la bandeja y clústeres en crecimiento.
+   - **Prescriptivo** (¿qué hacer?): acciones concretas con enlace a la pantalla donde se atienden.
+   - Con la IA encendida, (Generar lectura con IA) redacta un resumen ejecutivo usando **solo esas cifras**. Se guarda para la siguiente visita. Sin IA, el marco funciona igual.
 1. **Embudo del ciclo** — capturadas → filtradas → priorizadas → evaluadas → publicadas.  
 2. **Por clúster** — distribución.  
 3. **TTM** — tiempo al mercado (umbrales configurables).  
@@ -1311,7 +1358,8 @@ Solo el autor o un superadmin edita/elimina.
 ### 21.1 Tipos habituales
 
 - Fase III con mención a Colombia (u otros tokens configurados).  
-- Alto riesgo presupuestal (umbral de puntos).
+- Cambio de franja de una tecnología de alto riesgo presupuestal (umbral de puntos).  
+- **Cambio de fase clínica** de una tecnología de alto riesgo presupuestal: por ejemplo, pasa de fase II a fase III. Avisa aunque el cambio llegue por la vigilancia en un registro que ya se había capturado. Conocer la fase por primera vez no genera alerta.
 
 ### 21.2 Qué hacer
 
@@ -1434,6 +1482,27 @@ En (Configuración) › (Parámetros de fuentes), sección (Criterios de búsque
 - Las señales ya capturadas en categorías inactivas no se reclasifican ni se borran.
 - **Decisión pendiente del equipo técnico**: si Dispositivos implantables, Equipos biomédicos y Dispositivos de monitoreo se consideran parte de Dispositivos médicos (se activarían) o siguen inactivas.
 
+#### Base de conocimiento de búsqueda
+
+Al final de (Parámetros de fuentes). Son las páginas de cada fuente que ya se encontraron y que la vigilancia visita sin consultar buscadores. No pertenece a un ciclo: la usan todas las corridas y todos los ciclos, y se respalda junto con la base del sistema.
+
+| Elemento | Qué muestra o hace |
+|---|---|
+| Totales | Páginas guardadas, sitios, cuántas ya aportaron señales, cuántas están en pausa por no aportar y cuántas fuentes activas tienen páginas conocidas |
+| (Consultar la base) | Busca por texto en título, extracto, dirección o sitio. Cualquier perfil puede consultarla |
+| (Descargar paquete) | Baja toda la base en un archivo `base_busqueda_eh.json` |
+| (Cargar paquete) | Suma un paquete armado en otro equipo. Solo agrega o refuerza: nunca borra páginas ni baja sus cuentas |
+
+Cómo se mantiene sola:
+
+- Cada vigilancia anota si la página aportó señales. Las que aportan van primero en la siguiente corrida.
+- Una página que no aporta en 2 visitas deja de visitarse («Sin señal») y se vuelve a probar a los 45 días.
+- Lo que encuentre un buscador con llave o el mapa del sitio queda guardado aquí.
+
+Interruptores relacionados, en la misma pantalla: **Usar la base de conocimiento de búsqueda** y **Respaldo por mapa del sitio** (los dos encendidos por defecto), **Tiempo máximo de búsqueda por fuente** y **Días que la base cuenta como reciente**.
+
+**Llave de Brave Search (opcional).** La vigilancia funciona sin ella. Sirve para que el servidor descubra páginas nuevas por su cuenta: créela con una cuenta del IETS en el sitio de Brave Search API, péguela en esta pantalla y marque el motor «Brave Search API».
+
 #### Importar Excel
 
 1. Seleccione el archivo «Fuentes de información proactiva EH» (`.xlsx`).
@@ -1481,17 +1550,97 @@ Edite valores/etiquetas/rangos de prioridad, niveles, tipos de tecnología, orí
 
 ---
 
+### 25.8 Copia de respaldo y puntos de recuperación
+
+**Ruta:** `/configuracion`, pestaña de copia de respaldo. Solo el superadministrador.
+
+La base del sistema se copia sola a Firebase después de cada cambio y se restaura sola cuando el servidor reinicia. El panel **Base en Firebase** muestra si está sincronizada y la fecha de la última publicación.
+
+**Puntos de recuperación.** Son copias que las publicaciones siguientes no borran:
+
+| Punto | Qué es | Cuántos se guardan |
+|---|---|---|
+| Copia actual | La vigente; es la que se restaura sola al arrancar | 1 |
+| Copia anterior | La inmediatamente anterior | 1 |
+| Antes de un despliegue | Última copia hecha con la versión anterior del sistema | 5 |
+| Cierre del día | Última copia de cada día | 7 |
+| Escrita por otra instancia | La subió otro proceso del servicio durante un redespliegue | 3 |
+| Antes de una restauración | Estado que había justo antes de restaurar | 3 |
+| Fijada a mano | La que usted fija con **Fijar el estado actual** | 3 |
+
+Cada línea muestra la fecha, el tamaño, la versión del sistema y cuántas señales, tecnologías, fuentes y usuarios tenía.
+
+**Volver a un punto anterior:**
+
+1. Ubique el punto por su fecha y pulse **Restaurar**.
+2. Escriba `RESTAURAR` cuando el sistema lo pida.
+3. La página se recarga con los datos de ese punto.
+
+El estado que había queda guardado como «Antes de una restauración»: si se equivocó, restaure ese punto y vuelve a donde estaba. La restauración queda en la bitácora.
+
+**Antes de un cambio delicado** (cargar una matriz nueva, depurar ruido, cerrar un ciclo) pulse **Fijar el estado actual**.
+
+**Si aparece «Copia bloqueada».** El sistema detectó que la base del servidor tiene menos datos que la copia guardada y no la sobrescribió. No se perdió nada: avise a TI. Lo normal es restaurar la copia actual desde este mismo panel. Si TI confirma que la base del servidor es la correcta, **Publicar de todos modos** (pide escribir `PUBLICAR`) la sube y deja la copia guardada como punto de recuperación.
+
+---
+
+### 25.9 Inteligencia
+
+Pestaña **Inteligencia**. La consulta cualquier perfil; la cambia quien administra la configuración. Todo cambio queda en bitácora.
+
+**Base de conocimiento de señales.** Es la memoria del sistema: un documento por señal con su texto, su año, su origen y lo que el equipo decidió.
+
+- **Primera búsqueda histórica** y **vigilancias posteriores**: lo capturado hasta la línea base es histórico; lo que llega después, posterior. (Fijar línea base hoy) mueve ese corte.
+- Se actualiza sola. (Reconstruir) la rehace desde cero; (Descargar base) la entrega en un archivo.
+- (Buscar señales parecidas a un texto) muestra qué hay en la base y qué se decidió.
+- Sirve a todos los ciclos y se respalda con la base del sistema (la que se copia a Firestore).
+
+**Clasificador que aprende.**
+
+| Parámetro | Para qué sirve | De fábrica |
+|---|---|---|
+| Aprender de las clasificaciones | Usa las señales parecidas ya clasificadas o descartadas | Encendido |
+| Cuándo consultar a la IA | Nunca, solo si hay duda, o siempre | Solo si hay duda |
+| Señales parecidas que votan | Cuántas clasificaciones anteriores se consultan | 7 |
+| Parecido mínimo para votar | Por debajo, una señal no cuenta | 0,12 |
+| Confianza mínima del aprendizaje | Desde aquí el aprendizaje pesa más que las reglas | 0,55 |
+| Precisión objetivo | Lo que la calibración busca garantizar | 0,80 |
+| Parecido para avisar de un descarte | Dispara el aviso amarillo | 0,60 |
+| Ejemplos que ve la IA | Clasificaciones del equipo incluidas en la consulta | 6 |
+
+El sistema empieza a aprender con 5 señales clasificadas. Antes sugiere solo con las reglas del catálogo.
+
+**Calibración.** (Calibrar ahora) predice cada señal ya clasificada sin mirarla y compara con lo que decidió el equipo. Muestra el acierto de las reglas, del aprendizaje y del combinado, y lo compara con decir siempre el clúster más frecuente. Si cumple la precisión objetivo, ajusta sola los parámetros. Necesita 20 señales clasificadas en al menos dos clústeres; si no las hay, lo dice y no cambia nada. Con la calibración automática encendida se repite cada 25 clasificaciones nuevas.
+
+**Sugerencias confirmadas por el equipo.** Cuántas sugerencias terminó confirmando el evaluador, por método. Si baja, recalibre o ajuste las palabras clave de los clústeres.
+
+**Analítica.** Enciende o apaga la lectura con IA y fija los umbrales de las alertas: ruido por fuente, antigüedad de la bandeja y concentración en un clúster.
+
+**Prompts de la IA.** Instrucciones de la clasificación y de la analítica. Un campo vacío usa el texto de fábrica.
+
+**Vigencia de las señales por año.** Por defecto entran las señales de todos los años.
+
+1. **Vigencia general**: escriba (Desde el año) y (Hasta el año) y guarde. Vale para todas las fuentes sin vigencia propia. (Todos los años) la quita.
+2. **Vigencia propia**: marque fuentes en la tabla, escriba su rango y pulse (Aplicar a N fuentes). (Volver a la vigencia general) se la quita.
+3. **Revisar lo ya capturado**: (Revisar la bandeja) dice cuántas señales quedan fuera, por fuente, sin cambiar nada. (Pasar a Descartadas) las mueve con el motivo «Fuera de la vigencia configurada». Se restauran desde Bandeja de entrada › Descartadas.
+
+El año sale de la fecha de publicación de la señal. Una señal sin fecha se conserva, salvo que desmarque (Conservar las señales sin fecha de publicación). La vigencia rige para las capturas siguientes: lo publicado fuera del rango no entra a la bandeja.
+
+---
+
 ## 26. Portales públicos
 
 | URL | Quién | Qué hace |
 |---|---|---|
 | `/postular` | Ciudadanía / industria / academia | Postula tecnología + COI |
-| `/expedientes` | Público | Busca fichas publicadas |
+| `/expedientes` | Público | Busca fichas publicadas por nombre, denominación común o indicación, y las filtra por clúster, tipo de tecnología, fase de desarrollo y año de publicación |
 | `/expedientes/:id` | Público | Lee una ficha; **Descargar ficha técnica** entrega PDF y **Ver versión web**, HTML |
 | `/transparencia` | Público | Cifras agregadas |
 | `/revisar/:token` | Revisor invitado | Evalúa expediente |
 
 Estos portales **no** muestran la bandeja interna ni datos de ciclos en configuración.
+
+En `/expedientes` los filtros solo ofrecen opciones que tienen al menos una ficha pública, los resultados van de 20 en 20 y **Quitar filtros** vuelve a la lista completa. Las publicaciones confidenciales no aparecen ni se cuentan.
 
 ---
 
@@ -1568,7 +1717,7 @@ Su perfil no es clínico (ni superadmin). Pida a quien corresponda o un cambio d
 
 ### 28.4 “Recargué el catálogo y se movió la URL”
 
-Esperado para campos oficiales (URL, título, adaptador, nivel de acceso). Lo que el equipo editó desde **Editar fuente** permanece; lo que nadie editó sigue a la matriz vigente (ver 8.7). Si importó Excel con «Sobrescribir lo editado», el Excel mandó en todo.
+Esperado para los campos que nadie editó: siguen a la matriz vigente (ver 8.7). Todo lo que el equipo cambió desde **Editar fuente** permanece, incluidos el nombre, la URL, «ingesta activa» y la frecuencia, también después de un reinicio del servidor. Una fuente que el equipo sacó del catálogo o que la sonda suspendió por fallar tampoco se reactiva sola. La matriz que se carga desde la interfaz se conserva entre reinicios. Si importó Excel con «Sobrescribir lo editado», el Excel mandó en todo.
 
 ### 28.5 “Error interno del servidor”
 
