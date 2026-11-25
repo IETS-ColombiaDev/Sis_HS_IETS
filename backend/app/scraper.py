@@ -2050,6 +2050,12 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
         weights = screening_weights(db)
         pipeline = is_pipeline_source(source)
         siblings = sibling_source_ids(db, source)
+        # Vigencia por anos (Configuracion › Inteligencia): lo publicado fuera del rango no entra.
+        from . import signal_window
+
+        findings_data, out_of_window = signal_window.filter_items(db, source, findings_data)
+        if out_of_window:
+            scan_progress.note("window", dropped=out_of_window)
         for data in findings_data:
             row = data["title"]
             # La huella se calcula sobre la fila original: estable entre corridas

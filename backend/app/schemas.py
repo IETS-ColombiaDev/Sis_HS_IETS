@@ -852,6 +852,8 @@ class TechnologyOut(BaseModel):
     raw_origin: str = ""
     # URL mas especifica de la senal (propia, del hallazgo o del crudo).
     signal_url: str = ""
+    # URL de la fuente en el catalogo (la «fuente original» de la senal).
+    source_url: str = ""
     legacy: bool | None = False
     # Tipo de enlace de la senal (RF-001): exacto | consulta | sin_enlace, y evidencia de captura.
     link_type: str = ""

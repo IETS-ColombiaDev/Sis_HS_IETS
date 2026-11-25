@@ -31,6 +31,7 @@ import ModuleHeader from "../components/ModuleHeader";
 import InfoTip, { TermLabel } from "../components/InfoTip";
 import ClampText from "../components/ClampText";
 import StrategyGraph from "../components/StrategyGraph";
+import AnalyticsInsights from "../components/AnalyticsInsights";
 import { PERM, TECH_STATUS_LABELS } from "../constants/methodology";
 import "./dashboards.css";
 
@@ -1721,6 +1722,8 @@ export default function Dashboards() {
                 />
               )}
             </div>
+
+            <AnalyticsInsights toast={toast} />
 
             <Card padding={18} style={{ marginTop: 14 }}>
               <SectionTitle hint={HELP.embudo}>Embudo del ciclo</SectionTitle>

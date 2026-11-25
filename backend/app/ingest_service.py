@@ -585,6 +585,12 @@ def persist_record(
                     strategy_service.update_development_phase(db, tech, record.development_phase)
             return raw, False
 
+    from . import signal_window
+
+    if not signal_window.record_allowed(db, source, record.published_date, record.fda_approval_date, record.ema_approval_date):
+        # Fuera de la vigencia por anos: el registro crudo queda, la senal no entra a la bandeja.
+        return raw, False
+
     content_hash = record.content_hash(connector)
     existing = (
         db.query(Finding)

@@ -1127,3 +1127,42 @@ class SearchKnowledge(Base):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_visit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_signal_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SignalKnowledge(Base):
+    """Base de conocimiento de senales: un documento por tecnologia capturada.
+
+    Es la memoria con la que el sistema aprende: guarda el texto de cada senal,
+    de donde salio (la primera busqueda historica o una vigilancia posterior) y
+    que decidio el equipo sobre ella (clasificada con su cluster y tipologia, o
+    descartada con su motivo). Con ella se buscan senales parecidas para sugerir
+    clasificaciones y avisar de un probable descarte (ver `intelligence`).
+
+    No pertenece a un ciclo. Vive en la base del sistema, que es la que se copia
+    a Firestore. Se reconstruye entera desde `technologies`: nunca es la unica
+    copia de un dato.
+    """
+
+    __tablename__ = "signal_knowledge"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    technology_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    finding_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    # historica (primera busqueda) | vigilancia (senales posteriores) | postulacion
+    origin: Mapped[str] = mapped_column(String(20), default="vigilancia", index=True)
+    name: Mapped[str] = mapped_column(String(400), default="")
+    text: Mapped[str] = mapped_column(Text, default="")
+    terms: Mapped[list | None] = mapped_column(JSONType, default=list)
+    year: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    cluster_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tech_type_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    condition: Mapped[str] = mapped_column(String(20), default="")
+    # pendiente | clasificada | descartada
+    decision: Mapped[str] = mapped_column(String(20), default="pendiente", index=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    url: Mapped[str] = mapped_column(String(1024), default="")
+    captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # `updated_at` de la tecnologia cuando se indexo: si cambia, se reindexa.
+    source_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    indexed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

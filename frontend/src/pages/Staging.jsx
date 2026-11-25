@@ -14,6 +14,7 @@ import Icon from "../components/Icon";
 import InfoTip, { TermLabel } from "../components/InfoTip";
 import Modal from "../components/Modal";
 import SignalOrigin from "../components/SignalOrigin";
+import ClassificationSuggestion from "../components/ClassificationSuggestion";
 import ManualReviewPanel from "../components/ManualReviewPanel";
 import NoiseCleanup from "../components/NoiseCleanup";
 import useManualReview from "../scan/useManualReview";
@@ -82,6 +83,7 @@ export default function Staging() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
+  const [suggestion, setSuggestion] = useState(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [result, setResult] = useState(null);
   const [view, setView] = useState("pendientes");
@@ -309,6 +311,7 @@ export default function Staging() {
   }, [techId, loading, invalidParam]);
 
   const openEdit = (item, { readOnly = false } = {}) => {
+    setSuggestion(null);
     handledLink.current = item.id;
     setTechId(item.id);
     setEditing({
@@ -324,11 +327,14 @@ export default function Staging() {
     setSuggesting(true);
     try {
       const { data } = await api.post(`/technologies/${editing.id}/suggest-classification`);
+      setSuggestion(data);
       setEditing((prev) => ({
         ...prev,
         cluster_id: data.cluster_id || prev.cluster_id,
         tech_type_id: data.tech_type_id || prev.tech_type_id,
-        suggested_cluster_reason: [data.cluster_reason, data.tech_type_reason].filter(Boolean).join(" · "),
+        // La condición solo se propone si el evaluador aún no la eligió.
+        condition: prev.condition || data.condition || "",
+        suggested_cluster_reason: "",
       }));
       if (!data.cluster_id && !data.tech_type_id) {
         toast.info("El clasificador no encontró evidencia suficiente. Clasifique manualmente.");
@@ -1052,11 +1058,12 @@ export default function Staging() {
               >
                 <Icon name="pulse" size={15} /> Sugerir clasificación
               </HintButton>
-              {editing.suggested_cluster_reason && (
+              {editing.suggested_cluster_reason && !suggestion && (
                 <div style={{ fontSize: 12, color: "#64748B", marginTop: 6 }}>
                   {editing.suggested_cluster_reason}
                 </div>
               )}
+              <ClassificationSuggestion data={suggestion} />
             </div>
 
             <Input

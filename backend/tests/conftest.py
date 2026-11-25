@@ -62,6 +62,20 @@ def _hermetic_link_auto_resolve(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _hermetic_intelligence(monkeypatch):
+    """La sugerencia de clasificacion y la analitica no consultan a la IA en red durante las pruebas.
+
+    La prueba que cubre la IA vuelve a encender `intelligence.ai_available` y simula `ai_service.generate`.
+    """
+    from app import intelligence
+
+    monkeypatch.setattr(intelligence, "ai_available", lambda: False)
+    intelligence._invalidate()
+    yield
+    intelligence._invalidate()
+
+
+@pytest.fixture(autouse=True)
 def _hermetic_web_search(monkeypatch):
     """Los buscadores (Yahoo, Bing, DuckDuckGo) no se consultan en red durante las pruebas.
 

@@ -52,6 +52,7 @@ from .routers import (
     review_portal,
     scan,
     search_knowledge as search_knowledge_router,
+    intelligence as intelligence_router,
     screening,
     sources,
     strategy,
@@ -503,6 +504,7 @@ ROUTERS = (
     strategy,
     public_catalog,
     search_knowledge_router,
+    intelligence_router,
 )
 
 for r in ROUTERS:

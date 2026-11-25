@@ -5,7 +5,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.3.1 · actualizada el 25 de noviembre de 2026 (II seguimiento del Módulo 0: bandeja que abre siempre, señales que se ubican solas y enlaces a la ficha de los registros oficiales) |
+| **Versión del sistema** | 7.4.0 · actualizada el 25 de noviembre de 2026 (inteligencia del sistema: base de conocimiento de señales, sugerencia que aprende, calibración, marco analítico con IA y vigencia por año) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
@@ -811,10 +811,19 @@ Las señales/tecnologías **recién capturadas** esperan aquí **sin ciclo**. Us
 ### 10.3 Clasificar una señal (paso a paso)
 
 1. Pulse la fila o **Clasificar**.  
-2. Revise título, fuente, resumen, enlace (botón **↗ Abrir la fuente original**).  
-3. (Recomendado) **Sugerir clasificación**: la IA/reglas proponen clúster, tipología y condición con motivo.  
-   - Si no hay evidencia: “Clasifique manualmente”.  
-   - Si hay sugerencia: **revísela**; no es decisión final hasta guardar.  
+2. Revise título, fuente, resumen, enlace (botón **↗ Abrir la fuente original**).
+   - El recuadro **Direcciones de la señal** escribe completas las tres direcciones, cada una con (Copiar):
+     - **URL exacta de captura**: la ficha, noticia o registro donde está la señal. Si la fuente no da enlace por ítem, es la dirección que abre la página con la señal resaltada.
+     - **Página consultada**: el listado, buscador o canal que el sistema recorrió para encontrarla.
+     - **Fuente original**: la dirección de la fuente en el catálogo.
+   - Debajo aparece la fecha y hora de captura.
+3. (Recomendado) **Sugerir clasificación**: propone clúster, tipología y condición, cada uno con su **confianza** y de dónde sale:
+   - **Reglas del catálogo**: palabras clave, CIE-10 y MeSH de los clústeres y tipologías.
+   - **Aprendido de clasificaciones anteriores**: señales parecidas que el equipo ya clasificó. (Ver las señales parecidas) las lista con su parecido.
+   - **IA**: si está encendida, arbitra viendo esos mismos ejemplos.
+   - Si la señal se parece a otras que el equipo **descartó**, un aviso amarillo lo dice con el motivo de aquel descarte.
+   - Si no hay evidencia: “Clasifique manualmente”.
+   - La sugerencia **no es decisión final hasta guardar**. Lo que usted guarda es de lo que el sistema aprende.
 4. Complete o corrija:
    - Nombre comercial
    - DCI / INN (mejora desduplicación e INVIMA)
@@ -1307,6 +1316,12 @@ Solo el autor o un superadmin edita/elimina.
 
 ### 20.1 Bloques principales
 
+0. **Marco analítico del sistema**: cuatro preguntas sobre los datos de todo el sistema (no solo del ciclo):
+   - **Descriptivo** (¿qué pasa?): señales capturadas, por clasificar, captura de 30 días y clúster con más señales.
+   - **Diagnóstico** (¿por qué?): porcentaje de descarte, enlaces exactos, fuentes sin señales, antigüedad de la bandeja y fuentes con mucho ruido.
+   - **Predictivo** (¿qué puede pasar?): tendencia de la captura, tiempo estimado para evacuar la bandeja y clústeres en crecimiento.
+   - **Prescriptivo** (¿qué hacer?): acciones concretas con enlace a la pantalla donde se atienden.
+   - Con la IA encendida, (Generar lectura con IA) redacta un resumen ejecutivo usando **solo esas cifras**. Se guarda para la siguiente visita. Sin IA, el marco funciona igual.
 1. **Embudo del ciclo** — capturadas → filtradas → priorizadas → evaluadas → publicadas.  
 2. **Por clúster** — distribución.  
 3. **TTM** — tiempo al mercado (umbrales configurables).  
@@ -1559,6 +1574,50 @@ El estado que había queda guardado como «Antes de una restauración»: si se e
 **Antes de un cambio delicado** (cargar una matriz nueva, depurar ruido, cerrar un ciclo) pulse **Fijar el estado actual**.
 
 **Si aparece «Copia bloqueada».** El sistema detectó que la base del servidor tiene menos datos que la copia guardada y no la sobrescribió. No se perdió nada: avise a TI. Lo normal es restaurar la copia actual desde este mismo panel. Si TI confirma que la base del servidor es la correcta, **Publicar de todos modos** (pide escribir `PUBLICAR`) la sube y deja la copia guardada como punto de recuperación.
+
+---
+
+### 25.9 Inteligencia
+
+Pestaña **Inteligencia**. La consulta cualquier perfil; la cambia quien administra la configuración. Todo cambio queda en bitácora.
+
+**Base de conocimiento de señales.** Es la memoria del sistema: un documento por señal con su texto, su año, su origen y lo que el equipo decidió.
+
+- **Primera búsqueda histórica** y **vigilancias posteriores**: lo capturado hasta la línea base es histórico; lo que llega después, posterior. (Fijar línea base hoy) mueve ese corte.
+- Se actualiza sola. (Reconstruir) la rehace desde cero; (Descargar base) la entrega en un archivo.
+- (Buscar señales parecidas a un texto) muestra qué hay en la base y qué se decidió.
+- Sirve a todos los ciclos y se respalda con la base del sistema (la que se copia a Firestore).
+
+**Clasificador que aprende.**
+
+| Parámetro | Para qué sirve | De fábrica |
+|---|---|---|
+| Aprender de las clasificaciones | Usa las señales parecidas ya clasificadas o descartadas | Encendido |
+| Cuándo consultar a la IA | Nunca, solo si hay duda, o siempre | Solo si hay duda |
+| Señales parecidas que votan | Cuántas clasificaciones anteriores se consultan | 7 |
+| Parecido mínimo para votar | Por debajo, una señal no cuenta | 0,12 |
+| Confianza mínima del aprendizaje | Desde aquí el aprendizaje pesa más que las reglas | 0,55 |
+| Precisión objetivo | Lo que la calibración busca garantizar | 0,80 |
+| Parecido para avisar de un descarte | Dispara el aviso amarillo | 0,60 |
+| Ejemplos que ve la IA | Clasificaciones del equipo incluidas en la consulta | 6 |
+
+El sistema empieza a aprender con 5 señales clasificadas. Antes sugiere solo con las reglas del catálogo.
+
+**Calibración.** (Calibrar ahora) predice cada señal ya clasificada sin mirarla y compara con lo que decidió el equipo. Muestra el acierto de las reglas, del aprendizaje y del combinado, y lo compara con decir siempre el clúster más frecuente. Si cumple la precisión objetivo, ajusta sola los parámetros. Necesita 20 señales clasificadas en al menos dos clústeres; si no las hay, lo dice y no cambia nada. Con la calibración automática encendida se repite cada 25 clasificaciones nuevas.
+
+**Sugerencias confirmadas por el equipo.** Cuántas sugerencias terminó confirmando el evaluador, por método. Si baja, recalibre o ajuste las palabras clave de los clústeres.
+
+**Analítica.** Enciende o apaga la lectura con IA y fija los umbrales de las alertas: ruido por fuente, antigüedad de la bandeja y concentración en un clúster.
+
+**Prompts de la IA.** Instrucciones de la clasificación y de la analítica. Un campo vacío usa el texto de fábrica.
+
+**Vigencia de las señales por año.** Por defecto entran las señales de todos los años.
+
+1. **Vigencia general**: escriba (Desde el año) y (Hasta el año) y guarde. Vale para todas las fuentes sin vigencia propia. (Todos los años) la quita.
+2. **Vigencia propia**: marque fuentes en la tabla, escriba su rango y pulse (Aplicar a N fuentes). (Volver a la vigencia general) se la quita.
+3. **Revisar lo ya capturado**: (Revisar la bandeja) dice cuántas señales quedan fuera, por fuente, sin cambiar nada. (Pasar a Descartadas) las mueve con el motivo «Fuera de la vigencia configurada». Se restauran desde Bandeja de entrada › Descartadas.
+
+El año sale de la fecha de publicación de la señal. Una señal sin fecha se conserva, salvo que desmarque (Conservar las señales sin fecha de publicación). La vigencia rige para las capturas siguientes: lo publicado fuera del rango no entra a la bandeja.
 
 ---
 

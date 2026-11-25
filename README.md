@@ -25,7 +25,7 @@ Inspirado en el modelo operativo del [NIHR Innovation Observatory](https://io.ni
 ## Nombre y descripción del proyecto
 
 **Sistema de Escaneo de Horizonte del IETS (Sis_HS_IETS)**  
-**Versión actual:** `7.3.1` (25 de noviembre de 2026)
+**Versión actual:** `7.4.0` (25 de noviembre de 2026)
 
 El sistema automatiza el ciclo de vida del monitoreo proactivo y reactivo de tecnologías sanitarias (medicamentos, dispositivos médicos, procedimientos, biológicos, salud digital) antes o durante su llegada al mercado y al Sistema General de Seguridad Social en Salud (SGSSS) de Colombia.
 
@@ -42,6 +42,9 @@ El sistema automatiza el ciclo de vida del monitoreo proactivo y reactivo de tec
 - **Priorización metodológica oficial %P:** Evaluación sobre 6 criterios binarios ponderados (P1 a P6) según el Manual Metodológico del IETS, calculando el indicador porcentual oficial `%P = (suma / 6) * 100` y asignando la clasificación en tres franjas (Priorizada ≥ 60 %, Bajo vigilancia 33–59 %, No priorizada < 33 %).
 - **Evaluación temprana y revisión colegiada:** Elaboración de fichas técnicas, informes rápidos o Mini-HTA con control de versiones, revisión por pares internos y externos mediante token temporal sin cuenta requerida, y firma de COI previa.
 - **Diseminación institucional:** Generación de expedientes, fichas públicas y boletines consolidados en **PDF nativo** mediante ReportLab, tablero estratégico con grafo interactivo de gobernanza, y exportación masiva de paquetes ZIP de diseminación.
+- **Inteligencia del sistema (7.4.0):** Una **base de conocimiento de señales** guarda cada señal capturada con su origen (primera búsqueda histórica o vigilancia posterior), su año y la decisión del equipo (clasificada o descartada con su motivo). Con ella, (Sugerir clasificación) combina las reglas del catálogo con lo que el equipo ya clasificó y, si la IA está encendida, con su arbitraje sobre esos mismos ejemplos; siempre muestra confianza y evidencia, y avisa cuando una señal se parece a otras descartadas. La **calibración** mide con los datos reales cuánto acierta cada método y ajusta los parámetros. Funciona con la IA apagada.
+- **Marco analítico con IA (7.4.0):** Analítica muestra cuatro lentes sobre todo el sistema (descriptivo, diagnóstico, predictivo y prescriptivo) calculados con reglas, y una lectura ejecutiva que la IA redacta usando solo esas cifras.
+- **Vigencia de las señales por año (7.4.0):** Por defecto entran todos los años. El rango se fija de manera general o para fuentes específicas, se revisa qué señales de la bandeja quedan fuera y, si se confirma, pasan a Descartadas (reversible).
 - **Gobernanza y auditoría:** Registro inmutable append-only con triggers/permisos a nivel de motor de BD y middleware HTTP que audita cada mutación asociando usuario, IP, ruta, payload anterior y nuevo.
 - **Persistencia en Firestore sin pérdida:** La base SQLite se copia a Firestore por generaciones (una subida cortada no corrompe la copia), conserva la copia anterior como respaldo, no sube nada hasta haber leído la nube al arrancar y bloquea subir una base mucho más pequeña que la guardada.
 
@@ -330,7 +333,7 @@ cd backend
 .\.venv\Scripts\Activate.ps1
 python -m pytest -q
 ```
-*Cubre motores de priorización, máquinas de estados de ciclos, desduplicación difusa, cruce INVIMA, conectores de ingesta, auditoría, RBAC, persistencia en Firestore, avance de la vigilancia, enlaces de señales, buscador, matriz por enlace, bandeja Legacy protección de datos, vigilancia reanudable, base de conocimiento de búsqueda y II seguimiento del Módulo 0 (930 pruebas al 25-11-2026). Las pruebas de la matriz por enlace usan el Excel de `backend/tests/fixtures/matriz_fuentes_escaneo_eh.xlsx`.*
+*Cubre motores de priorización, máquinas de estados de ciclos, desduplicación difusa, cruce INVIMA, conectores de ingesta, auditoría, RBAC, persistencia en Firestore, avance de la vigilancia, enlaces de señales, buscador, matriz por enlace, bandeja Legacy protección de datos, vigilancia reanudable, base de conocimiento de búsqueda, II seguimiento del Módulo 0 e inteligencia del sistema (970 pruebas al 25-11-2026). Las pruebas de la matriz por enlace usan el Excel de `backend/tests/fixtures/matriz_fuentes_escaneo_eh.xlsx`.*
 
 #### Pruebas de navegador de extremo a extremo (Playwright)
 ```powershell
@@ -357,7 +360,7 @@ Sis_HS_IETS/
 ├── backend/
 │   ├── alembic/                    # Control de versiones de esquema con Alembic
 │   │   ├── env.py                  # Configuración del entorno de migración
-│   │   └── versions/               # Revisiones versionadas (0001 a 0006)
+│   │   └── versions/               # Revisiones versionadas (0001 a 0009)
 │   ├── app/
 │   │   ├── main.py                 # Punto de entrada FastAPI, middlewares y montaje de SPA
 │   │   ├── config.py               # Settings validados mediante Pydantic
@@ -445,6 +448,27 @@ Sis_HS_IETS/
 ├── NOTAS_DESARROLLADOR.md          # Respuesta por requerimiento al III seguimiento
 └── README.md                       # Documentación técnica principal del proyecto
 ```
+
+---
+
+## Inteligencia del sistema
+
+Todo se parametriza en **Configuración › Inteligencia** y queda en bitácora. Nada decide por el evaluador: sugiere, explica y aprende de lo que él confirma.
+
+| Pieza | Qué hace | Dónde está |
+|---|---|---|
+| Base de conocimiento de señales | Un documento por señal con su texto, origen (`historica`, `vigilancia` o `postulacion`), año y decisión del equipo. Se sincroniza sola desde `technologies` y se puede reconstruir. Vive en la base del sistema, que es la que se copia a Firestore. | `backend/app/intelligence.py`, tabla `signal_knowledge` (migración `0009`) |
+| Recuperación | Señales parecidas por TF-IDF y coseno, en memoria. Sin modelo externo: corre en el plan gratuito de Render y con la IA apagada. | `intelligence.similar` |
+| Clasificador que aprende | Reglas del catálogo + voto de las señales parecidas ya clasificadas + arbitraje opcional de la IA con esos ejemplos a la vista. Devuelve confianza, método y evidencia; avisa de un probable descarte. | `intelligence.suggest`, `POST /api/technologies/{id}/suggest-classification` |
+| Calibración | Validación dejando una fuera sobre lo ya clasificado. Elige el número de señales parecidas y la menor confianza que cumple la precisión objetivo, y la compara con decir siempre el clúster más frecuente. Automática cada cierto número de clasificaciones nuevas. | `intelligence.calibrate` |
+| Marco analítico | Cuatro lentes (descriptivo, diagnóstico, predictivo, prescriptivo) calculados con reglas, más la lectura que redacta la IA solo con esas cifras (se guarda para no gastar en cada visita). | `backend/app/analytics_insights.py` |
+| Vigencia por año | Rango de años de publicación, general o por fuente. Filtra la captura y permite revisar y descartar (reversible) lo ya capturado. | `backend/app/signal_window.py` |
+
+**API** (`/api/intelligence`): `GET /status`, `PUT /config`, `POST /config/reset`, `POST /reindex`, `POST /baseline`, `POST /calibrate`, `GET /knowledge?q=`, `GET /knowledge/export`, `GET /insights`, `POST /insights/narrative`, `GET|PUT /window`, `POST /window/preview`, `POST /window/apply`. Consultar lo hace cualquier perfil; cambiar, solo quien administra la configuración.
+
+**Parámetros** (valor de fábrica): aprender de las clasificaciones (sí), cuándo consultar a la IA (`desacuerdo`), señales parecidas que votan (7), parecido mínimo (0,12), confianza mínima (0,55), precisión objetivo (0,80), parecido para avisar de un descarte (0,60), ejemplos que ve la IA (6), calibración automática (sí, cada 25 clasificaciones), lectura analítica con IA (sí, se conserva 12 horas), alertas de ruido (0,50), antigüedad (30 días) y concentración (0,40), y los cuatro prompts (clasificación y analítica).
+
+**Límites conocidos:** el clasificador empieza a aprender con 5 señales clasificadas y la calibración exige 20, en al menos dos clústeres con 3 ejemplos cada uno; antes de eso manda el catálogo y el sistema lo dice. El parecido es léxico (palabras), no semántico: dos textos en idiomas distintos se parecen poco.
 
 ---
 

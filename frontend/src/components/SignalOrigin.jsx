@@ -4,6 +4,7 @@ import { useToast } from "./Toast";
 import Button from "./Button";
 import Icon from "./Icon";
 import SignalLinkInfo from "./SignalLinkInfo";
+import SignalUrls from "./SignalUrls";
 import "./signal-origin.css";
 
 const VERDICT = {
@@ -136,6 +137,15 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
         linkStatus={tech.link_status}
         queryUrl={tech.query_url}
         evidence={tech.evidence}
+      />
+      <SignalUrls
+        url={url}
+        linkType={tech.link_type}
+        queryUrl={tech.query_url}
+        sourceUrl={tech.source_url}
+        sourceTitle={tech.source_title}
+        evidence={tech.evidence}
+        toast={toast}
       />
       <div className="so-actions">
         {url ? (

@@ -167,7 +167,7 @@ def test_signals_are_located_without_pressing_any_button(pages):
     missing = _signal(pages, sid, "Tecnologia que no esta en la pagina")
 
     # Apagado (pruebas y LINK_AUTO_RESOLVE=false): no hace nada.
-    assert worker.guardian_tick() == "" and pages.fetches == []
+    assert worker.guardian_tick() != "ubicando" and pages.fetches == []
 
     settings.link_auto_resolve = True
     assert worker.guardian_tick() == "ubicando"
@@ -183,7 +183,7 @@ def test_signals_are_located_without_pressing_any_button(pages):
         assert log.new_value["ejecutado_por"] == link_resolver.AUTO_ACTOR
 
     # Cada senal se intenta una sola vez: la que quedo sin ubicar no se descarga de nuevo sola.
-    assert worker.guardian_tick() == ""
+    assert worker.guardian_tick() != "ubicando"
     assert pages.fetches == [[QUERY]]
     # El boton (Ubicar señales exactas) si la reintenta.
     with pages.db() as db:
@@ -245,7 +245,7 @@ def test_a_page_that_does_not_answer_is_reported_and_not_retried_alone(pages):
     with pages.db() as db:
         resolved = db.get(Finding, fid).evidence["resolved"]
         assert resolved["method"] == "sin_ubicar" and "no respondió" in resolved["reason"]
-    assert worker.guardian_tick() == ""
+    assert worker.guardian_tick() != "ubicando"
     assert pages.fetches == [[gone]]
 
 

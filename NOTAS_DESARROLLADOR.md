@@ -711,3 +711,83 @@ De 50 señales con enlace exacto tomadas al azar después de las correcciones:
 2. Al arrancar se corrigen solos los enlaces de la FDA y de Health Canada (queda en bitácora).
 3. Unos segundos después, con el sistema libre, se ubican solas las señales de «página de consulta».
 4. Repetir la prueba aleatoria desde la Bandeja de entrada: el icono de lupa de la fila abre la página con la señal resaltada.
+
+## Inteligencia del sistema: base de conocimiento de señales, clasificador que aprende y marco analítico (25-11-2026, versión 7.4.0)
+
+**Estado:** CUMPLIDO PARCIAL, 25-11-2026. Probado en local (suite de backend, pruebas de navegador y verificación sobre una copia de la base real: 656 señales). La consulta a la IA se probó con respuestas simuladas: la llave del proveedor en el equipo de desarrollo está vencida (HTTP 401), así que falta verla con el proveedor real en el sistema desplegado.
+
+### 1. Qué se pidió y cómo se entendió
+
+| Pedido | Cómo quedó |
+|---|---|
+| Al clasificar, mostrar la URL exacta de lo capturado, conservando la señal en la fuente y la fuente original | Recuadro (Direcciones de la señal) en Clasificar: URL exacta de captura, página consultada y fuente original, escritas completas y con (Copiar) |
+| Parametrizar el «ciclo de vida» de las fuentes por rango de años, general o por fuente, con todos los años por defecto | **Vigencia de las señales por año** (`signal_window.py`). Se interpretó como el rango de años de publicación que el sistema acepta. Si el equipo se refería a otra cosa (por ejemplo, la vida útil de la fuente en el catálogo), hay que ajustarlo |
+| Un RAG en Firestore con la primera búsqueda histórica y las señales posteriores | Tabla `signal_knowledge` en la base del sistema, que es la que se copia a Firestore. Distingue `historica`, `vigilancia` y `postulacion` |
+| Actualizar el prompt | Prompt de captura (URL exacta, fecha de publicación, exclusión de lo ya establecido) y prompts nuevos de clasificación y de analítica, editables |
+| Un modelo que aprenda de las clasificaciones y sugiera mejor | Clasificador de reglas + parecido con lo ya clasificado + arbitraje de la IA con esos ejemplos |
+| IA en la analítica y un marco analítico | Cuatro lentes calculados con reglas y lectura ejecutiva de la IA sobre esas cifras |
+| Que se calibre | Validación dejando una fuera, a demanda y automática |
+| Parametrizable y presente en todo el sistema | Pestaña Configuración › Inteligencia; aparece en Bandeja de entrada (Clasificar), Analítica, captura y vigilante de fondo |
+
+### 2. Base de conocimiento de señales
+
+- `SignalKnowledge` (migración `0009`, solo crea la tabla). Un documento por tecnología no fusionada: nombre, texto, términos, año, origen, clúster, tipología, condición, decisión (`pendiente`, `clasificada`, `descartada`) y motivo del descarte.
+- `intelligence.sync` compara `technologies.updated_at` con lo indexado y solo rehace lo que cambió. La llaman la sugerencia, la analítica y el vigilante de la cola cuando el sistema está libre. No hay ganchos en cada escritura: si la sincronización falla, la tabla se reconstruye entera con (Reconstruir).
+- **Origen.** La primera sincronización fija la línea base (`intelligence.baseline_until`): lo capturado hasta ese momento es `historica`. (Fijar línea base hoy) la mueve.
+- **Por qué no una colección aparte en Firestore.** Firestore guarda la copia de la base SQLite. Una colección aparte sería una segunda fuente de verdad que habría que mantener sincronizada, y un servidor local no debe escribir en la colección de producción. La tabla viaja con la copia de siempre y se puede reconstruir.
+- **Recuperación.** TF-IDF con coseno, en memoria, reconstruido cuando cambia la tabla. Con 656 señales el índice se arma en 0,3 s y una consulta tarda centésimas. No usa vectores de un modelo externo: no cabe en 512 MB ni funciona con la IA apagada. El parecido es léxico.
+
+### 3. Clasificador
+
+`intelligence.suggest` (lo usa `POST /api/technologies/{id}/suggest-classification`; el contrato anterior se conserva y se amplía):
+
+1. **Reglas** del catálogo (`classification.py`, sin cambios).
+2. **Aprendizaje**: las `neighbors` señales clasificadas más parecidas votan con su parecido. Confianza = parte del voto del ganador × fuerza del parecido más alto.
+3. **Combinación**: si coinciden, sube la confianza; si el aprendizaje supera `min_confidence`, gana; si no, mandan las reglas, con la confianza que les midió la calibración.
+4. **IA** según `ai_mode`: ve la señal, los catálogos, los ejemplos del equipo y las dos propuestas. Solo puede elegir nombres del catálogo. Una respuesta fuera del catálogo, sin JSON o con un error del proveedor se descarta.
+5. **Aviso de descarte**: si se parece a señales descartadas por encima de `discard_similarity`.
+
+Cada sugerencia queda en bitácora (`intelligence:suggest`); con eso `intelligence.acceptance` mide cuántas confirmó el evaluador.
+
+**Hallazgo durante la verificación.** El proveedor devolvió `[Error MiniMax HTTP 401: {...}]`. El cuerpo del error es JSON y se tomaba como respuesta válida: la sugerencia decía «con IA» sin haberla usado. Se corrigió y tiene prueba.
+
+### 4. Calibración
+
+`intelligence.calibrate`: predice cada señal clasificada sin verla, con 3, 5, 7 y 11 vecinos. Elige el mejor y la menor confianza (desde 0,30) que cumple `target_precision` con al menos 5 casos. Reporta el acierto de las reglas, del aprendizaje y del combinado, la tabla de confianza frente a acierto real y la referencia de decir siempre el clúster más frecuente.
+
+No calibra con menos de 20 señales clasificadas ni si casi todas están en un clúster. **Sobre la copia de la base real** hay 24 clasificadas, 21 de ellas en Cáncer: la calibración responde «datos insuficientes» y no cambia parámetros. Es el comportamiento correcto; la primera versión elegía una confianza mínima de 5 % con esos datos y se corrigió.
+
+### 5. Marco analítico
+
+`analytics_insights.py`. `facts` calcula las cifras; `framework` las convierte en hallazgos por lente; `narrative` pide a la IA la lectura con esas cifras y la guarda (`intelligence.analytics_narrative`). La lectura nunca se genera sola al abrir la pantalla: alguien pulsa el botón.
+
+### 6. Vigencia por año
+
+`signal_window.py`, clave `signals.window` en `app_meta` (general y por fuente). No se agregaron columnas a `sources`.
+
+- Captura por página: `scraper.py` filtra los candidatos antes de guardar.
+- Captura por conector: `ingest_service.persist_record` no crea la señal; el registro crudo queda y entra si después se amplía la vigencia.
+- Sobre lo capturado: `preview` y `apply`. El descarte usa el mismo mecanismo de la bandeja (`staging:discard`), así que se ve en Descartadas y se restaura.
+
+Sobre la copia real, de 638 señales en la bandeja: 380 de 2026, 20 de 2027 (fechas futuras de ensayos), 33 anteriores y 205 sin fecha. Con vigencia «desde 2026» quedarían fuera esas 33.
+
+### 7. Pruebas
+
+- **Backend:** 970 aprobadas y 1 omitida. 40 son nuevas (`test_inteligencia.py`): base de conocimiento, parecido, sugerencia con y sin ejemplos, IA simulada (acierto, respuesta fuera del catálogo, error del proveedor), calibración, mantenimiento de fondo, vigencia por año, API y marco analítico. Se ajustaron tres aserciones de `test_ii_seguimiento_modulo0.py`: el vigilante ahora también sincroniza la base de conocimiento.
+- **Navegador (E2E):** 114 pruebas, 5 nuevas (`inteligencia.spec.js`). Se corrieron en tres partes por el límite de tiempo del comando, cada una con la base vacía: 39, 33 y 39 aprobadas. Total: 111 aprobadas, 3 omitidas (se saltan solas según el estado de la base) y ninguna fallida.
+- **Verificación real** sobre la copia de la base, con la IA apagada: estado en 0,3 s la primera vez y 0,02 s después; sugerencia en 0,05 s; marco analítico en 0,05 s.
+
+### 8. Al desplegar
+
+1. Migración `0009`: solo crea `signal_knowledge`.
+2. A los pocos segundos de arrancar, con el sistema libre, el vigilante llena la base de conocimiento. Lo capturado hasta ese momento queda como primera búsqueda histórica.
+3. Revisar Configuración › Inteligencia: totales de la base y estado de la IA.
+4. Probar (Sugerir clasificación) en una señal y (Generar lectura con IA) en Analítica: es la primera vez que corren con el proveedor real.
+
+### 9. Pendientes y límites
+
+- La IA real no se pudo probar en desarrollo (llave vencida).
+- El clasificador aprende poco mientras haya pocas clasificaciones y casi todas en un clúster. Mejora sola a medida que el equipo clasifica.
+- El parecido es léxico: no relaciona sinónimos ni idiomas distintos. Pasar a vectores semánticos exige un servicio de embeddings o más memoria que la del plan gratuito.
+- 205 señales no tienen fecha de publicación: la vigencia no las puede juzgar y por defecto las conserva.
+- El prompt de captura cambió en su texto de fábrica. Si en producción hay un prompt propio guardado, ese sigue mandando hasta que alguien pulse (Restaurar) en Prompts de vigilancia.

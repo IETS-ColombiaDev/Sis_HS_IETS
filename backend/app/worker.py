@@ -215,7 +215,10 @@ def guardian_tick() -> str:
                 return "ubicando"
         except Exception:  # noqa: BLE001
             log.exception("Ubicacion automatica de senales")
-        return ""
+        # Y se pone al dia la base de conocimiento de senales (y su calibracion).
+        from . import intelligence
+
+        return intelligence.auto_maintain(SessionLocal)
     _guardian_resumes += 1
     log.warning("Vigilante: hay cola de vigilancia sin atender; se reanuda el drenaje.")
     kick()
