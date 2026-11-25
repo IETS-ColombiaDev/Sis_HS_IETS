@@ -325,6 +325,12 @@ def update_web_search(
             new_value={k: cfg.get(k) for k in changed},
         )
         db.commit()
+    # Motores, llave o servidor de busqueda nuevos: se prueban en la proxima
+    # vigilancia, sin esperar a que venza el plazo de "dominio ya buscado".
+    if {"engines", "searxng_url", "sitemap_fallback"} & set(changed) or "brave_api_key" in payload:
+        from .. import search_knowledge
+
+        search_knowledge.clear_searched(db)
     return _search_out(cfg, db)
 
 

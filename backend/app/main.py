@@ -51,6 +51,7 @@ from .routers import (
     recommendations,
     review_portal,
     scan,
+    search_knowledge as search_knowledge_router,
     screening,
     sources,
     strategy,
@@ -248,6 +249,20 @@ def backfill_signal_links() -> None:
         db.close()
 
 
+def seed_search_knowledge() -> None:
+    """Carga el paquete de la base de conocimiento de busqueda que viaja con el codigo."""
+    from . import search_knowledge
+
+    db = SessionLocal()
+    try:
+        search_knowledge.seed_from_package(db)
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        log.warning("No se pudo cargar el paquete de la base de busqueda: %s", exc)
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     assert_safe_configuration()
@@ -312,6 +327,7 @@ async def lifespan(app: FastAPI):
         seed_official_cycles()
         seed_api_sources()
         backfill_signal_links()
+        seed_search_knowledge()
     load_runtime_config()
 
     from .settings_store import load_ingest_keys
@@ -327,7 +343,7 @@ async def lifespan(app: FastAPI):
             settings.ncbi_email = keys["ncbi_email"]
     finally:
         db.close()
-    from .worker import start_worker, stop_worker
+    from .worker import start_guardian, start_worker, stop_worker
 
     firebase_db.enable_autosync()
 
@@ -340,6 +356,8 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=_boot_push, name="firebase-boot-push", daemon=True).start()
     _recover_orphan_jobs()
     start_worker()
+    # Con o sin worker regular: si quedo cola de una corrida anterior, se reanuda sola.
+    start_guardian()
     yield
     # Primero se detiene la vigilancia: asi la copia final no compite con sus
     # escrituras y se lleva el ultimo estado.
@@ -479,6 +497,7 @@ ROUTERS = (
     review_portal,
     strategy,
     public_catalog,
+    search_knowledge_router,
 )
 
 for r in ROUTERS:

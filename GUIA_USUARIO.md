@@ -5,7 +5,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.2.0 · actualizada el 24 de noviembre de 2026 (protección de datos con puntos de recuperación, envío del boletín, buscador público avanzado) |
+| **Versión del sistema** | 7.3.0 · actualizada el 25 de noviembre de 2026 (vigilancia que se reanuda sola, base de conocimiento de búsqueda y respaldo por mapa del sitio) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
@@ -749,6 +749,10 @@ El **rango** sale de la variación de cada fuente. Medido sobre 4 corridas reale
 - **Esperando reintentos**: una fuente falló y se reintenta a la hora indicada.
 - **Una fuente «sin novedades hace X min»**: se cerrará sola al llegar al tiempo máximo por fuente.
 - En el servidor de Render (plan gratuito), mientras haya fuentes en cola, el propio servicio se mantiene despierto, aunque nadie tenga la página abierta.
+- **Si el servidor se reinicia o se suspende a mitad de una vigilancia**, un vigilante de la cola la reanuda sola a los pocos segundos de volver: no hay que relanzarla. La pantalla lo indica con el aviso «la cola la cuida un vigilante».
+- **Si una corrida vieja sigue marcada «en curso»**, pulse (Detener): cancela lo que quedaba en cola. Lo ya capturado se conserva.
+
+**Búsqueda web sin esperas.** La vigilancia ya no espera a los buscadores gratuitos, que bloquean las consultas hechas desde la nube. Primero visita las páginas de la **base de conocimiento de búsqueda** (ver 25.6); si faltan, lee el **mapa del sitio** de la propia fuente. En el detalle de cada fuente verá de dónde salieron los resultados: «base de conocimiento», «mapa del sitio» o el nombre del buscador.
 
 ### 9.7 Vista previa de URL
 
@@ -1137,7 +1141,7 @@ No use esta pantalla como sustituto de `/priorizacion`.
 
 ### 14.3 Reporte de enlaces por fuente
 
-Arriba de la lista pulse (Reporte de enlaces). Muestra, por fuente, cuántas señales tienen enlace exacto, cuántas solo página de consulta (con evidencia), cuántas no tienen enlace y cuántas no responden.
+Arriba de la lista está la tarjeta «Enlaces a la fuente original» con dos botones siempre visibles: (Ubicar señales exactas) y (Reporte de enlaces). Pulse (Reporte de enlaces). Muestra, por fuente, cuántas señales tienen enlace exacto, cuántas solo página de consulta (con evidencia), cuántas no tienen enlace y cuántas no responden.
 
 - (Clasificar señales): vuelve a clasificar todas las señales y guarda su evidencia de captura. No cambia ninguna URL. Queda en bitácora.
 - (Verificar enlaces): abre cada enlace en segundo plano y marca los que no responden o redirigen a la portada. Tarda unos minutos; el avance aparece en el mismo panel. Queda en bitácora.
@@ -1445,6 +1449,27 @@ En (Configuración) › (Parámetros de fuentes), sección (Criterios de búsque
 - Para ampliar el alcance marque la casilla y pulse (Guardar). No requiere cambios de código. Cada cambio queda en la bitácora con el valor anterior y el nuevo.
 - Las señales ya capturadas en categorías inactivas no se reclasifican ni se borran.
 - **Decisión pendiente del equipo técnico**: si Dispositivos implantables, Equipos biomédicos y Dispositivos de monitoreo se consideran parte de Dispositivos médicos (se activarían) o siguen inactivas.
+
+#### Base de conocimiento de búsqueda
+
+Al final de (Parámetros de fuentes). Son las páginas de cada fuente que ya se encontraron y que la vigilancia visita sin consultar buscadores. No pertenece a un ciclo: la usan todas las corridas y todos los ciclos, y se respalda junto con la base del sistema.
+
+| Elemento | Qué muestra o hace |
+|---|---|
+| Totales | Páginas guardadas, sitios, cuántas ya aportaron señales, cuántas están en pausa por no aportar y cuántas fuentes activas tienen páginas conocidas |
+| (Consultar la base) | Busca por texto en título, extracto, dirección o sitio. Cualquier perfil puede consultarla |
+| (Descargar paquete) | Baja toda la base en un archivo `base_busqueda_eh.json` |
+| (Cargar paquete) | Suma un paquete armado en otro equipo. Solo agrega o refuerza: nunca borra páginas ni baja sus cuentas |
+
+Cómo se mantiene sola:
+
+- Cada vigilancia anota si la página aportó señales. Las que aportan van primero en la siguiente corrida.
+- Una página que no aporta en 2 visitas deja de visitarse («Sin señal») y se vuelve a probar a los 45 días.
+- Lo que encuentre un buscador con llave o el mapa del sitio queda guardado aquí.
+
+Interruptores relacionados, en la misma pantalla: **Usar la base de conocimiento de búsqueda** y **Respaldo por mapa del sitio** (los dos encendidos por defecto), **Tiempo máximo de búsqueda por fuente** y **Días que la base cuenta como reciente**.
+
+**Llave de Brave Search (opcional).** La vigilancia funciona sin ella. Sirve para que el servidor descubra páginas nuevas por su cuenta: créela con una cuenta del IETS en el sitio de Brave Search API, péguela en esta pantalla y marque el motor «Brave Search API».
 
 #### Importar Excel
 

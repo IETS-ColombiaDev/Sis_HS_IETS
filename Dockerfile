@@ -11,7 +11,7 @@
 # el `worker` de ingesta (1 proceso con INGEST_WORKER_ENABLED=true). Ver
 # docker-compose.yml, deploy/docker-entrypoint.sh y DEPLOY.md.
 #
-#   docker build -t iets-horizonte:7.2.0 .
+#   docker build -t iets-horizonte:7.3.0 .
 # ============================================================================
 
 # --------------------------------------------------------------------------- #

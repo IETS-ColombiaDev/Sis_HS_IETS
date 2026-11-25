@@ -1785,6 +1785,32 @@ def _crawl_with_profile(db: Session, source: Source, landing_url: str, html: str
     return crawl
 
 
+def _note_search_pages(db: Session, source: Source, crawl: dict | None, findings_data: list[dict]) -> None:
+    """Anota en la base de conocimiento si cada pagina de busqueda visitada aporto senales.
+
+    La que no aporta deja de visitarse en las corridas siguientes; la que el sitio
+    ya no sirve (404, 410) cuenta como visita sin senal. En un punto de guardado:
+    un fallo aqui nunca deshace las senales recien capturadas.
+    """
+    if not isinstance(crawl, dict):
+        return
+    pages = [p for p in crawl.get("pages") or [] if p.get("role") == "busqueda" and p.get("url")]
+    gone = [
+        {"url": st.get("url"), "text": ""}
+        for st in crawl.get("steps") or []
+        if st.get("action") == "busqueda" and st.get("status") in {"http_404", "http_410"} and st.get("url")
+    ]
+    if not pages and not gone:
+        return
+    try:
+        from . import search_knowledge
+
+        with db.begin_nested():
+            search_knowledge.record_visits(db, source, pages + gone, findings_data, commit=False)
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).warning("No se pudo anotar la base de búsqueda de %s", source.title, exc_info=True)
+
+
 def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") -> ScrapeLog:
     """Ejecuta el escaneo de una fuente y persiste hallazgos nuevos."""
     # Reglas de horizonte vigentes (otro proceso pudo cambiarlas en Configuracion).
@@ -2109,6 +2135,7 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             except Exception:  # noqa: BLE001 - ubicar la senal nunca tumba la captura
                 logging.getLogger(__name__).warning("No se pudo ubicar la señal exacta en %s", source.title, exc_info=True)
 
+        _note_search_pages(db, source, crawl, findings_data)
         log.items_found = len(findings_data)
         log.items_new = new_count
         # Si el sitio no se pudo leer y las senales vienen de un respaldo, la

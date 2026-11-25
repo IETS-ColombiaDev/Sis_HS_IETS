@@ -25,7 +25,7 @@ Inspirado en el modelo operativo del [NIHR Innovation Observatory](https://io.ni
 ## Nombre y descripción del proyecto
 
 **Sistema de Escaneo de Horizonte del IETS (Sis_HS_IETS)**  
-**Versión actual:** `7.2.0` (24 de noviembre de 2026)
+**Versión actual:** `7.3.0` (25 de noviembre de 2026)
 
 El sistema automatiza el ciclo de vida del monitoreo proactivo y reactivo de tecnologías sanitarias (medicamentos, dispositivos médicos, procedimientos, biológicos, salud digital) antes o durante su llegada al mercado y al Sistema General de Seguridad Social en Salud (SGSSS) de Colombia.
 
@@ -188,6 +188,7 @@ El archivo de configuración principal se ubica en `backend/.env`. Copie `backen
 | `INGEST_WORKER_ENABLED` | `true` | Activa el hilo del trabajador en segundo plano para colas de ingesta y vigilancia programada. |
 | `INGEST_WORKER_INTERVAL_SECONDS` | `20` | Intervalo de sondeo del trabajador de ingesta en segundos. |
 | `INGEST_WORKER_FORCE` | `false` | Fuerza la activación del worker de ingesta incluso con motor SQLite. |
+| `INGEST_GUARDIAN` | *Automático* | Vigilante de la cola: reanuda una vigilancia que quedó a medias tras un reinicio y mantiene despierto el servicio mientras haya cola. Sin definir, corre con SQLite y un solo proceso (Render, equipo local). `true` o `false` lo fuerza o lo apaga. |
 | `RECAPTCHA_SECRET` | *Vacío* | Llave secreta de Google reCAPTCHA v3 para validación en backend del formulario `/postular`. |
 | `RECAPTCHA_SITE_KEY` | *Vacío* | Llave de sitio de Google reCAPTCHA v3 entregada al frontend. |
 | `RECAPTCHA_MIN_SCORE` | `0.5` | Puntaje mínimo de confianza (0.0 a 1.0) para admitir una postulación ciudadana. |
@@ -328,7 +329,7 @@ cd backend
 .\.venv\Scripts\Activate.ps1
 python -m pytest -q
 ```
-*Cubre motores de priorización, máquinas de estados de ciclos, desduplicación difusa, cruce INVIMA, conectores de ingesta, auditoría, RBAC, persistencia en Firestore, avance de la vigilancia, enlaces de señales, buscador, matriz por enlace, bandeja Legacy y protección de datos (871 pruebas al 24-11-2026). Las pruebas de la matriz por enlace usan el Excel de `backend/tests/fixtures/matriz_fuentes_escaneo_eh.xlsx`.*
+*Cubre motores de priorización, máquinas de estados de ciclos, desduplicación difusa, cruce INVIMA, conectores de ingesta, auditoría, RBAC, persistencia en Firestore, avance de la vigilancia, enlaces de señales, buscador, matriz por enlace, bandeja Legacy protección de datos, vigilancia reanudable y base de conocimiento de búsqueda (900 pruebas al 25-11-2026). Las pruebas de la matriz por enlace usan el Excel de `backend/tests/fixtures/matriz_fuentes_escaneo_eh.xlsx`.*
 
 #### Pruebas de navegador de extremo a extremo (Playwright)
 ```powershell

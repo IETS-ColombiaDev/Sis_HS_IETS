@@ -546,3 +546,69 @@ El documento `Consolidado de observaciones SI EAA MOD 0.xlsx` es del equipo téc
 2. La primera copia después del despliegue fija sola la última copia de la versión anterior («Antes de un despliegue»). Compruébelo en **Configuración → Copia de respaldo**.
 3. Si algo se ve mal después de desplegar, restaure ese punto desde el mismo panel (pide escribir RESTAURAR). El estado dañado queda guardado, así que se puede deshacer.
 4. Las copias anteriores a esta versión no traen conteos: la guarda por conteos empieza a actuar desde la segunda copia.
+
+---
+
+## Vigilancia que se reanuda sola y búsqueda sin buscadores bloqueados (25-11-2026, versión 7.3.0)
+
+**Estado:** CUMPLIDO PARCIAL, 25-11-2026. Probado en local (suite de backend, suite de navegador y búsqueda real contra los sitios de las fuentes). Falta la verificación en el sistema desplegado, que solo se puede hacer después del despliegue.
+
+Responde a tres observaciones del equipo sobre el sistema en Render.
+
+### 1. La vigilancia quedó «en curso» 186 horas
+
+**Causa.** En Render solo corre el proceso web y el trabajador regular está apagado (la imagen trae `INGEST_WORKER_ENABLED=false`). La cola la atendía únicamente el hilo que lanzó la corrida. Cuando el servicio se reinició o se suspendió, ese hilo murió: los trabajos quedaron pendientes sin nadie que los tomara, y el servicio tampoco se mantenía despierto porque el aviso de actividad (keep-alive) solo arrancaba junto con el trabajador regular.
+
+**Corrección** (`worker.py`):
+
+- **Vigilante de la cola** (`start_guardian`, `guardian_tick`). Un hilo liviano revisa cada minuto. Si hay trabajo vencido y nadie lo atiende, devuelve a la cola lo que quedó a medias y relanza el drenaje. La primera revisión ocurre 10 segundos después de arrancar, así que tras un reinicio la vigilancia sigue sola.
+- El vigilante también hace el keep-alive cada 4 minutos mientras haya cola, con o sin trabajador regular.
+- El propio drenaje devuelve a la cola los trabajos huérfanos (antes solo lo hacía el trabajador regular).
+- Corre donde este proceso es el único que puede atender la cola: SQLite con un solo proceso (Render y equipos locales). Con PostgreSQL y varios procesos web no corre, porque allí la cola es del servicio `worker`. `INGEST_GUARDIAN=true|false` lo fuerza o lo apaga. Nunca corre dentro de las pruebas unitarias.
+- La pantalla de vigilancia ya no dice «el worker regular no está en marcha»: explica que la cola la cuida el vigilante y que se reanuda sola.
+
+**Lo que no cambia.** El vigilante no es un trabajador permanente: no lanza vigilancias programadas. Eso sigue siendo del trabajador regular, que en Render está apagado. Encenderlo es cuestión de dos variables en el panel (`INGEST_WORKER_ENABLED=true` e `INGEST_WORKER_FORCE=true`), pero implica vigilancias automáticas cada 6 horas con consumo de IA: es decisión del equipo. El servicio `worker` aparte sigue siendo la mejora prevista para cuando haya un plan de pago.
+
+### 2. La búsqueda web traía 0 resultados y cada fuente perdía cerca de un minuto
+
+**Causa medida.** Los buscadores gratuitos bloquean las consultas automáticas. Medido el 25-11-2026 desde un equipo de oficina (no desde la nube): DuckDuckGo respondió HTTP 202 (desafío) en todas las consultas, Bing ignoró `site:` y devolvió páginas ajenas, y Yahoo respondió bien las primeras consultas y luego HTTP 500. El minuto por fuente salía de sumar la redacción de consultas con IA (hasta 40 s) y la espera de motores que no contestaban, que se repetía en cada consulta porque un fallo de red no pausaba el motor.
+
+**Corrección** (`web_search.py`, `search_knowledge.py`, `sitemap_search.py`):
+
+- **Base de conocimiento de búsqueda** (tabla `search_knowledge`, migración `0008`). Guarda las páginas útiles de cada fuente. La vigilancia las visita sin consultar ningún buscador. No pertenece a un ciclo: la usan todas las corridas y todos los ciclos, y como vive en la base del sistema se respalda en Firestore y sobrevive a los reinicios.
+- **Aprende sola.** Cada visita anota si la página aportó señales. La que no aporta en 2 visitas deja de visitarse y se vuelve a probar a los 45 días. Las que ya aportaron van primero.
+- **Mapa del sitio como respaldo.** Si los buscadores no alcanzan, el sistema lee el `sitemap.xml` de la propia fuente (o el que declare su `robots.txt`) y elige las páginas por las palabras de la consulta y por lo recientes que son. Es una consulta a la fuente, no a un buscador: funciona desde la nube y no requiere llave. Lo que encuentra queda en la base.
+- **Sin esperas inútiles.** Con páginas recientes en la base (30 días por defecto) no se consulta ningún buscador ni se le pide a la IA redactar consultas. Si todos los motores están en pausa, se salta la búsqueda en vivo de inmediato. Dos fallos de red seguidos pausan el motor. Tras 4 bloqueos seguidos la pausa pasa a 3 horas. Hay un tope de tiempo de búsqueda por fuente (45 s).
+- **Paquete inicial.** `backend/app/data/base_busqueda_eh.json` viaja con el código y se carga solo al arrancar (una vez por versión del archivo). Se armó con `backend/scripts/build_search_knowledge.py`, que busca dentro del dominio de cada fuente, abre cada página y cuenta las señales que saca el extractor por reglas: 366 páginas de 47 sitios, 149 de ellas con señales (469 señales contadas). 326 salieron de los mapas de sitio y 40 de una búsqueda web asistida para fuentes sin mapa útil. De las 115 fuentes con ingesta activa, 83 tienen la búsqueda web encendida; sus sitios quedan marcados como ya buscados, así que la primera vigilancia no repite la búsqueda.
+- **Pantalla.** Configuración › Parámetros de fuentes › Base de conocimiento de búsqueda: totales, consulta por texto, descargar y cargar un paquete. El informe de la vigilancia muestra cuántas fuentes usaron la base.
+- **API.** `GET /api/search-knowledge` (cualquier perfil), `GET /api/search-knowledge/coverage`, `GET /api/search-knowledge/export` y `POST /api/search-knowledge/import` (solo quien administra la configuración; la carga queda en bitácora y nunca borra ni baja cuentas).
+
+**Sobre la llave de Brave.** Ya no es necesaria para que la vigilancia funcione. Sigue siendo útil para que el servidor descubra páginas nuevas por su cuenta: si el equipo la crea y la pega en Configuración › Parámetros de fuentes, lo que Brave encuentre también queda en la base. La llave se crea con una cuenta del IETS en el sitio de Brave Search API; no se creó ninguna desde el desarrollo.
+
+### 3. No se encontraban «Ubicar señales exactas» ni «Abrir la página y resaltar la señal»
+
+Los dos botones existían, pero escondidos:
+
+- **(Ubicar señales exactas)** estaba dentro del reporte plegado de Señales capturadas: había que pulsar primero (Reporte de enlaces). Ahora está siempre a la vista en la tarjeta «Enlaces a la fuente original», arriba de la lista de Señales capturadas.
+- **(Abrir la página y resaltar la señal)** aparece en el detalle de una señal solo cuando el sistema ya ubicó esa señal dentro de su página. Las señales capturadas antes de esa función no lo tienen hasta que alguien pulsa (Ubicar señales exactas). No depende de que termine la vigilancia.
+
+### 4. Pruebas
+
+- **Backend:** 900 aprobadas y 1 omitida. 29 son nuevas (`test_vigilancia_reanudable_y_base_busqueda.py`): base de conocimiento, paquete, búsqueda por fuente sin buscadores, mapa del sitio, vigilante de la cola y API.
+- **Navegador (E2E):** corrida completa con 105 aprobadas, 1 omitida (la del mapa de calor presupuestal, que se salta sola con la base vacía) y 1 fallida. La fallida era una aserción de la prueba nueva `search_knowledge.spec.js`, que esperaba una sola fila y la base ya trae las páginas del paquete; se corrigió y, al repetir ese archivo junto con `modulo0_pendientes.spec.js`, pasaron las 9. No se repitió la corrida completa después de ese ajuste, que solo tocó la prueba.
+- **Verificación real** sobre una copia de la base, con Firestore y la IA apagados y los buscadores simulados en bloqueo (HTTP 429): el paso de búsqueda de las 83 fuentes tardó 0,1 s en total, sin una sola consulta a buscadores, y 47 fuentes recibieron páginas de la base. Una cola abandonada hacía 186 horas (un trabajo «ejecutando» y dos pendientes) fue reanudada por el vigilante y quedó atendida en 10 segundos, visitando páginas de la base.
+- **Buscadores gratuitos**, medidos desde un equipo de oficina: no son utilizables de forma sostenida (ver punto 2).
+
+### 5. Al desplegar
+
+1. Hay una migración nueva (`0008`): solo crea la tabla `search_knowledge`. No toca ninguna otra.
+2. Al arrancar se carga el paquete de la base de búsqueda. Compruébelo en Configuración › Parámetros de fuentes.
+3. Si quedó una vigilancia a medias, el vigilante la reanuda sola a los pocos segundos. Si era la corrida atascada, también puede detenerla desde Vigilancia.
+4. En la primera vigilancia, revise en el informe la línea «Base de conocimiento de búsqueda» y el tiempo por fuente.
+
+### 6. Pendientes y limitaciones
+
+- El servicio `worker` permanente y las vigilancias programadas en Render siguen pendientes de decisión y de plan de pago.
+- El mapa del sitio no cubre todas las fuentes: hay sitios que no lo publican o que lo publican sin páginas relacionadas. Esas fuentes se siguen leyendo por su página principal y sus URL de entrada, como antes.
+- El conteo de señales del paquete inicial se hizo con el extractor por reglas, sin IA. Es una estimación para ordenar las páginas; la vigilancia real lo corrige con cada visita.
+- El paquete se debe refrescar cada cierto tiempo (el script se puede volver a correr) o complementar con una llave de buscador.

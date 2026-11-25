@@ -59,3 +59,7 @@ def _hermetic_web_search(monkeypatch):
 
     monkeypatch.setattr(web_search, "_engine_call", lambda engine, query, *, cfg, brave_key: [])
     monkeypatch.setattr(web_search, "ENGINE_MIN_INTERVAL_S", 0.0)
+    # El respaldo por mapa del sitio tampoco sale a la red: sin mapa por defecto.
+    from app import sitemap_search
+
+    monkeypatch.setattr(sitemap_search, "_get", lambda client, url: "")

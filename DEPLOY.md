@@ -73,7 +73,7 @@ Todos los comandos se ejecutan desde la raíz del repositorio y **siempre** con 
 3. **Construya la imagen** (etiquete con la versión para poder revertir):
 
    ```bash
-   export IMAGE_TAG=7.2.0        # o fije IMAGE_TAG en deploy/.env.production
+   export IMAGE_TAG=7.3.0        # o fije IMAGE_TAG en deploy/.env.production
    docker compose --env-file deploy/.env.production build
    ```
 
@@ -240,7 +240,22 @@ Mientras `main.py` siga llamando `Base.metadata.create_all` después de `upgrade
 
 Las bases contienen la bitácora de auditoría y, en `app_meta`, las claves de IA y de fuentes guardadas desde `/configuracion`: **trate los respaldos como secretos** (cifrado en reposo, acceso restringido, copia fuera del servidor).
 
-### SQLite con copia en Firestore (Render)
+### Vigilancia en Render sin servicio `worker`
+
+En Render gratuito solo corre el proceso web. La vigilancia la atiende el hilo que la lanza y la cuida un **vigilante de la cola** (`INGEST_GUARDIAN`, automático con SQLite y un proceso): si el servicio se reinicia o se suspende, a los 10 segundos de volver devuelve a la cola lo que quedó a medias y la reanuda. Mientras haya cola, el servicio se visita a sí mismo cada 4 minutos para no dormirse (usa `RENDER_EXTERNAL_URL`, que Render define solo, o `KEEPALIVE_URL`).
+
+El vigilante no lanza vigilancias programadas. Para eso hay que encender el trabajador regular en el panel (`INGEST_WORKER_ENABLED=true` e `INGEST_WORKER_FORCE=true`), lo que dispara vigilancias automáticas con consumo de IA, o pasar a un plan con servicio `worker` aparte.
+
+La búsqueda web no depende de buscadores: usa la base de conocimiento de búsqueda (tabla `search_knowledge`, migración `0008`, sembrada desde `backend/app/data/base_busqueda_eh.json`) y el mapa del sitio de cada fuente. Para refrescar el paquete desde un equipo del IETS:
+
+```bash
+cd backend
+python scripts/build_search_knowledge.py --db /ruta/a/una/copia.db
+```
+
+El script trabaja sobre una copia de la base, con Firestore y la IA apagados.
+
+## SQLite con copia en Firestore (Render)
 
 En Render el disco es efímero: la base SQLite se copia comprimida a Firestore (colección `hs_iets_db`) después de cada cambio y se restaura al arrancar. Protecciones:
 

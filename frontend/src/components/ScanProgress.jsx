@@ -141,6 +141,9 @@ export function SourceProgress({ row }) {
   );
 }
 
+const ENGINE_LABEL = { base_conocimiento: "base de conocimiento", sitemap: "mapa del sitio", brave_api: "Brave", searxng: "SearXNG" };
+const engineLabel = (e) => ENGINE_LABEL[e] || e;
+
 const ROUTE_LABEL = { sitio: "Sitio", ruta_matriz: "Ruta de la matriz", rss_oficial: "RSS oficial", google_news: "Google News", api: "API" };
 
 /** Línea corta: qué buscó en la web y qué hizo la IA. */
@@ -153,7 +156,7 @@ export function SearchAndAiLine({ search, ai }) {
           <Icon name="search" size={13} />{" "}
           {search.enabled === false
             ? "Búsqueda web apagada"
-            : `Búsqueda web: ${search.results ?? 0} resultado(s) de ${search.domain}${search.engines?.length ? ` (${search.engines.join(", ")})` : ""}`}
+            : `Búsqueda web: ${search.results ?? 0} resultado(s) de ${search.domain}${search.engines?.length ? ` (${search.engines.map(engineLabel).join(", ")})` : ""}`}
         </span>
       )}
       {ai && Object.keys(ai).length > 0 && (
@@ -203,8 +206,10 @@ export function SourceRunDetail({ row }) {
                 {(search.queries || []).map((q) => `«${q}»`).join(", ") || "ninguna"}
               </p>
               <p>
-                Motores: {(search.engine_attempts || []).join(" | ") || "-"}. Resultados útiles: {search.results ?? 0}.
+                Motores: {(search.engine_attempts || []).join(" | ") || "-"}. Resultados útiles: {search.results ?? 0}
+                {search.from_knowledge ? ` (${search.from_knowledge} de la base de conocimiento de búsqueda)` : ""}.
               </p>
+              {search.skipped ? <p>No se consultó ningún buscador: {search.skipped}.</p> : null}
               {search.urls?.length > 0 && (
                 <ul>
                   {search.urls.map((u) => (
@@ -351,7 +356,7 @@ export function AccessReport({ report, onReload }) {
                     {r.search?.enabled === false
                       ? "Apagada"
                       : r.search?.domain
-                        ? `${r.search.results ?? 0} resultado(s)${r.search.engines?.length ? ` · ${r.search.engines.join(", ")}` : ""}`
+                        ? `${r.search.results ?? 0} resultado(s)${r.search.engines?.length ? ` · ${r.search.engines.map(engineLabel).join(", ")}` : ""}`
                         : "-"}
                   </td>
                   <td>
@@ -508,10 +513,17 @@ export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter
             </p>
           )}
           {!progress.worker_running && (
-            <p className="scan-warn" role="status">
-              <Icon name="info" size={14} /> El worker regular no está en marcha en este servidor: la cola se atiende desde la
-              corrida que la lanzó.
-            </p>
+            progress.guardian_running ? (
+              <p className="scan-note" role="status" data-testid="scan-guardian">
+                <Icon name="info" size={14} /> Este servidor no tiene un trabajador permanente: la cola la cuida un vigilante que
+                revisa cada minuto. Si el servicio se reinicia o se suspende, la vigilancia se reanuda sola donde quedó.
+              </p>
+            ) : (
+              <p className="scan-warn" role="status">
+                <Icon name="info" size={14} /> El trabajador de vigilancia no está en marcha en este servidor: la cola se atiende
+                desde la corrida que la lanzó.
+              </p>
+            )
           )}
           {retryWait && (
             <p className="scan-note">
@@ -641,6 +653,13 @@ function SearchHealth({ health }) {
           Búsqueda web: {health.sources_with_results} de {health.sources_searched} fuente(s) obtuvieron resultados del dominio en su última corrida.
           {" "}Motores: {health.engines.join(", ")}{health.api_configured ? " · API configurada" : " · sin API"}.
           {cooling.length > 0 && <> En pausa por bloqueo: {cooling.map(([e, sec]) => `${e} (${Math.ceil(sec / 60)} min)`).join(", ")}.</>}
+          {health.knowledge ? (
+            <div style={{ marginTop: 4 }} data-testid="search-knowledge-line">
+              Base de conocimiento de búsqueda: {health.knowledge.pages} página(s) de {health.knowledge.domains} sitio(s),{" "}
+              {health.knowledge.with_signals} ya aportaron señales. La vigilancia las visita sin consultar buscadores
+              {health.sources_from_knowledge ? ` (${health.sources_from_knowledge} fuente(s) la usaron en su última corrida)` : ""}.
+            </div>
+          ) : null}
           {health.note && <div style={{ marginTop: 4 }}>{health.note}</div>}
         </>
       )}
