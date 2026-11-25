@@ -288,9 +288,9 @@ function PriorityVisual() {
           ))}
         </div>
         <div className="onb-scale-labels">
-          <span className="is-no">0–2 · No priorizada</span>
+          <span className="is-no">0-2 · No priorizada</span>
           <span className="is-watch">3 · Bajo vigilancia</span>
-          <span className="is-yes">4–6 · Priorizada</span>
+          <span className="is-yes">4-6 · Priorizada</span>
         </div>
         <div className="onb-scale-labels onb-scale-levels">
           <span />

@@ -65,12 +65,18 @@ export default function Notes() {
     return () => clearTimeout(debounce.current);
   }, [q]);
 
+  // Solo se aplica la respuesta de la ultima consulta: si una anterior llega tarde
+  // (busqueda, guardado y refresco automatico se cruzan) mostraria datos viejos.
+  const loadSeq = useRef(0);
+
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     try {
       const params = {};
       if (typeFilter) params.entity_type = typeFilter;
       if (query) params.q = query;
       const { data } = await api.get("/notes", { params });
+      if (seq !== loadSeq.current) return;
       setNotes(data);
       setDetail((d) => (d ? data.find((n) => n.id === d.id) || null : d));
     } catch (e) {

@@ -41,6 +41,7 @@ TAKEN_AT_KEY = "backup.taken_at"
 RESTORED_AT_KEY = "restore.at"
 RESTORED_TAKEN_AT_KEY = "restore.snapshot_taken_at"
 RESTORED_VERSION_KEY = "restore.state_version"
+RESTORED_AUDIT_KEY = "restore.audit_max_id"
 
 MAX_UPLOAD_BYTES = 200 * 1024 * 1024
 MAX_DB_BYTES = 1024 * 1024 * 1024
@@ -148,6 +149,46 @@ def _has_user_work(db) -> bool:
     return row is not None
 
 
+def _audit_max(db) -> int:
+    from sqlalchemy import text
+
+    return int(db.execute(text("SELECT COALESCE(MAX(id), 0) FROM audit_log")).scalar() or 0)
+
+
+def _audit_untouched(db) -> bool:
+    """Nada se escribio desde la restauracion, segun la bitacora.
+
+    El contador de version solo lo tocan algunas pantallas; la bitacora registra
+    todas las escrituras. Sin esta comprobacion, cambios hechos despues de
+    restaurar (usuarios, configuracion, postulaciones) se daban por inexistentes
+    y una restauracion posterior los descartaba.
+    """
+    mark = _meta(db, RESTORED_AUDIT_KEY)
+    if not mark.isdigit():
+        return True  # bases restauradas antes de esta marca: regla anterior
+    try:
+        return _audit_max(db) == int(mark)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def mark_restore_point(db) -> None:
+    """Anota el ultimo registro de la bitacora como el estado recien restaurado.
+
+    Se guarda con SQL directo para que la propia marca no genere otro registro.
+    """
+    from sqlalchemy import text
+
+    db.execute(
+        text(
+            "INSERT INTO app_meta(key, value, updated_at) VALUES (:k, :v, :t) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
+        ),
+        {"k": RESTORED_AUDIT_KEY, "v": str(_audit_max(db)), "t": _now_iso()},
+    )
+    db.commit()
+
+
 def info() -> dict:
     if not supported():
         return {"supported": False}
@@ -164,7 +205,8 @@ def info() -> dict:
             "restored_at": _meta(db, RESTORED_AT_KEY),
             "restored_snapshot_taken_at": _meta(db, RESTORED_TAKEN_AT_KEY),
             "untouched_since_restore": bool(_meta(db, RESTORED_VERSION_KEY))
-            and _meta(db, RESTORED_VERSION_KEY) == version,
+            and _meta(db, RESTORED_VERSION_KEY) == version
+            and _audit_untouched(db),
         }
     finally:
         db.close()
@@ -192,6 +234,7 @@ def export_snapshot() -> tuple[bytes, dict]:
                 (TAKEN_AT_KEY, taken_at, taken_at),
             )
             dst.commit()
+            counts = _table_counts(dst)
             dst.execute("PRAGMA journal_mode=DELETE")
             dst.execute("VACUUM")
         finally:
@@ -205,7 +248,24 @@ def export_snapshot() -> tuple[bytes, dict]:
         "state_version": meta.get("state_version", 0),
         "taken_at": taken_at,
         "raw_size": len(raw),
+        "counts": counts,
     }
+
+
+COUNTED_TABLES = (
+    "audit_log", "findings", "technologies", "sources", "users", "submissions", "notes",
+    "cycles", "recommendations", "raw_records",
+)
+
+
+def _table_counts(conn) -> dict:
+    """Filas de las tablas principales: viajan con la copia para detectar perdidas."""
+    existing = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    out: dict[str, int] = {}
+    for table in COUNTED_TABLES:
+        if table in existing:
+            out[table] = int(conn.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0])
+    return out
 
 
 def _read_snapshot(data: bytes, folder: Path) -> tuple[Path, dict]:
@@ -320,6 +380,7 @@ def _after_restore(snap: dict) -> None:
         version = bump_state_version(db)
         _set_meta(db, RESTORED_VERSION_KEY, str(version))
         db.commit()
+        mark_restore_point(db)
     finally:
         db.close()
 

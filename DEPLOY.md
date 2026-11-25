@@ -73,7 +73,7 @@ Todos los comandos se ejecutan desde la raíz del repositorio y **siempre** con 
 3. **Construya la imagen** (etiquete con la versión para poder revertir):
 
    ```bash
-   export IMAGE_TAG=7.0.0        # o fije IMAGE_TAG en deploy/.env.production
+   export IMAGE_TAG=7.2.0        # o fije IMAGE_TAG en deploy/.env.production
    docker compose --env-file deploy/.env.production build
    ```
 
@@ -226,6 +226,7 @@ python -m alembic -x url=sqlite:///./copia.db upgrade head   # ensayo sobre una 
    ```
 
    Use identificadores correlativos (`0002`, `0003`…) para que los archivos queden ordenados.
+   En SQLite, quitar o cambiar una columna **reconstruye la tabla**. El arranque migra con las llaves foráneas apagadas en esa conexión (`migrations.schema_change_connection`) para que esa reconstrucción no borre en cascada las filas hijas (reconstruir `sources` borraría todas las señales). El ensayo por línea de comandos (`alembic -x url=...`) no reproduce el arranque: ensaye siempre con `python -m app.migrations` sobre una copia de la base real y compare los conteos de `findings`, `technologies` y `audit_log` antes y después.
 3. **Revise el archivo a mano**: el autogenerate no detecta renombres (los propone como borrar y crear, lo que pierde datos), disparadores, índices GIN ni cambios de datos. En SQLite los `ALTER` van en `op.batch_alter_table` (ya activado en `env.py`). Escriba también el `downgrade()`.
 4. Si la revisión mueve datos o crea índices sobre tablas grandes, ensáyela sobre una copia de la base real y mida el tiempo.
 5. Ejecute las pruebas: `python -m pytest tests/test_frente_d_migrations.py` (incluye la guardia de deriva, que falla si los modelos y las migraciones no coinciden) y `python -m alembic -x url=sqlite:///./rev.db check`.
@@ -238,6 +239,33 @@ Mientras `main.py` siga llamando `Base.metadata.create_all` después de `upgrade
 ## Respaldo y restauración
 
 Las bases contienen la bitácora de auditoría y, en `app_meta`, las claves de IA y de fuentes guardadas desde `/configuracion`: **trate los respaldos como secretos** (cifrado en reposo, acceso restringido, copia fuera del servidor).
+
+### SQLite con copia en Firestore (Render)
+
+En Render el disco es efímero: la base SQLite se copia comprimida a Firestore (colección `hs_iets_db`) después de cada cambio y se restaura al arrancar. Protecciones:
+
+| Protección | Qué evita |
+|---|---|
+| No se sube nada hasta haber leído Firestore | Que una base recién sembrada pise la copia buena tras un fallo de red al arrancar |
+| Guarda de tamaño (menos del 50 %) y de conteos | Que una base con menos datos pise la copia buena. Si la bitácora local tiene menos registros que la guardada, la subida se bloquea |
+| Cada copia en su propia generación; el índice se escribe al final | Que una subida cortada deje fragmentos mezclados |
+| Puntos de recuperación | Que un despliegue defectuoso borre la última copia buena |
+| La base con datos manda | Que el sistema arranque vacío si alguien crea la base nombrada `hs-iets` mientras los datos están en `(default)` |
+
+**Puntos de recuperación.** Además de la copia vigente y la anterior se conservan, sin que las copias siguientes los borren: las 5 últimas copias previas a un despliegue, el cierre de los últimos 7 días, 3 copias escritas por otra instancia, 3 estados previos a una restauración y 3 fijadas a mano. Se ven en **Configuración → Copia de respaldo → Puntos de recuperación**.
+
+**Recuperar después de un despliegue defectuoso:**
+
+1. Entre como superadministrador a **Configuración → Copia de respaldo**.
+2. En **Puntos de recuperación** ubique la copia «Antes de un despliegue» con la fecha y la versión anteriores. La línea muestra cuántas señales, tecnologías, fuentes y usuarios tenía.
+3. Pulse **Restaurar** y escriba `RESTAURAR`. El estado actual queda guardado como «Antes de una restauración», de modo que se puede deshacer.
+4. Si el defecto está en el código, revierta el despliegue antes de restaurar: de lo contrario la versión defectuosa volverá a dañar los datos.
+
+Si el panel muestra «Copia bloqueada», la base del servidor tiene menos datos que la guardada y no la sobrescribió. Restaure la copia actual o, si la del servidor es la correcta, use **Publicar de todos modos** (`POST /api/backup/firebase/push?override=true`): la copia guardada queda fijada.
+
+Por API: `GET /api/backup/firebase/checkpoints`, `POST /api/backup/firebase/checkpoints/{gen}/restore?confirm=RESTAURAR` y `POST /api/backup/firebase/checkpoints/pin`. `GET /api/health` informa en `backup` si la copia está al día, bloqueada o con error (sin datos sensibles): úselo en el monitoreo.
+
+**Límites que conviene conocer.** Entre una copia y la siguiente pasan hasta 2 minutos (3 durante una vigilancia): si el proceso muere sin apagado limpio, se pierde lo escrito en esa ventana. En un redespliegue con dos instancias a la vez no se fusionan las bases: la copia de la otra instancia queda como punto de recuperación.
 
 ### PostgreSQL (contenedores)
 

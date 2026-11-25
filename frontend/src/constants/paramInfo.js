@@ -17,7 +17,7 @@ export const PARAM_GROUPS = [
   { id: "corroboration", title: "Corroboración entre fuentes", icon: "layers", intro: "Bono de orden para las señales que reporta más de una fuente. Solo cambia el orden de la bandeja: no toca el cribado ni el %P." },
   { id: "ingest", title: "Vigilancia de fuentes", icon: "radar", intro: "Cómo corre la vigilancia: cuántas fuentes a la vez, cuánto tiempo como máximo por fuente y cuándo se pausa una fuente que falla." },
   { id: "cycle", title: "Ciclos formales", icon: "clock", intro: "Reglas que se validan al crear o modificar un ciclo." },
-  { id: "priority", title: "Priorización (matriz P1–P6)", icon: "sliders", intro: "Umbrales del motor oficial de priorización. Los ciclos cerrados conservan el resultado que obtuvieron." },
+  { id: "priority", title: "Priorización (matriz P1-P6)", icon: "sliders", intro: "Umbrales del motor oficial de priorización. Los ciclos cerrados conservan el resultado que obtuvieron." },
   { id: "dedup", title: "Filtrado y novedad", icon: "search", intro: "Umbrales de similitud para proponer fusiones y para sugerir que una tecnología ya tiene registro en Colombia." },
   { id: "evaluation", title: "Evaluación temprana", icon: "doc", intro: "Qué producto se sugiere según los puntos de la matriz y la vigencia del acceso de los revisores externos." },
   { id: "ttm", title: "Time-to-market", icon: "clock", intro: "Franjas para clasificar cuándo llegaría la tecnología al mercado." },

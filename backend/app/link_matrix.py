@@ -498,12 +498,17 @@ def load_packaged() -> dict:
         return {}
 
 
-def write_packaged(parsed: dict) -> Path:
+def write_packaged(parsed: dict, db: Session | None = None, *, actor: str = "") -> Path:
+    """Deja la matriz cargada como vigente. Con `db` tambien se guarda en la base:
+    el disco del servicio es efimero y sin eso el siguiente reinicio la revertia."""
+    from . import matrix_store, source_matrix
+
+    base = matrix_store.base_sha(db, "enlaces", DATA_FILE) if db is not None else ""
     DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
     DATA_FILE.write_text(json.dumps(parsed, ensure_ascii=False, indent=1), encoding="utf-8")
-    from . import source_matrix
-
     source_matrix._cache = None
+    if db is not None:
+        matrix_store.remember(db, "enlaces", DATA_FILE, base, actor=actor)
     return DATA_FILE
 
 
@@ -548,8 +553,16 @@ def apply(
             continue
         before = {k: getattr(source, k, None) for k in fields}
         _apply_catalog_fields(source, fields, overwrite_admin=overwrite, edits=edits.get(source.id))
-        source.retired = False
-        source.catalog_active = True
+        kept = set(source.edited_fields or [])
+        if overwrite or "catalog_active" not in kept:
+            # Si el equipo la saco del catalogo a mano, el arranque no la reactiva.
+            source.retired = False
+            source.catalog_active = True
+        probe = source.last_probe_detail if isinstance(source.last_probe_detail, dict) else {}
+        if not overwrite and probe.get("ingestion_suspended") and before.get("scrape_enabled") is False:
+            # La sonda la suspendio por fallar: la reactiva la sonda cuando vuelva
+            # a responder, no el arranque.
+            source.scrape_enabled = False
         changed = [k for k in fields if before[k] != getattr(source, k, None)]
         if changed:
             updated.append(fields["catalog_code"])

@@ -203,7 +203,7 @@ export function SourceRunDetail({ row }) {
                 {(search.queries || []).map((q) => `«${q}»`).join(", ") || "ninguna"}
               </p>
               <p>
-                Motores: {(search.engine_attempts || []).join(" | ") || "—"}. Resultados útiles: {search.results ?? 0}.
+                Motores: {(search.engine_attempts || []).join(" | ") || "-"}. Resultados útiles: {search.results ?? 0}.
               </p>
               {search.urls?.length > 0 && (
                 <ul>
@@ -346,22 +346,22 @@ export function AccessReport({ report, onReload }) {
                     <div className="muted">{r.connector}{r.access_level ? ` · nivel ${r.access_level}` : ""}</div>
                   </td>
                   <td><Badge tone={OUTCOME_TONE[r.outcome]}>{r.outcome_label}</Badge></td>
-                  <td>{r.access_label || "—"}{r.http_status ? ` · ${r.http_status}` : ""}</td>
+                  <td>{r.access_label || "-"}{r.http_status ? ` · ${r.http_status}` : ""}</td>
                   <td>
                     {r.search?.enabled === false
                       ? "Apagada"
                       : r.search?.domain
                         ? `${r.search.results ?? 0} resultado(s)${r.search.engines?.length ? ` · ${r.search.engines.join(", ")}` : ""}`
-                        : "—"}
+                        : "-"}
                   </td>
                   <td>
                     {r.ai?.used === false
                       ? "Sin IA"
                       : r.ai?.used
                         ? `${r.ai.kept ?? 0} conservadas${r.ai.ungrounded ? ` · ${r.ai.ungrounded} descartadas` : ""}`
-                        : "—"}
+                        : "-"}
                   </td>
-                  <td>{r.outcome === "sin_ejecutar" ? "—" : `+${r.items_new ?? 0} / ${r.items_found ?? 0}`}</td>
+                  <td>{r.outcome === "sin_ejecutar" ? "-" : `+${r.items_new ?? 0} / ${r.items_found ?? 0}`}</td>
                   <td className="access-detail">
                     {(r.detail || r.message || "").slice(0, 160)}
                     {r.outcome !== "sin_ejecutar" && (

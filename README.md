@@ -25,7 +25,7 @@ Inspirado en el modelo operativo del [NIHR Innovation Observatory](https://io.ni
 ## Nombre y descripción del proyecto
 
 **Sistema de Escaneo de Horizonte del IETS (Sis_HS_IETS)**  
-**Versión actual:** `7.1.1` (24 de noviembre de 2026)
+**Versión actual:** `7.2.0` (24 de noviembre de 2026)
 
 El sistema automatiza el ciclo de vida del monitoreo proactivo y reactivo de tecnologías sanitarias (medicamentos, dispositivos médicos, procedimientos, biológicos, salud digital) antes o durante su llegada al mercado y al Sistema General de Seguridad Social en Salud (SGSSS) de Colombia.
 
@@ -169,9 +169,13 @@ El archivo de configuración principal se ubica en `backend/.env`. Copie `backen
 | `DATABASE_URL` | `sqlite:///./iets_horizonte.db` | Cadena de conexión SQLAlchemy. Para PostgreSQL: `postgresql+psycopg://usuario:clave@host:5432/base`. |
 | `CORS_ORIGINS` | *URLs locales* | Orígenes HTTP autorizados para peticiones cruzadas, separados por comas. |
 | `FRONTEND_DIST` | `../frontend/dist` | Ruta absoluta o relativa al directorio con los estáticos compilados de la SPA. |
-| `SEED_OFFICIAL_CYCLES` | *Dinámico* | `true` en desarrollo para precargar ciclos 2026; `false` en producción. |
+| `SEED_OFFICIAL_CYCLES` | *Dinámico* | `true` en desarrollo para precargar ciclos 2026; `false` en producción y en el servicio desplegado (`RENDER=true`), donde la siembra no debe reconstruir ciclos reales. |
+| `FIREBASE_DB_ENABLED` | `true` | Copia de la base SQLite en Firestore. Póngalo en `false` en servidores locales y de prueba. |
+| `FIREBASE_DB_DATABASE` | `hs-iets` | Base de Firestore preferida. Si no tiene copia y `(default)` sí, se usa `(default)`. |
+| `RUN_MIGRATIONS` | `true` | El contenedor migra y siembra una vez antes de lanzar uvicorn. |
+| `INGEST_MAX_PARALLEL` | `1` | Fuentes que la vigilancia rastrea a la vez. |
 | `AI_PROVIDER` | `auto` | Proveedor activo de IA: `auto` (detecta según llaves), `minimax`, `gemini` u `off`. |
-| `MINIMAX_API_KEY` | *Embebida por defecto* | Llave de API internacional de MiniMax (api.minimax.io). |
+| `MINIMAX_API_KEY` | *Vacío* | Llave de API internacional de MiniMax (api.minimax.io). No está en el código: sin ella la IA queda en modo degradado. |
 | `MINIMAX_MODEL` | *Vacío* | Modelo MiniMax; vacío realiza detección automática (prioriza `MiniMax-M3`). |
 | `GEMINI_API_KEY` | *Vacío* | Llave de Google AI Studio para IA de contingencia/respaldo. |
 | `GEMINI_MODEL` | *Vacío* | Modelo de Gemini; vacío realiza detección automática. |
@@ -324,7 +328,7 @@ cd backend
 .\.venv\Scripts\Activate.ps1
 python -m pytest -q
 ```
-*Cubre motores de priorización, máquinas de estados de ciclos, desduplicación difusa, cruce INVIMA, conectores de ingesta, auditoría, RBAC, persistencia en Firestore, avance de la vigilancia, enlaces de señales, buscador, matriz por enlace y bandeja Legacy (654 pruebas al 17-11-2026). Las pruebas de la matriz por enlace usan el Excel de `backend/tests/fixtures/matriz_fuentes_escaneo_eh.xlsx`.*
+*Cubre motores de priorización, máquinas de estados de ciclos, desduplicación difusa, cruce INVIMA, conectores de ingesta, auditoría, RBAC, persistencia en Firestore, avance de la vigilancia, enlaces de señales, buscador, matriz por enlace, bandeja Legacy y protección de datos (871 pruebas al 24-11-2026). Las pruebas de la matriz por enlace usan el Excel de `backend/tests/fixtures/matriz_fuentes_escaneo_eh.xlsx`.*
 
 #### Pruebas de navegador de extremo a extremo (Playwright)
 ```powershell

@@ -570,6 +570,19 @@ def persist_record(
         raw.reprocessed_count = (raw.reprocessed_count or 0) + 1
         raw.fetched_at = datetime.now(timezone.utc)
         if raw.finding_id:
+            # RF20: el registro ya visto puede traer una fase clinica nueva (por
+            # ejemplo un ensayo que pasa de fase II a fase III). Se actualiza la
+            # tecnologia y se avisa a los suscriptores.
+            if record.development_phase:
+                tech = db.get(Technology, raw.technology_id) if raw.technology_id else None
+                if tech is None:
+                    tech = db.query(Technology).filter(Technology.finding_id == raw.finding_id).first()
+                    if tech is not None:
+                        raw.technology_id = tech.id
+                if tech is not None:
+                    from . import strategy_service
+
+                    strategy_service.update_development_phase(db, tech, record.development_phase)
             return raw, False
 
     content_hash = record.content_hash(connector)

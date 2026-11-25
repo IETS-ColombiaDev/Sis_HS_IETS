@@ -3,7 +3,13 @@
 #
 # Un solo proceso + SQLite (el entrypoint fuerza WEB_CONCURRENCY=1 si no hay
 # Postgres). Defina BOOTSTRAP_ADMIN_* en el panel para el primer ingreso con
-# contraseña; o deje ENVIRONMENT=development si usa acceso de desarrollo.
+# contraseña. La imagen fija ENVIRONMENT=production y ALLOW_DEV_LOGIN=false: no
+# los cambie en el panel, porque con ENVIRONMENT=development el acceso sin
+# contraseña queda abierto a cualquier correo del dominio (RNF12).
+#
+# La base se copia a Firestore y se restaura al arrancar. La copia guarda puntos
+# de recuperación (antes de cada despliegue, cierre del día): ver DEPLOY.md,
+# "SQLite con copia en Firestore".
 services:
   - type: web
     name: sis-hs-iets

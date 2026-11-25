@@ -87,7 +87,7 @@ function ManualSource({ item, onDone, toast }) {
             {item.frequency && <span>Frecuencia: {item.frequency}</span>}
             {last && (
               <span>
-                Última: {fmtDate(last.at)} por {last.by || "—"} ({last.outcome_label})
+                Última: {fmtDate(last.at)} por {last.by || "-"} ({last.outcome_label})
               </span>
             )}
           </div>

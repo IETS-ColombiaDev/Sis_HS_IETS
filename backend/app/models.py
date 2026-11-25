@@ -1038,7 +1038,7 @@ class AlertEvent(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    # phase_change_high_budget | new_phase3_colombia
+    # phase_change_high_budget | clinical_phase_change_high_budget | new_phase3_colombia
     kind: Mapped[str] = mapped_column(String(60), index=True)
     title: Mapped[str] = mapped_column(String(400), default="")
     body: Mapped[str] = mapped_column(Text, default="")

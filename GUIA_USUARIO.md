@@ -5,7 +5,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.1.1 · actualizada el 24 de noviembre de 2026 (vigilancia más rápida y estable en el sitio desplegado) |
+| **Versión del sistema** | 7.2.0 · actualizada el 24 de noviembre de 2026 (protección de datos con puntos de recuperación, envío del boletín, buscador público avanzado) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
@@ -96,7 +96,7 @@ El escaneo de horizonte (EH) busca **tecnologías sanitarias emergentes** antes 
 
 El sistema:
 
-1. **Vigila** de forma automática (y manual) cerca de **97 fuentes** internacionales.
+1. **Vigila** de forma automática (y manual) **141 fuentes** internacionales (una por enlace de la matriz de escaneo).
 2. **Recibe** postulaciones externas con conflicto de interés declarado.
 3. **Clasifica** lo capturado (clúster, tipología, condición).
 4. **Filtra** duplicados y verifica novedad frente al INVIMA.
@@ -1255,7 +1255,18 @@ Desde administración / API de paquete: ZIP con Listado Único, informes aprobad
 2. **Compilar** borrador a partir de lo publicado/priorizado según reglas del módulo.  
 3. Revisar contenido.  
 4. **Aprobar** (líder / perfil habilitado).  
-5. **Publicar** y exportar: **Ver HTML ejecutivo** (pestaña nueva) o **Descargar PDF** (A4, listo para distribuir).  
+5. **Publicar** y exportar: **Ver HTML ejecutivo** (pestaña nueva) o **Descargar PDF** (A4, listo para distribuir).
+6. **Enviar a la alta dirección**: aparece cuando el boletín ya está publicado (ver 18.2).
+
+### 18.2 Enviar el boletín a la alta dirección
+
+1. En el boletín publicado pulse **Enviar a la alta dirección**.
+2. Escriba los correos separados por coma. La lista se recuerda para el siguiente boletín.
+3. Pulse **Enviar boletín**. Cada destinatario recibe un correo con las cifras del ciclo y el PDF adjunto.
+
+Bajo el título del boletín queda la línea **Último envío** con fecha, número de destinatarios y quién lo envió; el envío también queda en la bitácora. Si un correo es rechazado, el sistema lo dice y los demás igual salen.
+
+Solo se puede enviar un boletín **publicado**. Si el servidor no tiene correo institucional configurado, la ventana lo avisa: descargue el PDF y envíelo por su correo.
 
 Coordine con la fecha de boletín definida al crear el ciclo.
 
@@ -1311,7 +1322,8 @@ Solo el autor o un superadmin edita/elimina.
 ### 21.1 Tipos habituales
 
 - Fase III con mención a Colombia (u otros tokens configurados).  
-- Alto riesgo presupuestal (umbral de puntos).
+- Cambio de franja de una tecnología de alto riesgo presupuestal (umbral de puntos).  
+- **Cambio de fase clínica** de una tecnología de alto riesgo presupuestal: por ejemplo, pasa de fase II a fase III. Avisa aunque el cambio llegue por la vigilancia en un registro que ya se había capturado. Conocer la fase por primera vez no genera alerta.
 
 ### 21.2 Qué hacer
 
@@ -1481,17 +1493,53 @@ Edite valores/etiquetas/rangos de prioridad, niveles, tipos de tecnología, orí
 
 ---
 
+### 25.8 Copia de respaldo y puntos de recuperación
+
+**Ruta:** `/configuracion`, pestaña de copia de respaldo. Solo el superadministrador.
+
+La base del sistema se copia sola a Firebase después de cada cambio y se restaura sola cuando el servidor reinicia. El panel **Base en Firebase** muestra si está sincronizada y la fecha de la última publicación.
+
+**Puntos de recuperación.** Son copias que las publicaciones siguientes no borran:
+
+| Punto | Qué es | Cuántos se guardan |
+|---|---|---|
+| Copia actual | La vigente; es la que se restaura sola al arrancar | 1 |
+| Copia anterior | La inmediatamente anterior | 1 |
+| Antes de un despliegue | Última copia hecha con la versión anterior del sistema | 5 |
+| Cierre del día | Última copia de cada día | 7 |
+| Escrita por otra instancia | La subió otro proceso del servicio durante un redespliegue | 3 |
+| Antes de una restauración | Estado que había justo antes de restaurar | 3 |
+| Fijada a mano | La que usted fija con **Fijar el estado actual** | 3 |
+
+Cada línea muestra la fecha, el tamaño, la versión del sistema y cuántas señales, tecnologías, fuentes y usuarios tenía.
+
+**Volver a un punto anterior:**
+
+1. Ubique el punto por su fecha y pulse **Restaurar**.
+2. Escriba `RESTAURAR` cuando el sistema lo pida.
+3. La página se recarga con los datos de ese punto.
+
+El estado que había queda guardado como «Antes de una restauración»: si se equivocó, restaure ese punto y vuelve a donde estaba. La restauración queda en la bitácora.
+
+**Antes de un cambio delicado** (cargar una matriz nueva, depurar ruido, cerrar un ciclo) pulse **Fijar el estado actual**.
+
+**Si aparece «Copia bloqueada».** El sistema detectó que la base del servidor tiene menos datos que la copia guardada y no la sobrescribió. No se perdió nada: avise a TI. Lo normal es restaurar la copia actual desde este mismo panel. Si TI confirma que la base del servidor es la correcta, **Publicar de todos modos** (pide escribir `PUBLICAR`) la sube y deja la copia guardada como punto de recuperación.
+
+---
+
 ## 26. Portales públicos
 
 | URL | Quién | Qué hace |
 |---|---|---|
 | `/postular` | Ciudadanía / industria / academia | Postula tecnología + COI |
-| `/expedientes` | Público | Busca fichas publicadas |
+| `/expedientes` | Público | Busca fichas publicadas por nombre, denominación común o indicación, y las filtra por clúster, tipo de tecnología, fase de desarrollo y año de publicación |
 | `/expedientes/:id` | Público | Lee una ficha; **Descargar ficha técnica** entrega PDF y **Ver versión web**, HTML |
 | `/transparencia` | Público | Cifras agregadas |
 | `/revisar/:token` | Revisor invitado | Evalúa expediente |
 
 Estos portales **no** muestran la bandeja interna ni datos de ciclos en configuración.
+
+En `/expedientes` los filtros solo ofrecen opciones que tienen al menos una ficha pública, los resultados van de 20 en 20 y **Quitar filtros** vuelve a la lista completa. Las publicaciones confidenciales no aparecen ni se cuentan.
 
 ---
 
@@ -1568,7 +1616,7 @@ Su perfil no es clínico (ni superadmin). Pida a quien corresponda o un cambio d
 
 ### 28.4 “Recargué el catálogo y se movió la URL”
 
-Esperado para campos oficiales (URL, título, adaptador, nivel de acceso). Lo que el equipo editó desde **Editar fuente** permanece; lo que nadie editó sigue a la matriz vigente (ver 8.7). Si importó Excel con «Sobrescribir lo editado», el Excel mandó en todo.
+Esperado para los campos que nadie editó: siguen a la matriz vigente (ver 8.7). Todo lo que el equipo cambió desde **Editar fuente** permanece, incluidos el nombre, la URL, «ingesta activa» y la frecuencia, también después de un reinicio del servidor. Una fuente que el equipo sacó del catálogo o que la sonda suspendió por fallar tampoco se reactiva sola. La matriz que se carga desde la interfaz se conserva entre reinicios. Si importó Excel con «Sobrescribir lo editado», el Excel mandó en todo.
 
 ### 28.5 “Error interno del servidor”
 

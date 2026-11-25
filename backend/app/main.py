@@ -165,7 +165,11 @@ def seed_official_cycles() -> None:
     """
     # En produccion los ciclos los gobierna la coordinacion: la siembra solo corre
     # si se pide expresamente (SEED_OFFICIAL_CYCLES=true). En desarrollo, por defecto.
-    default = "false" if settings.is_production else "true"
+    # El servicio desplegado (Render) trabaja sobre los datos reales aunque corra
+    # con ENVIRONMENT=development: la siembra reconstruye ciclos y no debe correr
+    # ahi salvo que se pida.
+    deployed = settings.is_production or os.environ.get("RENDER", "").strip().lower() == "true"
+    default = "false" if deployed else "true"
     if os.environ.get("SEED_OFFICIAL_CYCLES", default).strip().lower() in {"0", "false", "no"}:
         log.info("Siembra de ciclos oficiales desactivada (SEED_OFFICIAL_CYCLES=false).")
         return
@@ -337,8 +341,10 @@ async def lifespan(app: FastAPI):
     _recover_orphan_jobs()
     start_worker()
     yield
-    firebase_db.flush_on_shutdown()
+    # Primero se detiene la vigilancia: asi la copia final no compite con sus
+    # escrituras y se lleva el ultimo estado.
     stop_worker()
+    firebase_db.flush_on_shutdown()
 
 
 app = FastAPI(
@@ -481,7 +487,31 @@ for r in ROUTERS:
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "iets-horizon-scanning", "version": __version__}
+    return {
+        "status": "ok",
+        "service": "iets-horizon-scanning",
+        "version": __version__,
+        "backup": _backup_health(),
+    }
+
+
+def _backup_health() -> dict:
+    """Estado de la copia en Firestore, sin datos sensibles (para monitoreo)."""
+    from . import firebase_db
+
+    try:
+        if not firebase_db.enabled():
+            return {"enabled": False}
+        st = firebase_db.status()
+        return {
+            "enabled": True,
+            "synced": bool(st.get("synced")),
+            "last_copy_at": st.get("taken_at") or "",
+            "blocked": bool(st.get("blocked_shrink")),
+            "error": bool(st.get("error")),
+        }
+    except Exception:  # noqa: BLE001
+        return {"enabled": False}
 
 
 # --------------------------------------------------------------------------- #

@@ -524,7 +524,7 @@ function GraphTool({ cycleId, filters, restricted }) {
                         toggle(n.id);
                       }}
                     >
-                      {expanded.has(n.id) ? "–" : "+"}
+                      {expanded.has(n.id) ? "-" : "+"}
                     </text>
                   )}
                   <text x={22} y={-4} className="sg-label">

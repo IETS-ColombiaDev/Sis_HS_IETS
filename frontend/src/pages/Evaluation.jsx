@@ -170,7 +170,7 @@ function ReportPreview({ title, levelLabel, statusLabel, cycleCode, labels, body
             return (
               <article key={key} className="iets-dossier-block">
                 <h4>{labels[key] || key}</h4>
-                {(paras.length ? paras : ["—"]).map((para, i) => (
+                {(paras.length ? paras : ["-"]).map((para, i) => (
                   <p key={`${key}-${i}`}>{para}</p>
                 ))}
               </article>
@@ -618,7 +618,7 @@ export default function Evaluation() {
                       {item.suggested_level_label}
                       {item.doc_status_label ? ` · ${item.doc_status_label}` : " · sin expediente"}
                     </span>
-                    <em title={GLOSSARY.fa_completitud}>{item.doc_id ? `${item.completeness_pct}%` : "—"}</em>
+                    <em title={GLOSSARY.fa_completitud}>{item.doc_id ? `${item.completeness_pct}%` : "-"}</em>
                   </button>
                 </li>
               ))}
@@ -630,7 +630,7 @@ export default function Evaluation() {
               <Card>
                 <ClampText as="h3" text={active.commercial_name || active.inn_name} lines={3} expandable style={{ marginTop: 0 }} />
                 <p style={{ fontSize: 14, color: "#475569" }}>
-                  Esta tecnología priorizada ({active.priority_points ?? "—"} puntos) aún no tiene
+                  Esta tecnología priorizada ({active.priority_points ?? "-"} puntos) aún no tiene
                   expediente. Se sugiere <strong>{active.suggested_level_label}</strong>.
                 </p>
                 {canWrite ? (

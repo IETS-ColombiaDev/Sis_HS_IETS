@@ -19,12 +19,12 @@ const STEPS = [
     title: "¿Cómo funciona?",
     body: (
       <ol style={{ margin: "0 0 0 18px", lineHeight: 1.7 }}>
-        <li><strong>Fuentes</strong> — listado maestro de URLs y documentos vigilados.</li>
-        <li><strong>Vigilancia</strong> — conectores de API y rastreo HTML/PDF consultan cada fuente, a mano o de forma programada.</li>
-        <li><strong>Señales</strong> — tecnologías capturadas, clasificadas por tipo, horizonte y estado de triage.</li>
-        <li><strong>Diseminación</strong> — recomendaciones de adopción para Colombia (IA como borrador) y paquete ZIP por ciclo.</li>
-        <li><strong>Notas del equipo</strong> — observaciones editables, descargables y mejorables con IA.</li>
-        <li><strong>Dashboards</strong> — gráficas que se actualizan en tiempo real cuando hay cambios.</li>
+        <li><strong>Fuentes</strong> - listado maestro de URLs y documentos vigilados.</li>
+        <li><strong>Vigilancia</strong> - conectores de API y rastreo HTML/PDF consultan cada fuente, a mano o de forma programada.</li>
+        <li><strong>Señales</strong> - tecnologías capturadas, clasificadas por tipo, horizonte y estado de triage.</li>
+        <li><strong>Diseminación</strong> - recomendaciones de adopción para Colombia (IA como borrador) y paquete ZIP por ciclo.</li>
+        <li><strong>Notas del equipo</strong> - observaciones editables, descargables y mejorables con IA.</li>
+        <li><strong>Dashboards</strong> - gráficas que se actualizan en tiempo real cuando hay cambios.</li>
       </ol>
     ),
   },

@@ -877,7 +877,7 @@ export default function Staging() {
                         {item.condition ? (
                           <Badge tone={item.condition}>{item.condition}</Badge>
                         ) : (
-                          <span className="staging-missing">—</span>
+                          <span className="staging-missing">-</span>
                         )}
                       </td>
                       <td>

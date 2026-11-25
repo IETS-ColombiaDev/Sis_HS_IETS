@@ -460,3 +460,89 @@ Sondeo de las 141 fuentes lanzado mientras corría la vigilancia: terminó sin b
 
 - El filtro sin IA es de reglas: prioriza no dejar entrar ruido. Puede perder algún titular legítimo redactado como pregunta o como frase larga sin nombre de producto. Con la IA activa, la IA decide.
 - Quedan señales de calidad media que no son ruido claro, como artículos de divulgación de noticias generales. Decidir si se conservan es criterio metodológico del equipo técnico.
+
+## Protección de datos y cierre de pendientes (24-11-2026, versión 7.2.0)
+
+**Estado:** CUMPLIDO PARCIAL, 24-11-2026. Todo está probado en local (suite de backend, suite de navegador y arranque real sobre una copia de la base). Falta la verificación en el sistema desplegado, que solo se puede hacer después del despliegue.
+
+**Qué se pidió:** que ningún cambio ni despliegue pueda borrar o dañar datos, cerrar lo que estaba a medias y comparar lo no tocado con los requerimientos de la raíz del repositorio.
+
+**Cómo se hizo:** dos auditorías de solo lectura sobre todo el código (pérdida de datos, y requerimientos contra código), verificación de cada hallazgo leyendo el código y con una prueba que lo reproduce, y corrección.
+
+### 1. Riesgos de pérdida de datos encontrados y corregidos
+
+**1.1 Una migración podía borrar las señales en cascada.** En SQLite, quitar o cambiar una columna reconstruye la tabla (copia y `DROP`). El arranque migraba con las llaves foráneas activas, así que reconstruir `sources` habría borrado en cascada todas las señales, y reconstruir `technologies` o `cycles`, los puntajes y evaluaciones. Hoy ninguna revisión (0001 a 0007) reconstruye tablas, por eso no había pasado, pero la siguiente revisión que quitara una columna lo habría hecho en producción, y el ensayo por línea de comandos (`alembic -x url=...`) no lo detecta porque corre sin ese ajuste. Ahora `migrations.schema_change_connection` migra con las llaves apagadas en esa conexión, comprueba al final que no quedaron referencias rotas y vuelve a activarlas. La prueba `test_rebuilding_a_table_with_foreign_keys_on_deletes_its_children` deja demostrado el riesgo y `test_schema_change_connection_keeps_the_children`, la protección.
+
+**1.2 Solo había una copia anterior y se pisaba en el arranque.** Firestore guardaba la copia vigente y la anterior. Cada arranque sube hasta tres copias en un minuto, así que un despliegue que dañara los datos restauraba la copia buena, la dañaba y borraba la buena antes de que alguien lo notara. Ahora hay **puntos de recuperación** que las copias siguientes no borran (`firebase_db.py`):
+
+| Punto | Cuándo se fija | Cuántos se guardan |
+|---|---|---|
+| Antes de un despliegue | La primera copia que hace una versión nueva del código fija la última de la versión anterior | 5 |
+| Cierre del día | La primera copia de un día fija la última del día anterior | 7 |
+| Otra instancia | Al subir, la nube trae una copia que este proceso no conocía (dos instancias durante un redespliegue) | 3 |
+| Antes de una restauración | Estado previo a cualquier restauración manual | 3 |
+| Fijada a mano | Botón del panel | 3 |
+
+El cupo es por motivo: las copias diarias nunca desplazan a la previa al despliegue. Se ven y se restauran en **Configuración → Copia de respaldo → Puntos de recuperación**. Cada copia guarda la versión del código que la hizo (`RENDER_GIT_COMMIT`) y el conteo de sus tablas principales.
+
+**1.3 Una base con menos datos podía pisar la copia buena.** La única guarda era el tamaño (menos del 50 %). Ahora cada copia lleva el conteo de sus tablas y la subida se bloquea si la bitácora local tiene menos registros que la guardada (la bitácora solo crece: si tiene menos, esa base no desciende de la copia) o si señales, tecnologías, fuentes, usuarios, postulaciones o notas caen a menos de la mitad. El bloqueo se ve en el panel y en `/api/health`. Si el superadministrador confirma que la base del servidor es la correcta, **Publicar de todos modos** la sube y deja la copia guardada como punto de recuperación (`backup:push_override` en la bitácora).
+
+**1.4 Dos instancias a la vez.** En un redespliegue la instancia nueva puede arrancar mientras la vieja sigue atendiendo, y su primera copia pisaba la última de la vieja. No se pueden fusionar dos bases, pero ahora esa copia ajena queda fijada como punto de recuperación en lugar de perderse. En ese caso la guarda por conteos no bloquea: la copia ajena puede traer más bitácora sin que la base local haya perdido nada, y bloquear dejaría a la instancia nueva sin poder guardar. Además, al apagar, primero se detiene la vigilancia y después se hace la copia final.
+
+**1.5 En qué base de Firestore viven los datos.** El arranque prefería la base nombrada `hs-iets` y, si lograba crearla, empezaba a trabajar en una base vacía dejando los datos reales huérfanos en `(default)`. Ahora, si la base nombrada no tiene copia y `(default)` sí, se usa `(default)`. Y si no se pudo determinar la base (fallo de red al arrancar), no se lee ni se sube nada: antes una base inexistente respondía «sin datos» y el sistema quedaba operando vacío.
+
+**1.6 Restaurar reemplazaba toda la base sin dejar rastro.** `POST /api/backup/restore?force=true` no quedaba en la bitácora ni guardaba el estado previo. Ahora, antes de reemplazar, el estado actual se sube y queda fijado; la acción queda en la bitácora de la base vigente (`backup:restore`, `backup:restore_checkpoint`, `backup:pin`).
+
+**1.7 Lo escrito después de una restauración se daba por inexistente.** «Sin cambios desde la restauración» se medía con un contador que solo algunas pantallas incrementan (no lo hacen usuarios, configuración ni postulaciones). Una restauración posterior podía descartar esos cambios, y era la causa de que la contraseña de `BOOTSTRAP_ADMIN_PASSWORD` a veces se aplicara y a veces no. Ahora también se mira la bitácora, que registra todas las escrituras.
+
+**1.8 La matriz cargada desde la interfaz se revertía al reiniciar.** El JSON de la matriz se escribía en el disco del servicio, que en Render es efímero. Tras el siguiente reinicio el arranque sincronizaba con la matriz de la imagen y revertía el inventario sin aviso. Ahora la matriz cargada se guarda también en la base (`matrix_store.py`) y el arranque la repone en disco antes de sincronizar. Si un despliegue trae una matriz nueva en la imagen, gana la de la imagen y queda aviso en el registro.
+
+**1.9 El arranque pisaba ediciones del equipo sobre las fuentes.** Solo se protegían los campos de la matriz (nivel, tipos, URL de entrada...). El nombre, la URL, «ingesta activa», la frecuencia, la descripción y las etiquetas volvían al valor de la matriz en cada reinicio. Ahora cualquier campo que una persona cambie en el panel queda marcado y la sincronización no lo toca; solo lo pisa la reimportación con «Sobrescribir lo editado». Tampoco se reactiva una fuente que el equipo sacó del catálogo ni una que la sonda suspendió por fallar.
+
+**1.10 La siembra de ciclos oficiales en el servicio desplegado.** La siembra reconstruye ciclos y solo estaba apagada con `ENVIRONMENT=production`. El servicio de Render trabaja sobre los datos reales aunque corra en `development`, así que ahora también se apaga cuando `RENDER=true`. `SEED_OFFICIAL_CYCLES=true` la vuelve a activar a propósito.
+
+**1.11 Carga de matriz por la API.** `POST /api/sources/matrix/import` pisaba lo editado por defecto. Ahora hay que pedirlo (`overwrite=true`); la interfaz ya lo enviaba de forma explícita.
+
+### 2. Pendientes funcionales cerrados
+
+- **RF20, alerta por cambio de fase.** La alerta «cambio de fase» solo miraba el estado del flujo. Ahora también avisa cuando cambia la fase clínica real de una tecnología de alto riesgo presupuestal (`clinical_phase_change_high_budget`), incluso si el cambio llega por la vigilancia en un registro ya capturado: antes la ingesta ignoraba la fase nueva de un registro ya visto. Conocer la fase por primera vez no cuenta como cambio.
+- **RF19, distribución del boletín.** El boletín publicado se envía a la alta dirección con el PDF adjunto (**Boletines → Enviar a la alta dirección**). La lista de destinatarios se recuerda; cada envío queda en el boletín y en la bitácora; un correo rechazado se informa sin ocultar los que sí salieron. Requiere SMTP configurado; sin él, la interfaz lo dice y ofrece descargar el PDF.
+- **RF18, buscador avanzado de expedientes.** La consulta pública filtra por clúster, tipo de tecnología, fase de desarrollo y año de publicación, busca también por indicación y pagina los resultados. Solo ofrece opciones con al menos una ficha visible, de modo que no revela publicaciones confidenciales.
+- **Notas del equipo.** Una respuesta tardía del servidor podía dejar en pantalla el contenido anterior de una nota recién editada. Solo se aplica la respuesta de la última consulta.
+- **Bandeja de entrada.** Error 500 con una base recién creada: dos peticiones simultáneas recalculaban «en varias fuentes» a la vez. Ahora hay un solo cálculo a la vez.
+- **Textos de la interfaz.** Sin rayas largas: se usan guiones normales.
+
+### 3. Lo que no se cambió y por qué
+
+Requiere decisión del equipo o infraestructura que no depende del código:
+
+| Tema | Situación | Qué se necesita |
+|---|---|---|
+| RNF12, acceso de desarrollo en el servicio desplegado | La imagen (`Dockerfile`) fija `ENVIRONMENT=production` y `ALLOW_DEV_LOGIN=false`. Si el panel de Render los cambia a `development`, el acceso sin contraseña queda abierto a cualquier correo del dominio | Confirmar en el panel de Render y, si el equipo aún entra por acceso de desarrollo, crear antes las cuentas con contraseña (`BOOTSTRAP_ADMIN_*`) |
+| RNF04, disponibilidad 99,5 % | Plan gratuito de Render con disco efímero | Plan de pago con disco persistente o PostgreSQL |
+| RNF03, cifrado AES-256 en reposo | No implementado; la copia en Firestore va comprimida, no cifrada | Definir manejo de llaves |
+| RNF06, API OAuth2 para EuroScan, NIHRIO y CONETEC | No implementado | Convenio y alcance con cada entidad |
+| RNF07, PostgreSQL con pgvector | El código es agnóstico del motor; el despliegue usa SQLite | Base PostgreSQL |
+| RF11, normas farmacológicas y carga del acta de Sala en PDF | Solo índice local y consulta en vivo de registros | Fuente oficial de normas y formato del acta |
+| RF13, editor enriquecido con comentarios en línea | Formulario estructurado con comentarios por campo | Decisión de alcance |
+| RF-006, criterios inactivos (implantables, equipos biomédicos, monitoreo) | Sin cambio | Decisión del equipo técnico |
+| Apagado en Render | La copia final puede no caber en los 30 s que da la plataforma | Evaluar `maxShutdownDelaySeconds` en el servicio |
+| Normalización ATC, CIE-10, MeSH y GMDN | El backend valida y normaliza; no hay pantalla para capturarlos | Diseño de la pantalla con el equipo técnico |
+
+El documento `Consolidado de observaciones SI EAA MOD 0.xlsx` es del equipo técnico y no se modificó. Tiene tres datos desactualizados frente al sistema: OBS-001 figura cumplida con «Prioridad sugerida» y esa función se retiró; cita los botones «Sondear A/B» y «Correr ahora», que hoy se llaman «Sondear todas» y «Ejecutar ahora»; y describe 11 categorías de búsqueda activas, cuando por RF-006 quedan 2.
+
+### 4. Pruebas
+
+- **Backend:** 871 aprobadas y 1 omitida. 46 son nuevas: 34 de protección de datos (`test_proteccion_datos.py`), 5 de RF20 (`test_rf20_cambio_de_fase.py`), 5 de RF19 y 2 de RF18.
+- **Verificación real sobre una copia de la base** (651 señales, 656 tecnologías, 141 fuentes), con el almacén de Firestore simulado en memoria y sin tocar la red:
+  - dos arranques completos seguidos no pierden ni una fila y conservan una fuente editada por el equipo;
+  - una base a la que se le borran todas las señales no logra sobrescribir la copia buena;
+  - la copia previa al «despliegue» sobrevive a las subidas siguientes y, al restaurarla, vuelven las 651 señales con la base íntegra (`integrity_check` y `foreign_key_check` en orden).
+- **Navegador (E2E):** 103 aprobadas y 1 omitida, con el código final y el frontend recién compilado (25-11-2026). Incluye las pruebas nuevas de puntos de recuperación (`backup_recovery.spec.js`), el envío del boletín y el buscador público. La omitida es `dashboards_tablero.spec.js` (mapa de calor presupuestal): se salta sola cuando la base de pruebas, que arranca vacía, no tiene ningún ciclo con montos presupuestales; no es un fallo ni cambió en esta entrega.
+
+### 5. Al desplegar
+
+1. No hay migración de esquema nueva: el arranque no cambia tablas.
+2. La primera copia después del despliegue fija sola la última copia de la versión anterior («Antes de un despliegue»). Compruébelo en **Configuración → Copia de respaldo**.
+3. Si algo se ve mal después de desplegar, restaure ese punto desde el mismo panel (pide escribir RESTAURAR). El estado dañado queda guardado, así que se puede deshacer.
+4. Las copias anteriores a esta versión no traen conteos: la guarda por conteos empieza a actuar desde la segunda copia.

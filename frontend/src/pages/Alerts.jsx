@@ -15,6 +15,7 @@ import { GLOSSARY } from "../constants/glossary";
 const KIND_LABEL = {
   new_phase3_colombia: "Ensayo fase III en el país",
   phase_change_high_budget: "Cambio de fase · alto riesgo presupuestal",
+  clinical_phase_change_high_budget: "Cambio de fase clínica · alto riesgo presupuestal",
 };
 
 /**
