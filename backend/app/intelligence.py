@@ -1032,3 +1032,185 @@ def export(db: Session) -> dict:
             for r in rows
         ],
     }
+
+
+# --------------------------------------------------------------------------- #
+#  Transparencia: ficha tecnica de los modelos y traza de las sugerencias
+# --------------------------------------------------------------------------- #
+METHOD_LABELS = {
+    "reglas": "Reglas del catálogo",
+    "aprendizaje": "Aprendizaje (señales parecidas)",
+    "aprendizaje_debil": "Aprendizaje con parecido bajo",
+    "reglas_y_aprendizaje": "Reglas y aprendizaje coinciden",
+    "ia": "IA generativa",
+    "ia_confirma": "IA confirma la propuesta",
+    "sin_evidencia": "Sin evidencia",
+}
+
+
+def model_card(db: Session) -> dict:
+    """Que modelos usa el sistema, de que tipo son, como aprenden y con que datos.
+
+    Todo sale del estado real: parametros guardados, tamano de la base de
+    conocimiento, ultima calibracion y proveedor de IA activo.
+    """
+    from . import ai_service, minimax_service, usage_meter
+
+    cfg = load_config(db)
+    kb = stats(db)
+    cal = load_calibration(db)
+    idx = index(db)
+    last_indexed = db.query(func.max(SignalKnowledge.indexed_at)).scalar()
+    try:
+        usage_meter.load_from_db(db)
+    except Exception:  # noqa: BLE001 - el contador es informativo
+        pass
+    usage = usage_meter.snapshot()
+    provider = ai_service.active_provider()
+    vision = ""
+    if provider == "minimax":
+        try:
+            vision = minimax_service.vision_model() or ""
+        except Exception:  # noqa: BLE001
+            vision = ""
+    learning_on = bool(cfg["enabled"]) and kb["learning"]
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "components": [
+            {
+                "key": "reglas",
+                "name": "Reglas del catálogo",
+                "type": "Sistema experto de reglas (determinista)",
+                "active": True,
+                "role": "Propone clúster, tipología y condición con palabras clave, códigos CIE-10 y términos MeSH del catálogo metodológico.",
+                "learning": "No aprende: aplica las reglas que el equipo mantiene en Configuración › Gobierno metodológico.",
+                "data": "Catálogo de clústeres y tipologías vigente.",
+                "facts": [
+                    {"label": "Acierto medido en clúster", "value": cal.get("rules_cluster_accuracy"), "kind": "percent"},
+                    {"label": "Acierto medido en tipología", "value": cal.get("rules_type_accuracy"), "kind": "percent"},
+                ],
+            },
+            {
+                "key": "aprendizaje",
+                "name": "Clasificador que aprende",
+                "type": "Aprendizaje supervisado por vecinos más cercanos (k-NN) sobre texto: TF-IDF y similitud coseno",
+                "active": learning_on,
+                "role": "Busca las señales más parecidas que el equipo ya clasificó y vota el clúster y la tipología, ponderando por el parecido.",
+                "learning": (
+                    "Aprendizaje incremental basado en ejemplos: cada clasificación o descarte del equipo entra a la base "
+                    "de conocimiento y cuenta desde la siguiente sugerencia. No hay entrenamiento por lotes ni pesos ocultos: "
+                    "cada sugerencia cita las señales que la sustentan."
+                ),
+                "data": "Base de conocimiento de señales del propio IETS (se respalda con la base del sistema).",
+                "facts": [
+                    {"label": "Señales en la base", "value": kb["documents"], "kind": "int"},
+                    {"label": "Ejemplos clasificados (de ellos aprende)", "value": kb["classified"], "kind": "int"},
+                    {"label": "Ejemplos descartados (avisos)", "value": kb["discarded"], "kind": "int"},
+                    {"label": "Términos distintos en el vocabulario", "value": len(idx.idf), "kind": "int"},
+                    {"label": "Vecinos que votan (k)", "value": cfg["neighbors"], "kind": "int"},
+                    {"label": "Parecido mínimo para votar", "value": cfg["min_similarity"], "kind": "percent"},
+                    {"label": "Confianza mínima para preferirlo a las reglas", "value": cfg["min_confidence"], "kind": "percent"},
+                    {"label": "Acierto medido en clúster", "value": cal.get("learned_cluster_accuracy"), "kind": "percent"},
+                    {"label": "Acierto combinado (lo que ve el evaluador)", "value": cal.get("combined_cluster_accuracy"), "kind": "percent"},
+                    {"label": "Última actualización de la base", "value": last_indexed.isoformat() if last_indexed else None, "kind": "datetime"},
+                ],
+                "note": (
+                    "" if learning_on else (
+                        "Apagado en los parámetros." if not cfg["enabled"]
+                        else f"Empieza a votar con {MIN_LABELED_TO_LEARN} señales clasificadas; hoy hay {kb['classified']}."
+                    )
+                ),
+            },
+            {
+                "key": "calibracion",
+                "name": "Calibración",
+                "type": "Validación cruzada dejando una fuera (leave-one-out)",
+                "active": cal.get("status") == "ok",
+                "role": "Mide el acierto real de cada método con las clasificaciones del equipo y ajusta k y la confianza mínima.",
+                "learning": (
+                    f"Se recalcula {'sola cada ' + str(cfg['auto_calibrate_every']) + ' clasificaciones nuevas' if cfg['auto_calibrate'] else 'solo cuando se pulsa «Calibrar ahora»'}."
+                ),
+                "data": "Señales ya clasificadas por el equipo.",
+                "facts": [
+                    {"label": "Última calibración", "value": cal.get("at"), "kind": "datetime"},
+                    {"label": "Señales evaluadas", "value": cal.get("evaluated"), "kind": "int"},
+                    {"label": "Precisión objetivo", "value": cfg["target_precision"], "kind": "percent"},
+                    {"label": "Objetivo cumplido", "value": cal.get("target_met"), "kind": "bool"},
+                ],
+                "note": "" if cal.get("status") else f"Aún no se ha calibrado: hacen falta {MIN_LABELED_TO_CALIBRATE} señales clasificadas.",
+            },
+            {
+                "key": "ia",
+                "name": "IA generativa",
+                "type": "Modelo de lenguaje de gran tamaño (LLM) preentrenado, consultado por API",
+                "active": bool(provider),
+                "role": (
+                    "Lee las páginas de las fuentes para extraer señales, arbitra la clasificación cuando reglas y aprendizaje "
+                    "no coinciden y redacta la lectura analítica. Nunca decide sola: el evaluador confirma."
+                ),
+                "learning": (
+                    "No se entrena ni se reajusta con datos del IETS. En cada consulta recibe como contexto los ejemplos ya "
+                    "clasificados por el equipo (aprendizaje en contexto) y el prompt configurado."
+                ),
+                "data": "Texto de la señal, ejemplos del equipo y prompts de Configuración. Lo extraído se contrasta con el texto visitado.",
+                "facts": [
+                    {"label": "Proveedor", "value": {"minimax": "MiniMax", "gemini": "Google Gemini"}.get(provider, "Ninguno (IA apagada)"), "kind": "text"},
+                    {"label": "Modelo de texto", "value": ai_service.current_model() or None, "kind": "text"},
+                    {"label": "Modelo de visión (OCR)", "value": (vision if ai_service.ocr_enabled() else "") or None, "kind": "text"},
+                    {"label": "Cuándo clasifica", "value": {"nunca": "Nunca", "desacuerdo": "Solo si hay duda", "siempre": "Siempre"}.get(cfg["ai_mode"], cfg["ai_mode"]), "kind": "text"},
+                    {"label": "Ejemplos del equipo en cada consulta", "value": cfg["examples_in_prompt"], "kind": "int"},
+                    {"label": "Lectura de sitios en la vigilancia", "value": ai_service.web_assist_enabled(), "kind": "bool"},
+                    {"label": "Consultas realizadas", "value": int(usage.get("calls") or 0), "kind": "int"},
+                    {"label": "Tokens consumidos", "value": int(usage.get("total_tokens") or 0), "kind": "int"},
+                    {"label": "Última consulta", "value": usage.get("last_at") or None, "kind": "datetime"},
+                    {"label": "Último modelo que respondió", "value": usage.get("last_model") or None, "kind": "text"},
+                ],
+                "note": "" if provider else "Sin IA el sistema sigue completo con reglas y aprendizaje.",
+            },
+        ],
+        "decision_rule": [
+            "Si reglas y aprendizaje coinciden, se propone ese valor y la confianza sube.",
+            f"Si no coinciden, gana el aprendizaje solo cuando su confianza llega a {int(round(cfg['min_confidence'] * 100))} %; si no, quedan las reglas.",
+            {
+                "nunca": "La IA no interviene en la clasificación.",
+                "desacuerdo": "La IA se consulta solo cuando hay duda (desacuerdo o confianza baja) y su respuesta se muestra con su razón.",
+                "siempre": "La IA se consulta en todas las sugerencias y su respuesta se muestra con su razón.",
+            }.get(cfg["ai_mode"], ""),
+            "La decisión final siempre es del evaluador y queda en la bitácora de auditoría junto con la sugerencia que vio.",
+        ],
+        "method_labels": METHOD_LABELS,
+    }
+
+
+def suggestion_trace(db: Session, *, limit: int = 15) -> list[dict]:
+    """Ultimas sugerencias registradas: metodo, confianza y lo que decidio el equipo."""
+    rows = (
+        db.query(AuditLog)
+        .filter(AuditLog.entity_type == "technologies", AuditLog.action == SUGGEST_ACTION)
+        .order_by(AuditLog.id.desc()).limit(limit).all()
+    )
+    ids = [int(r.entity_id) for r in rows if str(r.entity_id).isdigit()]
+    techs = {t.id: t for t in db.query(Technology).filter(Technology.id.in_(ids)).all()} if ids else {}
+    clusters, types, _sources = _names(db)
+    out = []
+    for row in rows:
+        value = row.new_value if isinstance(row.new_value, dict) else {}
+        tech = techs.get(int(row.entity_id)) if str(row.entity_id).isdigit() else None
+        decided = bool(tech and tech.cluster_id)
+        out.append(
+            {
+                "at": row.occurred_at.replace(tzinfo=timezone.utc) if row.occurred_at and row.occurred_at.tzinfo is None else row.occurred_at,
+                "by": row.user_email or "",
+                "technology_id": tech.id if tech else None,
+                "technology": (tech.commercial_name or tech.inn_name or f"Tecnología {tech.id}") if tech else f"Tecnología {row.entity_id}",
+                "cluster_suggested": clusters.get(value.get("cluster_id"), ""),
+                "tech_type_suggested": types.get(value.get("tech_type_id"), ""),
+                "method": value.get("cluster_method") or "",
+                "method_label": METHOD_LABELS.get(value.get("cluster_method") or "", value.get("cluster_method") or ""),
+                "confidence": value.get("cluster_confidence"),
+                "decided": decided,
+                "accepted": decided and bool(value.get("cluster_id")) and value.get("cluster_id") == tech.cluster_id,
+                "cluster_final": clusters.get(tech.cluster_id, "") if decided else "",
+            }
+        )
+    return out

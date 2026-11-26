@@ -1,649 +1,721 @@
 # Sistema de Escaneo de Horizonte del IETS
 
-Plataforma integral para el **escaneo de horizonte (horizon scanning)** del **Instituto de Evaluación Tecnológica en Salud (IETS)** de Colombia: identificación temprana de tecnologías sanitarias emergentes, vigilancia automatizada de referentes internacionales, postulación ciudadana con control de conflicto de intereses, depuración y desduplicación difusa, cruce regulatorio con INVIMA, priorización mediante la matriz oficial del Manual Metodológico (%P), caracterización técnica, evaluación temprana con revisión por pares, diseminación asistida por IA y bitácora inmutable de auditoría bajo un esquema de control de acceso basado en roles (RBAC).
+Aplicación web del **Instituto de Evaluación Tecnológica en Salud (IETS)** de Colombia para el escaneo de horizonte (*horizon scanning*) de tecnologías sanitarias: vigila fuentes públicas, captura señales, las depura y cruza con el registro sanitario, las prioriza con la matriz %P, soporta la evaluación temprana con revisión por pares y publica los resultados. Todo cambio queda en una bitácora de auditoría y el acceso se gobierna por perfiles.
 
-Inspirado en el modelo operativo del [NIHR Innovation Observatory](https://io.nihr.ac.uk/) y construido respetando la línea gráfica institucional formalizada en [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md).
+**Versión de esta entrega:** `7.5.0` (`backend/app/__init__.py`, `frontend/package.json`).
 
 ---
 
 ## Índice
 
-1. [Nombre y descripción del proyecto](#nombre-y-descripción-del-proyecto)
-2. [Tecnologías utilizadas](#tecnologías-utilizadas)
-3. [Requisitos previos](#requisitos-previos)
-4. [Instalación](#instalación)
-5. [Configuración (variables de entorno)](#configuración-variables-de-entorno)
-6. [Cómo ejecutar el proyecto y las pruebas](#cómo-ejecutar-el-proyecto-y-las-pruebas)
-7. [Estructura del proyecto](#estructura-del-proyecto)
-8. [Flujo de la aplicación](#flujo-de-la-aplicación)
-9. [Conceptos clave y metodología operativa](#conceptos-clave-y-metodología-operativa)
-10. [Perfiles y matriz de permisos (RBAC)](#perfiles-y-matriz-de-permisos-rbac)
-11. [Documentación relacionada](#documentación-relacionada)
+1. [Qué hace el sistema](#qué-hace-el-sistema)
+2. [Arquitectura y tecnologías](#arquitectura-y-tecnologías)
+3. [Requisitos](#requisitos)
+4. [Instalación y ejecución](#instalación-y-ejecución)
+5. [Variables de entorno](#variables-de-entorno)
+6. [Seguridad de los datos: copia en Firestore](#seguridad-de-los-datos-copia-en-firestore)
+7. [Vigilancia de fuentes](#vigilancia-de-fuentes)
+8. [Inteligencia del sistema](#inteligencia-del-sistema)
+9. [Perfiles y permisos](#perfiles-y-permisos)
+10. [API](#api)
+11. [Pruebas](#pruebas)
+12. [Migraciones de base de datos](#migraciones-de-base-de-datos)
+13. [Comandos de administración (CLI)](#comandos-de-administración-cli)
+14. [Estructura del repositorio](#estructura-del-repositorio)
+15. [Flujo de ramas](#flujo-de-ramas)
+16. [Documentación relacionada](#documentación-relacionada)
 
 ---
 
-## Nombre y descripción del proyecto
+## Qué hace el sistema
 
-**Sistema de Escaneo de Horizonte del IETS (Sis_HS_IETS)**  
-**Versión actual:** `7.4.2` (25 de noviembre de 2026)
+El menú lateral sigue las fases de la metodología (`frontend/src/constants/navigation.js`). Las pantallas de cada fase aparecen como submódulos, en el orden en que se usan.
 
-El sistema automatiza el ciclo de vida del monitoreo proactivo y reactivo de tecnologías sanitarias (medicamentos, dispositivos médicos, procedimientos, biológicos, salud digital) antes o durante su llegada al mercado y al Sistema General de Seguridad Social en Salud (SGSSS) de Colombia.
+| Sección del menú | Pantallas (ruta) |
+|---|---|
+| Inicio | Bandeja de trabajo (`/`), Ciclos de escaneo (`/ciclos`), Notas del equipo (`/notas`) |
+| Metodología IETS · 1. Vigilancia | Vigilancia (`/vigilancia`), Catálogo de fuentes (`/fuentes`), Señales capturadas (`/senales`), Bandeja de entrada (`/bandeja-entrada`), Postulaciones (`/postulaciones`), Filtrado y depuración (`/filtrado`) |
+| Metodología IETS · 2. Priorización | Priorización (`/priorizacion`) |
+| Metodología IETS · 3. Evaluación | Evaluación temprana (`/evaluacion`) |
+| Metodología IETS · 4. Diseminación | Diseminación (`/diseminacion`), Boletines del ciclo (`/boletines`) |
+| Análisis y seguimiento | Tablero estratégico (`/dashboards`), Alertas tempranas (`/alertas`), Asistente IA (`/chat`) |
+| Administración | Configuración (`/configuracion`), Usuarios y perfiles (`/usuarios`), Bitácora de auditoría (`/auditoria`) |
 
-### Capacidades principales
-- **Vigilancia proactiva por enlace:** El inventario es la primera hoja de la matriz `MATRIZ_FUENTES_ESCANEO_EH` (un enlace por fila): 142 filas de 85 organizaciones que dan **141 fuentes**, una por URL distinta, con código `EH-<ID>`. Cada fuente lleva su propio contexto (tipo de material, ruta de acceso, información a consultar, observaciones y restricciones) para que la extracción con IA sepa qué buscar en esa página. 108 se rastrean como página web, 7 se consultan por API oficial (ClinicalTrials.gov v2, PubMed, CTIS, PCORI, EMA, openFDA Drugs@FDA y Health Canada), 8 quedan en consulta manual por restricciones de uso y 18 de información general o metodológica quedan como referencia sin ingesta. El scraping web tiene respaldo de RSS oficial y Google News ante bloqueos antibot.
-- **Avance de la vigilancia en vivo:** Porcentaje ponderado por la etapa de cada fuente en curso, que nunca retrocede y cierra en 100 % solo cuando no queda nada en cola; tiempo estimado de fin y avance visible desde cualquier pantalla.
-- **Enlace a la fuente original (RF-001):** Cada señal guarda aparte la URL consultada y la URL exacta, y distingue (Enlace exacto) de (Página de consulta). Cuando la fuente no ofrece enlace directo, muestra la evidencia de captura (título, fragmento, fecha y hora, URL consultada). Incluye reporte de enlaces por fuente y verificación de enlaces caídos.
-- **Buscador de tecnologías (RF-005):** En la pantalla principal, búsqueda parcial sin tildes ni mayúsculas por nombre, DCI, marca, fabricante, señal o fuente, con módulo, etapa, estado, responsable, último cambio, enlace directo y recorrido por etapas tomado de la bitácora.
-- **Criterios de búsqueda por categoría (RF-006):** Solo Medicamentos y Dispositivos médicos activos; las demás categorías se activan desde Configuración, con registro en bitácora.
-- **Bandeja Legacy:** Las señales pendientes de fuentes del inventario anterior quedan en una pestaña aparte de la Bandeja de entrada, desde donde se pueden recuperar. Nada se borra.
-- **Canal reactivo externo:** Portal público de postulaciones (`/postular`) protegido por Google reCAPTCHA v3 y límite de tasa por IP, exigiendo declaración obligatoria de conflicto de interés (COI).
-- **Procesamiento inteligente y corroboración:** Extracción automática de detalles de producto (forma farmacéutica, concentración, vía de administración, marca, modelo de dispositivo) y detección de tecnologías corroboradas en múltiples fuentes (bono ponderado para la bandeja de entrada).
-- **Depuración y verificación regulatoria:** Motor de desduplicación difusa (Levenshtein, Jaro-Winkler, Token Sort) con soporte de emparejamiento decisivo por identificador NCT, normalización de vocabularios (ATC, CIE-10, MeSH, GMDN/EMDN) y cruce con copia local y consulta en vivo a bases de datos de INVIMA en `datos.gov.co`.
-- **Priorización metodológica oficial %P:** Evaluación sobre 6 criterios binarios ponderados (P1 a P6) según el Manual Metodológico del IETS, calculando el indicador porcentual oficial `%P = (suma / 6) * 100` y asignando la clasificación en tres franjas (Priorizada ≥ 60 %, Bajo vigilancia 33–59 %, No priorizada < 33 %).
-- **Evaluación temprana y revisión colegiada:** Elaboración de fichas técnicas, informes rápidos o Mini-HTA con control de versiones, revisión por pares internos y externos mediante token temporal sin cuenta requerida, y firma de COI previa.
-- **Diseminación institucional:** Generación de expedientes, fichas públicas y boletines consolidados en **PDF nativo** mediante ReportLab, tablero estratégico con grafo interactivo de gobernanza, y exportación masiva de paquetes ZIP de diseminación.
-- **Probado con IA real (7.4.2):** Vigilancia completa de 115 fuentes con el proveedor de IA: 115 de 115 atendidas, ninguna con error, 1.152 señales detectadas (847 sin IA) en 19 minutos. El prompt de captura excluye temas de salud, procedimientos y clases terapéuticas genéricas que no nombran un producto. Las pruebas automáticas nunca llaman al proveedor real, aunque el equipo tenga una llave válida.
-- **Búsqueda a fondo y vigilancia que no se queda (7.4.1):** El rastreador lee el contenido plegado u oculto de cada página (acordeones, pestañas, «ver más») y las tablas, además del cuerpo y de los PDF. Entre todas las fuentes abre como mucho dos páginas a la vez de un mismo sitio. Ninguna escritura queda abierta mientras se espera a la red, una fuente que falla al guardar se cierra y se reintenta sola, y el log avisa de cualquier escritura abierta más de 5 segundos. Los enlaces de las señales se verifican solos: un 404 (o una página de «no encontrado») deja de ofrecerse como enlace exacto.
-- **Inteligencia del sistema (7.4.0):** Una **base de conocimiento de señales** guarda cada señal capturada con su origen (primera búsqueda histórica o vigilancia posterior), su año y la decisión del equipo (clasificada o descartada con su motivo). Con ella, (Sugerir clasificación) combina las reglas del catálogo con lo que el equipo ya clasificó y, si la IA está encendida, con su arbitraje sobre esos mismos ejemplos; siempre muestra confianza y evidencia, y avisa cuando una señal se parece a otras descartadas. La **calibración** mide con los datos reales cuánto acierta cada método y ajusta los parámetros. Funciona con la IA apagada.
-- **Marco analítico con IA (7.4.0):** Analítica muestra cuatro lentes sobre todo el sistema (descriptivo, diagnóstico, predictivo y prescriptivo) calculados con reglas, y una lectura ejecutiva que la IA redacta usando solo esas cifras.
-- **Vigencia de las señales por año (7.4.0):** Por defecto entran todos los años. El rango se fija de manera general o para fuentes específicas, se revisa qué señales de la bandeja quedan fuera y, si se confirma, pasan a Descartadas (reversible).
-- **Gobernanza y auditoría:** Registro inmutable append-only con triggers/permisos a nivel de motor de BD y middleware HTTP que audita cada mutación asociando usuario, IP, ruta, payload anterior y nuevo.
-- **Persistencia en Firestore sin pérdida:** La base SQLite se copia a Firestore por generaciones (una subida cortada no corrompe la copia), conserva la copia anterior como respaldo, no sube nada hasta haber leído la nube al arrancar y bloquea subir una base mucho más pequeña que la guardada.
+Páginas públicas, sin sesión: formulario de postulación (`/postular`), portal del revisor externo (`/revisar/:token`), catálogo de expedientes publicados (`/expedientes`, `/expedientes/:id`) y cifras de transparencia (`/transparencia`).
 
----
+### 1. Vigilancia e identificación
 
-## Tecnologías utilizadas
+- **Catálogo de fuentes.** El inventario vigente es la matriz por enlace `backend/app/data/matriz_enlaces_eh.json` (142 filas, una por enlace; códigos `EH-<ID>`), que se sincroniza al arrancar (`catalog_service.sync_catalog`). Desde la pantalla se puede cargar una matriz nueva en Excel, compararla con la vigente y aplicarla, dar de alta una fuente solo con su URL, descubrir fuentes, registrar la consulta manual de las que no admiten rastreo y exportar el catálogo.
+- **Vigilancia.** Corridas manuales (todas las fuentes activas, una selección o una sola) y programadas. Cada fuente se consulta por su conector de API o con el rastreador web, que tiene varias rutas de acceso. Ver [Vigilancia de fuentes](#vigilancia-de-fuentes).
+- **Señales capturadas.** Cada señal guarda la URL consultada, la URL exacta cuando existe, el tipo de enlace y la evidencia de captura. Hay reporte de enlaces por fuente, verificación de enlaces caídos y ubicación de la señal dentro de su página (`signal_links.py`, `link_resolver.py`).
+- **Bandeja de entrada.** Clasificación por clúster y tipología con sugerencia explicada, dictamen de confiabilidad de la señal, datos de producto extraídos del texto (`product_details.py`), corroboración entre fuentes (`corroboration.py`), descarte y restauración, recuperación de señales de fuentes del inventario anterior (Legacy) y asignación por lotes al ciclo.
+- **Postulaciones.** Formulario público con declaración de conflicto de interés, reCAPTCHA v3 cuando están las dos llaves y tope de envíos por IP. La moderación cruza cada postulación con lo ya vigilado antes de aceptarla o rechazarla.
+- **Filtrado y depuración.** Propuestas de duplicados por similitud difusa (`dedup.py`, RapidFuzz) que una persona confirma o descarta; verificación de novedad con cruce al índice local del INVIMA y, si `INVIMA_LIVE_LOOKUP` lo permite, consulta en vivo a `datos.gov.co`; normalización de códigos; Listado Único por clúster exportable.
 
-| Tecnología | Versión | Uso en el proyecto |
-|---|---|---|
-| **Python** | `3.12` / `3.13` | Lenguaje de programación del backend |
-| **FastAPI** | `0.115.6` | Framework web asíncrono para la construcción de la API REST |
-| **Uvicorn** | `0.34.0` | Servidor ASGI para ejecución de la API |
-| **SQLAlchemy** | `2.0.36` | ORM para modelado de datos y abstracción relacional |
-| **Alembic** | `1.19.2` | Control de versiones y migraciones de la base de datos |
-| **PostgreSQL** | `15` | Base de datos relacional para entornos de producción |
-| **psycopg (psycopg 3)** | `3.3.5` | Driver de conexión nativa a PostgreSQL |
-| **SQLite** | `3` | Motor de base de datos embebido por defecto para desarrollo local |
-| **Pydantic** | `2.10.4` | Validación de datos, esquemas de entrada/salida y serialización |
-| **Pydantic-Settings** | `2.7.1` | Gestión y validación de variables de entorno |
-| **RapidFuzz** | `3.14.6` | Algoritmos de similitud de cadenas (Levenshtein, Jaro-Winkler, Token Sort) |
-| **ReportLab** | `4.2.5` | Generación nativa de documentos PDF (expedientes, boletines, fichas) |
-| **HTTPX** | `0.28.1` | Cliente HTTP asíncrono y síncrono para conectores y scraping web |
-| **Requests** | `2.32.3` | Cliente HTTP para descargas y sincronización con Socrata / INVIMA |
-| **BeautifulSoup4** | `4.12.3` | Parsing de páginas HTML durante la vigilancia proactiva |
-| **Lxml** | `6.1.1` | Procesador XML/HTML de alto rendimiento para BeautifulSoup |
-| **Trafilatura** | `2.1.0` | Extracción de texto estructurado y metadatos de páginas web |
-| **PyPDF / PyPDFium2** | `6.14.2` / `4.30.0` | Lectura, extracción y renderizado de documentos PDF |
-| **Pillow** | `11.3.0` | Procesamiento de imágenes para el módulo OCR |
-| **OpenPyXL** | `3.1.5` | Lectura y escritura de hojas de cálculo Excel (.xlsx) |
-| **Python-Jose** | `3.3.0` | Criptografía, generación y validación de JSON Web Tokens (JWT) |
-| **Google Generative AI** | `0.8.3` | SDK oficial de Gemini (IA de respaldo) |
-| **MiniMax HTTP API** | API REST v1 | Proveedor principal de Inteligencia Artificial (MiniMax-M3 / M3.1) |
-| **Google Firestore** | API v1 | Directorio institucional de RRHH y respaldo de snapshots de la BD |
-| **React** | `18.3.1` | Biblioteca de UI para la interfaz de usuario en el frontend |
-| **Vite** | `5.4.11` | Herramienta de compilación y servidor de desarrollo para la SPA |
-| **React Router DOM** | `6.28.0` | Enrutamiento del lado del cliente y control de vistas |
-| **Recharts** | `2.13.3` | Biblioteca de gráficos analíticos para tableros estratégicos |
-| **Axios** | `1.7.9` | Cliente HTTP en el frontend para comunicación con la API |
-| **Playwright** | `1.49.1` | Framework de pruebas de navegador E2E |
-| **Docker / Docker Compose** | — | Empaquetado en contenedor y orquestación con PostgreSQL y Caddy |
+### 2. Priorización
 
----
+Matriz oficial de seis criterios binarios, P1 a P6 (`priority_engine.py`). `%P = (suma de P1..P6 / 6) × 100`. La clasificación se hace por puntos: 4 o más, priorizada; 3, bajo vigilancia; 2 o menos, no priorizada. Los umbrales están en los parámetros metodológicos (`priority.points_prioritized`, `priority.points_watch`), no en el código. El %P no se calcula mientras falte un criterio y una entrada de ciclo congelada rechaza escrituras. Cada criterio solo lo califica el perfil que tiene su permiso.
 
-## Requisitos previos
+### 3. Evaluación
 
-Para desplegar y ejecutar el proyecto localmente o en un servidor, se requiere:
+Expediente por tecnología priorizada, con versiones, comentarios y declaración de conflicto de interés. Estados (`evaluation.py`): `borrador` → `revision_interna` → `revision_externa` → `con_observaciones` o `aprobado_comite` → `publicado`. El revisor externo entra por un enlace con token, sin cuenta, y firma su declaración antes de comentar. El expediente se exporta en HTML institucional o PDF (ReportLab).
 
-1. **Python:** Versión `3.12` recomendada (o `3.13` con entorno virtual). En sistemas Windows, se puede invocar como `python` o mediante el lanzador `py`.
-2. **Node.js y npm:** Node.js versión `18.x`, `20.x` o `24.x` (en Dockerfile se utiliza Node `24`) y `npm` versión `9.x` o superior.
-3. **Git:** Para clonar el repositorio y gestionar ramas.
-4. **PostgreSQL 15:** (Opcional para desarrollo, recomendado para producción). Si no se configura `DATABASE_URL`, el backend utilizará SQLite automáticamente.
-5. **Docker y Docker Compose:** (Opcional) Si se prefiere desplegar la solución completa en contenedores.
+### 4. Diseminación
 
----
+Informes de diseminación (redacción manual o generada con IA desde una señal), paquete ZIP del ciclo, boletines que se compilan desde el ciclo, se aprueban y se distribuyen, y ficha pública de los expedientes publicados.
 
-## Instalación
+### Análisis y seguimiento
 
-### Opción A: Instalación manual (Desarrollo)
+- **Bandeja de trabajo.** Pendientes del perfil, buscador de tecnologías y resumen de la **última vigilancia** del historial: cuándo corrió, cuánto duró, fuentes, cuántas entraron, cuántas quedaron sin acceso y señales nuevas.
+- **Tablero estratégico.** Indicadores del ciclo, grafo de relaciones y **marco analítico** (`analytics_insights.py`) con cuatro lentes: descriptivo, diagnóstico, predictivo y prescriptivo. El diagnóstico incluye el indicador **«Fuentes sin acceso»**: fuentes que no se pudieron leer en su última corrida, con enlace al informe de acceso. Todo se calcula con reglas; si la IA está encendida, redacta además una lectura ejecutiva usando solo esas cifras.
+- **Alertas tempranas** con suscripciones, y **Asistente IA** sobre lo registrado en el sistema. El asistente de navegación responde «cómo hago X» sin IA, a partir de `HOWTO` en `navigation.js`.
 
-#### 1. Clonar el repositorio
-```bash
-git clone https://github.com/FerneyBarbosa/Sis_HS_IETS.git
-cd Sis_HS_IETS
+### Administración
+
+Configuración agrupada por tema (`frontend/src/pages/Settings.jsx`):
+
+| Grupo | Pestañas |
+|---|---|
+| Metodología | Gobierno metodológico, Reglas de horizonte |
+| Fuentes y vigilancia | Parámetros de fuentes, Llaves de fuentes, Tareas programadas, Prompts de vigilancia |
+| Inteligencia artificial | Integración con IA, Inteligencia |
+| Datos y respaldo | Persistencia (Firebase) |
+
+Además: usuarios y perfiles, «Ver como» para que el superadministrador opere con los permisos de otro perfil, y bitácora de auditoría. La tabla `audit_log` rechaza `UPDATE` y `DELETE` a nivel de motor: disparadores en SQLite y revocación de privilegios en PostgreSQL (`database.harden_audit_log`).
+
+### Flujo general
+
+```mermaid
+flowchart TD
+    F["Fuentes de la matriz EH"] --> Q["Cola ingest_jobs"]
+    Q --> W["Worker: conectores de API o rastreador web"]
+    W --> S["Señales (findings) y tecnologías"]
+    P["Formulario público /postular"] --> M["Moderación de postulaciones"]
+    M --> B["Bandeja de entrada"]
+    S --> B
+    B -->|"Clasificar y asignar al ciclo"| D["Filtrado: duplicados, novedad, INVIMA"]
+    D -->|"Listado Único"| R["Priorización %P (P1 a P6)"]
+    R -->|"Priorizada"| E["Evaluación y revisión por pares"]
+    E -->|"Publicado"| O["Diseminación: informes, boletines, ficha pública"]
+    B -.-> K["Base de conocimiento de señales"]
+    K -.->|"Sugerencia de clasificación"| B
 ```
 
-#### 2. Configurar el Backend (Python)
-```bash
+---
+
+## Arquitectura y tecnologías
+
+Un solo servicio web: FastAPI expone la API bajo `/api` y, si existe `frontend/dist`, sirve también la aplicación React compilada. La cola de vigilancia vive en la tabla `ingest_jobs` y la atiende un hilo del mismo proceso (o un servicio `worker` aparte con la misma imagen). La base es SQLite por defecto o PostgreSQL 15 con `DATABASE_URL`. Con SQLite, la base se copia a Firestore.
+
+| Capa | Tecnología | Versión | Uso |
+|---|---|---|---|
+| Backend | Python | 3.12 (imagen Docker y CI) | Lenguaje del backend |
+| | FastAPI | 0.115.6 | API REST |
+| | Uvicorn | 0.34.0 | Servidor ASGI |
+| | SQLAlchemy | 2.0.36 | ORM |
+| | Alembic | 1.19.2 | Migraciones versionadas |
+| | psycopg | 3.3.5 | Driver de PostgreSQL |
+| | Pydantic / pydantic-settings | 2.10.4 / 2.7.1 | Esquemas y configuración |
+| | python-jose | 3.3.0 | Tokens de sesión (JWT) |
+| | google-auth | 2.37.0 | Inicio de sesión con Google y cuenta de servicio |
+| | httpx / requests | 0.28.1 / 2.32.3 | Clientes HTTP de conectores y rastreador |
+| | curl_cffi | 0.17.0 | Cliente compatible con navegador (opcional) |
+| | BeautifulSoup4 / lxml / trafilatura | 4.12.3 / 6.1.1 / 2.1.0 | Lectura de páginas |
+| | pypdf / pypdfium2 / Pillow | 6.14.2 / 4.30.0 / 11.3.0 | Lectura de PDF e imágenes |
+| | RapidFuzz | 3.14.6 | Similitud de cadenas para duplicados |
+| | openpyxl | 3.1.5 | Lectura y escritura de Excel |
+| | ReportLab | 4.2.5 | PDF de expedientes, informes y boletines |
+| | google-generativeai | 0.8.3 | Gemini (IA de respaldo) |
+| Frontend | React / React DOM | ^18.3.1 | Interfaz |
+| | React Router DOM | ^6.28.0 | Rutas |
+| | Vite | ^5.4.11 | Servidor de desarrollo y compilación |
+| | Axios | ^1.7.9 | Cliente de la API |
+| | Recharts | ^2.13.3 | Gráficos |
+| | react-markdown / remark-gfm | ^9.0.1 / ^4.0.0 | Texto con formato |
+| | Playwright | ^1.49.1 | Pruebas de navegador |
+| Despliegue | Docker | `node:24-bookworm-slim`, `python:3.12-slim-bookworm` | Imagen de tres etapas |
+| | Docker Compose | `postgres:15`, `caddy:2` | Pila con API, worker, base y proxy HTTPS |
+
+Servicios externos que el sistema puede usar: MiniMax (IA principal) o Gemini por API, Firestore (copia de la base y directorio institucional), `datos.gov.co` (INVIMA), E-utilities de NCBI, openFDA y las demás fuentes del catálogo. Ninguno es obligatorio para arrancar: sin llave de IA el sistema opera con reglas.
+
+La hoja `frontend/src/styles/horizon.css` se carga al final (`main.jsx`) y define el rediseño visual de esta entrega: menú lateral azul, cabecera de pantalla en una sola franja e indicadores en fichas compactas. Afina `globals.css`, `shell.css` y `ui.css`; no oculta contenido.
+
+---
+
+## Requisitos
+
+- **Python 3.12**, la versión de la imagen Docker y de la integración continua.
+- **Node.js y npm.** La imagen y la CI compilan con Node 24; el job de Playwright de la CI usa Node 22.
+- **Git.**
+- **Google Chrome** instalado, para las pruebas de navegador en el equipo (o Chromium de Playwright con `E2E_CHANNEL=chromium`).
+- Opcional: **Docker y Docker Compose** para la pila con PostgreSQL 15.
+
+---
+
+## Instalación y ejecución
+
+> Antes de levantar cualquier servidor local, lea [Seguridad de los datos](#seguridad-de-los-datos-copia-en-firestore): un servidor local o de pruebas debe correr con `FIREBASE_DB_ENABLED=false`.
+
+### Preparación
+
+```powershell
+git clone <URL-del-repositorio>
+cd Sis_HS_IETS
+
+# Backend
 cd backend
-
-# Crear entorno virtual
 python -m venv .venv
-
-# Activar entorno virtual
-# En Windows (PowerShell):
 .\.venv\Scripts\Activate.ps1
-# En Linux / macOS:
-source .venv/bin/activate
-
-# Actualizar pip e instalar dependencias
 python -m pip install --upgrade pip
 pip install -r requirements.txt
+Copy-Item .env.example .env      # edite los valores; ponga FIREBASE_DB_ENABLED=false
 
-# Configurar variables de entorno
-cp .env.example .env
-```
-
-#### 3. Configurar el Frontend (React + Vite)
-```bash
-cd ../frontend
-
-# Instalar dependencias de Node
+# Frontend
+cd ..\frontend
 npm install
 ```
 
----
+En Linux o macOS el entorno se activa con `source .venv/bin/activate` y el archivo se copia con `cp .env.example .env`.
 
-### Opción B: Arranque automático en Windows
+### Desarrollo (dos terminales, recarga en caliente)
 
-El proyecto incluye un script de automatización en PowerShell que valida dependencias, crea el `.venv`, instala librerías, compila el frontend e inicia el servidor unificado:
+```powershell
+# Terminal 1: API en http://127.0.0.1:8000 (documentación en /docs)
+cd backend
+.\.venv\Scripts\Activate.ps1
+$env:FIREBASE_DB_ENABLED = "false"
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+
+# Terminal 2: interfaz en http://127.0.0.1:5173
+cd frontend
+npm run dev
+```
+
+Vite redirige `/api` a `http://127.0.0.1:8000`. `API_TARGET`, `VITE_PORT` y `VITE_HOST` cambian el destino, el puerto y la interfaz (`frontend/vite.config.js`).
+
+### Arranque rápido en Windows
 
 ```powershell
 .\start.ps1
 ```
 
----
+Crea el entorno virtual e instala dependencias si faltan, copia `backend\.env.example` a `backend\.env` si no existe, compila el frontend si no hay `frontend\dist` y levanta uvicorn en `http://127.0.0.1:8000`, que sirve la API y la interfaz compilada.
 
-## Configuración (variables de entorno)
-
-El archivo de configuración principal se ubica en `backend/.env`. Copie `backend/.env.example` y ajuste las variables según el entorno:
-
-### Variables de entorno reconocidas
-
-| Variable | Tipo / Defecto | Descripción |
-|---|---|---|
-| `ENVIRONMENT` | `development` | `development`, `testing` o `production`. En producción se exige `SECRET_KEY` segura y se bloquea el acceso de desarrollo. |
-| `SECRET_KEY` | *Cadena* | Clave para firma de JWT. En producción debe tener mínimo 32 caracteres generados aleatoriamente. |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | `720` | Duración del token de sesión en minutos (12 horas). |
-| `PASSWORD_MIN_LENGTH` | `10` | Longitud mínima para contraseñas de usuarios locales. |
-| `LOGIN_MAX_ATTEMPTS` | `5` | Intentos fallidos permitidos antes de bloquear temporalmente una cuenta. |
-| `LOGIN_LOCKOUT_MINUTES` | `15` | Tiempo de bloqueo en minutos tras exceder los intentos fallidos. |
-| `GOOGLE_CLIENT_ID` | *Vacío* | OAuth 2.0 Client ID de Google Cloud Console (opcional para login con cuentas `@iets.org.co`). |
-| `ALLOWED_EMAIL_DOMAIN` | `iets.org.co` | Dominio corporativo obligatorio para inicio de sesión con Google o desarrollo. |
-| `ADMIN_EMAILS` | `admin@iets.org.co` | Lista de correos separados por coma que adquieren el rol `superadmin` al registrarse. |
-| `ALLOW_DEV_LOGIN` | `true` | Habilita botón de acceso rápido sin contraseña en login. **Se ignora automáticamente si `ENVIRONMENT=production`**. |
-| `DATABASE_URL` | `sqlite:///./iets_horizonte.db` | Cadena de conexión SQLAlchemy. Para PostgreSQL: `postgresql+psycopg://usuario:clave@host:5432/base`. |
-| `CORS_ORIGINS` | *URLs locales* | Orígenes HTTP autorizados para peticiones cruzadas, separados por comas. |
-| `FRONTEND_DIST` | `../frontend/dist` | Ruta absoluta o relativa al directorio con los estáticos compilados de la SPA. |
-| `SEED_OFFICIAL_CYCLES` | *Dinámico* | `true` en desarrollo para precargar ciclos 2026; `false` en producción y en el servicio desplegado (`RENDER=true`), donde la siembra no debe reconstruir ciclos reales. |
-| `FIREBASE_DB_ENABLED` | `true` | Copia de la base SQLite en Firestore. Póngalo en `false` en servidores locales y de prueba. |
-| `FIREBASE_DB_DATABASE` | `hs-iets` | Base de Firestore preferida. Si no tiene copia y `(default)` sí, se usa `(default)`. |
-| `RUN_MIGRATIONS` | `true` | El contenedor migra y siembra una vez antes de lanzar uvicorn. |
-| `INGEST_MAX_PARALLEL` | `1` | Fuentes que la vigilancia rastrea a la vez. |
-| `AI_PROVIDER` | `auto` | Proveedor activo de IA: `auto` (detecta según llaves), `minimax`, `gemini` u `off`. |
-| `MINIMAX_API_KEY` | *Vacío* | Llave de API internacional de MiniMax (api.minimax.io). No está en el código: sin ella la IA queda en modo degradado. |
-| `MINIMAX_MODEL` | *Vacío* | Modelo MiniMax; vacío realiza detección automática (prioriza `MiniMax-M3`). |
-| `GEMINI_API_KEY` | *Vacío* | Llave de Google AI Studio para IA de contingencia/respaldo. |
-| `GEMINI_MODEL` | *Vacío* | Modelo de Gemini; vacío realiza detección automática. |
-| `AI_WEB_ENABLED` | `true` | Permite que la IA navegue y extraiga información de páginas web enriquecidas. |
-| `AI_OCR_ENABLED` | `false` | Activa reconocimiento óptico de caracteres para PDFs e imágenes escaneadas. |
-| `INVIMA_LIVE_LOOKUP` | `true` | Si el registro local de INVIMA no coincide, consulta en vivo los conjuntos Socrata de `datos.gov.co`. |
-| `OPENFDA_API_KEY` | *Vacío* | Llave de `api.data.gov` para aumentar límites de peticiones a openFDA. |
-| `NCBI_API_KEY` | *Vacío* | Llave para consultas a PubMed E-utilities. |
-| `NCBI_EMAIL` | `escaneo.horizonte@iets.org.co` | Correo institucional requerido para el pool de consultas de PubMed. |
-| `INGEST_WORKER_ENABLED` | `true` | Activa el hilo del trabajador en segundo plano para colas de ingesta y vigilancia programada. |
-| `INGEST_WORKER_INTERVAL_SECONDS` | `20` | Intervalo de sondeo del trabajador de ingesta en segundos. |
-| `INGEST_WORKER_FORCE` | `false` | Fuerza la activación del worker de ingesta incluso con motor SQLite. |
-| `INGEST_GUARDIAN` | *Automático* | Vigilante de la cola: reanuda una vigilancia que quedó a medias tras un reinicio y mantiene despierto el servicio mientras haya cola. Sin definir, corre con SQLite y un solo proceso (Render, equipo local). `true` o `false` lo fuerza o lo apaga. |
-| `LINK_AUTO_RESOLVE` | `true` | RF-001: ubica solas, en segundo plano y con el sistema libre, las señales de «página de consulta» que aún no se han ubicado en su página. Cada señal se intenta una vez. `false` lo apaga (el botón «Ubicar señales exactas» sigue disponible). |
-| `LINK_AUTO_CHECK` | `true` | RF-001: verifica solos, en segundo plano y por tandas, los enlaces de las señales. Un 404 deja de ofrecerse como enlace exacto. `false` lo apaga (el botón «Verificar enlaces» sigue disponible). |
-| `RECAPTCHA_SECRET` | *Vacío* | Llave secreta de Google reCAPTCHA v3 para validación en backend del formulario `/postular`. |
-| `RECAPTCHA_SITE_KEY` | *Vacío* | Llave de sitio de Google reCAPTCHA v3 entregada al frontend. |
-| `RECAPTCHA_MIN_SCORE` | `0.5` | Puntaje mínimo de confianza (0.0 a 1.0) para admitir una postulación ciudadana. |
-| `PUBLIC_SUBMISSIONS_PER_WINDOW`| `5` | Máximo número de postulaciones públicas permitidas por IP en una ventana de tiempo. |
-| `PUBLIC_SUBMISSIONS_WINDOW_SECONDS`| `600` | Ventana de control de tasa para postulaciones públicas (en segundos). |
-| `FIREBASE_PROJECT_ID` | `sistema-permisos-iets` | Proyecto GCP/Firebase para directorio RRHH y persistencia Firestore. |
-| `FIREBASE_SERVICE_ACCOUNT_KEY`| *Vacío* | JSON con las credenciales de la cuenta de servicio de Google Cloud. |
-| `FIREBASE_SERVICE_ACCOUNT_FILE`| *Vacío* | Ruta en disco al archivo JSON de la cuenta de servicio. |
-| `FIREBASE_DB_ENABLED` | `true` | Habilita la replicación de instantáneas comprimidas de la base de datos en Firestore. |
-| `FIREBASE_DB_DATABASE` | `hs-iets` | Base de datos específica de Firestore para Escaneo de Horizonte (no usar la base `(default)`). |
-| `FIREBASE_DB_COLLECTION` | `hs_iets_db` | Colección donde se almacenan los snapshots. En desarrollo se añade el sufijo `_dev`. |
-| `FIREBASE_DB_SHARE_WITH_PRODUCTION` | `false` | Permite que entornos no productivos accedan a la colección de producción (solo soporte). |
-| `SMTP_HOST` | *Vacío* | Servidor de correo saliente para envío de invitaciones a revisores y alertas. |
-| `SMTP_PORT` | `587` | Puerto del servidor SMTP (587 para STARTTLS, 465 para SSL). |
-| `SMTP_USER` / `SMTP_PASSWORD` | *Vacío* | Credenciales de autenticación SMTP. |
-| `SMTP_FROM` | `escaneo.horizonte@iets.org.co` | Remitente de los correos automáticos. |
-| `SMTP_TLS` | `true` | Habilita cifrado STARTTLS en la conexión SMTP. |
-| `PUBLIC_BASE_URL` | *Vacío* | URL base pública institucional para enlaces absolutos en correos (ej. `https://horizonte.iets.org.co`). |
-
----
-
-## Cómo ejecutar el proyecto y las pruebas
-
-### 1. Ejecución en modo desarrollo (recarga en caliente)
-
-Se recomienda utilizar dos terminales:
-
-**Terminal 1 — Backend:**
-```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
-python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
-La API estará accesible en `http://127.0.0.1:8000` y su documentación OpenAPI interactiva en `http://127.0.0.1:8000/docs`.
-
-**Terminal 2 — Frontend:**
-```powershell
-cd frontend
-npm run dev
-```
-La aplicación web Vite abrirá en `http://localhost:5173`.
-
----
-
-### 2. Ejecución unificada (Producción local sin contenedores)
-
-Si compila el frontend, el backend de FastAPI servirá tanto los endpoints de la API como la aplicación de página única (SPA):
+### Producción local sin contenedores (Windows)
 
 ```powershell
-# Compilar el frontend
-cd frontend
-npm run build
-
-# Iniciar servidor de producción en Windows
-cd ..
-.\start-prod.ps1
+.\start-prod.ps1                              # 127.0.0.1:8000, detrás de un proxy HTTPS
+.\start-prod.ps1 -BindHost 0.0.0.0 -Port 8080
+.\start-prod.ps1 -SkipBuild                   # no compila el frontend aunque falte
 ```
 
----
+Fija `ENVIRONMENT=production` y `ALLOW_DEV_LOGIN=false` para el proceso, exige un `backend\.env` propio, valida la configuración con `python -m app.cli check-config`, aplica las migraciones con `python -m app.migrations` y lanza uvicorn con un solo proceso.
 
-### 3. Ejecución mediante Docker y Docker Compose
-
-El repositorio provee una configuración lista para entornos productivos con PostgreSQL 15, FastAPI y proxy inverso Caddy con HTTPS automático:
+### Docker Compose (PostgreSQL 15)
 
 ```bash
-# Preparar variables de entorno de producción
-cp deploy/.env.production.example deploy/.env.production
-# Editar deploy/.env.production con las credenciales reales
-
-# Construir imágenes e iniciar servicios
+cp deploy/.env.production.example deploy/.env.production   # complete los valores
 docker compose --env-file deploy/.env.production build
 docker compose --env-file deploy/.env.production up -d
-
-# Para incluir el proxy Caddy con certificados SSL automáticos:
-docker compose --env-file deploy/.env.production --profile https up -d
+docker compose --env-file deploy/.env.production --profile https up -d   # añade Caddy con HTTPS
 ```
+
+| Servicio | Qué es |
+|---|---|
+| `db` | PostgreSQL 15 con volumen persistente, sin puertos publicados |
+| `api` | FastAPI + interfaz, `WEB_CONCURRENCY` procesos, sin worker de ingesta |
+| `worker` | La misma imagen, un proceso, `INGEST_WORKER_ENABLED=true`; el único que recorre la cola |
+| `caddy` | Proxy con certificados automáticos (perfil `https`) |
+
+El punto de entrada del contenedor (`deploy/docker-entrypoint.sh`) valida la configuración, migra y siembra una vez (`python -m app.migrations --bootstrap`) si `RUN_MIGRATIONS=true`, crea el superadministrador si están `BOOTSTRAP_ADMIN_EMAIL` y `BOOTSTRAP_ADMIN_PASSWORD`, y lanza uvicorn. Con un motor que no sea PostgreSQL fuerza un solo proceso, y se niega a arrancar con `INGEST_WORKER_ENABLED=true` y más de un proceso. Los comandos de administración se ejecutan así:
+
+```bash
+docker compose --env-file deploy/.env.production run --rm api python -m app.cli check-config
+```
+
+### Render
+
+`render.yaml` define un servicio web con `runtime: docker`, plan gratuito, `healthCheckPath: /api/health` y `autoDeploy: true`. Corre un solo proceso con SQLite (`WEB_CONCURRENCY=1`), con el worker en el mismo proceso (`INGEST_WORKER_ENABLED=true`, `INGEST_WORKER_FORCE=true`) y una fuente a la vez (`INGEST_MAX_PARALLEL=1`). Como el disco es efímero, la base se copia a Firestore y se restaura al arrancar. `SECRET_KEY` la genera Render; la cuenta de servicio de Firebase y la llave de IA se escriben a mano en el panel (`sync: false`). La imagen fija `ENVIRONMENT=production` y `ALLOW_DEV_LOGIN=false`.
+
+El detalle de operación (primer superadministrador, HTTPS, respaldo, rotación de `SECRET_KEY`, reversión) está en [`DEPLOY.md`](DEPLOY.md).
 
 ---
 
-### 4. Herramientas CLI administrativas
+## Variables de entorno
 
-El backend incluye comandos de consola para aprovisionamiento y rescate (`backend/app/cli.py`):
+Se leen de `backend/.env` y del entorno del proceso. La plantilla es `backend/.env.example`; la de producción con contenedores, `deploy/.env.production.example`. Las llaves de IA y de fuentes guardadas desde Configuración se almacenan en la base y tienen prioridad sobre el `.env`.
 
-```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
+### Configuración de la aplicación (`backend/app/config.py`)
 
-# Crear o actualizar un superadministrador inicial
-python -m app.cli create-admin --email admin@iets.org.co --name "Administrador Sistema"
+| Variable | Valor por defecto | Para qué |
+|---|---|---|
+| `ENVIRONMENT` | `development` | `development`, `testing` o `production`. En producción se apaga el acceso de desarrollo y se exige una `SECRET_KEY` propia |
+| `SECRET_KEY` | valor de ejemplo | Firma de los tokens de sesión. En producción, al menos 32 caracteres o el servidor no arranca |
+| `ALGORITHM` | `HS256` | Algoritmo de firma del token |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `720` | Duración de la sesión |
+| `GOOGLE_CLIENT_ID` | vacío | Client ID de OAuth para el inicio de sesión con Google; vacío oculta el botón |
+| `ALLOWED_EMAIL_DOMAIN` | `iets.org.co` | Dominio institucional admitido |
+| `ADMIN_EMAILS` | vacío | Correos, separados por coma, que reciben el perfil de superadministrador al iniciar sesión |
+| `ALLOW_DEV_LOGIN` | `true` | Acceso sin contraseña para desarrollo. Se ignora en producción |
+| `PASSWORD_MIN_LENGTH` | `10` | Longitud mínima de contraseña |
+| `LOGIN_MAX_ATTEMPTS` | `5` | Intentos fallidos antes de bloquear la cuenta |
+| `LOGIN_LOCKOUT_MINUTES` | `15` | Minutos de bloqueo |
+| `AI_PROVIDER` | `auto` | `auto`, `minimax`, `gemini` u `off` |
+| `MINIMAX_API_KEY` / `MINIMAX_MODEL` | vacío | Llave y modelo de MiniMax. Sin llave, la IA queda en modo degradado |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | vacío | Llave y modelo de Gemini (respaldo) |
+| `AI_WEB_ENABLED` | `true` | La IA lee las páginas de las fuentes durante la vigilancia |
+| `AI_OCR_ENABLED` | `false` | Lectura de imágenes y PDF escaneados |
+| `BROWSER_FETCH_ENABLED` | `true` | Permiso del servidor para la ruta de cliente compatible con navegador. `false` la prohíbe aunque el interruptor de Configuración esté encendido |
+| `INVIMA_LIVE_LOOKUP` | `true` | Consulta en vivo a `datos.gov.co` si el índice local no tiene la tecnología |
+| `CORS_ORIGINS` | orígenes locales (puertos 5173 y 8000) | Orígenes admitidos, separados por coma |
+| `DATABASE_URL` | `sqlite:///./iets_horizonte.db` | Conexión. PostgreSQL: `postgresql+psycopg://usuario:clave@host:5432/base` |
+| `INGEST_WORKER_ENABLED` | `true` | Activa el worker de la cola y de las tareas programadas |
+| `INGEST_WORKER_INTERVAL_SECONDS` | `20` | Pausa entre vueltas del worker (mínimo 5) |
+| `LINK_AUTO_RESOLVE` | `true` | Ubica en segundo plano las señales que aún no tienen su punto exacto en la página |
+| `LINK_AUTO_CHECK` | `true` | Verifica en segundo plano los enlaces de las señales |
+| `RECAPTCHA_SECRET` / `RECAPTCHA_SITE_KEY` | vacío | reCAPTCHA v3 de `/postular`; opera solo con ambas |
+| `RECAPTCHA_MIN_SCORE` | `0.5` | Puntaje mínimo admitido |
+| `PUBLIC_SUBMISSIONS_PER_WINDOW` | `5` | Postulaciones por IP en la ventana |
+| `PUBLIC_SUBMISSIONS_WINDOW_SECONDS` | `600` | Duración de la ventana |
+| `OPENFDA_API_KEY` | vacío | Llave de openFDA |
+| `NCBI_API_KEY` / `NCBI_EMAIL` | vacío / correo institucional de contacto | Identificación ante las E-utilities de NCBI |
+| `FIREBASE_PROJECT_ID` | definido en `config.py` | Proyecto de Firebase del directorio institucional y de la copia |
+| `FIREBASE_SERVICE_ACCOUNT_KEY` | vacío | JSON de la cuenta de servicio |
+| `FIREBASE_SERVICE_ACCOUNT_FILE` | vacío | Ruta al JSON de la cuenta de servicio |
+| `FIREBASE_RRHH_ENV_FILE` | vacío | Archivo alterno del que tomar la cuenta de servicio. Definida y vacía, apaga la búsqueda automática |
+| `FIREBASE_DB_ENABLED` | `true` | Copia de la base SQLite en Firestore. **`false` en servidores locales y de prueba** |
+| `FIREBASE_DB_DATABASE` | `hs-iets` | Base de Firestore |
+| `FIREBASE_DB_COLLECTION` | `hs_iets_db` | Colección de la copia. Fuera de producción recibe el sufijo `_dev` |
+| `FIREBASE_DB_LOCATION` | `nam5` | Ubicación de la base de Firestore |
+| `FIREBASE_DB_SHARE_WITH_PRODUCTION` | `false` | Solo soporte: un entorno no productivo usa la colección de producción |
+| `SMTP_HOST` | vacío | Servidor de correo. Vacío: no se envía y la interfaz ofrece copiar el enlace |
+| `SMTP_PORT` / `SMTP_TLS` | `587` / `true` | Puerto y STARTTLS |
+| `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | vacío | Credenciales y remitente |
+| `PUBLIC_BASE_URL` | vacío | URL pública para los enlaces absolutos de los correos |
 
-# Restablecer contraseña y generar token temporal
-python -m app.cli reset-password --email evaluador@iets.org.co
+### Variables de proceso y de despliegue
 
-# Listar usuarios, estados y perfiles en la base de datos
-python -m app.cli list-users
-
-# Validar integridad y seguridad de la configuración antes de desplegar
-python -m app.cli check-config
-
-# Verificar conectividad y realizar sonda sobre Firestore
-python -m app.cli ensure-firebase-db --probe --push
-```
-
----
-
-### 5. Migraciones de Base de Datos (Alembic)
-
-Las migraciones gestionan el esquema de forma versionada e idempotente:
-
-```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
-
-# Ejecutar las migraciones pendientes hacia la última versión
-python -m alembic upgrade head
-
-# O utilizar el ejecutor integrado del sistema
-python -m app.migrations
-```
-
-**Revisiones implementadas:**
-1. `0001_baseline`: Estructura inicial completa (modelos v2 y v3).
-2. `0002_source_matrix_profile`: Parámetros de la matriz EH en la entidad `sources`.
-3. `0003_technology_reliability`: Trazabilidad y dictamen de confiabilidad (`technologies.reliability`).
-4. `0004_product_details_corroboration`: Datos de producto (dosis, forma, vía, marca, modelo), corroboración cruzada entre fuentes (`corroboration_count`, `corroboration_bonus`) y bloqueo de sobreescritura de campos editados.
-5. `0005_signal_links`: Enlace de cada señal a su fuente (`findings.query_url`, `link_type`, `link_status`, `link_http`, `link_checked_at`, `evidence`). No modifica `findings.url`.
-6. `0006_technology_legacy`: Marca `technologies.legacy` para la bandeja Legacy.
-
-Todas son reversibles (`alembic downgrade`) y solo agregan columnas; ninguna borra datos.
-
----
-
-### 6. Ejecución de pruebas
-
-#### Pruebas unitarias y de integración (Pytest)
-```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
-python -m pytest -q
-```
-*Cubre motores de priorización, máquinas de estados de ciclos, desduplicación difusa, cruce INVIMA, conectores de ingesta, auditoría, RBAC, persistencia en Firestore, avance de la vigilancia, enlaces de señales, buscador, matriz por enlace, bandeja Legacy protección de datos, vigilancia reanudable, base de conocimiento de búsqueda, II seguimiento del Módulo 0 inteligencia del sistema y búsqueda a fondo (1000 pruebas al 25-11-2026). Las pruebas de la matriz por enlace usan el Excel de `backend/tests/fixtures/matriz_fuentes_escaneo_eh.xlsx`.*
-
-#### Pruebas de navegador de extremo a extremo (Playwright)
-```powershell
-cd frontend
-npm run build
-npx playwright test
-```
-*Ejecuta escenarios en navegadores reales cubriendo navegación, autenticación, flujos por perfil de usuario, evaluación y validación responsive.*
-
-#### Suite de regresión API (Smoke Test)
-```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
-# Con el servidor backend corriendo en http://127.0.0.1:8000:
-python smoke_test.py --base http://127.0.0.1:8000 --skip-network
-```
+| Variable | Valor por defecto | Para qué |
+|---|---|---|
+| `FRONTEND_DIST` | `frontend/dist` | Carpeta de la interfaz compilada que sirve el backend |
+| `SEED_OFFICIAL_CYCLES` | `true` en desarrollo; `false` en producción y en Render | Siembra de los ciclos oficiales al arrancar |
+| `INGEST_WORKER_FORCE` | apagado | Con SQLite el worker regular solo arranca si esta variable está encendida |
+| `INGEST_GUARDIAN` | automático | Vigilante de la cola. Sin definir, corre con SQLite y un solo proceso; `true` o `false` lo fuerza o lo apaga |
+| `INGEST_MAX_PARALLEL` | `3` (`1` en Render) | Tope de fuentes rastreadas a la vez (máximo 8) |
+| `WEB_CONCURRENCY` | `1` | Procesos de uvicorn. Más de uno solo con PostgreSQL |
+| `KEEPALIVE_URL` | vacío | URL pública que el servicio visita mientras haya cola (en Render se usa `RENDER_EXTERNAL_URL`) |
+| `KEEPALIVE_ALWAYS` | apagado | Visita la URL aunque no haya cola |
+| `RUN_MIGRATIONS` | `true` | El contenedor migra y siembra antes de lanzar uvicorn |
+| `PORT` | `8000` | Puerto del contenedor |
+| `FORWARDED_ALLOW_IPS` | `*` | Proxies de los que uvicorn acepta cabeceras `X-Forwarded-*` |
+| `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` / `BOOTSTRAP_ADMIN_NAME` | vacío | Crean o actualizan el superadministrador al arrancar el contenedor |
+| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | `iets_horizonte` / `iets` / obligatoria | Base de datos de Docker Compose |
+| `API_BIND` / `API_PORT` | `127.0.0.1` / `8000` | Dónde publica Compose el puerto de la API |
+| `IMAGE_TAG` | `latest` | Etiqueta de la imagen |
+| `SITE_DOMAIN` / `ACME_EMAIL` | `localhost` / vacío | Dominio y contacto de certificados de Caddy |
 
 ---
 
-## Estructura del proyecto
+## Seguridad de los datos: copia en Firestore
 
-```
-Sis_HS_IETS/
-├── backend/
-│   ├── alembic/                    # Control de versiones de esquema con Alembic
-│   │   ├── env.py                  # Configuración del entorno de migración
-│   │   └── versions/               # Revisiones versionadas (0001 a 0009)
-│   ├── app/
-│   │   ├── main.py                 # Punto de entrada FastAPI, middlewares y montaje de SPA
-│   │   ├── config.py               # Settings validados mediante Pydantic
-│   │   ├── models.py               # Modelos relacionales ORM (SQLAlchemy)
-│   │   ├── database.py             # Conexión relacional (SQLite / PostgreSQL)
-│   │   ├── audit.py                # Middleware y listeners de auditoría append-only
-│   │   ├── rbac.py                 # Definición de roles, permisos y autorización
-│   │   ├── deps.py                 # Dependencias inyectables (seguridad, permisos)
-│   │   ├── methodology.py          # Catálogos maestros, estados y parámetros metodológicos
-│   │   ├── cycle_service.py        # Máquina de estados y reglas de negocio de ciclos
-│   │   ├── priority_engine.py      # Motor de cálculo de la matriz oficial %P (P1-P6)
-│   │   ├── priority.py             # Cálculo del screening_score de señales
-│   │   ├── technology_service.py   # Gestión del ciclo de vida de la entidad Technology
-│   │   ├── corroboration.py        # Detección de corroboración multifuente (RF-002)
-│   │   ├── product_details.py      # Extracción estructurada de datos de producto (RF-003)
-│   │   ├── reprocess_service.py    # Reprocesamiento histórico de datos crudos
-│   │   ├── classification.py       # Heurísticas de sugerencia de clúster y tipología
-│   │   ├── screening_service.py    # Fusión de duplicados, novedad y Listado Único
-│   │   ├── dedup.py                # Motor de similitud difusa (RapidFuzz)
-│   │   ├── invima.py               # Sincronización y consulta del registro INVIMA
-│   │   ├── normalization.py        # Normalización de códigos ATC, CIE-10, MeSH, GMDN
-│   │   ├── scraper.py              # Motor de scraping y extracción web con fuentes de respaldo
-│   │   ├── source_matrix.py        # Lector del Excel de la matriz EH (detecta el formato por enlace)
-│   │   ├── link_matrix.py          # Inventario por enlace (MATRIZ_FUENTES_ESCANEO_EH) y bandeja Legacy
-│   │   ├── catalog.py              # Catálogo verificado D-06 (referencia de API y consulta manual)
-│   │   ├── catalog_service.py      # Sincronización del inventario al arrancar y con (Recargar catálogo)
-│   │   ├── signal_links.py         # Tipo de enlace, evidencia, verificación y reporte de enlaces (RF-001)
-│   │   ├── tech_search.py          # Buscador de tecnologías y recorrido por etapas (RF-005)
-│   │   ├── scan_progress.py        # Estado en vivo de cada fuente durante la vigilancia
-│   │   ├── scan_eta.py             # Tiempo estimado de fin de la vigilancia
-│   │   ├── source_profile.py       # Perfiles de escaneo y configuración por fuente
-│   │   ├── web_search.py           # Consultas web automatizadas de apoyo
-│   │   ├── probe_service.py        # Sonda de salud y disponibilidad de fuentes
-│   │   ├── pdf_export.py           # Generación de reportes PDF institucionales (ReportLab)
-│   │   ├── firebase_auth.py        # Autenticación y credenciales de Google Service Account
-│   │   ├── firebase_db.py          # Sincronización de snapshots con Firestore
-│   │   ├── firestore_directory.py  # Resolución de identidades institucionales vía Firestore
-│   │   ├── browser_backup.py       # Copias de seguridad locales en navegador
-│   │   ├── strategy_service.py     # Métricas consolidadas, datamart y tableros
-│   │   ├── minimax_service.py      # Conexión con IA MiniMax (análisis y enriquecimiento)
-│   │   ├── gemini_service.py       # Conexión con IA Gemini (contingencia)
-│   │   ├── mailer.py               # Envío de notificaciones y enlaces vía SMTP
-│   │   ├── scheduler_service.py    # Programador de tareas periódicas de fondo
-│   │   ├── cli.py                  # Interfaz de línea de comandos de administración
-│   │   ├── migrations.py           # Envoltorio de ejecución programática de Alembic
-│   │   ├── data/                   # matriz_enlaces_eh.json (inventario vigente) y matriz_fuentes_eh.json (matriz anterior)
-│   │   ├── ingest/                 # Conectores especializados de fuentes de datos
-│   │   │   ├── base.py             # Clase base abstracta de conectores
-│   │   │   ├── clinicaltrials.py   # Conector ClinicalTrials.gov API v2
-│   │   │   ├── fda.py              # Conector openFDA
-│   │   │   ├── ema.py              # Conector Agencia Europea de Medicamentos
-│   │   │   ├── ctis.py             # Conector ensayos clínicos europeos (CTIS)
-│   │   │   ├── pubmed.py           # Conector NCBI PubMed E-Utilities
-│   │   │   ├── pcori_hs.py         # Conector PCORI
-│   │   │   ├── health_canada.py    # Conector Health Canada (DPD / MDALL)
-│   │   │   ├── who_ictrp.py        # Conector ensayos clínicos de la OMS
-│   │   │   └── file_feed.py        # Ingesta por archivos planos y lotes
-│   │   └── routers/                # 25 módulos de rutas FastAPI (API REST)
-│   ├── tests/                      # 51 suites de pruebas unitarias y de integración
-│   ├── requirements.txt            # Dependencias fijadas de Python
-│   ├── alembic.ini                 # Configuración del motor Alembic
-│   ├── smoke_test.py               # Suite de regresión integral sobre la API
-│   └── .env.example                # Plantilla documentada de variables de entorno
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx                 # Configuración de rutas React Router y guards RBAC
-│   │   ├── main.jsx                # Punto de entrada ReactDOM
-│   │   ├── auth/                   # Contexto de autenticación, JWT y permisos
-│   │   ├── cycle/                  # Contexto global del ciclo activo de trabajo
-│   │   ├── realtime/               # Sincronización en tiempo real vía versionado de estado
-│   │   ├── components/             # Componentes reutilizables (Tablas, Guía, Modales, Tooltips, Grafo)
-│   │   ├── pages/                  # Vistas de cada módulo del sistema
-│   │   ├── styles/                 # Hojas de estilo globales, UI y variables de diseño
-│   │   └── utils/                  # Utilidades auxiliares (descargas, formatos)
-│   ├── e2e/                        # Pruebas automatizadas de interfaz (Playwright)
-│   ├── package.json                # Manifiesto de paquetes de Node.js
-│   └── vite.config.js              # Configuración de empaquetado de Vite
-├── deploy/                         # Scripts de aprovisionamiento, Caddyfile y configs de despliegue
-├── .github/workflows/ci.yml        # Flujo de Integración Continua en GitHub Actions
-├── Dockerfile                      # Construcción multi-etapa (Node + Python + Runtime)
-├── docker-compose.yml              # Orquestación de contenedores (API, Worker, Postgres, Caddy)
-├── start.ps1                       # Script de arranque rápido de desarrollo en Windows
-├── start-prod.ps1                  # Script de arranque en modo producción en Windows
-├── GUIA_USUARIO.md                 # Manual de operación por pantalla
-├── NOTAS_DESARROLLADOR.md          # Respuesta por requerimiento al III seguimiento
-└── README.md                       # Documentación técnica principal del proyecto
-```
+Con SQLite, la base de trabajo se copia completa a Firestore (`backend/app/firebase_db.py`): es una instantánea comprimida y partida en fragmentos, que se sube tras los cambios y se restaura al arrancar. Así sobrevive al disco efímero de Render. La copia está activa cuando se cumplen las cuatro condiciones: `FIREBASE_DB_ENABLED=true`, el motor es SQLite, hay cuenta de servicio y el proceso no es una prueba de pytest.
+
+**Regla para servidores locales y de prueba: `FIREBASE_DB_ENABLED=false`.** Con ese valor el proceso no toca Firestore en absoluto, ni siquiera para verificar que la base exista. Las razones:
+
+- Fuera de producción, el código añade el sufijo `_dev` a la colección, de modo que un servidor de desarrollo no escribe en `hs_iets_db`. Pero esa protección desaparece si el proceso corre con `ENVIRONMENT=production` (lo que hace `start-prod.ps1`), con `RENDER=true` o con `FIREBASE_DB_SHARE_WITH_PRODUCTION=true`: en esos casos usa la colección real.
+- Si no hay `FIREBASE_SERVICE_ACCOUNT_KEY` ni `FIREBASE_SERVICE_ACCOUNT_FILE`, el backend busca la cuenta de servicio en un archivo `.env.local` del proyecto vecino de RRHH (`firebase_auth.sibling_rrhh_env`). Un equipo que tenga ese proyecto obtiene credenciales sin haberlas configurado. Definir `FIREBASE_RRHH_ENV_FILE` vacía apaga esa búsqueda.
+- Un servidor con credenciales y la colección real restaura la base de producción al arrancar y sube la suya después.
+
+Lo que ya viene protegido: las pruebas de pytest nunca activan la copia y `frontend/playwright.config.js` levanta su backend con `FIREBASE_DB_ENABLED=false`, sin credenciales y con la IA apagada. `python -m app.cli check-config` muestra la base y la colección configuradas.
+
+Protecciones de la copia en producción:
+
+| Protección | Qué evita |
+|---|---|
+| No se sube nada hasta haber leído Firestore al arrancar | Que una base recién sembrada pise la copia buena tras un fallo de lectura |
+| Guarda de tamaño (menos de la mitad) y de conteos por tabla | Que una base con menos datos reemplace a la guardada. Si la bitácora local tiene menos filas, la subida se bloquea |
+| Cada copia en su propia generación | Que una subida interrumpida deje fragmentos mezclados |
+| Puntos de recuperación fijados | Que un despliegue defectuoso borre la última copia buena: se conservan copias previas a un despliegue, cierres diarios, copias escritas por otra instancia, estados previos a una restauración y fijadas a mano |
+| Colección exclusiva | Que la copia use la colección del directorio de RRHH: el código lo rechaza |
+
+Entre una copia y la siguiente pasan al menos 2 minutos (3 durante una vigilancia); al terminar una corrida se programa una copia sin esperar ese mínimo. Los puntos de recuperación se consultan y restauran en **Configuración › Persistencia (Firebase)**, y `GET /api/health` informa en `backup` si la copia está al día, bloqueada o con error. El procedimiento completo está en [`DEPLOY.md`](DEPLOY.md).
+
+Los respaldos contienen la bitácora y las llaves guardadas desde Configuración: deben tratarse como secretos.
+
+---
+
+## Vigilancia de fuentes
+
+### Cola y worker
+
+Lanzar una vigilancia encola un trabajo por fuente en `ingest_jobs` y responde de inmediato; el rastreo ocurre fuera del hilo de la petición (`worker.py`, `ingest_service.py`).
+
+- **Worker regular.** Hilo que, en cada vuelta, corre las tareas programadas vencidas, drena la cola y cierra las corridas terminadas. Requiere `INGEST_WORKER_ENABLED=true`; con SQLite, además `INGEST_WORKER_FORCE`.
+- **Drenaje por disparo.** Una corrida manual lanza el drenaje en segundo plano aunque el worker regular esté apagado.
+- **Vigilante de la cola.** Revisa cada minuto: si hay trabajo vencido y nadie lo atiende (por ejemplo, tras un reinicio), devuelve a la cola lo que quedó a medias y reanuda. Con el sistema libre, ubica señales en su página, verifica enlaces y pone al día la base de conocimiento.
+- **Paralelismo.** Parámetro `ingest.parallel_jobs` (3 de fábrica), con el tope de `INGEST_MAX_PARALLEL`.
+- **Tiempo máximo por fuente.** Parámetro `ingest.job_timeout_minutes` (20 de fábrica, mínimo 2). Una fuente colgada se cierra y la corrida sigue.
+- **Reintentos.** Hasta 3 intentos por trabajo, con espera creciente.
+- **Circuito.** Tras `ingest.circuit_failures` fallos seguidos (3), la fuente descansa `ingest.circuit_cooldown_hours` horas (6) en las corridas programadas. Una corrida manual la intenta igual.
+- **Tareas programadas.** Vigilancia (cada 6 horas de fábrica) y barrido de duplicados (cada 24), con interruptor e intervalo en Configuración › Tareas programadas. La vigilancia programada encola solo las fuentes cuya frecuencia propia venció.
+
+Conectores registrados (`backend/app/ingest/`): `clinicaltrials` (ClinicalTrials.gov API v2), `ctis`, `ema`, `fda` (openFDA), `health_canada`, `pcori_hs`, `pubmed`, `who_ictrp`, `file_feed` (CSV o XLSX), `manual` (curaduría humana) y `fixture` (pruebas). Las fuentes sin conector usan el rastreador genérico `html` o `pdf` (`scraper.py`).
+
+### Rutas de acceso a una fuente web
+
+El rastreador prueba las rutas en este orden y registra cuál funcionó (`scraper._fetch_url`, `scraper.fallback_urls`, `scraper.access_route`, `access_routes.py`):
+
+| Orden | Ruta | Cuándo se usa |
+|---|---|---|
+| 1 | Cliente HTTP normal (`httpx`) | Siempre primero |
+| 2 | Cliente compatible con navegador (`curl_cffi`) | Si la respuesta es 401, 403, 406, 429, 503, no hay respuesta, o el HTML es un cascarón o un aviso de bloqueo, y la ruta está disponible |
+| 3 | URL de entrada de la matriz EH | Si la URL principal falló (hasta tres rutas de la fila) |
+| 4 | RSS oficial del sitio | Para los dominios con canal conocido (`FEED_FALLBACKS`) |
+| 5 | Índice oficial de la revista en PubMed | Para NEJM, The Lancet, BMJ, BMJ Innovations, JAMA y Cochrane, mediante las E-utilities de NCBI: lo publicado en los últimos 120 días, con título, resumen y enlace |
+| 6 | RSS de Google News | Último respaldo: lo publicado en el dominio en los últimos 90 días |
+
+Sobre el **cliente compatible con navegador**:
+
+- Repite la descarga con el saludo TLS y HTTP/2 de un navegador corriente. No resuelve captchas ni inicia sesión, y solo se usa en páginas públicas.
+- Viene **apagado de fábrica**. Se enciende en **Configuración › Parámetros de fuentes**, con el interruptor **«Acceso con cliente compatible con navegador»**. Encenderlo es decisión del IETS según las condiciones de uso de las fuentes.
+- El servidor puede prohibirlo del todo con `BROWSER_FETCH_ENABLED=false`. También queda inactivo si `curl_cffi` no está instalado.
+- Respeta `robots.txt`: si el sitio no permite la URL, la ruta no se usa.
+- Un sitio que solo respondió por esta ruta se recuerda durante 6 horas y sus páginas siguientes van directo por ella.
+
+**La sonda ya no suspende una fuente web.** Para las fuentes de nivel A o B, el trabajo verifica primero la salud de la fuente. Si la sonda sale en ámbar o rojo y la fuente se lee con el rastreador web, se deja la nota en el avance y el rastreo se intenta igual por las rutas de acceso (`ingest_service._run_job`). Antes, un 403 en la sonda dejaba la fuente sin leer. En las fuentes con conector de API, una sonda en ámbar o rojo sí detiene la ingesta.
+
+### Avance e informe de acceso
+
+Durante la corrida, la pantalla Vigilancia consulta `GET /api/ingest/progress`: etapa de cada fuente, ruta por la que entró, código HTTP, páginas visitadas, intentos de acceso, porcentaje de la corrida y tiempo estimado (`scan_progress.py`, `scan_eta.py`). El detalle en vivo está en memoria del proceso; el resultado final de cada fuente se guarda para el informe.
+
+El **«Informe de acceso por fuente»** (`GET /api/ingest/access-report`) es una tarjeta plegable. Durante la corrida su encabezado dice **«Ver informe en tiempo real»**. Clasifica el último resultado de cada fuente:
+
+| Desenlace | Significado |
+|---|---|
+| Entró a la fuente | Leyó el sitio (con el cliente normal, el compatible con navegador o una ruta de la matriz) y encontró señales |
+| Entró por una ruta de respaldo | Entró por RSS oficial, índice de PubMed o Google News |
+| Entró, pero no encontró señales | Hubo acceso y la extracción no dio resultados |
+| Entró, pero la extracción falló | Hubo acceso y el trabajo terminó con error |
+| No pudo entrar | Ninguna ruta respondió; el mensaje lista cada ruta probada y su resultado |
+| En curso / Sin ejecutar | Trabajo pendiente o fuente que aún no se ha corrido |
+
+### Historial de vigilancias
+
+Cada corrida, manual o programada, deja una fila en `scheduled_runs` (`scheduler_service.record_manual_scan`, `finalize_scan_runs`, `scan_history`). `GET /api/ingest/runs` devuelve, por corrida: fecha y hora de inicio y de fin, duración, estado, alcance (todas las fuentes activas, fuentes seleccionadas o fuentes con frecuencia vencida), origen (manual o programada), quién la lanzó, fuentes totales y pendientes, fuentes por desenlace de acceso, las que fallaron con su mensaje, y señales detectadas y nuevas.
+
+- La corrida termina a la hora en que terminó su última fuente.
+- Si ya hay una corrida manual abierta, las fuentes que se lancen después se suman a ella.
+- Las corridas manuales no mueven el reloj de la vigilancia programada.
+
+En la pantalla Vigilancia, bajo el botón «Ejecutar vigilancia», aparece **«Última realizada»** con fecha, hora y duración, y más abajo la tarjeta **«Historial de vigilancias»**; al pulsar una fila se abre su resumen (`frontend/src/pages/Scan.jsx`, `frontend/src/components/ScanProgress.jsx`).
 
 ---
 
 ## Inteligencia del sistema
 
-Todo se parametriza en **Configuración › Inteligencia** y queda en bitácora. Nada decide por el evaluador: sugiere, explica y aprende de lo que él confirma.
+Se parametriza en **Configuración › Inteligencia** y cada cambio queda en la bitácora. Nada decide por el evaluador: el sistema sugiere, explica y aprende de lo que la persona confirma (`backend/app/intelligence.py`).
 
-| Pieza | Qué hace | Dónde está |
-|---|---|---|
-| Base de conocimiento de señales | Un documento por señal con su texto, origen (`historica`, `vigilancia` o `postulacion`), año y decisión del equipo. Se sincroniza sola desde `technologies` y se puede reconstruir. Vive en la base del sistema, que es la que se copia a Firestore. | `backend/app/intelligence.py`, tabla `signal_knowledge` (migración `0009`) |
-| Recuperación | Señales parecidas por TF-IDF y coseno, en memoria. Sin modelo externo: corre en el plan gratuito de Render y con la IA apagada. | `intelligence.similar` |
-| Clasificador que aprende | Reglas del catálogo + voto de las señales parecidas ya clasificadas + arbitraje opcional de la IA con esos ejemplos a la vista. Devuelve confianza, método y evidencia; avisa de un probable descarte. | `intelligence.suggest`, `POST /api/technologies/{id}/suggest-classification` |
-| Calibración | Validación dejando una fuera sobre lo ya clasificado. Elige el número de señales parecidas y la menor confianza que cumple la precisión objetivo, y la compara con decir siempre el clúster más frecuente. Automática cada cierto número de clasificaciones nuevas. | `intelligence.calibrate` |
-| Marco analítico | Cuatro lentes (descriptivo, diagnóstico, predictivo, prescriptivo) calculados con reglas, más la lectura que redacta la IA solo con esas cifras (se guarda para no gastar en cada visita). | `backend/app/analytics_insights.py` |
-| Vigencia por año | Rango de años de publicación, general o por fuente. Filtra la captura y permite revisar y descartar (reversible) lo ya capturado. | `backend/app/signal_window.py` |
+### Modelos
 
-**API** (`/api/intelligence`): `GET /status`, `PUT /config`, `POST /config/reset`, `POST /reindex`, `POST /baseline`, `POST /calibrate`, `GET /knowledge?q=`, `GET /knowledge/export`, `GET /insights`, `POST /insights/narrative`, `GET|PUT /window`, `POST /window/preview`, `POST /window/apply`. Consultar lo hace cualquier perfil; cambiar, solo quien administra la configuración.
+La pantalla muestra la **ficha de modelos** (`intelligence.model_card`, `frontend/src/components/ModelCard.jsx`), armada con el estado real del sistema y descargable en JSON:
 
-**Parámetros** (valor de fábrica): aprender de las clasificaciones (sí), cuándo consultar a la IA (`desacuerdo`), señales parecidas que votan (7), parecido mínimo (0,12), confianza mínima (0,55), precisión objetivo (0,80), parecido para avisar de un descarte (0,60), ejemplos que ve la IA (6), calibración automática (sí, cada 25 clasificaciones), lectura analítica con IA (sí, se conserva 12 horas), alertas de ruido (0,50), antigüedad (30 días) y concentración (0,40), y los cuatro prompts (clasificación y analítica).
+| Pieza | Tipo | Cómo aprende | Cifras que muestra |
+|---|---|---|---|
+| Reglas del catálogo | Sistema experto de reglas, determinista | No aprende: aplica las palabras clave, códigos CIE-10 y términos MeSH que el equipo mantiene en Gobierno metodológico | Acierto medido en clúster y en tipología |
+| Clasificador que aprende | Vecinos más cercanos (k-NN) sobre texto: TF-IDF y similitud coseno | Aprendizaje incremental por ejemplos: cada clasificación o descarte entra a la base de conocimiento y cuenta desde la siguiente sugerencia. Sin entrenamiento por lotes ni pesos ocultos | Señales en la base, ejemplos clasificados y descartados, vocabulario, vecinos (k), umbrales, acierto medido |
+| Calibración | Validación cruzada dejando una fuera (*leave-one-out*) | Mide el acierto de cada método con las clasificaciones del equipo y ajusta k y la confianza mínima | Última calibración, señales evaluadas, precisión objetivo y si se cumplió |
+| IA generativa | Modelo de lenguaje (LLM) preentrenado, consultado por API: MiniMax o Gemini | **No se entrena ni se reajusta con datos del IETS.** En cada consulta recibe como contexto los ejemplos del equipo y el prompt configurado | Proveedor, modelos, cuándo clasifica, consultas y tokens consumidos |
 
-**Límites conocidos:** el clasificador empieza a aprender con 5 señales clasificadas y la calibración exige 20, en al menos dos clústeres con 3 ejemplos cada uno; antes de eso manda el catálogo y el sistema lo dice. El parecido es léxico (palabras), no semántico: dos textos en idiomas distintos se parecen poco.
+**Regla de decisión** de una sugerencia:
+
+1. Si reglas y aprendizaje coinciden, se propone ese valor y la confianza sube.
+2. Si no coinciden, gana el aprendizaje solo cuando su confianza llega al mínimo configurado; si no, quedan las reglas.
+3. La IA interviene según el modo: `nunca`, `desacuerdo` (solo cuando hay duda) o `siempre`. Su respuesta se muestra con su razón.
+4. La decisión final es del evaluador.
+
+### Trazabilidad
+
+Cada sugerencia se registra en la bitácora con la acción `intelligence:suggest`. La ficha lista las últimas (`intelligence.suggestion_trace`): fecha y hora, señal, clúster y tipología sugeridos, método, confianza y qué decidió el equipo. Los cambios de parámetros quedan como `intelligence:config`.
+
+### Otras piezas
+
+- **Base de conocimiento de señales** (tabla `signal_knowledge`): un documento por tecnología capturada, con su origen y la decisión del equipo. Se sincroniza sola y se puede reconstruir.
+- **Marco analítico** (`analytics_insights.py`), descrito en [Análisis y seguimiento](#análisis-y-seguimiento).
+- **Vigencia por año** (`signal_window.py`): rango de años de publicación, general o por fuente, con vista previa antes de aplicarlo.
+- **Base de conocimiento de búsqueda** (tabla `search_knowledge`, `search_knowledge.py`): páginas útiles de cada fuente, sembradas desde `backend/app/data/base_busqueda_eh.json`.
+
+Parámetros de fábrica (`intelligence.DEFAULTS`): aprendizaje encendido, IA en modo `desacuerdo`, 7 vecinos, parecido mínimo 0,12, confianza mínima 0,55, precisión objetivo 0,80, parecido para avisar de un descarte 0,60, 6 ejemplos en el prompt, calibración automática cada 25 clasificaciones, lectura analítica con IA conservada 12 horas.
+
+Límites: el clasificador empieza a votar con 5 señales clasificadas y la calibración exige 20. El parecido es léxico, no semántico: dos textos en idiomas distintos se parecen poco. Sin IA, el sistema sigue completo con reglas y aprendizaje.
 
 ---
 
-## Flujo de la aplicación
+## Perfiles y permisos
 
-El sistema orquesta el ciclo de vida metodológico en seis fases interconectadas. Cada fase involucra módulos específicos, validaciones de seguridad y persistencia en base de datos.
+Cinco perfiles definidos en `backend/app/rbac.py`. Los roles heredados se resuelven por alias: `admin` → `superadmin`, `editor` → `evaluador_tecnico`, `viewer` → `tomador_decisiones`.
 
-### Diagrama del flujo de datos y procesos
+| Perfil | Código | Qué hace |
+|---|---|---|
+| Superadministrador | `superadmin` | Control total: usuarios, configuración, catálogos, bitácora y cierre de ciclos. Puede calificar los seis criterios |
+| Evaluador técnico | `evaluador_tecnico` | Opera vigilancia, bandeja de entrada, filtrado y ciclos; sincroniza el índice INVIMA; califica P1, P5 y P6 |
+| Evaluador clínico | `evaluador_clinico` | Opera vigilancia, bandeja de entrada y filtrado; redacta informes; califica P2, P3 y P4 |
+| Tomador de decisiones | `tomador_decisiones` | Consulta el sistema y los tableros restringidos; escribe notas |
+| Revisor por pares | `revisor_pares` | Consulta y registra revisiones. El experto externo no necesita cuenta: entra con el enlace de la invitación |
 
-```mermaid
-flowchart TD
-    %% 1. Fuentes de Entrada
-    subgraph S1 ["1. Entrada y Captura de Senales"]
-        F1["Fuentes Proactivas: 141 enlaces de la matriz EH (web, API oficial)"]
-        F2["Postulacion Ciudadana Reactiva: formulario /postular"]
-        SC["Captura: scraper.py y conectores en app/ingest/"]
-        SUB["Recepcion: submissions.py (con reCAPTCHA y COI)"]
-        F1 --> SC
-        F2 --> SUB
-    end
+| Permiso | Superadmin | Ev. técnico | Ev. clínico | Tomador | Revisor |
+|---|:-:|:-:|:-:|:-:|:-:|
+| `read` (consultar) | Sí | Sí | Sí | Sí | Sí |
+| `source:write` (editar fuentes) | Sí | Sí | Sí | | |
+| `scan:run` (ejecutar vigilancia) | Sí | Sí | Sí | | |
+| `staging:assign` (asignar al ciclo) | Sí | Sí | Sí | | |
+| `technology:write` (editar tecnologías) | Sí | Sí | Sí | | |
+| `screening:write` (filtrar) | Sí | Sí | Sí | | |
+| `report:write` (redactar informes) | Sí | Sí | Sí | | |
+| `note:write` (escribir notas) | Sí | Sí | Sí | Sí | |
+| `cycle:write` (gestionar ciclos) | Sí | Sí | | | |
+| `invima:sync` (sincronizar INVIMA) | Sí | Sí | | | |
+| `priority:rate:tecnico` (P1, P5, P6) | Sí | Sí | | | |
+| `priority:rate:clinico` (P2, P3) | Sí | | Sí | | |
+| `priority:rate:p4` (P4) | Sí | | Sí | | |
+| `review:submit` (revisar por pares) | Sí | | | | Sí |
+| `analytics:restricted` (tableros restringidos) | Sí | | | Sí | |
+| `cycle:close`, `catalog:write`, `audit:read`, `user:manage`, `config:manage` | Sí | | | | |
 
-    %% 2. Ingesta y Staging
-    subgraph S2 ["2. Ingesta, Extraccion y Bandeja de Entrada"]
-        STG["Bandeja de Entrada: Staging (technologies.py)"]
-        DET["Extraccion de Dosis y Forma: product_details.py"]
-        CORR["Corroboracion Multifuente: corroboration.py"]
-        CLAS["Sugerencia de Cluster y Tipo: classification.py"]
-        TEC["Creacion de Tecnologia: technology_service.py"]
-        
-        SC -->|"Crea registro Finding"| STG
-        SUB -->|"Aprobacion por moderador"| STG
-        STG --> DET
-        STG --> CORR
-        STG --> CLAS
-        STG -->|"Asignar a Ciclo Activo"| TEC
-    end
+El superadministrador puede usar **«Ver como»** para operar con los permisos de otro perfil. El perfil simulado viaja en la cabecera `X-Acting-Role`, no se guarda en la base y solo reduce permisos.
 
-    %% 3. Filtrado y Novedad
-    subgraph S3 ["3. Filtrado, Desduplicacion e INVIMA"]
-        SCR["Modulo de Filtrado: screening.py"]
-        DEDUP["Desduplicacion Difusa: dedup.py (RapidFuzz)"]
-        INV["Cruce Regulatorio: invima.py (Socrata y Local)"]
-        NORM["Normalizacion de Codigos: normalization.py"]
-        NOV["Compuerta de Novedad: NoveltyAssessment"]
-        LST["Listado Unico por Cluster"]
+Inicio de sesión: correo y contraseña (cuentas creadas por el superadministrador, con bloqueo tras intentos fallidos y cambio obligatorio de la contraseña temporal), Google para el dominio institucional si hay `GOOGLE_CLIENT_ID`, y acceso de desarrollo sin contraseña, que nunca opera en producción.
 
-        TEC -->|"Enviar a filtrado"| SCR
-        SCR --> DEDUP
-        SCR --> INV
-        SCR --> NORM
-        SCR -->|"Validar novedad"| NOV
-        NOV -->|"Aprobadas"| LST
-    end
+---
 
-    %% 4. Priorizacion Oficial
-    subgraph S4 ["4. Priorizacion Metodologica Oficial %P"]
-        PRI["Bandeja de Calificacion: priority.py"]
-        PE["Motor de Priorizacion: priority_engine.py"]
-        DEC{"Clasificacion segun %P"}
-        P_ALTA["Priorizada (%P >= 60%)"]
-        P_MED["Bajo Vigilancia (33% <= %P < 60%)"]
-        P_BAJ["No Priorizada (%P < 33%)"]
+## API
 
-        LST -->|"Pasan compuerta"| PRI
-        PRI -->|"Evaluador Tecnico (P1, P5, P6)"| PE
-        PRI -->|"Evaluador Clinico (P2, P3, P4)"| PE
-        PE -->|"Formula: (Suma / 6) * 100"| DEC
-        DEC --> P_ALTA
-        DEC --> P_MED
-        DEC --> P_BAJ
-    end
+La documentación interactiva está en `/docs` (OpenAPI) con el servidor en marcha. Hay 27 módulos de rutas en `backend/app/routers/`.
 
-    %% 5. Evaluacion y Revision
-    subgraph S5 ["5. Evaluacion Temprana y Revision por Pares"]
-        EVA["Expediente de Evaluacion: evaluation.py"]
-        REV["Portal de Revision: review_portal.py"]
-        COI["Declaracion Obligatoria COI (audit.py)"]
+| Prefijo | Módulo | Qué cubre |
+|---|---|---|
+| `/api/health` | `main.py` | Estado del servicio, versión y estado de la copia |
+| `/api/status`, `/api/realtime/version` | `system.py` | Estado del sistema y versión del estado para refrescar pantallas |
+| `/api/auth` | `auth.py` | Inicio de sesión (contraseña, Google, desarrollo), cambio de contraseña, perfil actual y «Ver como» |
+| `/api/users` | `users.py` | Cuentas, perfiles, permisos, restablecer y desbloquear |
+| `/api/audit` | `audit.py` | Consulta de la bitácora y vida de un registro |
+| `/api/config` | `config.py` | IA, prompts, parámetros de fuentes, búsqueda web, trazas de escaneo, consumo, tareas programadas y reglas de horizonte |
+| `/api/backup` | `backup.py` | Copia en Firestore, puntos de recuperación, exportar y restaurar |
+| `/api/clusters`, `/api/tech-types`, `/api/methodology` | `catalogs.py` | Catálogos y parámetros metodológicos |
+| `/api/cycles` | `cycles.py` | Ciclos, cambio de estado, verificación de cierre y arrastre |
+| `/api/sources` | `sources.py` | Catálogo de fuentes, matriz (importar, comparar, aplicar), alta rápida, descubrimiento, consulta manual y exportación |
+| `/api/scan` | `scan.py` | Lanzar la vigilancia (todas o una fuente), vista previa de un enlace y registros de rastreo |
+| `/api/ingest` | `ingest.py` | Cola, avance, historial (`/runs`), informe de acceso, cancelación, sondas de salud, cobertura, dato crudo y reprocesamiento |
+| `/api/findings` | `findings.py` | Señales y sus enlaces: reporte, verificación, ubicación y diagnóstico |
+| `/api/technologies` | `technologies.py` | Buscador, bandeja de entrada, asignación al ciclo, sugerencia de clasificación, confiabilidad y cambios de estado en el ciclo |
+| `/api/submissions`, `/api/public/submissions` | `submissions.py` | Formulario público y moderación de postulaciones |
+| `/api/screening` | `screening.py` | Duplicados, novedad, cruce INVIMA, normalización y Listado Único |
+| `/api/invima` | `invima.py` | Estado, búsqueda y sincronización del índice INVIMA |
+| `/api/priority` | `priority.py` | Criterios, cola de calificación y calificación P1 a P6 |
+| `/api/reports` | `evaluation.py` | Expedientes de evaluación: versiones, transiciones, invitaciones, comentarios y exportación |
+| `/api/public/reviews` | `review_portal.py` | Portal del revisor externo por token |
+| `/api/recommendations` | `recommendations.py` | Informes de diseminación y paquete ZIP del ciclo |
+| `/api/strategy`, `/api/bulletins`, `/api/alerts` | `strategy.py` | Tablero estratégico, grafos, boletines y alertas |
+| `/api/public` | `public_catalog.py` | Catálogo y ficha pública, cifras de transparencia |
+| `/api/dashboard` | `dashboard.py` | Indicadores de la bandeja de trabajo y pendientes del perfil |
+| `/api/notes` | `notes.py` | Notas del equipo |
+| `/api/chat` | `chat.py` | Asistente IA y asistente de navegación |
+| `/api/intelligence` | `intelligence.py` | Estado (incluye ficha de modelos y traza), parámetros, base de conocimiento, calibración, marco analítico y vigencia por año |
+| `/api/search-knowledge` | `search_knowledge.py` | Base de conocimiento de búsqueda: consulta, cobertura, exportar e importar |
 
-        P_ALTA -->|"Crear expediente"| EVA
-        EVA -->|"Invitacion con token JWT temporal"| REV
-        REV -->|"Firma obligatoria"| COI
-        COI -->|"Emision de observaciones y dictamen"| EVA
-    end
+Las respuestas de `/api/` llevan `Cache-Control: no-store`. El servidor añade cabeceras de seguridad (política de contenido, `X-Frame-Options`, HSTS en producción) y un identificador `X-Request-ID` por petición.
 
-    %% 6. Diseminacion y Gobernanza
-    subgraph S6 ["6. Diseminacion, Salida y Cierre"]
-        PUB["Expediente Aprobado por Comite"]
-        PDF["Generacion PDF Nativo: pdf_export.py"]
-        BOL["Boletines y Paquetes ZIP del Ciclo"]
-        EXT["Catalogo Ciudadano: public_catalog.py"]
-        STRAT["Tablero y Grafo: strategy.py"]
+---
 
-        EVA -->|"Aprobacion final"| PUB
-        PUB --> PDF
-        PUB --> BOL
-        PUB --> EXT
-        PUB --> STRAT
-    end
+## Pruebas
+
+Ninguna suite necesita ni debe usar los datos de producción. Las pruebas automáticas no llaman al proveedor de IA real.
+
+### Backend (pytest)
+
+`pytest` no está en `requirements.txt`; la CI instala `pytest==9.1.1`.
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+pip install "pytest==9.1.1"
+python -m pytest -q
+python -m pytest tests/test_entrega_final.py -q     # lo nuevo de esta entrega
+```
+
+Hay 61 archivos `test_*.py` en `backend/tests/`. `test_entrega_final.py` cubre las rutas de acceso, que la sonda en rojo no detiene una fuente web, el historial de vigilancias y la ficha de modelos.
+
+### Navegador (Playwright)
+
+```powershell
+cd frontend
+npm run build
+npx playwright test
+```
+
+Sin `E2E_BASE_URL`, la configuración levanta su propio backend en el puerto 8799 con una base SQLite temporal, acceso de desarrollo, worker apagado, IA apagada y `FIREBASE_DB_ENABLED=false`. Usa el Python de `backend\.venv` (o el de `E2E_PYTHON`) y el Chrome instalado. Para usar Chromium de Playwright:
+
+```powershell
+npx playwright install chromium
+$env:E2E_CHANNEL = "chromium"; npx playwright test
+```
+
+`E2E_BASE_URL=http://127.0.0.1:8000` ejecuta las pruebas contra una instancia ya levantada; esa instancia debe ser de pruebas. El reporte queda en `frontend/e2e-report`.
+
+### Regresión de la API (smoke)
+
+Con un servidor de pruebas en marcha (base propia y `FIREBASE_DB_ENABLED=false`; la suite crea datos):
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe smoke_test.py --base http://127.0.0.1:8000 --skip-network
+```
+
+`--skip-network` omite las pruebas que salen a internet.
+
+### Integración continua
+
+`.github/workflows/ci.yml` corre en cada *pull request* y en cada *push* a `main`: pytest y Alembic sobre SQLite, migraciones reales en PostgreSQL 15, compilación del frontend, Playwright, `smoke_test.py` y construcción de la imagen Docker.
+
+---
+
+## Migraciones de base de datos
+
+El esquema se versiona con Alembic (`backend/alembic/versions/`). Al arrancar, `migrations.upgrade_database()` resuelve los tres casos: base vacía (la crea), base anterior a Alembic (la completa y la marca en la revisión base) y base ya versionada (aplica lo pendiente). En PostgreSQL la migración se serializa con un candado consultivo.
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+python -m app.migrations              # migra y muestra la revisión
+python -m app.migrations --bootstrap  # además ejecuta una vez el arranque completo (siembras), sin worker
+python -m alembic upgrade head        # Alembic directo
+```
+
+| Revisión | Contenido |
+|---|---|
+| `0001_baseline` | Esquema completo de partida |
+| `0002_source_matrix_profile` | Campos de la matriz EH y flujo de escaneo por fuente |
+| `0003_technology_reliability` | Dictamen de confiabilidad de la señal |
+| `0004_product_details_corroboration` | Datos de producto, corroboración entre fuentes y campos editados |
+| `0005_signal_links` | Enlace de la señal a su fuente original |
+| `0006_technology_legacy` | Marca de señales de fuentes del inventario anterior |
+| `0007_submission_cross_check` | Cruce de postulaciones con la vigilancia y la web |
+| `0008_search_knowledge` | Base de conocimiento de búsqueda |
+| `0009_signal_knowledge` | Base de conocimiento de señales |
+
+Esta entrega no añade revisiones: el historial de vigilancias usa la tabla `scheduled_runs` existente, y el informe de acceso y el interruptor del cliente compatible con navegador se guardan como parámetros en la base.
+
+---
+
+## Comandos de administración (CLI)
+
+Desde `backend/`, con el entorno activo (`backend/app/cli.py`). Cada acción queda en la bitácora como ejecutada por `cli`.
+
+```powershell
+# Crea o promueve un superadministrador. Sin --password genera una temporal que se muestra una vez
+python -m app.cli create-admin --email <correo> --name "<Nombre Apellido>"
+python -m app.cli create-admin --email <correo> --password -      # la pide sin eco
+python -m app.cli create-admin --email <correo> --password <clave> --force-change
+
+# Asigna una contraseña temporal a una cuenta existente
+python -m app.cli reset-password --email <correo>
+
+# Lista las cuentas con su perfil y estado
+python -m app.cli list-users
+
+# Valida la configuración del entorno; sale con código 1 si es insegura para producción
+python -m app.cli check-config
+
+# Crea o verifica la base de Firestore. --probe escribe y borra un documento; --push publica la base local
+python -m app.cli ensure-firebase-db --probe
+```
+
+`ensure-firebase-db --push` sube la base SQLite local a la colección configurada, forzando la subida. No debe ejecutarse desde un equipo que resuelva a la colección de producción.
+
+---
+
+## Estructura del repositorio
+
+```
+Sis_HS_IETS/
+├── backend/
+│   ├── alembic/                  # env.py y versions/ (0001 a 0009)
+│   ├── app/
+│   │   ├── main.py               # FastAPI: arranque, middlewares, routers y servicio de la SPA
+│   │   ├── config.py             # Variables de entorno (pydantic-settings)
+│   │   ├── database.py           # Motor, sesión, blindaje de audit_log
+│   │   ├── models.py             # Modelos ORM
+│   │   ├── schemas.py            # Esquemas de entrada y salida
+│   │   ├── rbac.py, deps.py, security.py, audit.py   # Perfiles, dependencias, contraseñas y bitácora
+│   │   ├── migrations.py         # Adopción y ejecución de Alembic
+│   │   ├── cli.py                # Comandos de administración
+│   │   ├── worker.py             # Worker de la cola, vigilante y keep-alive
+│   │   ├── ingest_service.py     # Cola de ingesta, tiempo máximo, circuito y sonda
+│   │   ├── scheduler_service.py  # Tareas programadas e historial de vigilancias
+│   │   ├── scraper.py            # Rastreador web y rutas de respaldo
+│   │   ├── access_routes.py      # Cliente compatible con navegador e índice de PubMed
+│   │   ├── scan_progress.py, scan_eta.py, scan_trace.py   # Avance, estimación y traza
+│   │   ├── probe_service.py      # Sonda de salud de las fuentes
+│   │   ├── link_matrix.py, source_matrix.py, catalog_service.py   # Inventario de fuentes
+│   │   ├── source_profile.py     # Parámetros de fuentes y flujo de escaneo
+│   │   ├── signal_links.py, link_resolver.py, evidence_locator.py # Enlaces y evidencia de las señales
+│   │   ├── intelligence.py       # Base de conocimiento, clasificador, calibración, ficha y traza
+│   │   ├── analytics_insights.py # Marco analítico
+│   │   ├── signal_window.py, search_knowledge.py
+│   │   ├── dedup.py, screening_service.py, invima.py, normalization.py
+│   │   ├── priority_engine.py, priority.py
+│   │   ├── evaluation.py, evaluation_service.py
+│   │   ├── dissemination_service.py, pdf_export.py, report_html.py, xlsx_report.py
+│   │   ├── strategy_service.py, graph_service.py, ttm.py
+│   │   ├── ai_service.py, minimax_service.py, gemini_service.py, prompt_store.py, usage_meter.py
+│   │   ├── firebase_db.py, firebase_auth.py, firestore_directory.py, browser_backup.py
+│   │   ├── data/                 # matriz_enlaces_eh.json, matriz_fuentes_eh.json, base_busqueda_eh.json
+│   │   ├── ingest/               # Conectores de fuentes con API
+│   │   └── routers/              # 27 módulos de rutas
+│   ├── scripts/build_search_knowledge.py
+│   ├── tests/                    # pytest (incluye fixtures/)
+│   ├── smoke_test.py             # Regresión contra la API en ejecución
+│   ├── requirements.txt
+│   ├── alembic.ini
+│   └── .env.example
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx, main.jsx     # Rutas y proveedores
+│   │   ├── api/, auth/, cycle/, realtime/, backup/, scan/, ai/, graph/, utils/
+│   │   ├── components/           # ScanProgress, ModelCard, IntelligencePanel, SourceParamsPanel, Layout…
+│   │   ├── constants/            # navigation.js (menú), glossary.js, methodology.js, paramInfo.js
+│   │   ├── pages/                # Una pantalla por módulo
+│   │   └── styles/               # globals.css, shell.css, ui.css, horizon.css, theme.js
+│   ├── e2e/                      # Pruebas de Playwright
+│   ├── playwright.config.js
+│   ├── vite.config.js
+│   └── package.json
+├── deploy/                       # docker-entrypoint.sh, Caddyfile, backup.sh, backup.ps1, .env.production.example
+├── .github/workflows/            # ci.yml, keepalive.yml
+├── Dockerfile
+├── docker-compose.yml
+├── render.yaml
+├── start.ps1
+├── start-prod.ps1
+└── README.md
 ```
 
 ---
 
-### Explicación detallada paso a paso
+## Flujo de ramas
 
-#### Paso 1: Entrada y captura de señales
-- **Canal proactivo:** Tareas programadas periódicas (`backend/app/scheduler_service.py`) o ejecuciones manuales encolan una tarea por fuente activa; el worker las atiende con tiempo máximo por fuente para que la corrida no se detenga. Cada fuente es un enlace de la matriz por enlace (`backend/app/link_matrix.py`): se consulta por su adaptador de API (`backend/app/ingest/clinicaltrials.py`, `fda.py`, `ema.py`, etc.) o con el scraper web con respaldo de RSS y Google News (`backend/app/scraper.py`), que entrega a la IA el contexto de la fila (qué consultar, ruta de acceso, tipo de material). Cada registro extraído se valida y se inserta como un `Finding` (señal) con la URL consultada, la URL exacta, el tipo de enlace y la evidencia de captura (`backend/app/signal_links.py`).
-- **Inventario de fuentes:** Al arrancar, `catalog_service.sync_catalog` sincroniza el inventario con `backend/app/data/matriz_enlaces_eh.json`, respetando lo editado por el equipo. Las próximas cargas se hacen desde (Catálogo de fuentes) › (Cargar matriz) con el mismo formato; las fuentes que salen de la matriz se retiran sin borrarse.
-- **Canal reactivo:** Ciudadanos u organizaciones ingresan al formulario público `/postular`. El backend valida el captcha (`RECAPTCHA_SECRET`), aplica límites por IP y persiste una postulación (`Submission`) con su declaración de conflicto de intereses. Un evaluador revisa la postulación en `/postulaciones` y, de ser aceptada, la transforma en una señal apta para el flujo de trabajo.
-
-#### Paso 2: Ingesta, extracción y bandeja de entrada (Staging)
-- En `/bandeja-entrada` (`backend/app/routers/technologies.py`), los evaluadores visualizan las señales capturadas. La pestaña (Legacy) reúne las señales pendientes de fuentes del inventario anterior y permite recuperarlas.
-- El módulo `backend/app/product_details.py` analiza el título y resumen para inferir automáticamente concentración, forma farmacéutica, vía de administración o modelo de dispositivo.
-- El módulo `backend/app/corroboration.py` contrasta la tecnología contra las demás fuentes registradas. Si la misma innovación aparece en múltiples referentes (p. ej., FDA y EMA), se incrementa su `corroboration_count` y se le otorga un bono de visualización en la bandeja (hasta 15 puntos).
-- El evaluador confirma o ajusta el Clúster de Salud y la Tipología recomendados por `backend/app/classification.py`, y asigna la tecnología al ciclo operativo vigente (`backend/app/technology_service.py`).
-
-#### Paso 3: Filtrado, desduplicación e indexación regulatoria (Screening)
-- En `/filtrado` (`backend/app/routers/screening.py`), el sistema activa tres compuertas de calidad:
-  1. **Detección de duplicados:** `backend/app/dedup.py` utiliza algoritmos de RapidFuzz (Levenshtein, Jaro-Winkler, Token Sort) y coincidencia exacta de códigos NCT para agrupar registros repetidos y someterlos a confirmación humana.
-  2. **Verificación regulatoria INVIMA:** `backend/app/invima.py` contrasta la tecnología contra la copia local indexada de registros sanitarios y, si no hay coincidencia, realiza una consulta en vivo a `datos.gov.co`.
-  3. **Declaración de Novedad:** Se registra una `NoveltyAssessment` donde se certifica si la tecnología no está disponible en Colombia, si es una nueva indicación, forma o combinación. Los genéricos o cambios cosméticos quedan expresamente excluidos.
-- Solo las tecnologías que superan la compuerta de novedad se consolidan en el **Listado Único por Clúster**.
-
-#### Paso 4: Calificación mediante la Matriz Oficial %P
-- En `/priorizacion` (`backend/app/routers/priority.py`), las tecnologías del Listado Único son calificadas bajo estricta segregación de funciones:
-  - **Evaluador Técnico:** Califica P1 (disponibilidad nacional), P5 (aprobación EMA/FDA ≤ 12 meses) y P6 (proceso regulatorio formal ≤ 6 meses).
-  - **Evaluador Clínico:** Califica P2 (gravedad/mortalidad de la condición), P3 (carga de enfermedad / impacto financiero) y P4 (impacto organizacional en el SGSSS).
-- El motor `backend/app/priority_engine.py` computa el porcentaje `%P = (criterios afirmativos / 6) * 100` y clasifica el registro:
-  - **Priorizada:** `%P ≥ 60 %` (pasa automáticamente a evaluación temprana).
-  - **Bajo Vigilancia:** `33 % ≤ %P < 60 %` (se mantiene en observación para futuros ciclos).
-  - **No Priorizada:** `%P < 33 %` (se archiva con trazabilidad).
-
-#### Paso 5: Evaluación temprana y revisión por pares
-- En `/evaluacion` (`backend/app/routers/evaluation.py`), los evaluadores elaboran el informe técnico (Ficha, Informe Breve o Mini-HTA) estructurado en seis estados editoriales (`borrador`, `revision_interna`, `revision_externa`, `consolidacion`, `comite` y `aprobado`).
-- Para revisión externa, el sistema genera una invitación con token JWT seguro (`backend/app/routers/review_portal.py`) que permite al revisor acceder a un portal web aislado sin necesidad de credenciales institucionales, requiriendo obligatoriamente la firma electrónica previa de declaración de conflicto de intereses (COI).
-
-#### Paso 6: Diseminación, reportes y cierre
-- Al aprobarse la tecnología, el sistema genera de forma nativa fichas técnicas, expedientes y boletines en formato PDF de alta calidad mediante `backend/app/pdf_export.py`.
-- La información de acceso abierto se publica automáticamente en el portal ciudadano `/expedientes` (`backend/app/routers/public_catalog.py`), omitiendo datos confidenciales y presupuestales.
-- El Tablero Estratégico y de Gobernanza (`backend/app/routers/strategy.py`) actualiza en tiempo real los indicadores de avance, matrices de decisión TTM (Time-To-Market) y el grafo interactivo de relaciones.
-- Toda acción queda inmutablemente asentada en la tabla `audit_logs` (`backend/app/audit.py`), vinculando usuario, hora, IP, recurso y deltas de cambio.
-
----
-
-## Conceptos clave y metodología operativa
-
-1. **Señal (`Finding`):** Unidad atómica de captura obtenida durante la vigilancia. Posee título, extracto de texto, enlace de origen y hash de contenido para prevenir duplicaciones exactas.
-2. **Tecnología (`Technology`):** La unidad metodológica persistente a lo largo del tiempo. Agrupa nombre comercial, DCI, clúster clínico, fabricante, códigos regulatorios y detalle de formulación.
-3. **Ciclo Operativo (`Cycle`):** Ventana de trabajo formal reglamentada (entre 10 y 16 semanas, máximo 3 ciclos formales por año calendario). Su cierre congela de forma inmutable todas las calificaciones emitidas.
-4. **Instancia de Ciclo (`CycleTechnology`):** Representa el estado y evaluación de una tecnología dentro de un ciclo concreto. Permite que una tecnología evaluada en un ciclo anterior pueda reevaluarse en un ciclo futuro sin sobreescribir la evidencia histórica.
-
----
-
-## Perfiles y matriz de permisos (RBAC)
-
-El sistema implementa 5 perfiles definidos en `backend/app/rbac.py`:
-
-| Rol / Perfil | Nombre en sistema | Responsabilidad principal |
-|---|---|---|
-| **Superadministrador** | `superadmin` | Gestión de usuarios, configuración global, parámetros metodológicos y cierre formal de ciclos. |
-| **Evaluador Técnico** | `evaluador_tecnico` | Ejecución de vigilancia, ingesta, desduplicación, verificación INVIMA, calificación de P1, P5 y P6. |
-| **Evaluador Clínico** | `evaluador_clinico` | Calificación de criterios clínicos de priorización (P2, P3 y P4) y redacción de expedientes de evaluación. |
-| **Tomador de Decisiones**| `tomador_decisiones` | Acceso analítico a tableros ejecutivos, gráficos de gobernanza, capas de impacto presupuestal y reportes. |
-| **Revisor Externo** | `revisor_externo` | Perfil transitorio activado exclusivamente mediante token firmado para revisión técnica de un expediente con COI previo. |
+- El trabajo se hace en una rama propia, `feat/…` o `fix/…`, y se integra con *pull request* a **`develop`**.
+- **`main` despliega en Render** (`autoDeploy: true` en `render.yaml`). No se hace *push* directo a `main`: solo recibe cambios ya integrados, por *pull request*.
+- Cada *pull request* pasa por la integración continua descrita en [Pruebas](#pruebas).
 
 ---
 
 ## Documentación relacionada
 
-- [`DEPLOY.md`](DEPLOY.md): Guía de despliegue en producción con Docker Compose, HTTPS con Caddy, respaldo y políticas de restauración.
-- [`GUIA_USUARIO.md`](GUIA_USUARIO.md): Manual paso a paso de operación de pantallas para cada perfil de usuario.
-- [`BACKLOG.md`](BACKLOG.md): Trazabilidad de Requerimientos Funcionales (RF01 a RF20), diagramas de arquitectura detallados y decisiones de diseño.
-- [`Plan_Fases_Actualizacion_Plataforma_EH_IETS.md`](Plan_Fases_Actualizacion_Plataforma_EH_IETS.md): Cronograma y arquitectura de fases de evolución del sistema.
-- [`NOTAS_DESARROLLADOR.md`](NOTAS_DESARROLLADOR.md): Respuesta por requerimiento al III seguimiento (RF-001, OBS-001, OBS-002, RF-005, RF-006) y al reemplazo del inventario por la matriz por enlace, con causa raíz, cambios y pasos de verificación.
-- [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md): Detalle técnico del catálogo verificado D-06 (97 referentes), que desde el 17-11-2026 queda como referencia de adaptadores de API y de consulta manual; el inventario vigente es la matriz por enlace.
-- [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md): Manual de identidad visual, paleta cromática y estándares de componentes.
+- [`GUIA_USUARIO.md`](GUIA_USUARIO.md): guía de uso por pantalla. También en PDF: [`Guia_Usuario_Escaneo_Horizonte_IETS.pdf`](Guia_Usuario_Escaneo_Horizonte_IETS.pdf).
+- [`DEPLOY.md`](DEPLOY.md): despliegue en producción, HTTPS, worker, migraciones, respaldo y restauración, copia en Firestore, monitoreo y reversión.
+- [`NOTAS_DESARROLLADOR.md`](NOTAS_DESARROLLADOR.md): notas técnicas por requerimiento.
+- [`BACKLOG.md`](BACKLOG.md): requerimientos y decisiones de diseño.
+- [`linea-grafica-y-ux-ui.md`](linea-grafica-y-ux-ui.md): línea gráfica y reglas de interfaz.
+- [`Plan_Fases_Actualizacion_Plataforma_EH_IETS.md`](Plan_Fases_Actualizacion_Plataforma_EH_IETS.md): plan de fases de la plataforma.
+- [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md): catálogo verificado de fuentes proactivas.
+- [`Comparacion_Requerimientos_Validacion_SI_Escaneo_Horizonte.md`](Comparacion_Requerimientos_Validacion_SI_Escaneo_Horizonte.md): comparación de requerimientos y validación.

@@ -19,7 +19,7 @@ import { LoadingBlock, Spinner } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
 import { ietsTag } from "../utils/iets";
 import LinkPreview from "../components/LinkPreview";
-import { AccessReport, ScanRunSummary, SourceProgress } from "../components/ScanProgress";
+import { AccessReport, LastRunCaption, ScanHistory, ScanRunSummary, SourceProgress } from "../components/ScanProgress";
 import { useScan } from "../scan/ScanContext";
 import { UrlOriginTag } from "../components/UrlOrigin";
 
@@ -89,6 +89,8 @@ export default function Scan() {
   const [cancelling, setCancelling] = useState(false);
   const wasActive = useRef(false);
   const [report, setReport] = useState(null);
+  const [reportAt, setReportAt] = useState(null);
+  const [history, setHistory] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -115,8 +117,18 @@ export default function Scan() {
     try {
       const { data } = await api.get("/ingest/access-report");
       setReport(data);
+      setReportAt(new Date().toISOString());
     } catch {
       /* el informe es complementario: si falla, la pantalla sigue */
+    }
+  }, []);
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const { data } = await api.get("/ingest/runs", { params: { limit: 30 } });
+      setHistory(data);
+    } catch {
+      /* el historial es complementario: si falla, la pantalla sigue */
     }
   }, []);
 
@@ -124,7 +136,8 @@ export default function Scan() {
     load();
     loadProgress();
     loadReport();
-  }, [load, loadProgress, loadReport, version]);
+    loadHistory();
+  }, [load, loadProgress, loadReport, loadHistory, version]);
 
   // En esta pantalla el avance se refresca más seguido; al terminar se recargan registro e informe.
   useEffect(() => {
@@ -133,13 +146,18 @@ export default function Scan() {
         wasActive.current = false;
         load();
         loadReport();
+        loadHistory();
       }
       return undefined;
     }
     wasActive.current = true;
+    loadHistory();
     const timer = setInterval(loadProgress, PROGRESS_POLL_MS);
-    // El informe cambia más despacio: cada 15 s basta durante la corrida.
-    const reportTimer = setInterval(loadReport, REPORT_POLL_MS);
+    // El informe y el historial cambian más despacio: cada 15 s basta durante la corrida.
+    const reportTimer = setInterval(() => {
+      loadReport();
+      loadHistory();
+    }, REPORT_POLL_MS);
     return () => {
       clearInterval(timer);
       clearInterval(reportTimer);
@@ -201,6 +219,7 @@ export default function Scan() {
       setSelected(new Set());
       load();
       loadProgress();
+      loadHistory();
     } catch (e) {
       toast.error(apiError(e, "No se pudo ejecutar la vigilancia"));
     } finally {
@@ -228,6 +247,7 @@ export default function Scan() {
       if (data.status === "sin_trabajo") toast.info(data.message);
       else toast.success(data.message || "Vigilancia programada ejecutada");
       load();
+      loadHistory();
     } catch (e) {
       toast.error(apiError(e, "No se pudo ejecutar la vigilancia programada"));
     } finally {
@@ -247,6 +267,7 @@ export default function Scan() {
       load();
       loadProgress();
       loadReport();
+      loadHistory();
     } catch (err) {
       toast.error(apiError(err, "No se pudo escanear"));
     } finally {
@@ -287,16 +308,19 @@ export default function Scan() {
             <Button variant="secondary" onClick={() => navigate("/fuentes")}>
               <Icon name="globe" size={16} /> Inventario
             </Button>
-            <HintButton
-              size="lg"
-              onClick={() => runScan(null)}
-              loading={running}
-              disabled={!canScan || enabled.length === 0}
-              hint={`Encola las ${enabled.length} fuentes con ingesta activa. El worker las procesa en segundo plano: puede seguir trabajando.`}
-              disabledHint={!canScan ? noScan : "No hay fuentes con ingesta activa. Habilite alguna en el catálogo de fuentes."}
-            >
-              <Icon name="radar" size={17} /> Ejecutar vigilancia ({enabled.length})
-            </HintButton>
+            <div className="run-with-caption">
+              <HintButton
+                size="lg"
+                onClick={() => runScan(null)}
+                loading={running}
+                disabled={!canScan || enabled.length === 0}
+                hint={`Encola las ${enabled.length} fuentes con ingesta activa. El worker las procesa en segundo plano: puede seguir trabajando.`}
+                disabledHint={!canScan ? noScan : "No hay fuentes con ingesta activa. Habilite alguna en el catálogo de fuentes."}
+              >
+                <Icon name="radar" size={17} /> Ejecutar vigilancia ({enabled.length})
+              </HintButton>
+              <LastRunCaption history={history} active={Boolean(progress?.active)} />
+            </div>
           </div>
         }
       />
@@ -313,7 +337,8 @@ export default function Scan() {
         hint={GLOSSARY.vigilancia}
         tasks={[
           "Pulse «Ejecutar vigilancia»: corre en el servidor y puede seguir trabajando en otros módulos; la barra flotante muestra el avance y el tiempo restante.",
-          "La sonda corre antes de cada corrida de contrato. Ámbar o rojo suspende esa fuente, no el resto.",
+          "Si un sitio rechaza al rastreador se prueban las rutas de respaldo (RSS oficial, índice de la revista en PubMed, Google News). El informe de acceso dice por dónde entró cada fuente.",
+          "Cada corrida queda en el historial con su fecha y hora, su duración y su resumen.",
           "Las señales nuevas llegan a la bandeja de entrada; el nivel D no pisa campos ya llenados por A/B.",
         ]}
         nextLabel="Bandeja de entrada"
@@ -339,7 +364,9 @@ export default function Scan() {
         lastFetch={lastFetch}
       />
 
-      <AccessReport report={report} onReload={loadReport} />
+      <AccessReport report={report} onReload={loadReport} live={Boolean(progress?.active)} updatedAt={reportAt} />
+
+      <ScanHistory history={history} onReload={loadHistory} />
 
       <div className="fb-schedule-grid" style={{ marginBottom: 16 }}>
         <Card padding={18} className="fb-schedule-card">

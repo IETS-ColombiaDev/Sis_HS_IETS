@@ -149,6 +149,13 @@ def facts(db: Session, now: datetime | None = None) -> dict:
     active = [s for s in sources.values() if s.scrape_enabled and not getattr(s, "retired", False) and s.catalog_active is not False]
     silent = [s for s in active if s.id not in per_source]
 
+    # Acceso en la ultima corrida de cada fuente (informe de acceso de la vigilancia).
+    from . import scan_progress
+
+    access = scan_progress.load_report(db)
+    ran = [access[str(s.id)] for s in active if str(s.id) in access]
+    no_access = sum(1 for entry in ran if not entry.get("accessed"))
+
     link_rows = dict(
         db.query(Finding.link_type, func.count(Finding.id)).group_by(Finding.link_type).all()
     )
@@ -176,6 +183,7 @@ def facts(db: Session, now: datetime | None = None) -> dict:
         "top_clusters": top_clusters, "concentration": top_clusters[0]["share"] if top_clusters else 0,
         "classified": len(classified), "growing": growing,
         "noisy_sources": noisy, "top_sources": top_sources, "active_sources": len(active), "silent_sources": len(silent),
+        "scanned_sources": len(ran), "no_access_sources": no_access,
         "exact_links": _pct(link_rows.get("exacto", 0), links_total), "links_total": links_total,
         "backlog_median_days": int(statistics.median(ages)) if ages else 0, "backlog_old": old,
         "classified_last30": done30, "weeks_to_clear": weeks_to_clear,
@@ -222,6 +230,11 @@ def framework(f: dict) -> list[dict]:
         _item("Fuentes sin señales", f["silent_sources"],
               f"De {f['active_sources']} fuentes con ingesta activa. Revise su URL en el Diagnóstico para la matriz.",
               "warn" if f["silent_sources"] else "ok", "/fuentes"),
+        _item("Fuentes sin acceso", f.get("no_access_sources", 0),
+              (f"De {f['scanned_sources']} fuentes rastreadas, en su última corrida. El informe de acceso de Vigilancia "
+               "dice qué rutas se probaron en cada una.") if f.get("scanned_sources")
+              else "Aún no hay corridas registradas en el informe de acceso.",
+              "warn" if f.get("no_access_sources") else ("ok" if f.get("scanned_sources") else "info"), "/vigilancia"),
         _item("Antigüedad de la bandeja", f"{f['backlog_median_days']} días",
               f"Mediana de las señales por clasificar; {f['backlog_old']} llevan {t['backlog_days_alert']} días o más.",
               "warn" if f["backlog_old"] else "ok", "/bandeja-entrada"),
@@ -258,6 +271,11 @@ def framework(f: dict) -> list[dict]:
     if f["silent_sources"]:
         actions.append(_item("Atender fuentes sin señales", f["silent_sources"],
                              "Abra Señales capturadas › Reporte de enlaces › Diagnóstico para la matriz.", "warn", "/senales"))
+    if f.get("no_access_sources"):
+        actions.append(_item("Recuperar el acceso a fuentes", f["no_access_sources"],
+                             "Revise en Vigilancia › Informe de acceso las rutas probadas. Corrija la URL si cambió, agregue "
+                             "su canal RSS en la matriz o active el cliente compatible con navegador en Parámetros de fuentes.",
+                             "warn", "/vigilancia"))
     if f["concentration"] >= t["concentration_alert"] and f["top_clusters"]:
         actions.append(_item("Equilibrar la vigilancia", f"{f['concentration']} %",
                              f"{f['top_clusters'][0]['name']} concentra la clasificación: revise si faltan fuentes de otros clústeres.",

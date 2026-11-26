@@ -497,7 +497,15 @@ def _run_job(db: Session, job: IngestJob) -> IngestJob:
 
         scan_progress.stage("sonda", "Verificando la salud de la fuente antes de ingerir")
         probe = probe_source(db, source)
-        if probe.get("status") in {"ambar", "rojo"}:
+        if probe.get("status") in {"ambar", "rojo"} and used_html:
+            # Una fuente web no se suspende por la sonda: el rastreador tiene sus
+            # propias rutas (cliente compatible con navegador, RSS, índice, Google News)
+            # y se intenta siempre. Antes un 403 en la sonda dejaba la fuente sin leer.
+            scan_progress.stage(
+                "sonda",
+                f"Sonda {probe.get('status')}: {probe.get('message')} Se intenta igual por las rutas de acceso."[:240],
+            )
+        elif probe.get("status") in {"ambar", "rojo"}:
             return _fail(
                 db,
                 job,

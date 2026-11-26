@@ -325,6 +325,30 @@ def fetch_url(url: str, timeout: float | None = None, retries: int | None = None
 
 
 def _fetch_url(url: str, timeout: float | None = None, retries: int | None = None) -> tuple[int, str, str, bytes]:
+    """Descarga por la mejor ruta: cliente normal y, si el sitio lo rechaza, cliente compatible con navegador.
+
+    Un sitio que solo respondio por la segunda ruta se recuerda unas horas: sus
+    paginas siguientes van directo por ella. `access_routes.last_via()` dice cual se uso.
+    """
+    from . import access_routes
+
+    access_routes.set_via("directo")
+    if access_routes.prefers_browser(url):
+        alt = access_routes.browser_get(url, float(timeout or 25.0))
+        if 0 < alt[0] < 400:
+            access_routes.set_via("navegador")
+            return alt
+    result = _fetch_plain(url, timeout, retries)
+    if access_routes.available() and access_routes.looks_blocked(result[0], result[1], result[2]):
+        alt = access_routes.browser_get(url, float(timeout or 25.0), quick=result[0] == 0)
+        better = 0 < alt[0] < 400 and (not (0 < result[0] < 400) or len(alt[2]) > len(result[2]) * 2)
+        if better:
+            access_routes.set_via("navegador")
+            return alt
+    return result
+
+
+def _fetch_plain(url: str, timeout: float | None = None, retries: int | None = None) -> tuple[int, str, str, bytes]:
     """Descarga con reintentos. Nunca lanza: si falla, status 0 y cuerpo vacio.
 
     `retries` limita los reintentos de esta descarga (las paginas internas del
@@ -904,7 +928,6 @@ def apply_crawled_text(findings: list[dict], crawl: dict | None) -> list[dict]:
 # publican RSS abierto. Se usan como respaldo despues de las rutas de la matriz.
 FEED_FALLBACKS: dict[str, tuple[str, ...]] = {
     "jamanetwork.com": ("https://jamanetwork.com/rss/site_3/onlineFirst_67.xml", "https://jamanetwork.com/rss/site_3/67.xml"),
-    "bmj.com": ("https://www.bmj.com/rss/recent.xml",),
     "nytimes.com": ("https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",),
     "england.nhs.uk": ("https://www.england.nhs.uk/aac/feed/", "https://www.england.nhs.uk/feed/"),
     "cochranelibrary.com": ("https://www.cochrane.org/news/rss.xml",),
@@ -952,13 +975,18 @@ def news_feed_url(source: Source) -> str:
 
 
 def fallback_urls(source: Source, entry_urls: list[str] | None = None) -> list[str]:
-    """Rutas de respaldo: las de la matriz EH, el RSS oficial del dominio y Google News."""
+    """Rutas de respaldo: las de la matriz EH, el RSS oficial, el indice de la revista en PubMed y Google News."""
     main = _normalize_url(source.url or "")
     out = [u for u in (entry_urls or []) if _normalize_url(u) != main][:3]
     host = (urlparse(source.url or "").hostname or "").lower().removeprefix("www.")
     for domain, feeds in FEED_FALLBACKS.items():
         if host == domain or host.endswith("." + domain):
             out.extend(feeds)
+    from . import access_routes
+
+    journal = access_routes.journal_index_url(source.url or "")
+    if journal:
+        out.append(journal)
     news = news_feed_url(source)
     if news:
         out.append(news)
@@ -971,6 +999,10 @@ def access_route(source: Source, landing_url: str, entry_urls: list[str] | None 
         return "sitio"
     if is_news_feed_url(landing_url) and not is_news_feed_url(source.url or ""):
         return "google_news"
+    from . import access_routes
+
+    if access_routes.is_journal_index(landing_url):
+        return "indice_pubmed"
     for feeds in FEED_FALLBACKS.values():
         if landing_url in feeds:
             return "rss_oficial"
@@ -1947,6 +1979,9 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
     profile = source_profile.effective_profile(source)
     options = source_profile.load_options(db)
     context = source_profile.source_context(source, options)
+    from . import access_routes as _routes
+
+    _routes.configure_from_db(db)
 
     def finish_trace(*, ok: bool, items_found: int = 0, items_new: int = 0) -> None:
         from . import ai_service, scan_trace
@@ -1977,13 +2012,25 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             db,
         )
 
+    browser_urls: set[str] = set()
+
     def download(url: str, action: str) -> tuple[int, str, str, bytes]:
         verb = "Accediendo a" if action == "descarga" else "Probando ruta de respaldo"
         scan_progress.stage("conectando", f"{verb} {url[:140]}")
         t0 = time.perf_counter()
-        result = fetch_url(url)
+        from . import access_routes
+
+        if access_routes.is_journal_index(url):
+            result = access_routes.fetch_journal_index(url)
+            used_browser = False
+        else:
+            access_routes.set_via("directo")
+            result = fetch_url(url)
+            used_browser = access_routes.last_via() == "navegador"
         code, ctype = result[0], result[1]
         status = "ok" if 0 < code < 400 else (f"http_{code}" if code else "sin_conexion")
+        if used_browser and 0 < code < 400:
+            browser_urls.add(url)
         steps.append(
             {
                 "action": action,
@@ -1994,6 +2041,8 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             }
         )
         route = "sitio" if action == "descarga" else access_route(source, url, profile["entry_urls"])
+        if url in browser_urls and route == "sitio":
+            route = "navegador"
         scan_progress.attempt(url, status, ctype or "", route=route)
         return result
 
@@ -2004,7 +2053,7 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             if step["action"] not in ("descarga", "respaldo"):
                 continue
             route = "sitio" if step["action"] == "descarga" else access_route(source, step["url"], profile["entry_urls"])
-            label = {"sitio": "sitio", "ruta_matriz": "ruta de la matriz", "rss_oficial": "RSS oficial", "google_news": "Google News"}.get(route, route)
+            label = {"sitio": "sitio", "ruta_matriz": "ruta de la matriz", "rss_oficial": "RSS oficial", "indice_pubmed": "índice de PubMed", "google_news": "Google News"}.get(route, route)
             status = step["status"].replace("http_", "HTTP ").replace("sin_conexion", "sin respuesta").replace(
                 "omitida_sin_respuesta_reciente", "omitido (no respondió en una corrida reciente)"
             )
@@ -2052,6 +2101,8 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
 
         is_pdf = "pdf" in content_type or landing_url.lower().endswith(".pdf")
         via = access_route(source, landing_url, profile["entry_urls"])
+        if via == "sitio" and landing_url in browser_urls:
+            via = "navegador"
         if is_pdf:
             via_detail = f"Documento PDF descargado (HTTP {status_code})"
         else:
@@ -2098,7 +2149,8 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             scan_progress.stage("extrayendo", "Identificando candidatos en la página principal")
             # El respaldo de Google News trae todo lo publicado en el dominio
             # (empleos, resultados financieros): solo quedan los items pertinentes.
-            news_fallback = via == "google_news"
+            # El indice de la revista en PubMed se lee igual: un canal con titulos y resumenes.
+            news_fallback = via in ("google_news", "indice_pubmed")
             findings_data = extract_candidates(target, text, only_relevant=news_fallback)
             # Tabla de pipeline solo si la pagina trae filas reconocibles. Con la matriz
             # por enlace un fabricante tiene paginas de innovacion, portafolio o
@@ -2124,7 +2176,7 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             # Un canal de Google News sin items pertinentes no tiene nada que leer.
             if news_fallback and not (crawl or {}).get("combined"):
                 findings_data = rules_gate(findings_data)
-                scan_progress.note("ai", used=False, reason="El respaldo de Google News no trajo ítems pertinentes: nada que leer", final=len(findings_data))
+                scan_progress.note("ai", used=False, reason="El canal de respaldo no trajo ítems pertinentes: nada que leer", final=len(findings_data))
             if not news_fallback or (crawl or {}).get("combined"):
                 findings_data = _enrich_with_ai(
                     findings_data,
@@ -2257,9 +2309,9 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
         # Si el sitio no se pudo leer y las senales vienen de un respaldo, la
         # corrida queda parcial: la fuente en si no se consulto.
         fallback_note = ""
-        if via in ("google_news", "rss_oficial"):
+        if via in ("google_news", "rss_oficial", "indice_pubmed", "navegador"):
             fallback_note = f" Vía {ACCESS_VIA_LABELS[via]}."
-        log.status = "ok" if findings_data and via != "google_news" else "parcial"
+        log.status = "ok" if findings_data and via not in ("google_news", "indice_pubmed") else "parcial"
         visited = f" {crawl.get('pages_visited', 1)} página(s) visitadas." if crawl else ""
         elapsed = int((time.perf_counter() - started) * 1000)
         relinked_note = f" {relinked} con enlace corregido a la página exacta." if relinked else ""
