@@ -11,6 +11,8 @@ import { RealtimeProvider } from "./realtime/RealtimeContext";
 import { ToastProvider } from "./components/Toast";
 import { BackupProvider } from "./backup/BackupContext";
 import { ScanProvider } from "./scan/ScanContext";
+// Al final: afina los estilos base y los de cada componente.
+import "./styles/horizon.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

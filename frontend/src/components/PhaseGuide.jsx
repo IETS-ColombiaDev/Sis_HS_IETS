@@ -54,7 +54,7 @@ export default function PhaseGuide({ phase, tasks, nextLabel, nextTo, onNext, hi
           <InfoTip text={hint} label={`Qué es ${phase}`} />
         </span>
         <span className="phase-guide-label">Qué hace el técnico en esta fase</span>
-        {!open && next}
+        {next}
         <button
           type="button"
           className="phase-guide-toggle"
@@ -75,7 +75,6 @@ export default function PhaseGuide({ phase, tasks, nextLabel, nextTo, onNext, hi
               <li key={t}>{t}</li>
             ))}
           </ul>
-          {next}
         </>
       )}
     </div>

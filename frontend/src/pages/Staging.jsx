@@ -592,7 +592,7 @@ export default function Staging() {
       {stats && (
         <ModuleStatsRow
           items={[
-            { label: "Sin asignar", value: stats.unassigned, color: "#4F46E5", hint: GLOSSARY.fa_sin_asignar },
+            { label: "Sin asignar", value: stats.unassigned, color: "#1D4ED8", hint: GLOSSARY.fa_sin_asignar },
             { label: "Total capturadas", value: stats.total, hint: GLOSSARY.fa_total_capturadas },
             {
               label: "Sin clúster",

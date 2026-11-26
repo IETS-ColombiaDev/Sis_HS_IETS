@@ -75,7 +75,7 @@ const ROLES = [
     key: "evaluador_tecnico",
     name: "Evaluador técnico",
     who: "Equipo de escaneo IETS",
-    color: "#4f46e5",
+    color: "#1d4ed8",
     phases: [0, 1, 2, 3],
     tasks: [
       "Ejecuta la vigilancia, clasifica la bandeja y arma el ciclo",

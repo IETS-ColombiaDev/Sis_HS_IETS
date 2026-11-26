@@ -291,7 +291,7 @@ export default function Findings() {
 
       <ModuleStatsRow
         items={[
-          { label: "Nuevas", value: counts.nuevo || 0, color: counts.nuevo ? "#6366F1" : undefined, hint: "Señales que nadie ha revisado todavía.", testId: "findings-kpi-nuevas" },
+          { label: "Nuevas", value: counts.nuevo || 0, color: counts.nuevo ? "#2563EB" : undefined, hint: "Señales que nadie ha revisado todavía.", testId: "findings-kpi-nuevas" },
           { label: "En revisión", value: counts.revisado || 0, hint: "Señales ya leídas por el equipo, pendientes de decidir si se siguen." },
           { label: "A seguir", value: counts.priorizado || 0, color: "#10B981", hint: "Marcadas para seguimiento (estado 'priorizado'). No es la priorización oficial P1-P6." },
           { label: "Cribado alto", value: stats?.high_priority || 0, sub: `>= ${stats?.threshold ?? 70}`, color: "#EF4444", hint: GLOSSARY.fb_cribado },

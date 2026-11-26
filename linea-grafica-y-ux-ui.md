@@ -8,6 +8,25 @@ En este repositorio, los valores están implementados en `frontend/src/styles/th
 
 ---
 
+## 0. Actualización de noviembre de 2026 (Escaneo de Horizonte)
+
+La interfaz pasó del morado con menú blanco a un **azul institucional** con menú oscuro. Donde esta guía diga morado (`#6366F1`, `#4F46E5`, `#EEF2FF`), el valor vigente es el azul equivalente; el resto de la guía sigue igual.
+
+| Antes | Ahora | Uso |
+|-------|-------|-----|
+| `#6366F1` | `#2563EB` | Acción principal, ítem activo, foco. |
+| `#4F46E5` | `#1D4ED8` | Hover de la acción principal, enlaces de acento. |
+| `#EEF2FF` | `#EFF6FF` | Fondo de ítem activo o seleccionado. |
+| Menú blanco | `#0B2A5B` → `#114091` | Barra lateral: texto claro, ítem activo translúcido. |
+
+- **Cabecera de pantalla:** una sola franja azul (`backgrounds.hero`) con sección, título, propósito, flujo de fases y acciones. La acción principal va en blanco; las demás, translúcidas.
+- **Indicadores:** fichas compactas con el rótulo arriba en mayúsculas, la cifra grande y el detalle debajo.
+- **Densidad:** cuerpo de 14px, botones de 36px, tarjetas con 20px de relleno.
+- **Excepción:** los colores de datos (insignias de estado, series de gráficos) conservan el índigo donde distingue una categoría de otra.
+- Implementación: `frontend/src/styles/horizon.css` (se carga al final) y `frontend/src/components/layout.css` (menú).
+
+---
+
 ## 1. Identidad y marca (configurable)
 
 Esta guía no impone nombre de producto ni institución. Aplica así:

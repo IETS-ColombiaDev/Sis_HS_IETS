@@ -4,9 +4,9 @@
 export const theme = {
   colors: {
     primary: {
-      purple: "#6366F1",
-      purpleDark: "#4F46E5",
-      purpleLight: "#818CF8",
+      purple: "#2563EB",
+      purpleDark: "#1D4ED8",
+      purpleLight: "#60A5FA",
       blue: "#3B82F6",
       aquamarine: "#06B6D4",
     },
@@ -19,9 +19,10 @@ export const theme = {
     backgrounds: {
       app: "#F8FAFC",
       card: "#FFFFFF",
-      sidebar: "#FFFFFF",
+      sidebar: "#0B2A5B",
+      hero: "linear-gradient(120deg, #0B2A5B 0%, #11408F 60%, #1B57C2 100%)",
       hover: "#F1F5F9",
-      active: "#EEF2FF",
+      active: "#EFF6FF",
     },
     borders: {
       light: "#E2E8F0",
@@ -39,7 +40,7 @@ export const theme = {
       infoBg: "#DBEAFE",
     },
   },
-  gradient: "linear-gradient(135deg, #6366F1 0%, #3B82F6 100%)",
+  gradient: "linear-gradient(135deg, #0D3270 0%, #2563EB 100%)",
   fonts: {
     primary:
       "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
@@ -89,20 +90,20 @@ export const theme = {
 
 // Paleta para graficos (derivada de los tokens).
 export const chartColors = [
-  "#6366F1",
+  "#2563EB",
   "#3B82F6",
   "#06B6D4",
   "#10B981",
   "#F59E0B",
-  "#818CF8",
+  "#60A5FA",
   "#EF4444",
   "#8B5CF6",
 ];
 
 export const horizonColors = {
-  emergente: "#818CF8",
+  emergente: "#60A5FA",
   transicional: "#3B82F6",
-  inminente: "#6366F1",
+  inminente: "#2563EB",
   "": "#CBD5E1",
 };
 

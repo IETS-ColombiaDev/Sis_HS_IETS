@@ -475,7 +475,7 @@ export default function Recommendations() {
               <button
                 type="button"
                 onClick={() => setShowPreview((s) => !s)}
-                style={{ border: "none", background: "transparent", color: "#4F46E5", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+                style={{ border: "none", background: "transparent", color: "#1D4ED8", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
               >
                 <Icon name={showPreview ? "eyeOff" : "eye"} size={14} />
                 {showPreview ? "Ocultar vista previa" : "Ver vista previa"}
