@@ -3,20 +3,21 @@ import api, { apiError } from "../api/client";
 import Badge from "./Badge";
 import HintButton from "./HintButton";
 import Icon from "./Icon";
+import { t, ts, intlLocale } from "../i18n";
 import "./signal-origin.css";
 
 function fmt(value) {
   if (!value) return "";
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleString("es-CO");
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleString(intlLocale());
 }
 
 const MATCHED_ON = {
-  nct: "mismo NCT",
-  nombre: "nombre o DCI",
-  nombre_contenido: "nombre contenido en la señal",
-  fabricante: "fabricante",
-  atc: "código ATC",
+  nct: t("mismo NCT"),
+  nombre: t("nombre o DCI"),
+  nombre_contenido: t("nombre contenido en la señal"),
+  fabricante: t("fabricante"),
+  atc: t("código ATC"),
 };
 
 /**
@@ -35,9 +36,9 @@ export default function SubmissionCrossCheck({ row, canRun, onUpdated, toast, co
     try {
       const { data } = await api.post(`/submissions/${row.id}/cross-check`, null, { params: { web: true } });
       onUpdated?.(data);
-      toast?.success("Cruce actualizado con la vigilancia y la web.");
+      toast?.success(t("Cruce actualizado con la vigilancia y la web."));
     } catch (e) {
-      toast?.error(apiError(e, "No se pudo cruzar la postulación"));
+      toast?.error(apiError(e, t("No se pudo cruzar la postulación")));
     } finally {
       setBusy(false);
     }
@@ -58,9 +59,9 @@ export default function SubmissionCrossCheck({ row, canRun, onUpdated, toast, co
         {r.title || r.url}
       </a>{" "}
       {r.registry && <Badge tone="ok">{r.registry}</Badge>}
-      {!r.registry && r.official && <Badge tone="ok">Oficial</Badge>}{" "}
-      {r.catalog_source && <Badge tone="editor">En el catálogo: {r.catalog_source}</Badge>}{" "}
-      {r.cited_by_submitter && <Badge tone="viewer">Citada por quien postula</Badge>}
+      {!r.registry && r.official && <Badge tone="ok">{t("Oficial")}</Badge>}{" "}
+      {r.catalog_source && <Badge tone="editor">{t("En el catálogo: {source}", { source: r.catalog_source })}</Badge>}{" "}
+      {r.cited_by_submitter && <Badge tone="viewer">{t("Citada por quien postula")}</Badge>}
       <div className="xc-muted" style={{ overflowWrap: "anywhere" }}>
         {r.snippet || r.host}
       </div>
@@ -69,29 +70,29 @@ export default function SubmissionCrossCheck({ row, canRun, onUpdated, toast, co
   return (
     <section className="xc-box" data-testid={`submission-cross-${row.id}`}>
       <header className="xc-head">
-        <strong>Cruce con la vigilancia y la web</strong>
+        <strong>{t("Cruce con la vigilancia y la web")}</strong>
         {canRun && (
           <HintButton
             size="sm"
             variant="outline"
             loading={busy}
             onClick={run}
-            hint="Busca la tecnología entre las señales de la vigilancia proactiva (mismo comparador del filtrado), en registros oficiales (ClinicalTrials.gov, FDA, PubMed) y en la web. Tarda unos segundos."
+            hint={t("Busca la tecnología entre las señales de la vigilancia proactiva (mismo comparador del filtrado), en registros oficiales (ClinicalTrials.gov, FDA, PubMed) y en la web. Tarda unos segundos.")}
             data-testid={`submission-cross-run-${row.id}`}
           >
-            <Icon name="search" size={14} /> {cross ? "Cruzar de nuevo" : "Cruzar ahora"}
+            <Icon name="search" size={14} /> {cross ? t("Cruzar de nuevo") : t("Cruzar ahora")}
           </HintButton>
         )}
       </header>
       {!cross ? (
-        <p className="xc-muted">Aún no se ha cruzado esta postulación.</p>
+        <p className="xc-muted">{t("Aún no se ha cruzado esta postulación.")}</p>
       ) : (
         <>
-          <p className={`xc-summary ${proactive.count ? "is-known" : "is-new"}`}>{cross.summary?.text}</p>
+          <p className={`xc-summary ${proactive.count ? "is-known" : "is-new"}`}>{ts(cross.summary?.text)}</p>
 
           <div className="xc-section">
             <div className="xc-label">
-              Vigilancia proactiva <Badge tone={proactive.count ? "parcial" : "ok"}>{proactive.count ? `${proactive.count} coincidencia(s)` : "Sin coincidencias"}</Badge>
+              {t("Vigilancia proactiva")} <Badge tone={proactive.count ? "parcial" : "ok"}>{proactive.count ? t("{n} coincidencia(s)", { n: proactive.count }) : t("Sin coincidencias")}</Badge>
             </div>
             {proactive.matches?.length > 0 && (
               <ul className="xc-list">
@@ -101,16 +102,16 @@ export default function SubmissionCrossCheck({ row, canRun, onUpdated, toast, co
                     <li key={m.technology_id}>
                       <div>
                         <strong>{m.name}</strong>
-                        {m.manufacturer ? ` · ${m.manufacturer}` : ""} - {m.source_title || "Sin fuente"}{" "}
+                        {m.manufacturer ? ` · ${m.manufacturer}` : ""} - {m.source_title || t("Sin fuente")}{" "}
                         <span className="xc-muted">
-                          ({Math.round(m.score)}% por {(m.matched_on || []).map((k) => MATCHED_ON[k] || k).join(", ") || "nombre"}
-                          {m.status_label ? ` · ${m.status_label}` : ""})
+                          ({t("{score}% por {criteria}", { score: Math.round(m.score), criteria: (m.matched_on || []).map((k) => MATCHED_ON[k] || k).join(", ") || t("nombre") })}
+                          {m.status_label ? ` · ${ts(m.status_label)}` : ""})
                         </span>
                       </div>
                       {href && (
                         <a href={href} target="_blank" rel="noopener noreferrer" className="so-link">
                           <Icon name="external" size={13} />{" "}
-                          {m.link_type === "exacto" ? "Abrir la señal en la fuente" : m.locator_url ? "Abrir la página y resaltar la señal" : "Abrir la página de consulta"}
+                          {m.link_type === "exacto" ? t("Abrir la señal en la fuente") : m.locator_url ? t("Abrir la página y resaltar la señal") : t("Abrir la página de consulta")}
                         </a>
                       )}
                     </li>
@@ -122,16 +123,16 @@ export default function SubmissionCrossCheck({ row, canRun, onUpdated, toast, co
 
           <div className="xc-section">
             <div className="xc-label">
-              Registros oficiales{" "}
+              {t("Registros oficiales")}{" "}
               {web ? (
                 <Badge tone={registryResults.length ? "ok" : "parcial"}>
-                  {registryResults.length ? `${registryResults.length} ficha(s)` : "Sin fichas"}
+                  {registryResults.length ? t("{n} ficha(s)", { n: registryResults.length }) : t("Sin fichas")}
                 </Badge>
               ) : (
-                <span className="xc-muted">en curso: pulse «Cruzar de nuevo» si no aparece en unos segundos.</span>
+                <span className="xc-muted">{t("en curso: pulse «Cruzar de nuevo» si no aparece en unos segundos.")}</span>
               )}
             </div>
-            {web?.names?.length > 0 && <div className="xc-muted">ClinicalTrials.gov, FDA y PubMed por «{web.names.join("» y «")}».</div>}
+            {web?.names?.length > 0 && <div className="xc-muted">{t("ClinicalTrials.gov, FDA y PubMed por «{names}».", { names: web.names.join(t("» y «")) })}</div>}
             {registryResults.length > 0 && (
               <ul className="xc-list">
                 {registryResults.slice(0, limit).map((r) => (
@@ -144,15 +145,15 @@ export default function SubmissionCrossCheck({ row, canRun, onUpdated, toast, co
           {web && (
             <div className="xc-section">
               <div className="xc-label">
-                Web <Badge tone={webResults.length ? "ok" : "viewer"}>{webResults.length ? `${webResults.length} resultado(s)` : "Sin resultados pertinentes"}</Badge>
+                Web <Badge tone={webResults.length ? "ok" : "viewer"}>{webResults.length ? t("{n} resultado(s)", { n: webResults.length }) : t("Sin resultados pertinentes")}</Badge>
               </div>
               {web.query && (
                 <div className="xc-muted">
-                  Búsqueda: {web.query}
-                  {web.discarded ? ` · ${web.discarded} resultado(s) descartados porque no mencionan la tecnología` : ""}
+                  {t("Búsqueda: {query}", { query: web.query })}
+                  {web.discarded ? " · " + t("{n} resultado(s) descartados porque no mencionan la tecnología", { n: web.discarded }) : ""}
                 </div>
               )}
-              {web.error && !allResults.length && <div className="xc-muted">{web.error}</div>}
+              {web.error && !allResults.length && <div className="xc-muted">{ts(web.error)}</div>}
               {webResults.length > 0 && (
                 <ul className="xc-list">
                   {webResults.slice(0, limit).map((r) => (
@@ -163,13 +164,14 @@ export default function SubmissionCrossCheck({ row, canRun, onUpdated, toast, co
             </div>
           )}
           <div className="xc-muted">
-            Cruce del {fmt(cross.at)}
-            {cross.by && cross.by !== "sistema" ? ` por ${cross.by}` : ""}.
+            {cross.by && cross.by !== "sistema"
+              ? t("Cruce del {date} por {name}.", { date: fmt(cross.at), name: cross.by })
+              : t("Cruce del {date}.", { date: fmt(cross.at) })}
           </div>
         </>
       )}
       {compact && cross && (proactive.matches?.length > 3 || registryResults.length > 3 || webResults.length > 3) && (
-        <div className="xc-muted">El cruce completo se ve en «Revisar y decidir».</div>
+        <div className="xc-muted">{t("El cruce completo se ve en «Revisar y decidir».")}</div>
       )}
     </section>
   );

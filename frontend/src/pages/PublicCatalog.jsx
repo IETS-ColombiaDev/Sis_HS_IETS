@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import PublicShell from "../components/PublicShell";
 import Button from "../components/Button";
+import { t, ts } from "../i18n";
 
 const PAGE_SIZE = 20;
 const EMPTY_FILTERS = { cluster_id: "", tech_type_id: "", phase: "", year: "" };
@@ -37,7 +38,7 @@ export default function PublicCatalog() {
       setTotal(Number.isFinite(count) ? count : list.data.length);
       setPage(pageIndex);
     } catch {
-      setError("No se pudo cargar el catálogo público. Intente de nuevo.");
+      setError(t("No se pudo cargar el catálogo público. Intente de nuevo."));
     } finally {
       setLoading(false);
     }
@@ -69,19 +70,19 @@ export default function PublicCatalog() {
   return (
     <PublicShell
       wide
-      kicker="Consulta pública"
-      title="Expedientes de tecnologías emergentes"
-      lead="Fichas técnicas ya publicadas por el IETS. No incluye modelaciones presupuestales, comparadores estratégicos ni documentos confidenciales."
+      kicker={t("Consulta pública")}
+      title={t("Expedientes de tecnologías emergentes")}
+      lead={t("Fichas técnicas ya publicadas por el IETS. No incluye modelaciones presupuestales, comparadores estratégicos ni documentos confidenciales.")}
     >
       {stats && (
         <div className="public-kpis">
           <div>
             <b>{stats.published}</b>
-            <span title="Tecnologías cuyo informe ya fue publicado. Algunas pueden no tener ficha pública por confidencialidad.">Tecnologías publicadas</span>
+            <span title={t("Tecnologías cuyo informe ya fue publicado. Algunas pueden no tener ficha pública por confidencialidad.")}>{t("Tecnologías publicadas")}</span>
           </div>
           <div>
             <b>{stats.cycles}</b>
-            <span>Ciclos formales</span>
+            <span>{t("Ciclos formales")}</span>
           </div>
         </div>
       )}
@@ -96,41 +97,41 @@ export default function PublicCatalog() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value.slice(0, 80))}
-          placeholder="Buscar por nombre comercial, denominación común internacional o indicación"
-          aria-label="Buscar expediente"
+          placeholder={t("Buscar por nombre comercial, denominación común internacional o indicación")}
+          aria-label={t("Buscar expediente")}
         />
-        <Button type="submit">Buscar</Button>
+        <Button type="submit">{t("Buscar")}</Button>
       </form>
 
       {hasOptions && (
         <div className="public-filters" data-testid="public-filters">
           {options.clusters.length > 1 && (
-            <select aria-label="Filtrar por clúster" value={filters.cluster_id} onChange={(e) => setFilter("cluster_id", e.target.value)}>
-              <option value="">Todos los clústeres</option>
+            <select aria-label={t("Filtrar por clúster")} value={filters.cluster_id} onChange={(e) => setFilter("cluster_id", e.target.value)}>
+              <option value="">{t("Todos los clústeres")}</option>
               {options.clusters.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>{ts(c.name)}</option>
               ))}
             </select>
           )}
           {options.tech_types.length > 1 && (
-            <select aria-label="Filtrar por tipo de tecnología" value={filters.tech_type_id} onChange={(e) => setFilter("tech_type_id", e.target.value)}>
-              <option value="">Todos los tipos de tecnología</option>
-              {options.tech_types.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+            <select aria-label={t("Filtrar por tipo de tecnología")} value={filters.tech_type_id} onChange={(e) => setFilter("tech_type_id", e.target.value)}>
+              <option value="">{t("Todos los tipos de tecnología")}</option>
+              {options.tech_types.map((type) => (
+                <option key={type.id} value={type.id}>{ts(type.name)}</option>
               ))}
             </select>
           )}
           {options.phases.length > 1 && (
-            <select aria-label="Filtrar por fase de desarrollo" value={filters.phase} onChange={(e) => setFilter("phase", e.target.value)}>
-              <option value="">Todas las fases</option>
+            <select aria-label={t("Filtrar por fase de desarrollo")} value={filters.phase} onChange={(e) => setFilter("phase", e.target.value)}>
+              <option value="">{t("Todas las fases")}</option>
               {options.phases.map((p) => (
-                <option key={p.code} value={p.code}>{p.name}</option>
+                <option key={p.code} value={p.code}>{ts(p.name)}</option>
               ))}
             </select>
           )}
           {options.years.length > 1 && (
-            <select aria-label="Filtrar por año de publicación" value={filters.year} onChange={(e) => setFilter("year", e.target.value)}>
-              <option value="">Todos los años</option>
+            <select aria-label={t("Filtrar por año de publicación")} value={filters.year} onChange={(e) => setFilter("year", e.target.value)}>
+              <option value="">{t("Todos los años")}</option>
               {options.years.map((y) => (
                 <option key={y} value={y}>{y}</option>
               ))}
@@ -138,24 +139,29 @@ export default function PublicCatalog() {
           )}
           {filtered && (
             <button type="button" className="public-filters-clear" onClick={clear}>
-              Quitar filtros
+              {t("Quitar filtros")}
             </button>
           )}
         </div>
       )}
 
       {error && <p className="public-submit-error">{error}</p>}
-      {loading && <p className="public-submit-lead">Cargando expedientes...</p>}
+      {loading && <p className="public-submit-lead">{t("Cargando expedientes...")}</p>}
 
       {!loading && !error && items.length === 0 && (
         <p className="public-submit-lead">
-          {filtered ? "No hay expedientes públicos que coincidan con la búsqueda." : "Aún no hay expedientes publicados."}
+          {filtered ? t("No hay expedientes públicos que coincidan con la búsqueda.") : t("Aún no hay expedientes publicados.")}
         </p>
       )}
       {!loading && !error && items.length > 0 && (
         <p className="public-submit-lead" data-testid="public-count" aria-live="polite">
-          {total === 1 ? "1 expediente" : `${total} expedientes`}
-          {filtered ? " con estos criterios" : ""}
+          {filtered
+            ? total === 1
+              ? t("1 expediente con estos criterios")
+              : t("{n} expedientes con estos criterios", { n: total })
+            : total === 1
+              ? t("1 expediente")
+              : t("{n} expedientes", { n: total })}
         </p>
       )}
 
@@ -165,10 +171,10 @@ export default function PublicCatalog() {
             <Link to={`/expedientes/${item.id}`}>
               <strong>{item.title}</strong>
               <span>
-                {[item.inn_name, item.commercial_name, item.development_phase].filter(Boolean).join(" · ")}
+                {[item.inn_name, item.commercial_name, ts(item.development_phase)].filter(Boolean).join(" · ")}
               </span>
               {(item.nct_ids || []).length > 0 && (
-                <em>Ensayos: {item.nct_ids.slice(0, 3).join(", ")}</em>
+                <em>{t("Ensayos: {ids}", { ids: item.nct_ids.slice(0, 3).join(", ") })}</em>
               )}
             </Link>
           </li>
@@ -176,13 +182,13 @@ export default function PublicCatalog() {
       </ul>
 
       {!loading && pages > 1 && (
-        <nav className="public-pager" aria-label="Páginas de resultados">
+        <nav className="public-pager" aria-label={t("Páginas de resultados")}>
           <Button variant="outline" disabled={page === 0} onClick={() => search(q, filters, page - 1)}>
-            Anterior
+            {t("Anterior")}
           </Button>
-          <span>Página {page + 1} de {pages}</span>
+          <span>{t("Página {page} de {pages}", { page: page + 1, pages })}</span>
           <Button variant="outline" disabled={page + 1 >= pages} onClick={() => search(q, filters, page + 1)}>
-            Siguiente
+            {t("Siguiente")}
           </Button>
         </nav>
       )}

@@ -5,12 +5,13 @@ import Button from "./Button";
 import Icon from "./Icon";
 import SignalLinkInfo from "./SignalLinkInfo";
 import SignalUrls from "./SignalUrls";
+import { intlLocale, t, ts } from "../i18n";
 import "./signal-origin.css";
 
 const VERDICT = {
-  confiable: { label: "Confiable", tone: "ok", icon: "shield" },
-  verificar: { label: "Verificar antes de usar", tone: "warn", icon: "alert" },
-  baja: { label: "Baja confiabilidad", tone: "bad", icon: "x" },
+  confiable: { label: t("Confiable"), tone: "ok", icon: "shield" },
+  verificar: { label: t("Verificar antes de usar"), tone: "warn", icon: "alert" },
+  baja: { label: t("Baja confiabilidad"), tone: "bad", icon: "x" },
 };
 
 const MAX_JSON_CHARS = 200000;
@@ -24,9 +25,9 @@ function hostOf(url) {
 }
 
 function CheckMark({ ok }) {
-  if (ok === true) return <span className="so-mark so-mark--ok" aria-label="A favor">✓</span>;
-  if (ok === false) return <span className="so-mark so-mark--bad" aria-label="En contra">✕</span>;
-  return <span className="so-mark so-mark--neutral" aria-label="Por verificar">•</span>;
+  if (ok === true) return <span className="so-mark so-mark--ok" aria-label={t("A favor")}>✓</span>;
+  if (ok === false) return <span className="so-mark so-mark--bad" aria-label={t("En contra")}>✕</span>;
+  return <span className="so-mark so-mark--neutral" aria-label={t("Por verificar")}>•</span>;
 }
 
 function ReasonList({ title, items, tone, testId }) {
@@ -35,8 +36,8 @@ function ReasonList({ title, items, tone, testId }) {
     <div className={`so-reasons so-reasons--${tone}`} data-testid={testId}>
       <div className="so-reasons-title">{title}</div>
       <ul>
-        {items.map((t, i) => (
-          <li key={i}>{t}</li>
+        {items.map((item, i) => (
+          <li key={i}>{ts(item)}</li>
         ))}
       </ul>
     </div>
@@ -86,7 +87,7 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
       setChecksOpen(false);
       onAssessed?.(data.assessment, data.url);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo analizar la confiabilidad"));
+      toast.error(apiError(e, t("No se pudo analizar la confiabilidad")));
     } finally {
       setAnalyzing(false);
     }
@@ -104,7 +105,7 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
       const { data } = await api.get(`/ingest/raw/${tech.id}`);
       setRaw(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo abrir el registro original"));
+      toast.error(apiError(e, t("No se pudo abrir el registro original")));
       setRawOpen(false);
     } finally {
       setRawLoading(false);
@@ -115,9 +116,9 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
   const copyJson = async () => {
     try {
       await navigator.clipboard.writeText(json);
-      toast.success("JSON copiado al portapapeles.");
+      toast.success(t("JSON copiado al portapapeles."));
     } catch {
-      toast.error("El navegador no permitió copiar. Seleccione el texto y cópielo.");
+      toast.error(t("El navegador no permitió copiar. Seleccione el texto y cópielo."));
     }
   };
 
@@ -127,7 +128,7 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
   return (
     <section className="so-panel" data-testid="signal-origin">
       <div className="so-head">
-        <div className="so-title">Origen de la señal</div>
+        <div className="so-title">{t("Origen de la señal")}</div>
         {tech.source_title && <div className="so-source">{tech.source_title}</div>}
       </div>
 
@@ -161,18 +162,18 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
             hidden={Boolean(tech.link_type)}
           >
             <Icon name="external" size={15} />
-            <span>Abrir fuente original</span>
+            <span>{t("Abrir fuente original")}</span>
             {host && <span className="so-host">{host}</span>}
           </a>
         ) : null}
         {tech.has_raw && (
           <Button variant="outline" size="sm" onClick={toggleRaw} loading={rawLoading} data-testid="signal-json-toggle">
-            <Icon name="doc" size={15} /> {rawOpen ? "Ocultar JSON" : "Ver JSON original"}
+            <Icon name="doc" size={15} /> {rawOpen ? t("Ocultar JSON") : t("Ver JSON original")}
           </Button>
         )}
         {canAnalyze && (
           <Button size="sm" onClick={analyze} loading={analyzing} data-testid="signal-reliability-run">
-            <Icon name="spark" size={15} /> {assessment ? "Volver a analizar" : "¿Es confiable? Analizar con IA"}
+            <Icon name="spark" size={15} /> {assessment ? t("Volver a analizar") : t("¿Es confiable? Analizar con IA")}
           </Button>
         )}
       </div>
@@ -181,22 +182,22 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
         <div className="so-json" data-testid="signal-json">
           <div className="so-json-bar">
             <span>
-              {raw.connector || raw.origin || "registro"}
+              {raw.connector || raw.origin || t("registro")}
               {raw.external_id ? ` · id ${raw.external_id}` : ""}
-              {raw.fetched_at ? ` · ${new Date(raw.fetched_at).toLocaleString("es-CO")}` : ""}
+              {raw.fetched_at ? ` · ${new Date(raw.fetched_at).toLocaleString(intlLocale())}` : ""}
             </span>
             <button type="button" className="so-copy" onClick={copyJson}>
-              Copiar
+              {t("Copiar")}
             </button>
           </div>
           <pre>
-            {json.length > MAX_JSON_CHARS ? `${json.slice(0, MAX_JSON_CHARS)}\n… (recortado)` : json}
+            {json.length > MAX_JSON_CHARS ? `${json.slice(0, MAX_JSON_CHARS)}\n… ${t("(recortado)")}` : json}
           </pre>
         </div>
       )}
 
       {analyzing && !assessment && (
-        <p className="so-wait">Revisando la fuente, la página y el registro original…</p>
+        <p className="so-wait">{t("Revisando la fuente, la página y el registro original…")}</p>
       )}
 
       {assessment && v && (
@@ -205,22 +206,24 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
             <span className="so-verdict-badge" data-testid="signal-verdict">
               <Icon name={v.icon} size={15} /> {v.label}
             </span>
-            <span className="so-score" aria-label={`Puntaje ${assessment.score} de 100`}>
+            <span className="so-score" aria-label={t("Puntaje {score} de 100", { score: assessment.score })}>
               <span className="so-score-bar">
                 <span style={{ width: `${assessment.score}%` }} />
               </span>
               {assessment.score}/100
             </span>
           </div>
-          {assessment.summary && <p className="so-summary">{assessment.summary}</p>}
+          {assessment.summary && <p className="so-summary">{ts(assessment.summary)}</p>}
           <div className="so-reason-grid">
-            <ReasonList title="A favor" items={assessment.pros} tone="ok" testId="signal-pros" />
-            <ReasonList title="Alertas" items={assessment.alerts} tone="bad" testId="signal-alerts" />
-            <ReasonList title="Qué verificar" items={assessment.to_verify} tone="warn" testId="signal-verify" />
+            <ReasonList title={t("A favor")} items={assessment.pros} tone="ok" testId="signal-pros" />
+            <ReasonList title={t("Alertas")} items={assessment.alerts} tone="bad" testId="signal-alerts" />
+            <ReasonList title={t("Qué verificar")} items={assessment.to_verify} tone="warn" testId="signal-verify" />
           </div>
 
           <button type="button" className="so-linkbtn" onClick={() => setChecksOpen((o) => !o)}>
-            {checksOpen ? "Ocultar" : "Ver"} los {assessment.checks?.length || 0} chequeos automáticos
+            {checksOpen
+              ? t("Ocultar los {n} chequeos automáticos", { n: assessment.checks?.length || 0 })
+              : t("Ver los {n} chequeos automáticos", { n: assessment.checks?.length || 0 })}
           </button>
           {checksOpen && (
             <ul className="so-checks" data-testid="signal-checks">
@@ -228,8 +231,8 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
                 <li key={c.key}>
                   <CheckMark ok={c.ok} />
                   <div>
-                    <strong>{c.label}</strong>
-                    <span>{c.detail}</span>
+                    <strong>{ts(c.label)}</strong>
+                    <span>{ts(c.detail)}</span>
                   </div>
                 </li>
               ))}
@@ -237,13 +240,17 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
           )}
 
           <div className="so-foot">
-            {assessment.ai_used ? `Dictamen de ${assessment.model || "la IA"}` : "Solo chequeos automáticos"}
+            {assessment.ai_used
+              ? assessment.model
+                ? t("Dictamen de {model}", { model: assessment.model })
+                : t("Dictamen de la IA")
+              : t("Solo chequeos automáticos")}
             {assessment.ai_used && assessment.base_score !== assessment.score
-              ? ` · chequeos automáticos: ${assessment.base_score}/100`
+              ? ` · ${t("chequeos automáticos: {score}/100", { score: assessment.base_score })}`
               : ""}
-            {assessment.assessed_at ? ` · ${new Date(assessment.assessed_at).toLocaleString("es-CO")}` : ""}
-            {assessment.note ? <div className="so-note">{assessment.note}</div> : null}
-            <div className="so-note">La IA orienta; la decisión de clasificar o descartar es del evaluador.</div>
+            {assessment.assessed_at ? ` · ${new Date(assessment.assessed_at).toLocaleString(intlLocale())}` : ""}
+            {assessment.note ? <div className="so-note">{ts(assessment.note)}</div> : null}
+            <div className="so-note">{t("La IA orienta; la decisión de clasificar o descartar es del evaluador.")}</div>
           </div>
         </div>
       )}
@@ -251,8 +258,8 @@ export default function SignalOrigin({ tech, canAnalyze, onAssessed }) {
       {!assessment && !analyzing && (
         <p className="so-wait">
           {canAnalyze
-            ? "Aún no se ha revisado la confiabilidad de esta señal."
-            : "Aún no hay un dictamen de confiabilidad. Lo genera un evaluador."}
+            ? t("Aún no se ha revisado la confiabilidad de esta señal.")
+            : t("Aún no hay un dictamen de confiabilidad. Lo genera un evaluador.")}
         </p>
       )}
     </section>

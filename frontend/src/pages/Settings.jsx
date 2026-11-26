@@ -17,36 +17,37 @@ import SourceParamsPanel from "../components/SourceParamsPanel";
 import IntelligencePanel from "../components/IntelligencePanel";
 import BackupPanel from "../components/BackupPanel";
 import HorizonRulesPanel from "../components/HorizonRulesPanel";
+import { t, ts, intlLocale, fmtDateTime } from "../i18n";
 
 // Las pestañas, agrupadas por tema y en el orden en que se suelen configurar.
 const TAB_GROUPS = [
   {
-    title: "Metodología",
+    title: t("Metodología"),
     tabs: [
-      { id: "metodologia", label: "Gobierno metodológico", icon: "sliders", about: "Criterios, pesos y umbrales con los que se filtra y se prioriza." },
-      { id: "reglas_horizonte", label: "Reglas de horizonte", icon: "filter", about: "Palabras que incluyen o descartan una señal leída de páginas web." },
+      { id: "metodologia", label: t("Gobierno metodológico"), icon: "sliders", about: t("Criterios, pesos y umbrales con los que se filtra y se prioriza.") },
+      { id: "reglas_horizonte", label: t("Reglas de horizonte"), icon: "filter", about: t("Palabras que incluyen o descartan una señal leída de páginas web.") },
     ],
   },
   {
-    title: "Fuentes y vigilancia",
+    title: t("Fuentes y vigilancia"),
     tabs: [
-      { id: "parametros_fuentes", label: "Parámetros de fuentes", icon: "layers", about: "Listas de la matriz, búsqueda web y páginas útiles de cada fuente." },
-      { id: "fuentes", label: "Llaves de fuentes", icon: "globe", about: "Llaves de acceso de los registros oficiales de nivel A." },
-      { id: "programacion", label: "Tareas programadas", icon: "clock", about: "Cuándo corren solas la vigilancia y el barrido de duplicados." },
-      { id: "prompts", label: "Prompts de vigilancia", icon: "doc", about: "Instrucciones que sigue la IA al capturar señales." },
+      { id: "parametros_fuentes", label: t("Parámetros de fuentes"), icon: "layers", about: t("Listas de la matriz, búsqueda web y páginas útiles de cada fuente.") },
+      { id: "fuentes", label: t("Llaves de fuentes"), icon: "globe", about: t("Llaves de acceso de los registros oficiales de nivel A.") },
+      { id: "programacion", label: t("Tareas programadas"), icon: "clock", about: t("Cuándo corren solas la vigilancia y el barrido de duplicados.") },
+      { id: "prompts", label: t("Prompts de vigilancia"), icon: "doc", about: t("Instrucciones que sigue la IA al capturar señales.") },
     ],
   },
   {
-    title: "Inteligencia artificial",
+    title: t("Inteligencia artificial"),
     tabs: [
-      { id: "ia", label: "Integración con IA", icon: "spark", about: "Proveedor, llave, modelo y lectura de sitios con OCR." },
-      { id: "inteligencia", label: "Inteligencia", icon: "bulb", about: "Sugerencia de clasificación, base de conocimiento, vigencia de señales y analítica." },
+      { id: "ia", label: t("Integración con IA"), icon: "spark", about: t("Proveedor, llave, modelo y lectura de sitios con OCR.") },
+      { id: "inteligencia", label: t("Inteligencia"), icon: "bulb", about: t("Sugerencia de clasificación, base de conocimiento, vigencia de señales y analítica.") },
     ],
   },
   {
-    title: "Datos y respaldo",
+    title: t("Datos y respaldo"),
     tabs: [
-      { id: "copia_local", label: "Persistencia (Firebase)", icon: "save", about: "Copia de la base, puntos de recuperación y restauración." },
+      { id: "copia_local", label: t("Persistencia (Firebase)"), icon: "save", about: t("Copia de la base, puntos de recuperación y restauración.") },
     ],
   },
 ];
@@ -56,7 +57,7 @@ export default function Settings() {
   const toast = useToast();
   const { refreshStatus } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = TABS.some((t) => t.id === searchParams.get("tab")) ? searchParams.get("tab") : "metodologia";
+  const initialTab = TABS.some((item) => item.id === searchParams.get("tab")) ? searchParams.get("tab") : "metodologia";
   const [tab, setTabState] = useState(initialTab);
   const setTab = (id) => {
     setTabState(id);
@@ -65,7 +66,7 @@ export default function Settings() {
   // Un enlace interno (?tab=...) abre su pestaña aunque la pantalla ya esté montada.
   const urlTab = searchParams.get("tab");
   useEffect(() => {
-    if (urlTab && TABS.some((t) => t.id === urlTab)) setTabState(urlTab);
+    if (urlTab && TABS.some((item) => item.id === urlTab)) setTabState(urlTab);
   }, [urlTab]);
   const [cfg, setCfg] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -117,7 +118,7 @@ export default function Settings() {
       const { data } = await api.get("/config");
       applyCfg(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar la configuración"));
+      toast.error(apiError(e, t("No se pudo cargar la configuración")));
     } finally {
       setLoading(false);
     }
@@ -135,7 +136,7 @@ export default function Settings() {
       .then(({ data }) => {
         if (!cancelled) setPrompts(data);
       })
-      .catch((e) => toast.error(apiError(e, "No se pudieron cargar los prompts")));
+      .catch((e) => toast.error(apiError(e, t("No se pudieron cargar los prompts"))));
     return () => {
       cancelled = true;
     };
@@ -160,9 +161,9 @@ export default function Settings() {
     try {
       const { data } = await api.post("/config/usage/reset");
       applyCfg(data);
-      toast.success("Contador de tokens reiniciado");
+      toast.success(t("Contador de tokens reiniciado"));
     } catch (e) {
-      toast.error(apiError(e, "No se pudo reiniciar el uso"));
+      toast.error(apiError(e, t("No se pudo reiniciar el uso")));
     } finally {
       setSaving(false);
     }
@@ -172,9 +173,9 @@ export default function Settings() {
     try {
       const { data } = await api.get("/config/usage");
       applyCfg(data);
-      toast.success(data.minimax_plan_summary || "Uso de tokens actualizado");
+      toast.success(ts(data.minimax_plan_summary) || t("Uso de tokens actualizado"));
     } catch (e) {
-      toast.error(apiError(e, "No se pudo consultar el saldo"));
+      toast.error(apiError(e, t("No se pudo consultar el saldo")));
     }
   };
 
@@ -186,15 +187,15 @@ export default function Settings() {
       if (who === "minimax" && minimaxToken.trim()) payload.minimax_api_key = minimaxToken.trim();
       if (who === "gemini" && token.trim()) payload.gemini_api_key = token.trim();
       const { data } = await api.post("/config/test", payload, { timeout: AI_TIMEOUT });
-      setBanner({ type: data.ok ? "ok" : "error", message: data.message });
+      setBanner({ type: data.ok ? "ok" : "error", message: ts(data.message) });
       if (data.ok) {
-        toast.success(`Conexión ${who === "gemini" ? "Gemini" : "MiniMax"} verificada`);
+        toast.success(t("Conexión {provider} verificada", { provider: who === "gemini" ? "Gemini" : "MiniMax" }));
         if (data.available_models?.length && who === "minimax") {
           setCfg((prev) => ({ ...prev, minimax_available_models: data.available_models, minimax_active_model: data.model }));
         }
-      } else toast.error("La prueba de conexión falló");
+      } else toast.error(t("La prueba de conexión falló"));
     } catch (e) {
-      const msg = apiError(e, "No se pudo probar la conexión");
+      const msg = apiError(e, t("No se pudo probar la conexión"));
       setBanner({ type: "error", message: msg });
       toast.error(msg);
     } finally {
@@ -207,7 +208,7 @@ export default function Settings() {
     setBanner(null);
     try {
       const { data } = await api.post("/config/detect-models", null, { timeout: AI_TIMEOUT });
-      setBanner({ type: data.ok ? "ok" : "error", message: data.message });
+      setBanner({ type: data.ok ? "ok" : "error", message: ts(data.message) });
       if (data.ok) {
         setMinimaxModel("");
         setCfg((prev) => ({
@@ -215,10 +216,10 @@ export default function Settings() {
           minimax_available_models: data.available_models || prev.minimax_available_models,
           minimax_active_model: data.model,
         }));
-        toast.success(`Mejor modelo: ${data.model}`);
+        toast.success(t("Mejor modelo: {model}", { model: data.model }));
       }
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron detectar modelos"));
+      toast.error(apiError(e, t("No se pudieron detectar modelos")));
     } finally {
       setDetecting(false);
     }
@@ -252,15 +253,17 @@ export default function Settings() {
       if (data.ai_enabled) {
         setBanner({
           type: "ok",
-          message: `IA activa con ${data.ai_active_provider || "MiniMax"} · ${data.ai_model || data.minimax_active_model}. OCR ${data.ai_ocr_enabled ? "encendido" : "apagado"}.`,
+          message: data.ai_ocr_enabled
+            ? t("IA activa con {provider} · {model}. OCR encendido.", { provider: data.ai_active_provider || "MiniMax", model: data.ai_model || data.minimax_active_model })
+            : t("IA activa con {provider} · {model}. OCR apagado.", { provider: data.ai_active_provider || "MiniMax", model: data.ai_model || data.minimax_active_model }),
         });
-        toast.success("Configuración de IA guardada");
+        toast.success(t("Configuración de IA guardada"));
       } else {
-        setBanner({ type: "warn", message: "Configuración guardada, pero no hay una llave de IA válida." });
-        toast.success("Configuración guardada");
+        setBanner({ type: "warn", message: t("Configuración guardada, pero no hay una llave de IA válida.") });
+        toast.success(t("Configuración guardada"));
       }
     } catch (e) {
-      toast.error(apiError(e, "No se pudo guardar la configuración"));
+      toast.error(apiError(e, t("No se pudo guardar la configuración")));
     } finally {
       setSaving(false);
     }
@@ -275,10 +278,10 @@ export default function Settings() {
       if (kind === "minimax") setMinimaxToken("");
       else setToken("");
       refreshStatus();
-      setBanner({ type: "warn", message: `Token de ${kind === "minimax" ? "MiniMax" : "Gemini"} eliminado.` });
-      toast.success("Token eliminado");
+      setBanner({ type: "warn", message: t("Token de {provider} eliminado.", { provider: kind === "minimax" ? "MiniMax" : "Gemini" }) });
+      toast.success(t("Token eliminado"));
     } catch (e) {
-      toast.error(apiError(e, "No se pudo eliminar el token"));
+      toast.error(apiError(e, t("No se pudo eliminar el token")));
     } finally {
       setSaving(false);
     }
@@ -293,13 +296,13 @@ export default function Settings() {
       setNcbiKey("");
       toast.success(message);
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron guardar las llaves"));
+      toast.error(apiError(e, t("No se pudieron guardar las llaves")));
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <LoadingBlock label="Cargando configuración..." />;
+  if (loading) return <LoadingBlock label={t("Cargando configuración...")} />;
 
   const aiOn = Boolean(cfg.ai_enabled);
   const models = cfg.minimax_available_models?.length
@@ -309,9 +312,9 @@ export default function Settings() {
   return (
     <div>
       <PageHeader
-        title="Configuración del sistema"
+        title={t("Configuración del sistema")}
         titleHint={GLOSSARY.minimax}
-        subtitle="Metodología, fuentes y vigilancia, inteligencia artificial y respaldo de datos."
+        subtitle={t("Metodología, fuentes y vigilancia, inteligencia artificial y respaldo de datos.")}
       />
 
       <div
@@ -324,52 +327,52 @@ export default function Settings() {
       >
         <StatusCard
           icon="spark"
-          label="Inteligencia Artificial"
-          value={aiOn ? "Activa" : "Sin configurar"}
+          label={t("Inteligencia Artificial")}
+          value={aiOn ? t("Activa") : t("Sin configurar")}
           tone={aiOn ? "ok" : "warn"}
-          sub={aiOn ? `${cfg.ai_active_provider || "minimax"} · ${cfg.ai_model || cfg.minimax_active_model}` : "Requiere llave de MiniMax"}
-          tip="MiniMax es el proveedor principal. Gemini queda como respaldo opcional."
+          sub={aiOn ? `${cfg.ai_active_provider || "minimax"} · ${cfg.ai_model || cfg.minimax_active_model}` : t("Requiere llave de MiniMax")}
+          tip={t("MiniMax es el proveedor principal. Gemini queda como respaldo opcional.")}
         />
         <StatusCard
           icon="globe"
-          label="IA en sitios / OCR"
-          value={!aiOn ? "Requiere IA" : cfg.ai_ocr_enabled ? "OCR activo" : cfg.ai_web_enabled ? "Solo texto" : "Apagado"}
+          label={t("IA en sitios / OCR")}
+          value={!aiOn ? t("Requiere IA") : cfg.ai_ocr_enabled ? t("OCR activo") : cfg.ai_web_enabled ? t("Solo texto") : t("Apagado")}
           tone={!aiOn ? "neutral" : cfg.ai_ocr_enabled ? "ok" : cfg.ai_web_enabled ? "info" : "neutral"}
-          sub={cfg.ai_ocr_enabled ? `Visión: ${cfg.minimax_vision_model || "MiniMax-M3"}` : "La IA puede leer páginas; el OCR es opcional"}
-          tip="Con OCR, MiniMax-M3 lee imágenes y PDF escaneados de las fuentes."
+          sub={cfg.ai_ocr_enabled ? t("Visión: {model}", { model: cfg.minimax_vision_model || "MiniMax-M3" }) : t("La IA puede leer páginas; el OCR es opcional")}
+          tip={t("Con OCR, MiniMax-M3 lee imágenes y PDF escaneados de las fuentes.")}
         />
         <StatusCard
           icon="shield"
-          label="Login con Google"
-          value={cfg.google_login_enabled ? "Habilitado" : "Deshabilitado"}
+          label={t("Login con Google")}
+          value={cfg.google_login_enabled ? t("Habilitado") : t("Deshabilitado")}
           tone={cfg.google_login_enabled ? "ok" : "neutral"}
-          sub={`Dominio: @${cfg.allowed_domain}`}
-          tip="Acceso con cuentas institucionales de Google del dominio permitido."
+          sub={t("Dominio: @{domain}", { domain: cfg.allowed_domain })}
+          tip={t("Acceso con cuentas institucionales de Google del dominio permitido.")}
         />
         <StatusCard
           icon="info"
-          label="Versión del sistema"
+          label={t("Versión del sistema")}
           value={`v${cfg.version}`}
           tone="neutral"
-          sub={`${cfg.total_sources} fuentes · ${cfg.total_findings} hallazgos`}
-          tip="Versión de la aplicación y volumen del inventario."
+          sub={t("{sources} fuentes · {findings} hallazgos", { sources: cfg.total_sources, findings: cfg.total_findings })}
+          tip={t("Versión de la aplicación y volumen del inventario.")}
         />
       </div>
 
-      <nav className="settings-menu" aria-label="Secciones de configuración">
+      <nav className="settings-menu" aria-label={t("Secciones de configuración")}>
         {TAB_GROUPS.map((g) => (
           <div key={g.title} className="settings-group">
             <div className="settings-group-title">{g.title}</div>
             <div className="settings-group-tabs">
-              {g.tabs.map((t) => (
+              {g.tabs.map((item) => (
                 <Button
-                  key={t.id}
-                  variant={tab === t.id ? "primary" : "secondary"}
-                  onClick={() => setTab(t.id)}
-                  title={t.about}
-                  aria-pressed={tab === t.id}
+                  key={item.id}
+                  variant={tab === item.id ? "primary" : "secondary"}
+                  onClick={() => setTab(item.id)}
+                  title={item.about}
+                  aria-pressed={tab === item.id}
                 >
-                  <Icon name={t.icon} size={16} /> {t.label}
+                  <Icon name={item.icon} size={16} /> {item.label}
                 </Button>
               ))}
             </div>
@@ -377,7 +380,7 @@ export default function Settings() {
         ))}
       </nav>
       <p className="settings-about" data-testid="settings-about">
-        <strong>{TABS.find((t) => t.id === tab)?.label}.</strong> {TABS.find((t) => t.id === tab)?.about}
+        <strong>{TABS.find((item) => item.id === tab)?.label}.</strong> {TABS.find((item) => item.id === tab)?.about}
       </p>
 
       {tab === "metodologia" && <MethodologyPanel />}
@@ -409,25 +412,24 @@ export default function Settings() {
             hint={GLOSSARY.minimax}
             right={
               <Badge tone={aiOn ? "ok" : "warn"}>
-                {aiOn ? `Conectado · ${cfg.ai_active_provider || "minimax"}` : "No conectado"}
+                {aiOn ? t("Conectado · {provider}", { provider: cfg.ai_active_provider || "minimax" }) : t("No conectado")}
               </Badge>
             }
           >
             <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-              <Icon name="key" size={18} /> MiniMax (IA principal)
+              <Icon name="key" size={18} /> {t("MiniMax (IA principal)")}
             </span>
           </SectionTitle>
 
           <p style={{ fontSize: 13, color: "#64748B", marginTop: -6, marginBottom: 16 }}>
-            MiniMax entra a las páginas de las fuentes, estructura señales de horizonte y, si lo
-            habilita, lee imágenes y PDF escaneados con MiniMax-M3. La llave no se muestra completa.
+            {t("MiniMax entra a las páginas de las fuentes, estructura señales de horizonte y, si lo habilita, lee imágenes y PDF escaneados con MiniMax-M3. La llave no se muestra completa.")}
           </p>
 
           {banner && <AlertBanner type={banner.type} message={banner.message} onClose={() => setBanner(null)} />}
 
           {cfg.minimax_has_key && (
             <MaskedKey
-              label="Llave MiniMax"
+              label={t("Llave MiniMax")}
               value={cfg.minimax_key_masked}
               onRemove={() => removeToken("minimax")}
               saving={saving}
@@ -435,23 +437,23 @@ export default function Settings() {
           )}
 
           <SecretInput
-            label={cfg.minimax_has_key ? "Nueva llave MiniMax (reemplaza la actual)" : "API Key de MiniMax"}
-            placeholder="sk-cp-... o sk-api-..."
+            label={cfg.minimax_has_key ? t("Nueva llave MiniMax (reemplaza la actual)") : t("API Key de MiniMax")}
+            placeholder={t("sk-cp-... o sk-api-...")}
             value={minimaxToken}
             show={showMinimaxToken}
             onToggle={() => setShowMinimaxToken((s) => !s)}
             onChange={setMinimaxToken}
           />
 
-          <Select label="Proveedor" hint="Automático usa MiniMax si tiene llave y, si falla, Gemini. Elija uno solo si quiere forzarlo." value={provider} onChange={(e) => setProvider(e.target.value)}>
-            <option value="auto">Automático (MiniMax si hay llave; si no, Gemini)</option>
-            <option value="minimax">Solo MiniMax</option>
-            <option value="gemini">Solo Gemini</option>
-            <option value="off">Apagada (sin IA; se usan los modos de respaldo)</option>
+          <Select label={t("Proveedor")} hint={t("Automático usa MiniMax si tiene llave y, si falla, Gemini. Elija uno solo si quiere forzarlo.")} value={provider} onChange={(e) => setProvider(e.target.value)}>
+            <option value="auto">{t("Automático (MiniMax si hay llave; si no, Gemini)")}</option>
+            <option value="minimax">{t("Solo MiniMax")}</option>
+            <option value="gemini">{t("Solo Gemini")}</option>
+            <option value="off">{t("Apagada (sin IA; se usan los modos de respaldo)")}</option>
           </Select>
 
-          <Select label="Modelo MiniMax" hint="Automático elige el mejor modelo que responda con su llave. Use Detectar mejor modelo para probarlo." value={minimaxModel} onChange={(e) => setMinimaxModel(e.target.value)}>
-            <option value="">Automático (mejor modelo disponible)</option>
+          <Select label={t("Modelo MiniMax")} hint={t("Automático elige el mejor modelo que responda con su llave. Use Detectar mejor modelo para probarlo.")} value={minimaxModel} onChange={(e) => setMinimaxModel(e.target.value)}>
+            <option value="">{t("Automático (mejor modelo disponible)")}</option>
             {models.map((m) => (
               <option key={m} value={m}>{m}</option>
             ))}
@@ -463,19 +465,19 @@ export default function Settings() {
           <ToggleRow
             checked={webEnabled}
             onChange={setWebEnabled}
-            title="Paso 7 · IA entra a los sitios web"
-            text="MiniMax lee el texto ya visitado (pasos 2-5) y nombra tecnologías. Si falla, se conserva la heurística del paso 4."
+            title={t("Paso 7 · IA entra a los sitios web")}
+            text={t("MiniMax lee el texto ya visitado (pasos 2-5) y nombra tecnologías. Si falla, se conserva la heurística del paso 4.")}
           />
           <ToggleRow
             checked={ocrEnabled}
             onChange={setOcrEnabled}
-            title="Paso 6 · OCR con MiniMax-M3"
-            text={`Solo corre si el PDF o la página no entregan texto. Visión: ${cfg.minimax_vision_model || "MiniMax-M3"}.`}
+            title={t("Paso 6 · OCR con MiniMax-M3")}
+            text={t("Solo corre si el PDF o la página no entregan texto. Visión: {model}.", { model: cfg.minimax_vision_model || "MiniMax-M3" })}
           />
 
           <Input
             id="scan-max-tokens"
-            label="Tokens máximos por llamada de vigilancia"
+            label={t("Tokens máximos por llamada de vigilancia")}
             hint={GLOSSARY.token_ia}
             type="number"
             min={256}
@@ -485,8 +487,8 @@ export default function Settings() {
           />
           <Input
             id="scan-max-pages"
-            label="Páginas internas a visitar por fuente"
-            hint="El rastreador entra al listado y sigue hasta esta cantidad de fichas del mismo sitio."
+            label={t("Páginas internas a visitar por fuente")}
+            hint={t("El rastreador entra al listado y sigue hasta esta cantidad de fichas del mismo sitio.")}
             type="number"
             min={1}
             max={20}
@@ -494,81 +496,81 @@ export default function Settings() {
             onChange={(e) => setScanMaxPages(e.target.value)}
           />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
-            <Input id="scan-fetch-timeout" label="Timeout de descarga (s)" type="number" min={5} max={90} value={fetchTimeout} onChange={(e) => setFetchTimeout(e.target.value)} hint="Tiempo máximo para abrir la URL de la fuente." />
-            <Input id="scan-child-timeout" label="Timeout de fichas (s)" type="number" min={5} max={60} value={childTimeout} onChange={(e) => setChildTimeout(e.target.value)} hint="Cada ficha interna. Si una falla, el rastreo sigue." />
-            <Input id="scan-ai-timeout" label="Timeout de MiniMax (s)" type="number" min={15} max={120} value={aiTimeout} onChange={(e) => setAiTimeout(e.target.value)} hint="Si MiniMax no responde, se queda la heurística local." />
-            <Input id="scan-retries" label="Reintentos HTTP" type="number" min={0} max={6} value={retries} onChange={(e) => setRetries(e.target.value)} hint="Reintenta 429, 502, 503, 504 y cortes de red." />
-            <Input id="scan-pause" label="Pausa entre páginas (ms)" type="number" min={0} max={3000} value={pauseMs} onChange={(e) => setPauseMs(e.target.value)} hint="Evita que el sitio bloquee por ráfaga de peticiones." />
+            <Input id="scan-fetch-timeout" label={t("Timeout de descarga (s)")} type="number" min={5} max={90} value={fetchTimeout} onChange={(e) => setFetchTimeout(e.target.value)} hint={t("Tiempo máximo para abrir la URL de la fuente.")} />
+            <Input id="scan-child-timeout" label={t("Timeout de fichas (s)")} type="number" min={5} max={60} value={childTimeout} onChange={(e) => setChildTimeout(e.target.value)} hint={t("Cada ficha interna. Si una falla, el rastreo sigue.")} />
+            <Input id="scan-ai-timeout" label={t("Timeout de MiniMax (s)")} type="number" min={15} max={120} value={aiTimeout} onChange={(e) => setAiTimeout(e.target.value)} hint={t("Si MiniMax no responde, se queda la heurística local.")} />
+            <Input id="scan-retries" label={t("Reintentos HTTP")} type="number" min={0} max={6} value={retries} onChange={(e) => setRetries(e.target.value)} hint={t("Reintenta 429, 502, 503, 504 y cortes de red.")} />
+            <Input id="scan-pause" label={t("Pausa entre páginas (ms)")} type="number" min={0} max={3000} value={pauseMs} onChange={(e) => setPauseMs(e.target.value)} hint={t("Evita que el sitio bloquee por ráfaga de peticiones.")} />
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
             <Button variant="secondary" onClick={() => testConnection("minimax")} loading={testing}>
-              <Icon name="pulse" size={16} /> Probar MiniMax
+              <Icon name="pulse" size={16} /> {t("Probar MiniMax")}
             </Button>
             <Button variant="secondary" onClick={detectBest} loading={detecting}>
-              <Icon name="spark" size={16} /> Detectar mejor modelo
+              <Icon name="spark" size={16} /> {t("Detectar mejor modelo")}
             </Button>
             <Button onClick={save} loading={saving}>
-              <Icon name="save" size={16} /> Guardar IA
+              <Icon name="save" size={16} /> {t("Guardar IA")}
             </Button>
           </div>
 
           <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid #E2E8F0" }}>
-            <SectionTitle>Gemini (respaldo opcional)</SectionTitle>
+            <SectionTitle>{t("Gemini (respaldo opcional)")}</SectionTitle>
             {cfg.gemini_has_key && (
               <MaskedKey
-                label="Token Gemini"
+                label={t("Token Gemini")}
                 value={cfg.gemini_key_masked}
                 onRemove={() => removeToken("gemini")}
                 saving={saving}
               />
             )}
             <SecretInput
-              label={cfg.gemini_has_key ? "Nuevo token Gemini" : "Token / API Key de Gemini"}
+              label={cfg.gemini_has_key ? t("Nuevo token Gemini") : t("Token / API Key de Gemini")}
               placeholder="AIza..."
               value={token}
               show={showToken}
               onToggle={() => setShowToken((s) => !s)}
               onChange={setToken}
             />
-            <Select label="Modelo Gemini" value={model} onChange={(e) => setModel(e.target.value)}>
-              <option value="">Automático</option>
+            <Select label={t("Modelo Gemini")} value={model} onChange={(e) => setModel(e.target.value)}>
+              <option value="">{t("Automático")}</option>
               {(cfg.available_models || []).map((m) => (
                 <option key={m} value={m}>{m}</option>
               ))}
             </Select>
             <Button variant="outline" size="sm" onClick={() => testConnection("gemini")} loading={testing}>
-              Probar Gemini
+              {t("Probar Gemini")}
             </Button>
           </div>
         </Card>
 
         <Card style={{ background: "#F8FAFC" }}>
-          <SectionTitle hint={GLOSSARY.token_ia}>Uso de tokens</SectionTitle>
+          <SectionTitle hint={GLOSSARY.token_ia}>{t("Uso de tokens")}</SectionTitle>
           <div data-testid="ai-usage" style={{ display: "grid", gap: 10, marginBottom: 16 }}>
-            <UsageRow label="Llamadas" value={cfg.ai_usage_calls || 0} />
-            <UsageRow label="Tokens de entrada" value={cfg.ai_usage_prompt_tokens || 0} />
-            <UsageRow label="Tokens de salida" value={cfg.ai_usage_completion_tokens || 0} />
-            <UsageRow label="Total" value={cfg.ai_usage_total_tokens || 0} />
+            <UsageRow label={t("Llamadas")} value={cfg.ai_usage_calls || 0} />
+            <UsageRow label={t("Tokens de entrada")} value={cfg.ai_usage_prompt_tokens || 0} />
+            <UsageRow label={t("Tokens de salida")} value={cfg.ai_usage_completion_tokens || 0} />
+            <UsageRow label={t("Total")} value={cfg.ai_usage_total_tokens || 0} />
             {cfg.ai_usage_last_model && (
               <p style={{ margin: 0, fontSize: 12, color: "#64748B" }}>
-                Último modelo: {cfg.ai_usage_last_model}
-                {cfg.ai_usage_last_at ? ` · ${new Date(cfg.ai_usage_last_at).toLocaleString()}` : ""}
+                {t("Último modelo: {model}", { model: cfg.ai_usage_last_model })}
+                {cfg.ai_usage_last_at ? ` · ${fmtDateTime(cfg.ai_usage_last_at)}` : ""}
               </p>
             )}
             {cfg.minimax_plan_summary && (
-              <p style={{ margin: 0, fontSize: 13, color: "#0F172A", fontWeight: 600 }}>{cfg.minimax_plan_summary}</p>
+              <p style={{ margin: 0, fontSize: 13, color: "#0F172A", fontWeight: 600 }}>{ts(cfg.minimax_plan_summary)}</p>
             )}
             <Button variant="outline" size="sm" onClick={refreshUsage}>
-              Actualizar saldo
+              {t("Actualizar saldo")}
             </Button>
             <Button variant="outline" size="sm" onClick={resetUsage} loading={saving} disabled={!cfg.ai_usage_calls}>
-              Reiniciar contador
+              {t("Reiniciar contador")}
             </Button>
           </div>
-          <SectionTitle>Bitácora de entrada a sitios</SectionTitle>
+          <SectionTitle>{t("Bitácora de entrada a sitios")}</SectionTitle>
           <p style={{ fontSize: 12, color: "#64748B", marginTop: -8 }}>
-            Cada rastreo y vista previa deja los pasos (descarga, fichas, OCR, IA) con milisegundos y el error si el sitio no respondió.
+            {t("Cada rastreo y vista previa deja los pasos (descarga, fichas, OCR, IA) con milisegundos y el error si el sitio no respondió.")}
           </p>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <Button
@@ -579,11 +581,11 @@ export default function Settings() {
                   const { data } = await api.get("/config/scan-traces");
                   setTraces(data || []);
                 } catch (e) {
-                  toast.error(apiError(e, "No se pudo cargar la bitácora"));
+                  toast.error(apiError(e, t("No se pudo cargar la bitácora##sitios")));
                 }
               }}
             >
-              Actualizar logs
+              {t("Actualizar logs")}
             </Button>
             <Button
               variant="outline"
@@ -593,13 +595,13 @@ export default function Settings() {
                 try {
                   await api.post("/config/scan-traces/clear");
                   setTraces([]);
-                  toast.success("Bitácora de entrada vaciada");
+                  toast.success(t("Bitácora de entrada vaciada"));
                 } catch (e) {
-                  toast.error(apiError(e, "No se pudo vaciar la bitácora"));
+                  toast.error(apiError(e, t("No se pudo vaciar la bitácora")));
                 }
               }}
             >
-              Vaciar
+              {t("Vaciar")}
             </Button>
           </div>
           <ScanTraceList traces={traces} />
@@ -610,50 +612,49 @@ export default function Settings() {
 
       {tab === "fuentes" && (
         <Card>
-          <SectionTitle hint={GLOSSARY.nivel_a}>Llaves de fuentes de nivel A</SectionTitle>
+          <SectionTitle hint={GLOSSARY.nivel_a}>{t("Llaves de fuentes de nivel A")}</SectionTitle>
           <p style={{ fontSize: 13, color: "#64748B", marginTop: -6 }}>
-            openFDA y PubMed multiplican su cupo con una llave gratuita. Sin ellas el sistema funciona,
-            pero con un tope bajo que puede dejar corridas en ámbar. Las llaves no se muestran una vez guardadas.
+            {t("openFDA y PubMed multiplican su cupo con una llave gratuita. Sin ellas el sistema funciona, pero con un tope bajo que puede dejar corridas en ámbar. Las llaves no se muestran una vez guardadas.")}
           </p>
           <div style={{ display: "grid", gap: 12, maxWidth: 560 }}>
-            <KeyStatus label="openFDA" configured={cfg.openfda_has_key} onRemove={() => saveSourceKeys({ openfda_api_key: "" }, "Llave de openFDA eliminada")} saving={saving} />
+            <KeyStatus label="openFDA" configured={cfg.openfda_has_key} onRemove={() => saveSourceKeys({ openfda_api_key: "" }, t("Llave de openFDA eliminada"))} saving={saving} />
             <Input
               id="openfda-key"
-              label="Llave openFDA (api.data.gov)"
+              label={t("Llave openFDA (api.data.gov)")}
               hint={GLOSSARY.fb_llave_openfda}
               type="password"
               autoComplete="off"
               value={openfdaKey}
               onChange={(e) => setOpenfdaKey(e.target.value)}
-              placeholder={cfg.openfda_has_key ? "Escriba una nueva para reemplazarla" : "Pegue la llave gratuita"}
+              placeholder={cfg.openfda_has_key ? t("Escriba una nueva para reemplazarla") : t("Pegue la llave gratuita")}
             />
-            <KeyStatus label="NCBI / PubMed" configured={cfg.ncbi_has_key} onRemove={() => saveSourceKeys({ ncbi_api_key: "" }, "Llave de NCBI eliminada")} saving={saving} />
+            <KeyStatus label="NCBI / PubMed" configured={cfg.ncbi_has_key} onRemove={() => saveSourceKeys({ ncbi_api_key: "" }, t("Llave de NCBI eliminada"))} saving={saving} />
             <Input
               id="ncbi-key"
-              label="Llave NCBI / PubMed"
+              label={t("Llave NCBI / PubMed")}
               hint={GLOSSARY.fb_llave_ncbi}
               type="password"
               autoComplete="off"
               value={ncbiKey}
               onChange={(e) => setNcbiKey(e.target.value)}
-              placeholder={cfg.ncbi_has_key ? "Escriba una nueva para reemplazarla" : "Opcional; 10 peticiones por segundo"}
+              placeholder={cfg.ncbi_has_key ? t("Escriba una nueva para reemplazarla") : t("Opcional; 10 peticiones por segundo")}
             />
-            <Input id="ncbi-email" label="Correo institucional NCBI" hint={GLOSSARY.fb_correo_ncbi} type="email" value={ncbiEmail} onChange={(e) => setNcbiEmail(e.target.value)} />
+            <Input id="ncbi-email" label={t("Correo institucional NCBI")} hint={GLOSSARY.fb_correo_ncbi} type="email" value={ncbiEmail} onChange={(e) => setNcbiEmail(e.target.value)} />
             <div>
               <Button
                 onClick={() => {
                   if (ncbiEmail.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ncbiEmail.trim())) {
-                    toast.error("El correo de NCBI no es válido");
+                    toast.error(t("El correo de NCBI no es válido"));
                     return;
                   }
                   const payload = { ncbi_email: ncbiEmail.trim() };
                   if (openfdaKey.trim()) payload.openfda_api_key = openfdaKey.trim();
                   if (ncbiKey.trim()) payload.ncbi_api_key = ncbiKey.trim();
-                  saveSourceKeys(payload, "Llaves de fuentes guardadas");
+                  saveSourceKeys(payload, t("Llaves de fuentes guardadas"));
                 }}
                 loading={saving}
               >
-                Guardar llaves
+                {t("Guardar llaves")}
               </Button>
             </div>
           </div>
@@ -666,12 +667,12 @@ export default function Settings() {
 function KeyStatus({ label, configured, onRemove, saving }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#475569" }} data-testid={`key-status-${label}`}>
-      <Badge tone={configured ? "ok" : "viewer"}>{configured ? "Configurada" : "Sin llave"}</Badge>
+      <Badge tone={configured ? "ok" : "viewer"}>{configured ? t("Configurada") : t("Sin llave")}</Badge>
       <span>{label}</span>
       {configured && (
-        <Tooltip text="Borra la llave guardada desde esta pantalla. Si el servidor tiene una en su archivo .env, se vuelve a usar esa.">
+        <Tooltip text={t("Borra la llave guardada desde esta pantalla. Si el servidor tiene una en su archivo .env, se vuelve a usar esa.")}>
           <button type="button" onClick={onRemove} disabled={saving} style={{ marginLeft: "auto", border: "none", background: "transparent", color: "#EF4444", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
-            Eliminar llave guardada
+            {t("Eliminar llave guardada")}
           </button>
         </Tooltip>
       )}
@@ -711,22 +712,21 @@ function ToggleRow({ checked, onChange, title, text }) {
 function ScanIngestFlow({ cfg, webEnabled, ocrEnabled, fetchTimeout, childTimeout, aiTimeout, retries, pauseMs, scanMaxPages }) {
   const aiOn = Boolean(cfg?.ai_enabled);
   const steps = [
-    { n: "1", title: "Fuente en cola", text: "Solo fuentes con ingesta activa, en orden de prioridad de la matriz EH (alta primero).", on: true, meta: "Siempre" },
-    { n: "2", title: "Descarga HTTP", text: `Abre la URL con ${retries} reintento(s) si hay 429/502/503, corte o timeout. Si falla, prueba las URLs de entrada de la matriz.`, on: true, meta: `${fetchTimeout}s` },
-    { n: "3", title: "PDF o HTML", text: "Si es PDF extrae texto. Si es HTML, lee el listado.", on: true, meta: "Siempre" },
-    { n: "4", title: "Heurística local", text: "Titulares, tipo, horizonte y área. No consume tokens. Si la IA falla, esto se conserva.", on: true, meta: "Siempre" },
-    { n: "5", title: "Búsqueda web", text: "La IA redacta consultas site:dominio y los buscadores traen documentos de la fuente. Casilla por fuente.", on: aiOn, meta: "Por fuente" },
-    { n: "6", title: "Ruta de la matriz", text: `Visita las URLs de entrada y sigue hasta ${scanMaxPages} fichas, primero las que coinciden con la ruta de acceso. ${pauseMs} ms de pausa.`, on: true, meta: `${childTimeout}s / ficha` },
-    { n: "7", title: "OCR MiniMax-M3", text: "Solo si el PDF o la página no traen texto, el OCR está activo y la casilla OCR de la fuente está encendida.", on: Boolean(aiOn && ocrEnabled), meta: ocrEnabled ? "Activo" : "Apagado" },
-    { n: "8", title: "IA estructura JSON", text: "MiniMax lee el corpus con el contexto de la matriz (prioridad, qué consultar) y nombra tecnologías. Si no responde, queda el paso 4.", on: Boolean(aiOn && webEnabled), meta: webEnabled ? `${aiTimeout}s` : "Apagado" },
-    { n: "9", title: "Huella y bandeja", text: "Deduplica por hash y deja las señales nuevas en la bandeja de entrada.", on: true, meta: "Siempre" },
+    { n: "1", title: t("Fuente en cola"), text: t("Solo fuentes con ingesta activa, en orden de prioridad de la matriz EH (alta primero)."), on: true, meta: t("Siempre") },
+    { n: "2", title: t("Descarga HTTP"), text: t("Abre la URL con {retries} reintento(s) si hay 429/502/503, corte o timeout. Si falla, prueba las URLs de entrada de la matriz.", { retries }), on: true, meta: `${fetchTimeout}s` },
+    { n: "3", title: t("PDF o HTML"), text: t("Si es PDF extrae texto. Si es HTML, lee el listado."), on: true, meta: t("Siempre") },
+    { n: "4", title: t("Heurística local"), text: t("Titulares, tipo, horizonte y área. No consume tokens. Si la IA falla, esto se conserva."), on: true, meta: t("Siempre") },
+    { n: "5", title: t("Búsqueda web"), text: t("La IA redacta consultas site:dominio y los buscadores traen documentos de la fuente. Casilla por fuente."), on: aiOn, meta: t("Por fuente") },
+    { n: "6", title: t("Ruta de la matriz"), text: t("Visita las URLs de entrada y sigue hasta {pages} fichas, primero las que coinciden con la ruta de acceso. {pause} ms de pausa.", { pages: scanMaxPages, pause: pauseMs }), on: true, meta: t("{seconds}s / ficha", { seconds: childTimeout }) },
+    { n: "7", title: "OCR MiniMax-M3", text: t("Solo si el PDF o la página no traen texto, el OCR está activo y la casilla OCR de la fuente está encendida."), on: Boolean(aiOn && ocrEnabled), meta: ocrEnabled ? t("Activo") : t("Apagado") },
+    { n: "8", title: t("IA estructura JSON"), text: t("MiniMax lee el corpus con el contexto de la matriz (prioridad, qué consultar) y nombra tecnologías. Si no responde, queda el paso 4."), on: Boolean(aiOn && webEnabled), meta: webEnabled ? `${aiTimeout}s` : t("Apagado") },
+    { n: "9", title: t("Huella y bandeja"), text: t("Deduplica por hash y deja las señales nuevas en la bandeja de entrada."), on: true, meta: t("Siempre") },
   ];
   return (
     <Card data-testid="ai-ingest-flow">
-      <SectionTitle hint={GLOSSARY.flujo_ingesta}>Cómo entran las tecnologías (orden fijo)</SectionTitle>
+      <SectionTitle hint={GLOSSARY.flujo_ingesta}>{t("Cómo entran las tecnologías (orden fijo)")}</SectionTitle>
       <p style={{ fontSize: 13, color: "#64748B", marginTop: -6, marginBottom: 14 }}>
-        El orden no cambia. Lo que sí ajusta desde este panel es OCR, IA, tiempos, reintentos y el prompt.
-        Un sitio que no responde no detiene las demás fuentes.
+        {t("El orden no cambia. Lo que sí ajusta desde este panel es OCR, IA, tiempos, reintentos y el prompt. Un sitio que no responde no detiene las demás fuentes.")}
       </p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
         {steps.map((s) => (
@@ -755,26 +755,31 @@ function ScanIngestFlow({ cfg, webEnabled, ocrEnabled, fetchTimeout, childTimeou
 
 function ScanTraceList({ traces }) {
   if (!traces?.length) {
-    return <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>Aún no hay corridas. Ejecute una vigilancia o una vista previa para ver los pasos aquí.</p>;
+    return <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>{t("Aún no hay corridas. Ejecute una vigilancia o una vista previa para ver los pasos aquí.")}</p>;
   }
   return (
     <div data-testid="scan-trace-list" style={{ display: "grid", gap: 10, maxHeight: 420, overflow: "auto" }}>
-      {traces.slice(0, 12).map((t, i) => (
-        <div key={`${t.at}-${i}`} style={{ border: "1px solid #E2E8F0", borderRadius: 10, padding: 10, background: "#fff" }}>
+      {traces.slice(0, 12).map((trace, i) => (
+        <div key={`${trace.at}-${i}`} style={{ border: "1px solid #E2E8F0", borderRadius: 10, padding: 10, background: "#fff" }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
-            <strong style={{ fontSize: 13 }}>{t.source || t.url || "Fuente"}</strong>
-            <Badge tone={t.ok ? "ok" : "warning"}>{t.status || (t.ok ? "ok" : "error")}</Badge>
+            <strong style={{ fontSize: 13 }}>{trace.source || trace.url || t("Fuente")}</strong>
+            <Badge tone={trace.ok ? "ok" : "warning"}>{trace.status || (trace.ok ? "ok" : "error")}</Badge>
           </div>
           <p style={{ margin: "4px 0 6px", fontSize: 12, color: "#64748B" }}>
-            {t.kind === "preview" ? "Vista previa" : "Rastreo"} · {t.elapsed_ms || 0} ms · {t.pages_visited || 0} pág. · {t.items_found || 0} señales
-            {t.ai ? " · IA" : ""}{t.ocr ? " · OCR" : ""}{t.web_search ? " · Búsqueda web" : ""}
-            {t.priority ? ` · Prioridad ${t.priority}` : ""}
-            {t.at ? ` · ${new Date(t.at).toLocaleString()}` : ""}
+            {t("{kind} · {ms} ms · {pages} pág. · {items} señales", {
+              kind: trace.kind === "preview" ? t("Vista previa") : t("Rastreo"),
+              ms: trace.elapsed_ms || 0,
+              pages: trace.pages_visited || 0,
+              items: trace.items_found || 0,
+            })}
+            {trace.ai ? ` · ${t("IA")}` : ""}{trace.ocr ? " · OCR" : ""}{trace.web_search ? ` · ${t("Búsqueda web")}` : ""}
+            {trace.priority ? ` · ${t("Prioridad {priority}", { priority: ts(trace.priority) })}` : ""}
+            {trace.at ? ` · ${fmtDateTime(trace.at)}` : ""}
           </p>
-          {t.message && <p style={{ margin: "0 0 6px", fontSize: 12, color: "#334155" }}>{t.message}</p>}
-          {(t.steps || []).slice(0, 14).map((s, j) => (
+          {trace.message && <p style={{ margin: "0 0 6px", fontSize: 12, color: "#334155" }}>{ts(trace.message)}</p>}
+          {(trace.steps || []).slice(0, 14).map((s, j) => (
             <div key={j} style={{ fontSize: 11, color: "#475569", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", marginBottom: 2 }}>
-              {s.action} · {s.status} · {s.ms}ms {s.detail ? `· ${s.detail}` : ""}
+              {s.action} · {s.status} · {s.ms}ms {s.detail ? `· ${ts(s.detail)}` : ""}
             </div>
           ))}
         </div>
@@ -787,13 +792,13 @@ function UsageRow({ label, value }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#334155" }}>
       <span>{label}</span>
-      <strong>{Number(value).toLocaleString("es-CO")}</strong>
+      <strong>{Number(value).toLocaleString(intlLocale())}</strong>
     </div>
   );
 }
 
 function PromptsPanel({ prompts, setPrompts, toast, saving, setSaving }) {
-  if (!prompts) return <LoadingBlock label="Cargando prompts..." />;
+  if (!prompts) return <LoadingBlock label={t("Cargando prompts...")} />;
   const save = async () => {
     setSaving(true);
     try {
@@ -805,9 +810,9 @@ function PromptsPanel({ prompts, setPrompts, toast, saving, setSaving }) {
         max_chars: Number(prompts.max_chars) || 28000,
       });
       setPrompts(data);
-      toast.success("Prompts de vigilancia guardados");
+      toast.success(t("Prompts de vigilancia guardados"));
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron guardar los prompts"));
+      toast.error(apiError(e, t("No se pudieron guardar los prompts")));
     } finally {
       setSaving(false);
     }
@@ -817,24 +822,22 @@ function PromptsPanel({ prompts, setPrompts, toast, saving, setSaving }) {
     try {
       const { data } = await api.post("/config/prompts/reset");
       setPrompts(data);
-      toast.success("Prompts restaurados a los valores de fábrica");
+      toast.success(t("Prompts restaurados a los valores de fábrica"));
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron restaurar los prompts"));
+      toast.error(apiError(e, t("No se pudieron restaurar los prompts")));
     } finally {
       setSaving(false);
     }
   };
   return (
     <Card data-testid="prompts-panel">
-      <SectionTitle hint={GLOSSARY.prompt_vigilancia}>Instrucciones de MiniMax en el escaneo activo</SectionTitle>
+      <SectionTitle hint={GLOSSARY.prompt_vigilancia}>{t("Instrucciones de MiniMax en el escaneo activo")}</SectionTitle>
       <p style={{ fontSize: 13, color: "#64748B", marginTop: -6 }}>
-        El rastreador entra al listado, sigue hasta las fichas internas y entrega ese texto a MiniMax.
-        El prompt de fábrica extrae solo tecnologías nominadas, no inventa NCT y responde JSON.
-        Variables: {"{source_title}"}, {"{source_url}"}, {"{pages_visited}"}, {"{content}"}, {"{ocr_note}"} y {"{max_items}"}.
+        {t("El rastreador entra al listado, sigue hasta las fichas internas y entrega ese texto a MiniMax. El prompt de fábrica extrae solo tecnologías nominadas, no inventa NCT y responde JSON. Variables: {source_title}, {source_url}, {pages_visited}, {content}, {ocr_note} y {max_items}.")}
       </p>
       <Textarea
         id="prompt-system"
-        label="Prompt de sistema"
+        label={t("Prompt de sistema")}
         hint={GLOSSARY.prompt_vigilancia}
         rows={5}
         value={prompts.system}
@@ -842,7 +845,7 @@ function PromptsPanel({ prompts, setPrompts, toast, saving, setSaving }) {
       />
       <Textarea
         id="prompt-user"
-        label="Prompt de extracción (usuario)"
+        label={t("Prompt de extracción (usuario)")}
         rows={16}
         value={prompts.user}
         onChange={(e) => setPrompts({ ...prompts, user: e.target.value })}
@@ -851,7 +854,7 @@ function PromptsPanel({ prompts, setPrompts, toast, saving, setSaving }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
         <Input
           id="prompt-max-tokens"
-          label="Tokens de salida"
+          label={t("Tokens de salida")}
           type="number"
           min={256}
           max={8192}
@@ -860,7 +863,7 @@ function PromptsPanel({ prompts, setPrompts, toast, saving, setSaving }) {
         />
         <Input
           id="prompt-max-pages"
-          label="Páginas a visitar"
+          label={t("Páginas a visitar")}
           type="number"
           min={1}
           max={20}
@@ -869,7 +872,7 @@ function PromptsPanel({ prompts, setPrompts, toast, saving, setSaving }) {
         />
         <Input
           id="prompt-max-chars"
-          label="Caracteres de contenido"
+          label={t("Caracteres de contenido")}
           type="number"
           min={4000}
           max={80000}
@@ -879,10 +882,10 @@ function PromptsPanel({ prompts, setPrompts, toast, saving, setSaving }) {
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
         <Button onClick={save} loading={saving}>
-          <Icon name="save" size={16} /> Guardar prompts
+          <Icon name="save" size={16} /> {t("Guardar prompts")}
         </Button>
         <Button variant="outline" onClick={reset} loading={saving}>
-          Restaurar predeterminados
+          {t("Restaurar predeterminados")}
         </Button>
       </div>
     </Card>
@@ -904,7 +907,7 @@ function SecretInput({ label, placeholder, value, show, onToggle, onChange }) {
       <button
         type="button"
         onClick={onToggle}
-        title={show ? "Ocultar" : "Mostrar"}
+        title={show ? t("Ocultar") : t("Mostrar")}
         style={{
           position: "absolute",
           right: 10,
@@ -940,7 +943,7 @@ function MaskedKey({ label, value, onRemove, saving }) {
       <Icon name="key" size={16} color="#64748B" />
       <span style={{ color: "#475569" }}>{label}:</span>
       <code style={{ fontWeight: 700, color: "#0F172A" }}>{value}</code>
-      <Tooltip text="Eliminar la llave guardada.">
+      <Tooltip text={t("Eliminar la llave guardada.")}>
         <button
           onClick={onRemove}
           disabled={saving}
@@ -957,7 +960,7 @@ function MaskedKey({ label, value, onRemove, saving }) {
             fontWeight: 600,
           }}
         >
-          <Icon name="trash" size={15} /> Eliminar
+          <Icon name="trash" size={15} /> {t("Eliminar")}
         </button>
       </Tooltip>
     </div>

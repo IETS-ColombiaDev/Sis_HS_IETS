@@ -25,9 +25,11 @@ import EmptyState from "./EmptyState";
 import InfoTip from "./InfoTip";
 import { Input } from "./Field";
 import ErrorBoundary from "./ErrorBoundary";
+import { t, ts } from "../i18n";
 
-const HELP =
-  "Mapa del ciclo. Use el controlador de la izquierda para buscar y saltar a un nodo sin perderse. Clic en el dibujo abre el chat de ese nodo. La rueda hace zoom hacia el cursor. Esc cierra la vista amplia.";
+const HELP = t(
+  "Mapa del ciclo. Use el controlador de la izquierda para buscar y saltar a un nodo sin perderse. Clic en el dibujo abre el chat de ese nodo. La rueda hace zoom hacia el cursor. Esc cierra la vista amplia."
+);
 
 function GraphTool({ cycleId, filters, restricted }) {
   const toast = useToast();
@@ -80,7 +82,7 @@ function GraphTool({ cycleId, filters, restricted }) {
       setView({ x: 0, y: 0, k: 1 });
       setActiveSave(null);
     } catch (e) {
-      toastRef.current.error(apiError(e, "No se pudo armar el grafo del ciclo"));
+      toastRef.current.error(apiError(e, t("No se pudo armar el grafo del ciclo")));
       setGraph(null);
     } finally {
       setLoading(false);
@@ -128,7 +130,7 @@ function GraphTool({ cycleId, filters, restricted }) {
   const lost = isCameraLost(placed, view, width, height);
   const typesPresent = useMemo(() => {
     const set = new Set((graph?.nodes || []).map((n) => n.type));
-    return Object.keys(TYPE_LABEL).filter((t) => set.has(t));
+    return Object.keys(TYPE_LABEL).filter((key) => set.has(key));
   }, [graph]);
 
   const applyView = (next) => setView(sanitizeView(next));
@@ -209,7 +211,7 @@ function GraphTool({ cycleId, filters, restricted }) {
         answer && typeof answer === "object" ? answer : { role: "assistant", content: messageText(answer) },
       ]);
     } catch (e) {
-      toastRef.current.error(apiError(e, "No se pudo consultar el nodo"));
+      toastRef.current.error(apiError(e, t("No se pudo consultar el nodo")));
       setMessages((m) => m.filter((x) => !String(x.id || "").startsWith("tmp-")));
     } finally {
       setSending(false);
@@ -218,7 +220,7 @@ function GraphTool({ cycleId, filters, restricted }) {
 
   const persist = async () => {
     if (!cycleId) return;
-    const title = saveTitle.trim() || `Grafo ${graph?.cycle_code || cycleId}`;
+    const title = saveTitle.trim() || t("Grafo {ciclo}", { ciclo: graph?.cycle_code || cycleId });
     const body = {
       cycle_id: cycleId,
       title,
@@ -238,10 +240,10 @@ function GraphTool({ cycleId, filters, restricted }) {
         : await api.post("/strategy/graphs", body);
       setActiveSave(data.id);
       setSaveTitle(data.title);
-      toastRef.current.success("Vista del grafo guardada");
+      toastRef.current.success(t("Vista del grafo guardada"));
       loadSaved();
     } catch (e) {
-      toastRef.current.error(apiError(e, "No se pudo guardar el grafo"));
+      toastRef.current.error(apiError(e, t("No se pudo guardar el grafo")));
     }
   };
 
@@ -264,7 +266,7 @@ function GraphTool({ cycleId, filters, restricted }) {
       if (activeSave === id) setActiveSave(null);
       loadSaved();
     } catch (e) {
-      toastRef.current.error(apiError(e, "No se pudo eliminar la vista"));
+      toastRef.current.error(apiError(e, t("No se pudo eliminar la vista")));
     }
   };
 
@@ -337,38 +339,38 @@ function GraphTool({ cycleId, filters, restricted }) {
   if (loading) {
     return (
       <div className="sg-shell">
-        <Spinner /> Armando el grafo del ciclo...
+        <Spinner /> {t("Armando el grafo del ciclo...")}
       </div>
     );
   }
-  if (!graph) return <EmptyState message="No hay grafo para este ciclo." />;
+  if (!graph) return <EmptyState message={t("No hay grafo para este ciclo.")} />;
 
   const controller = (
-    <aside className="sg-controller" aria-label="Controlador interno del grafo">
+    <aside className="sg-controller" aria-label={t("Controlador interno del grafo")}>
       <header>
-        <strong>Controlador interno</strong>
-        <InfoTip text={HELP} label="Cómo usar el controlador" />
+        <strong>{t("Controlador interno")}</strong>
+        <InfoTip text={HELP} label={t("Cómo usar el controlador")} />
       </header>
       <input
         ref={searchRef}
         className="sg-search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Buscar nodo, tecnología o etapa..."
-        aria-label="Buscar nodo"
+        placeholder={t("Buscar nodo, tecnología o etapa...")}
+        aria-label={t("Buscar nodo")}
       />
       <div className="sg-type-chips">
         <button type="button" className={!typeFilter ? "is-on" : ""} onClick={() => setTypeFilter("")}>
-          Todos
+          {t("Todos")}
         </button>
-        {typesPresent.map((t) => (
+        {typesPresent.map((key) => (
           <button
-            key={t}
+            key={key}
             type="button"
-            className={typeFilter === t ? "is-on" : ""}
-            onClick={() => setTypeFilter(typeFilter === t ? "" : t)}
+            className={typeFilter === key ? "is-on" : ""}
+            onClick={() => setTypeFilter(typeFilter === key ? "" : key)}
           >
-            {TYPE_LABEL[t]}
+            {TYPE_LABEL[key]}
           </button>
         ))}
       </div>
@@ -382,7 +384,7 @@ function GraphTool({ cycleId, filters, restricted }) {
           max="280"
           value={Math.round(view.k * 100)}
           onChange={(e) => setView((v) => sanitizeView({ ...v, k: Number(e.target.value) / 100 }))}
-          aria-label="Zoom"
+          aria-label={t("Zoom")}
         />
         <Button size="sm" variant="ghost" onClick={() => setView((v) => sanitizeView({ ...v, k: v.k * 1.15 }))}>
           +
@@ -391,22 +393,26 @@ function GraphTool({ cycleId, filters, restricted }) {
       </div>
       <div className="sg-ctrl-actions">
         <Button size="sm" variant="secondary" onClick={() => applyView({ x: 0, y: 0, k: 1 })}>
-          Encajar
+          {t("Encajar")}
         </Button>
         <Button size="sm" variant="ghost" onClick={expandAll}>
-          Ampliar todo
+          {t("Ampliar todo")}
         </Button>
         <Button size="sm" variant="ghost" onClick={compact}>
-          Compactar
+          {t("Compactar")}
         </Button>
         {selected && (
           <Button size="sm" variant="outline" onClick={() => jumpTo(selected)}>
-            Ir al seleccionado
+            {t("Ir al seleccionado")}
           </Button>
         )}
       </div>
       <p className="sg-ctrl-hint">
-        {catalog.length} nodos · {visible.length} visibles · {selected ? selected.label : "sin selección"}
+        {t("{n} nodos · {visibles} visibles · {seleccion}", {
+          n: catalog.length,
+          visibles: visible.length,
+          seleccion: selected ? ts(selected.label) : t("sin selección"),
+        })}
       </p>
       <ul className="sg-node-list">
         {catalog.slice(0, 80).map((n) => {
@@ -417,15 +423,15 @@ function GraphTool({ cycleId, filters, restricted }) {
               <button type="button" className={on ? "is-on" : ""} style={{ paddingLeft: 8 + depth * 10 }} onClick={() => jumpTo(n)}>
                 <i style={{ background: TYPE_COLOR[n.type] || "#64748B" }} />
                 <span>
-                  <b>{n.label}</b>
-                  <em>{n.subtitle}</em>
+                  <b>{ts(n.label)}</b>
+                  <em>{ts(n.subtitle)}</em>
                 </span>
               </button>
             </li>
           );
         })}
       </ul>
-      <p className="sg-keys">Atajos: / buscar · + − zoom · 0 encajar · Esc salir de amplia</p>
+      <p className="sg-keys">{t("Atajos: / buscar · + − zoom · 0 encajar · Esc salir de amplia")}</p>
     </aside>
   );
 
@@ -433,16 +439,16 @@ function GraphTool({ cycleId, filters, restricted }) {
     <div className={`sg-board${wide ? " is-wide" : ""}`}>
       <div className="sg-toolbar">
         <div className="term-label">
-          <strong>Grafo del ciclo</strong>
-          <Badge tone="info">{visible.length} visibles</Badge>
-          {restricted && <Badge tone="ok">Capa restringida</Badge>}
+          <strong>{t("Grafo del ciclo")}</strong>
+          <Badge tone="info">{t("{n} visibles", { n: visible.length })}</Badge>
+          {restricted && <Badge tone="ok">{t("Capa restringida")}</Badge>}
         </div>
         <div className="eval-actions">
           <Button size="sm" variant="secondary" onClick={() => applyView({ x: 0, y: 0, k: 1 })}>
-            Encajar
+            {t("Encajar")}
           </Button>
           <Button size="sm" variant={wide ? "primary" : "outline"} onClick={() => setWide((v) => !v)}>
-            {wide ? "Cerrar" : "Ampliar grafo"}
+            {wide ? t("Cerrar") : t("Ampliar grafo")}
           </Button>
         </div>
       </div>
@@ -450,9 +456,9 @@ function GraphTool({ cycleId, filters, restricted }) {
       <div className="sg-canvas-wrap">
         {lost && (
           <div className="sg-lost">
-            <span>El dibujo quedó fuera de vista.</span>
+            <span>{t("El dibujo quedó fuera de vista.")}</span>
             <Button size="sm" onClick={() => applyView({ x: 0, y: 0, k: 1 })}>
-              Volver a encajar
+              {t("Volver a encajar")}
             </Button>
           </div>
         )}
@@ -528,10 +534,10 @@ function GraphTool({ cycleId, filters, restricted }) {
                     </text>
                   )}
                   <text x={22} y={-4} className="sg-label">
-                    {n.label}
+                    {ts(n.label)}
                   </text>
                   <text x={22} y={12} className="sg-sub">
-                    {n.subtitle}
+                    {ts(n.subtitle)}
                   </text>
                 </g>
               );
@@ -555,21 +561,21 @@ function GraphTool({ cycleId, filters, restricted }) {
     <aside className="sg-chat">
       <header>
         <div>
-          <strong>{selected.label}</strong>
-          <p>{selected.subtitle}</p>
+          <strong>{ts(selected.label)}</strong>
+          <p>{ts(selected.subtitle)}</p>
         </div>
         <Badge>{TYPE_LABEL[selected.type] || selected.type}</Badge>
       </header>
       <div className="sg-prompts">
         {(selected.prompts || []).map((q) => (
-          <button key={q} type="button" disabled={sending} onClick={() => send(q)}>
-            {q}
+          <button key={q} type="button" disabled={sending} onClick={() => send(ts(q))}>
+            {ts(q)}
           </button>
         ))}
       </div>
       <div className="sg-messages" ref={chatRef}>
         {messages.length === 0 && (
-          <p className="sg-chat-empty">Pregunte sobre este nodo. La conversación se guarda y puede retomarla después.</p>
+          <p className="sg-chat-empty">{t("Pregunte sobre este nodo. La conversación se guarda y puede retomarla después.")}</p>
         )}
         {messages.map((m, i) => {
           const text = messageText(m);
@@ -577,7 +583,7 @@ function GraphTool({ cycleId, filters, restricted }) {
           return (
             <div key={m.id || `${role}-${i}`} className={`sg-msg sg-msg-${role}`}>
               {role === "assistant" ? (
-                <ErrorBoundary title="No se pudo mostrar la respuesta" hint="El texto crudo sigue disponible al reintentar.">
+                <ErrorBoundary title={t("No se pudo mostrar la respuesta")} hint={t("El texto crudo sigue disponible al reintentar.")}>
                   <Markdown>{text}</Markdown>
                 </ErrorBoundary>
               ) : (
@@ -599,10 +605,10 @@ function GraphTool({ cycleId, filters, restricted }) {
           rows={2}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={`Consultar ${selected.label}...`}
+          placeholder={t("Consultar {nodo}...", { nodo: ts(selected.label) })}
         />
         <Button type="submit" disabled={sending || !draft.trim()}>
-          Enviar
+          {t("Enviar")}
         </Button>
       </form>
     </aside>
@@ -611,21 +617,21 @@ function GraphTool({ cycleId, filters, restricted }) {
   const saves = (
     <div className="sg-saves">
       <Input
-        label="Nombre de la vista"
+        label={t("Nombre de la vista")}
         value={saveTitle}
         onChange={(e) => setSaveTitle(e.target.value)}
-        placeholder={`Grafo ${graph.cycle_code || ""}`}
+        placeholder={t("Grafo {ciclo}", { ciclo: graph.cycle_code || "" })}
       />
       <textarea
         className="sg-notes"
         rows={2}
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
-        placeholder="Notas de lectura (se guardan con la vista)"
+        placeholder={t("Notas de lectura (se guardan con la vista)")}
       />
       <div className="eval-actions">
         <Button size="sm" onClick={persist}>
-          {activeSave ? "Actualizar vista" : "Guardar vista"}
+          {activeSave ? t("Actualizar vista") : t("Guardar vista")}
         </Button>
         {activeSave && (
           <Button
@@ -636,7 +642,7 @@ function GraphTool({ cycleId, filters, restricted }) {
               setSaveTitle("");
             }}
           >
-            Nueva
+            {t("Nueva")}
           </Button>
         )}
       </div>
@@ -670,7 +676,7 @@ function GraphTool({ cycleId, filters, restricted }) {
 
   if (wide) {
     return (
-      <div className="sg-lightbox" role="dialog" aria-modal="true" aria-label="Grafo ampliado">
+      <div className="sg-lightbox" role="dialog" aria-modal="true" aria-label={t("Grafo ampliado")}>
         <div className="sg-lightbox-inner">{body}</div>
       </div>
     );
@@ -682,8 +688,8 @@ function GraphTool({ cycleId, filters, restricted }) {
 export default function StrategyGraph(props) {
   return (
     <ErrorBoundary
-      title="El grafo se detuvo"
-      hint="El tablero sigue disponible. Reintente el mapa o use Encajar si el dibujo quedó fuera de vista."
+      title={t("El grafo se detuvo")}
+      hint={t("El tablero sigue disponible. Reintente el mapa o use Encajar si el dibujo quedó fuera de vista.")}
     >
       <GraphTool {...props} />
     </ErrorBoundary>

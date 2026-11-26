@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import InfoTip from "./InfoTip";
 import Icon from "./Icon";
+import { t } from "../i18n";
 
 const KEY = "iets_hs_phase_guide_closed";
 
@@ -42,7 +43,7 @@ export default function PhaseGuide({ phase, tasks, nextLabel, nextTo, onNext, hi
       // Navegacion dentro de la SPA: recargar la pagina perdia el estado.
       onClick={onNext || (() => navigate(nextTo))}
     >
-      Siguiente: {nextLabel} →
+      {t("Siguiente: {label} →", { label: nextLabel })}
     </button>
   );
 
@@ -51,18 +52,18 @@ export default function PhaseGuide({ phase, tasks, nextLabel, nextTo, onNext, hi
       <div className="phase-guide-head">
         <span className="phase-guide-badge term-label">
           {phase}
-          <InfoTip text={hint} label={`Qué es ${phase}`} />
+          <InfoTip text={hint} label={t("Qué es {name}", { name: phase })} />
         </span>
-        <span className="phase-guide-label">Qué hace el técnico en esta fase</span>
+        <span className="phase-guide-label">{t("Qué hace el técnico en esta fase")}</span>
         {next}
         <button
           type="button"
           className="phase-guide-toggle"
           onClick={toggle}
           aria-expanded={open}
-          aria-label={open ? "Ocultar los pasos de la fase" : "Mostrar los pasos de la fase"}
+          aria-label={open ? t("Ocultar los pasos de la fase") : t("Mostrar los pasos de la fase")}
         >
-          {open ? "Ocultar" : `Ver ${tasks.length} pasos`}
+          {open ? t("Ocultar") : t("Ver {n} pasos", { n: tasks.length })}
           <span className={`phase-guide-caret${open ? " is-open" : ""}`}>
             <Icon name="chevron" size={14} />
           </span>
@@ -71,8 +72,8 @@ export default function PhaseGuide({ phase, tasks, nextLabel, nextTo, onNext, hi
       {open && (
         <>
           <ul className="phase-guide-tasks">
-            {tasks.map((t) => (
-              <li key={t}>{t}</li>
+            {tasks.map((task) => (
+              <li key={task}>{task}</li>
             ))}
           </ul>
         </>
@@ -95,7 +96,7 @@ export function ModuleStatsRow({ items }) {
           </div>
           <div className="module-stat-label">
             {item.label}
-            {item.hint ? <InfoTip text={item.hint} label={`Qué es ${item.label}`} /> : null}
+            {item.hint ? <InfoTip text={item.hint} label={t("Qué es {name}", { name: item.label })} /> : null}
           </div>
           {item.sub && <div className="module-stat-sub">{item.sub}</div>}
         </div>

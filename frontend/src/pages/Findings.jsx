@@ -23,12 +23,19 @@ import { LoadingBlock } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
 import { PERM } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
+import { t, tr, ts } from "../i18n";
 
 const HORIZONS = ["emergente", "transicional", "inminente"];
 const TYPES = ["medicamento", "dispositivo", "digital", "otro"];
 const STATUSES = ["nuevo", "revisado", "priorizado", "descartado"];
 const PAGE = 100;
 const EMPTY_FILTERS = { q: "", horizon: "", technology_type: "", status: "" };
+// Etiquetas de los valores: el valor en español es el que se guarda y se envía al servidor.
+const HORIZON_NAME = { emergente: t("emergente"), transicional: t("transicional"), inminente: t("inminente") };
+const TYPE_NAME = { medicamento: t("medicamento"), dispositivo: t("dispositivo"), digital: t("digital"), otro: t("otro") };
+const STATUS_NAME = { nuevo: t("nuevo"), revisado: t("revisado"), priorizado: t("priorizado"), descartado: t("descartado") };
+// Badge elige el color por el valor: se le pasa como tono para que la etiqueta traducida no lo cambie.
+const toneOf = (value) => String(value || "").toLowerCase();
 
 export default function Findings() {
   const { can, status, user } = useAuth();
@@ -78,7 +85,7 @@ export default function Findings() {
       setFindings(list.data);
       setStats(st.data);
     } catch (e) {
-      if (firstLoad.current) toast.error(apiError(e, "No se pudieron cargar las señales"));
+      if (firstLoad.current) toast.error(apiError(e, t("No se pudieron cargar las señales")));
     } finally {
       firstLoad.current = false;
       setLoading(false);
@@ -96,7 +103,7 @@ export default function Findings() {
       const { data } = await api.get("/findings", { params: { ...params, limit: PAGE, offset: findings.length } });
       setFindings((prev) => [...prev, ...data.filter((f) => !prev.some((p) => p.id === f.id))]);
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar más señales"));
+      toast.error(apiError(e, t("No se pudieron cargar más señales")));
     } finally {
       setLoadingMore(false);
     }
@@ -110,7 +117,7 @@ export default function Findings() {
 
   const save = async () => {
     if (!form.title?.trim()) {
-      setFormError("El título de la señal es obligatorio.");
+      setFormError(t("El título de la señal es obligatorio."));
       return;
     }
     setSaving(true);
@@ -126,12 +133,12 @@ export default function Findings() {
         published_date: form.published_date,
         status: form.status,
       });
-      toast.success("Señal actualizada");
+      toast.success(t("Señal actualizada"));
       setEditOpen(false);
       if (detail?.id === data.id) setDetail(data);
       load();
     } catch (e) {
-      setFormError(apiError(e, "No se pudo actualizar"));
+      setFormError(apiError(e, t("No se pudo actualizar")));
     } finally {
       setSaving(false);
     }
@@ -140,11 +147,11 @@ export default function Findings() {
   const quickStatus = async (f, newStatus) => {
     try {
       const { data } = await api.put(`/findings/${f.id}`, { status: newStatus });
-      toast.success(`Marcada como ${newStatus}`);
+      toast.success(t("Marcada como {status}", { status: STATUS_NAME[newStatus] || newStatus }));
       if (detail?.id === f.id) setDetail(data);
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo actualizar"));
+      toast.error(apiError(e, t("No se pudo actualizar")));
     }
   };
 
@@ -153,11 +160,11 @@ export default function Findings() {
     try {
       const { data } = await api.post("/recommendations/generate", { finding_id: f.id }, { timeout: AI_TIMEOUT });
       const preliminary = /sin IA|fallback/i.test(data.model_used || "");
-      if (preliminary) toast.warning("IA no configurada: se creó un informe preliminar para completar en Diseminación.");
-      else toast.success(`Informe generado (${data.model_used})`);
+      if (preliminary) toast.warning(t("IA no configurada: se creó un informe preliminar para completar en Diseminación."));
+      else toast.success(t("Informe generado ({model})", { model: data.model_used }));
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo generar el informe"));
+      toast.error(apiError(e, t("No se pudo generar el informe")));
     } finally {
       setGenId(null);
     }
@@ -167,11 +174,11 @@ export default function Findings() {
     setEnhancingId(f.id);
     try {
       const { data } = await api.post(`/findings/${f.id}/enhance-ai`, null, { timeout: AI_TIMEOUT });
-      toast.success("Ficha enriquecida con IA. Revise el resultado.");
+      toast.success(t("Ficha enriquecida con IA. Revise el resultado."));
       setDetail(data);
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo enriquecer con IA"));
+      toast.error(apiError(e, t("No se pudo enriquecer con IA")));
     } finally {
       setEnhancingId(null);
     }
@@ -181,12 +188,12 @@ export default function Findings() {
     setDeleting(true);
     try {
       await api.delete(`/findings/${confirmDel.id}`);
-      toast.success("Señal eliminada");
+      toast.success(t("Señal eliminada"));
       setConfirmDel(null);
       setDetail(null);
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo eliminar la señal"));
+      toast.error(apiError(e, t("No se pudo eliminar la señal")));
       setConfirmDel(null);
     } finally {
       setDeleting(false);
@@ -200,7 +207,7 @@ export default function Findings() {
   const columns = [
     {
       key: "title",
-      label: "Señal tecnológica",
+      label: t("Señal tecnológica"),
       render: (f) => (
         <div>
           <button type="button" onClick={() => setDetail(f)} style={linkBtn}>
@@ -208,33 +215,33 @@ export default function Findings() {
           </button>
           <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
             <ScreeningScore score={f.screening_score} compact />
-            {f.recommendations_count > 0 && <span title="Recomendaciones de adopción ya generadas"><Badge tone="priorizado">Informes {f.recommendations_count}</Badge></span>}
-            {f.notes_count > 0 && <span title="Notas del equipo"><Badge>Notas {f.notes_count}</Badge></span>}
+            {f.recommendations_count > 0 && <span title={t("Recomendaciones de adopción ya generadas")}><Badge tone="priorizado">{t("Informes {n}", { n: f.recommendations_count })}</Badge></span>}
+            {f.notes_count > 0 && <span title={t("Notas del equipo")}><Badge>{t("Notas {n}", { n: f.notes_count })}</Badge></span>}
           </div>
         </div>
       ),
     },
-    { key: "type", width: 110, label: "Tipo", render: (f) => <Badge>{f.technology_type || "otro"}</Badge> },
-    { key: "horizon", width: 120, label: "Horizonte", tip: <InfoTip text={GLOSSARY.horizonte} label="Qué es el horizonte" />, render: (f) => (f.horizon ? <Badge>{f.horizon}</Badge> : "-") },
-    { key: "status", width: 110, label: "Estado", tip: <InfoTip text={GLOSSARY.fb_estado_senal} label="Qué es el estado" />, render: (f) => <Badge tone={f.status}>{f.status}</Badge> },
-    { key: "source", width: 160, label: "Fuente", render: (f) => <span style={{ fontSize: 13, color: "#64748B" }}>{f.source_title}</span> },
+    { key: "type", width: 110, label: t("Tipo"), render: (f) => <Badge tone={toneOf(f.technology_type || "otro")}>{TYPE_NAME[f.technology_type || "otro"] || f.technology_type}</Badge> },
+    { key: "horizon", width: 120, label: t("Horizonte"), tip: <InfoTip text={GLOSSARY.horizonte} label={t("Qué es el horizonte")} />, render: (f) => (f.horizon ? <Badge tone={toneOf(f.horizon)}>{HORIZON_NAME[f.horizon] || f.horizon}</Badge> : "-") },
+    { key: "status", width: 110, label: t("Estado"), tip: <InfoTip text={GLOSSARY.fb_estado_senal} label={t("Qué es el estado")} />, render: (f) => <Badge tone={f.status}>{STATUS_NAME[f.status] || f.status}</Badge> },
+    { key: "source", width: 160, label: t("Fuente"), render: (f) => <span style={{ fontSize: 13, color: "#64748B" }}>{f.source_title}</span> },
     {
       key: "actions",
       width: isEditor ? 250 : 80,
       align: "right",
-      label: "Acciones",
+      label: t("Acciones"),
       render: (f) => (
         <div className="fb-toolbar" style={{ justifyContent: "flex-end", gap: 2 }}>
-          <Button size="sm" variant="ghost" onClick={() => setDetail(f)}>Ver</Button>
+          <Button size="sm" variant="ghost" onClick={() => setDetail(f)}>{t("Ver")}</Button>
           {isEditor && (
             <>
-              <HintButton size="sm" variant="ghost" hint="Editar la señal" onClick={() => openEdit(f)} aria-label={`Editar ${f.title}`}>
+              <HintButton size="sm" variant="ghost" hint={t("Editar la señal")} onClick={() => openEdit(f)} aria-label={t("Editar {title}", { title: f.title })}>
                 <Icon name="edit" size={14} />
               </HintButton>
-              <HintButton size="sm" variant="outline" hint={GLOSSARY.fb_generar_informe} disabled={!canReport} disabledHint="Su perfil no redacta informes (permiso report:write)." loading={genId === f.id} onClick={() => generateRec(f)} aria-label={`Generar informe de ${f.title}`}>
-                <Icon name="pulse" size={14} /> Informe
+              <HintButton size="sm" variant="outline" hint={GLOSSARY.fb_generar_informe} disabled={!canReport} disabledHint={t("Su perfil no redacta informes (permiso report:write).")} loading={genId === f.id} onClick={() => generateRec(f)} aria-label={t("Generar informe de {title}", { title: f.title })}>
+                <Icon name="pulse" size={14} /> {t("Informe")}
               </HintButton>
-              <HintButton size="sm" variant="ghost" style={{ color: "#DC2626" }} hint={GLOSSARY.fb_eliminar_senal} onClick={() => setConfirmDel(f)} aria-label={`Eliminar ${f.title}`}>
+              <HintButton size="sm" variant="ghost" style={{ color: "#DC2626" }} hint={GLOSSARY.fb_eliminar_senal} onClick={() => setConfirmDel(f)} aria-label={t("Eliminar {title}", { title: f.title })}>
                 <Icon name="trash" size={14} />
               </HintButton>
             </>
@@ -244,22 +251,22 @@ export default function Findings() {
     },
   ];
 
-  if (loading) return <LoadingBlock label="Cargando señales..." />;
+  if (loading) return <LoadingBlock label={t("Cargando señales...")} />;
 
   return (
     <div>
       <ModuleHeader
         step="priorizacion"
-        title="Señales capturadas"
+        title={t("Señales capturadas")}
         titleHint={GLOSSARY.senal}
-        purpose={`Cola de cribado: revise, siga o descarte lo que trae la vigilancia. El puntaje de cribado (destaque desde ${stats?.threshold ?? 70}) solo ordena la cola; la priorización oficial es la matriz P1-P6 del ciclo.`}
+        purpose={t("Cola de cribado: revise, siga o descarte lo que trae la vigilancia. El puntaje de cribado (destaque desde {n}) solo ordena la cola; la priorización oficial es la matriz P1-P6 del ciclo.", { n: stats?.threshold ?? 70 })}
         actions={
           <div className="fb-toolbar">
             <Button variant="secondary" onClick={() => navigate("/bandeja-entrada")}>
-              <Icon name="inbox" size={16} /> Bandeja de entrada
+              <Icon name="inbox" size={16} /> {t("Bandeja de entrada")}
             </Button>
             <Button variant="secondary" onClick={() => navigate("/priorizacion")}>
-              Matriz P1-P6
+              {t("Matriz P1-P6")}
             </Button>
           </div>
         }
@@ -271,62 +278,63 @@ export default function Findings() {
         <div className="fb-readonly-note" data-testid="findings-readonly">
           <Icon name="info" size={16} />
           <span>
-            Modo consulta: su perfil ({user?.role_label || user?.role}) no edita señales (permiso technology:write). Puede leerlas
-            {can(PERM.NOTE_WRITE) ? " y dejar notas en cada ficha." : "."}
+            {can(PERM.NOTE_WRITE)
+              ? t("Modo consulta: su perfil ({role}) no edita señales (permiso technology:write). Puede leerlas y dejar notas en cada ficha.", { role: ts(user?.role_label) || user?.role })
+              : t("Modo consulta: su perfil ({role}) no edita señales (permiso technology:write). Puede leerlas.", { role: ts(user?.role_label) || user?.role })}
           </span>
         </div>
       )}
 
       <PhaseGuide
-        phase="Señales · Cola de cribado"
+        phase={t("Señales · Cola de cribado")}
         hint={GLOSSARY.cribado}
         tasks={[
-          "Revise las señales nuevas que trajo la vigilancia; las de mayor cribado primero.",
-          "Marque 'Seguir' lo pertinente y 'Descartar' el ruido: descartar no borra.",
-          "Lo que vale la pena pasa por la Bandeja de entrada al ciclo, donde se clasifica y se prioriza con P1-P6.",
+          t("Revise las señales nuevas que trajo la vigilancia; las de mayor cribado primero."),
+          t("Marque 'Seguir' lo pertinente y 'Descartar' el ruido: descartar no borra."),
+          t("Lo que vale la pena pasa por la Bandeja de entrada al ciclo, donde se clasifica y se prioriza con P1-P6."),
         ]}
-        nextLabel="Bandeja de entrada"
+        nextLabel={t("Bandeja de entrada")}
         onNext={() => navigate("/bandeja-entrada")}
       />
 
       <ModuleStatsRow
         items={[
-          { label: "Nuevas", value: counts.nuevo || 0, color: counts.nuevo ? "#2563EB" : undefined, hint: "Señales que nadie ha revisado todavía.", testId: "findings-kpi-nuevas" },
-          { label: "En revisión", value: counts.revisado || 0, hint: "Señales ya leídas por el equipo, pendientes de decidir si se siguen." },
-          { label: "A seguir", value: counts.priorizado || 0, color: "#10B981", hint: "Marcadas para seguimiento (estado 'priorizado'). No es la priorización oficial P1-P6." },
-          { label: "Cribado alto", value: stats?.high_priority || 0, sub: `>= ${stats?.threshold ?? 70}`, color: "#EF4444", hint: GLOSSARY.fb_cribado },
+          { label: t("Nuevas"), value: counts.nuevo || 0, color: counts.nuevo ? "#2563EB" : undefined, hint: t("Señales que nadie ha revisado todavía."), testId: "findings-kpi-nuevas" },
+          { label: t("En revisión"), value: counts.revisado || 0, hint: t("Señales ya leídas por el equipo, pendientes de decidir si se siguen.") },
+          { label: t("A seguir"), value: counts.priorizado || 0, color: "#10B981", hint: t("Marcadas para seguimiento (estado 'priorizado'). No es la priorización oficial P1-P6.") },
+          { label: t("Cribado alto"), value: stats?.high_priority || 0, sub: `>= ${stats?.threshold ?? 70}`, color: "#EF4444", hint: GLOSSARY.fb_cribado },
         ]}
       />
 
       <Card style={{ marginBottom: 16 }} padding={16}>
         <div className="fb-toolbar">
           <input
-            placeholder="Buscar tecnología o señal..."
-            aria-label="Buscar señal"
+            placeholder={t("Buscar tecnología o señal...")}
+            aria-label={t("Buscar señal")}
             value={filters.q}
             onChange={(e) => setFilters({ ...filters, q: e.target.value })}
             className="filter-input"
             style={{ flex: 1, minWidth: 200 }}
           />
-          <select value={filters.horizon} onChange={(e) => setFilters({ ...filters, horizon: e.target.value })} className="filter-select" aria-label="Filtrar por horizonte">
-            <option value="">Todos los horizontes</option>
-            {HORIZONS.map((h) => <option key={h} value={h}>{h}</option>)}
+          <select value={filters.horizon} onChange={(e) => setFilters({ ...filters, horizon: e.target.value })} className="filter-select" aria-label={t("Filtrar por horizonte")}>
+            <option value="">{t("Todos los horizontes")}</option>
+            {HORIZONS.map((h) => <option key={h} value={h}>{HORIZON_NAME[h]}</option>)}
           </select>
-          <select value={filters.technology_type} onChange={(e) => setFilters({ ...filters, technology_type: e.target.value })} className="filter-select" aria-label="Filtrar por tipo">
-            <option value="">Todos los tipos</option>
-            {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          <select value={filters.technology_type} onChange={(e) => setFilters({ ...filters, technology_type: e.target.value })} className="filter-select" aria-label={t("Filtrar por tipo")}>
+            <option value="">{t("Todos los tipos")}</option>
+            {TYPES.map((ty) => <option key={ty} value={ty}>{TYPE_NAME[ty]}</option>)}
           </select>
-          <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })} className="filter-select" aria-label="Filtrar por estado">
-            <option value="">Todos los estados</option>
-            {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })} className="filter-select" aria-label={t("Filtrar por estado")}>
+            <option value="">{t("Todos los estados")}</option>
+            {STATUSES.map((s) => <option key={s} value={s}>{STATUS_NAME[s]}</option>)}
           </select>
-          {hasFilters && <Button size="sm" variant="ghost" onClick={() => setFilters(EMPTY_FILTERS)}>Limpiar</Button>}
+          {hasFilters && <Button size="sm" variant="ghost" onClick={() => setFilters(EMPTY_FILTERS)}>{t("Limpiar")}</Button>}
           <div style={{ display: "flex", gap: 4, background: "#F1F5F9", padding: 4, borderRadius: 8 }}>
-            <button type="button" className={`view-toggle${view === "kanban" ? " active" : ""}`} onClick={() => setView("kanban")}>Tablero</button>
-            <button type="button" className={`view-toggle${view === "table" ? " active" : ""}`} onClick={() => setView("table")}>Tabla</button>
+            <button type="button" className={`view-toggle${view === "kanban" ? " active" : ""}`} onClick={() => setView("kanban")}>{t("Tablero##vista")}</button>
+            <button type="button" className={`view-toggle${view === "table" ? " active" : ""}`} onClick={() => setView("table")}>{t("Tabla")}</button>
           </div>
           <span style={{ fontSize: 13, color: "#64748B" }} data-testid="findings-count">
-            {findings.length < total ? `${findings.length} de ${total} señales` : `${total} señales`}
+            {findings.length < total ? t("{n} de {total} señales", { n: findings.length, total }) : t("{total} señales", { total })}
           </span>
         </div>
       </Card>
@@ -335,14 +343,14 @@ export default function Findings() {
         <Card>
           <EmptyState
             icon="🔭"
-            title={hasFilters ? "Ninguna señal coincide" : "Sin señales capturadas"}
-            message={hasFilters ? "Ajuste o limpie los filtros." : "Ejecute la vigilancia de fuentes (Fase 1) para capturar tecnologías emergentes."}
+            title={hasFilters ? t("Ninguna señal coincide") : t("Sin señales capturadas")}
+            message={hasFilters ? t("Ajuste o limpie los filtros.") : t("Ejecute la vigilancia de fuentes (Fase 1) para capturar tecnologías emergentes.")}
             action={
               hasFilters ? (
-                <Button variant="secondary" onClick={() => setFilters(EMPTY_FILTERS)}>Limpiar filtros</Button>
+                <Button variant="secondary" onClick={() => setFilters(EMPTY_FILTERS)}>{t("Limpiar filtros")}</Button>
               ) : (
                 <Button onClick={() => navigate("/vigilancia")}>
-                  <Icon name="radar" size={16} /> Ir a vigilancia
+                  <Icon name="radar" size={16} /> {t("Ir a vigilancia")}
                 </Button>
               )
             }
@@ -359,7 +367,7 @@ export default function Findings() {
       {findings.length < total && (
         <div style={{ textAlign: "center", marginTop: 16 }}>
           <Button variant="secondary" onClick={loadMore} loading={loadingMore}>
-            Cargar más ({total - findings.length} restantes)
+            {t("Cargar más ({n} restantes)", { n: total - findings.length })}
           </Button>
         </div>
       )}
@@ -382,38 +390,39 @@ export default function Findings() {
       <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        title="Editar ficha de señal"
+        title={t("Editar ficha de señal")}
         width={640}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setEditOpen(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={save} loading={saving}>Guardar</Button>
+            <Button variant="secondary" onClick={() => setEditOpen(false)} disabled={saving}>{t("Cancelar")}</Button>
+            <Button onClick={save} loading={saving}>{t("Guardar")}</Button>
           </>
         }
       >
         {form && (
           <>
             {formError && <p className="public-submit-error" role="alert">{formError}</p>}
-            <Input id="finding-title" label="Título" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-            <Input id="finding-technology" label="Tecnología" value={form.technology || ""} onChange={(e) => setForm({ ...form, technology: e.target.value })} />
-            <Textarea id="finding-summary" label="Resumen / evidencia" value={form.summary || ""} onChange={(e) => setForm({ ...form, summary: e.target.value })} rows={3} />
+            <Input id="finding-title" label={t("Título")} required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            <Input id="finding-technology" label={t("Tecnología")} value={form.technology || ""} onChange={(e) => setForm({ ...form, technology: e.target.value })} />
+            <Textarea id="finding-summary" label={t("Resumen / evidencia")} value={form.summary || ""} onChange={(e) => setForm({ ...form, summary: e.target.value })} rows={3} />
             <div className="fb-grid-2">
-              <Select id="finding-type" label="Tipo" value={form.technology_type || "otro"} onChange={(e) => setForm({ ...form, technology_type: e.target.value })}>
-                {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              <Select id="finding-type" label={t("Tipo")} value={form.technology_type || "otro"} onChange={(e) => setForm({ ...form, technology_type: e.target.value })}>
+                {TYPES.map((ty) => <option key={ty} value={ty}>{TYPE_NAME[ty]}</option>)}
               </Select>
-              <Select id="finding-horizon" label="Horizonte temporal" hint={GLOSSARY.horizonte} value={form.horizon || ""} onChange={(e) => setForm({ ...form, horizon: e.target.value })}>
-                <option value="">Sin clasificar</option>
-                {HORIZONS.map((h) => <option key={h} value={h}>{h}</option>)}
+              <Select id="finding-horizon" label={t("Horizonte temporal")} hint={GLOSSARY.horizonte} value={form.horizon || ""} onChange={(e) => setForm({ ...form, horizon: e.target.value })}>
+                <option value="">{t("Sin clasificar")}</option>
+                {HORIZONS.map((h) => <option key={h} value={h}>{HORIZON_NAME[h]}</option>)}
               </Select>
-              <Input id="finding-phase" label="Fase de desarrollo" hint={GLOSSARY.fase} value={form.phase || ""} onChange={(e) => setForm({ ...form, phase: e.target.value })} />
-              <Input id="finding-area" label="Área terapéutica" value={form.therapeutic_area || ""} onChange={(e) => setForm({ ...form, therapeutic_area: e.target.value })} />
+              <Input id="finding-phase" label={t("Fase de desarrollo")} hint={GLOSSARY.fase} value={form.phase || ""} onChange={(e) => setForm({ ...form, phase: e.target.value })} />
+              <Input id="finding-area" label={t("Área terapéutica")} value={form.therapeutic_area || ""} onChange={(e) => setForm({ ...form, therapeutic_area: e.target.value })} />
             </div>
-            <Select id="finding-status" label="Estado de triage" hint={GLOSSARY.fb_estado_senal} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-              {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            <Select id="finding-status" label={t("Estado de triage")} hint={GLOSSARY.fb_estado_senal} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+              {STATUSES.map((s) => <option key={s} value={s}>{STATUS_NAME[s]}</option>)}
             </Select>
             {form.screening_score != null && (
               <p style={{ fontSize: 13, color: "#64748B", marginTop: 8 }}>
-                Puntaje de cribado actual: <strong>{form.screening_score}</strong> (se recalcula al guardar). {aiOn ? "" : "La IA no está configurada: el enriquecimiento automático no está disponible."}
+                {tr("Puntaje de cribado actual: <b>{score}</b> (se recalcula al guardar).", { score: form.screening_score }, { b: (c) => <strong>{c}</strong> })}{" "}
+                {aiOn ? "" : t("La IA no está configurada: el enriquecimiento automático no está disponible.")}
               </p>
             )}
           </>
@@ -425,9 +434,9 @@ export default function Findings() {
         onClose={() => setConfirmDel(null)}
         onConfirm={doDelete}
         loading={deleting}
-        title="Eliminar señal"
-        message={`Se eliminará "${confirmDel?.title?.slice(0, 120)}" con sus notas. Solo es posible si su tecnología sigue en la bandeja sin asignar; si ya entró a un ciclo, márquela como descartada.`}
-        confirmLabel="Eliminar"
+        title={t("Eliminar señal")}
+        message={t('Se eliminará "{title}" con sus notas. Solo es posible si su tecnología sigue en la bandeja sin asignar; si ya entró a un ciclo, márquela como descartada.', { title: confirmDel?.title?.slice(0, 120) })}
+        confirmLabel={t("Eliminar")}
       />
     </div>
   );

@@ -5,12 +5,14 @@ import { apiError, getLastEmail } from "../api/client";
 import Button from "../components/Button";
 import { Input } from "../components/Field";
 import PasswordField from "../components/PasswordField";
+import LanguageSwitch from "../components/LanguageSwitch";
 import Icon from "../components/Icon";
+import { t } from "../i18n";
 
 const FEATURES = [
-  ["radar", "Vigilancia automatizada de agencias, registros de ensayos y literatura internacional"],
-  ["layers", "Ciclo metodológico IETS: filtrado, matriz P1-P6, evaluación temprana y pares"],
-  ["chart", "Tablero de gobernanza, boletines y alertas tempranas para el SGSSS"],
+  ["radar", t("Vigilancia automatizada de agencias, registros de ensayos y literatura internacional")],
+  ["layers", t("Ciclo metodológico IETS: filtrado, matriz P1-P6, evaluación temprana y pares")],
+  ["chart", t("Tablero de gobernanza, boletines y alertas tempranas para el SGSSS")],
 ];
 
 export default function Login() {
@@ -41,7 +43,7 @@ export default function Login() {
               setError("");
               await loginWithGoogle(resp.credential);
             } catch (e) {
-              setError(apiError(e, "No se pudo iniciar sesión con Google"));
+              setError(apiError(e, t("No se pudo iniciar sesión con Google")));
             } finally {
               setLoading(false);
             }
@@ -76,14 +78,14 @@ export default function Login() {
     e.preventDefault();
     setError("");
     if (!email.trim() || !password) {
-      setError("Escriba su correo y su contraseña.");
+      setError(t("Escriba su correo y su contraseña."));
       return;
     }
     try {
       setLoading(true);
       await loginWithPassword(email.trim(), password);
     } catch (err) {
-      setError(apiError(err, "No se pudo iniciar sesión. Si el servidor está ocupado, espere unos segundos e intente de nuevo."));
+      setError(apiError(err, t("No se pudo iniciar sesión. Si el servidor está ocupado, espere unos segundos e intente de nuevo.")));
       setPassword("");
     } finally {
       setLoading(false);
@@ -96,7 +98,7 @@ export default function Login() {
       setError("");
       await loginDev(targetEmail, targetName);
     } catch (err) {
-      setError(apiError(err, "No se pudo iniciar sesión. Espere un momento e intente de nuevo."));
+      setError(apiError(err, t("No se pudo iniciar sesión. Espere un momento e intente de nuevo.")));
     } finally {
       setLoading(false);
     }
@@ -123,19 +125,18 @@ export default function Login() {
             <Icon name="radar" size={30} strokeWidth={2} />
           </div>
           <h1 style={{ fontSize: 34, fontWeight: 800, lineHeight: 1.15, color: "#fff" }}>
-            Sistema de Escaneo de Horizonte
+            {t("Sistema de Escaneo de Horizonte")}
           </h1>
           <p style={{ fontSize: 16, opacity: 0.92, marginTop: 16, lineHeight: 1.6 }}>
-            Identificación temprana de tecnologías sanitarias emergentes para Colombia, con la
-            metodología oficial del IETS y trazabilidad completa en bitácora.
+            {t("Identificación temprana de tecnologías sanitarias emergentes para Colombia, con la metodología oficial del IETS y trazabilidad completa en bitácora.")}
           </p>
           <div style={{ marginTop: 32, display: "flex", flexDirection: "column", gap: 14 }}>
-            {FEATURES.map(([ic, t]) => (
-              <div key={t} style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 14 }}>
+            {FEATURES.map(([ic, text]) => (
+              <div key={text} style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 14 }}>
                 <span className="login-feature-ico" aria-hidden="true">
                   <Icon name={ic} size={17} />
                 </span>
-                <span style={{ opacity: 0.95 }}>{t}</span>
+                <span style={{ opacity: 0.95 }}>{text}</span>
               </div>
             ))}
           </div>
@@ -159,9 +160,12 @@ export default function Login() {
             boxShadow: "var(--shadow-md)",
           }}
         >
-          <h2 style={{ fontSize: 22, fontWeight: 700 }}>Iniciar sesión</h2>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+            <LanguageSwitch />
+          </div>
+          <h2 style={{ fontSize: 22, fontWeight: 700 }}>{t("Iniciar sesión")}</h2>
           <p style={{ color: "#64748B", fontSize: 14, marginTop: 6 }}>
-            Ingrese con la cuenta que le asignó el administrador del sistema.
+            {t("Ingrese con la cuenta que le asignó el administrador del sistema.")}
           </p>
 
           {sessionNotice && (
@@ -170,12 +174,12 @@ export default function Login() {
             </div>
           )}
 
-          <form onSubmit={submit} style={{ marginTop: 22 }} noValidate aria-label="Acceso con correo y contraseña">
+          <form onSubmit={submit} style={{ marginTop: 22 }} noValidate aria-label={t("Acceso con correo y contraseña")}>
             <Input
               id="login-email"
-              label="Correo"
-              hint={`Su correo institucional (@${domain}) o el que registró el administrador para su cuenta.`}
-              placeholder={`nombre.apellido@${domain}`}
+              label={t("Correo")}
+              hint={t("Su correo institucional (@{domain}) o el que registró el administrador para su cuenta.", { domain })}
+              placeholder={t("nombre.apellido@{domain}", { domain })}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               type="email"
@@ -185,8 +189,8 @@ export default function Login() {
             />
             <PasswordField
               id="login-password"
-              label="Contraseña"
-              hint="Distingue mayúsculas y minúsculas. Tras 5 intentos fallidos la cuenta se bloquea 15 minutos."
+              label={t("Contraseña")}
+              hint={t("Distingue mayúsculas y minúsculas. Tras 5 intentos fallidos la cuenta se bloquea 15 minutos.")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -197,16 +201,16 @@ export default function Login() {
               </div>
             )}
             <Button type="submit" loading={loading} style={{ width: "100%", marginTop: 4 }}>
-              Ingresar
+              {t("Ingresar")}
             </Button>
           </form>
           <p style={{ fontSize: 12.5, color: "#64748B", marginTop: 12, textAlign: "center" }}>
-            ¿Olvidó su contraseña o no tiene cuenta? Solicítela al superadministrador del sistema.
+            {t("¿Olvidó su contraseña o no tiene cuenta? Solicítela al superadministrador del sistema.")}
           </p>
 
           {status?.google_login_enabled && (
             <>
-              <div className="login-divider">o</div>
+              <div className="login-divider">{t("o")}</div>
               <div ref={googleBtn} style={{ display: "flex", justifyContent: "center", minHeight: 44 }} />
             </>
           )}
@@ -214,17 +218,17 @@ export default function Login() {
           {status?.dev_login_enabled && (
             <div className="login-dev">
               <button type="button" className="login-dev-toggle" onClick={() => setDevOpen((v) => !v)} aria-expanded={devOpen}>
-                <span>Acceso de desarrollo</span>
-                <span className="login-dev-badge">solo fuera de producción</span>
+                <span>{t("Acceso de desarrollo")}</span>
+                <span className="login-dev-badge">{t("solo fuera de producción")}</span>
                 <span aria-hidden="true">{devOpen ? "▴" : "▾"}</span>
               </button>
               {devOpen && (
                 <div style={{ marginTop: 12 }}>
                   <p style={{ fontSize: 12, color: "#92400E", marginBottom: 10 }}>
-                    Entra sin contraseña. Queda deshabilitado automáticamente con ENVIRONMENT=production.
+                    {t("Entra sin contraseña. Queda deshabilitado automáticamente con ENVIRONMENT=production.")}
                   </p>
                   <Button variant="secondary" onClick={() => devLogin("admin@iets.org.co", "Administrador IETS")} loading={loading} style={{ width: "100%", marginBottom: 12 }}>
-                    Acceso rápido como administrador
+                    {t("Acceso rápido como administrador")}
                   </Button>
                   <form
                     onSubmit={(e) => {
@@ -234,16 +238,16 @@ export default function Login() {
                   >
                     <Input
                       id="dev-email"
-                      label="Correo institucional"
-                      placeholder={`usuario@${domain}`}
+                      label={t("Correo institucional")}
+                      placeholder={t("usuario@{domain}", { domain })}
                       value={devEmail}
                       onChange={(e) => setDevEmail(e.target.value)}
                       type="email"
                       required
                     />
-                    <Input id="dev-name" label="Nombre (opcional)" placeholder="Nombre y apellido" value={devName} onChange={(e) => setDevName(e.target.value)} />
+                    <Input id="dev-name" label={t("Nombre (opcional)")} placeholder={t("Nombre y apellido")} value={devName} onChange={(e) => setDevName(e.target.value)} />
                     <Button type="submit" variant="outline" loading={loading} style={{ width: "100%" }}>
-                      Ingresar sin contraseña
+                      {t("Ingresar sin contraseña")}
                     </Button>
                   </form>
                 </div>
@@ -252,17 +256,17 @@ export default function Login() {
           )}
 
           <p style={{ fontSize: 13, color: "#64748B", marginTop: 20, textAlign: "center", lineHeight: 1.6 }}>
-            ¿Desarrollador o sociedad científica?{" "}
+            {t("¿Desarrollador o sociedad científica?")}{" "}
             <Link to="/postular" style={{ fontWeight: 700, color: "#1D4ED8" }}>
-              Postule una tecnología
+              {t("Postule una tecnología")}
             </Link>
             <br />
-            <Link to="/expedientes" style={{ color: "#1D4ED8" }}>Consultar fichas públicas</Link>
+            <Link to="/expedientes" style={{ color: "#1D4ED8" }}>{t("Consultar fichas públicas")}</Link>
             {" · "}
-            <Link to="/transparencia" style={{ color: "#1D4ED8" }}>Transparencia</Link>
+            <Link to="/transparencia" style={{ color: "#1D4ED8" }}>{t("Transparencia")}</Link>
           </p>
           {status?.version && (
-            <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 10, textAlign: "center" }}>Versión {status.version}</p>
+            <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 10, textAlign: "center" }}>{t("Versión {version}", { version: status.version })}</p>
           )}
         </main>
       </div>

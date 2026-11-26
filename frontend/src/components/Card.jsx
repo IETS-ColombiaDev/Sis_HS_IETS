@@ -1,6 +1,7 @@
 import { useLocation } from "react-router-dom";
 import InfoTip from "./InfoTip";
 import { sectionFor } from "../constants/navigation";
+import { t } from "../i18n";
 
 /**
  * `title`, `hint` y `actions` son opcionales y componen la misma cabecera que
@@ -43,7 +44,7 @@ export function PageHeader({ title, subtitle, actions, titleHint, eyebrow }) {
     typeof title === "string" && titleHint ? (
       <span className="term-label">
         {title}
-        <InfoTip text={titleHint} label={`Qué es ${title}`} />
+        <InfoTip text={titleHint} label={t("Qué es {term}", { term: title })} />
       </span>
     ) : (
       title
@@ -68,7 +69,7 @@ export function SectionTitle({ children, right, hint }) {
         {hint ? (
           <InfoTip
             text={hint}
-            label={typeof children === "string" ? `Qué es ${children}` : "Más información"}
+            label={typeof children === "string" ? t("Qué es {term}", { term: children }) : t("Más información")}
           />
         ) : null}
       </h3>

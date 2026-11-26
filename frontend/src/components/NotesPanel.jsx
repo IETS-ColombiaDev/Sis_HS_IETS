@@ -11,12 +11,13 @@ import ConfirmDialog from "./ConfirmDialog";
 import { Textarea } from "./Field";
 import { PERM } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
+import { t, intlLocale } from "../i18n";
 
 const ENTITY_LABELS = {
-  finding: "Señal",
-  source: "Fuente",
-  recommendation: "Informe",
-  general: "General",
+  finding: t("Señal"),
+  source: t("Fuente"),
+  recommendation: t("Informe"),
+  general: t("General"),
 };
 
 /** Puede editar o borrar: el autor o quien administra usuarios (superadmin). */
@@ -54,7 +55,7 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
       const { data } = await api.get("/notes", { params });
       setNotes(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar las notas"));
+      toast.error(apiError(e, t("No se pudieron cargar las notas")));
     } finally {
       setLoading(false);
     }
@@ -67,7 +68,7 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
 
   const addNote = async () => {
     if (!draft.trim()) {
-      toast.warning("Escriba el contenido de la nota");
+      toast.warning(t("Escriba el contenido de la nota"));
       return;
     }
     setSaving(true);
@@ -78,12 +79,12 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
         title: title.trim(),
         content: draft.trim(),
       });
-      toast.success("Nota guardada");
+      toast.success(t("Nota guardada"));
       setDraft("");
       setTitle("");
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo guardar la nota"));
+      toast.error(apiError(e, t("No se pudo guardar la nota")));
     } finally {
       setSaving(false);
     }
@@ -91,17 +92,17 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
 
   const saveEdit = async (note) => {
     if (!editContent.trim()) {
-      toast.warning("La nota no puede quedar vacía");
+      toast.warning(t("La nota no puede quedar vacía"));
       return;
     }
     setSaving(true);
     try {
       await api.put(`/notes/${note.id}`, { title: editTitle, content: editContent });
-      toast.success("Nota actualizada");
+      toast.success(t("Nota actualizada"));
       setEditId(null);
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo actualizar"));
+      toast.error(apiError(e, t("No se pudo actualizar")));
     } finally {
       setSaving(false);
     }
@@ -112,7 +113,7 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
       await api.put(`/notes/${note.id}`, { pinned: !note.pinned });
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo fijar la nota"));
+      toast.error(apiError(e, t("No se pudo fijar la nota")));
     }
   };
 
@@ -120,11 +121,11 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
     setDeleting(true);
     try {
       await api.delete(`/notes/${confirmDel.id}`);
-      toast.success("Nota eliminada");
+      toast.success(t("Nota eliminada"));
       setConfirmDel(null);
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo eliminar"));
+      toast.error(apiError(e, t("No se pudo eliminar")));
     } finally {
       setDeleting(false);
     }
@@ -134,17 +135,17 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
     setEnhancingId(note.id);
     try {
       await api.post(`/notes/${note.id}/enhance-ai`, null, { timeout: AI_TIMEOUT });
-      toast.success("Nota mejorada con IA");
+      toast.success(t("Nota mejorada con IA"));
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo mejorar con IA"));
+      toast.error(apiError(e, t("No se pudo mejorar con IA")));
     } finally {
       setEnhancingId(null);
     }
   };
 
   const downloadNote = (note) => {
-    const text = `# ${note.title || "Nota"}\n\n${note.content}\n\n---\nAutor: ${note.author_name}\nActualizada: ${note.updated_at}`;
+    const text = `# ${note.title || t("Nota")}\n\n${note.content}\n\n---\n${t("Autor")}: ${note.author_name}\n${t("Actualizada")}: ${note.updated_at}`;
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -159,44 +160,44 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <Icon name="note" size={18} color="#1D4ED8" />
         <h4 style={{ fontSize: 14, fontWeight: 700, flex: 1, display: "inline-flex", alignItems: "center", gap: 6 }}>
-          Notas del equipo {notes.length > 0 && <span style={{ color: "#94A3B8", fontWeight: 500 }}>({notes.length})</span>}
-          <InfoTip text={`${GLOSSARY.fb_nota_autor} ${GLOSSARY.fb_nota_fijar}`} label="Reglas de las notas" />
+          {t("Notas del equipo")} {notes.length > 0 && <span style={{ color: "#94A3B8", fontWeight: 500 }}>({notes.length})</span>}
+          <InfoTip text={`${GLOSSARY.fb_nota_autor} ${GLOSSARY.fb_nota_fijar}`} label={t("Reglas de las notas")} />
         </h4>
       </div>
 
       {canWrite ? (
         <div style={{ marginBottom: 14, background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 10, padding: 12 }}>
           <input
-            placeholder="Título opcional (ej. Seguimiento regulatorio)"
-            aria-label="Título de la nota"
+            placeholder={t("Título opcional (ej. Seguimiento regulatorio)")}
+            aria-label={t("Título de la nota")}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             style={{ width: "100%", padding: "8px 10px", border: "1px solid #E2E8F0", borderRadius: 8, fontSize: 13, marginBottom: 8 }}
           />
           <Textarea
-            placeholder="Escriba una observación, seguimiento o decisión del equipo..."
-            aria-label="Contenido de la nota"
+            placeholder={t("Escriba una observación, seguimiento o decisión del equipo...")}
+            aria-label={t("Contenido de la nota")}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={compact ? 2 : 3}
           />
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
             <Button size="sm" onClick={addNote} loading={saving} disabled={!draft.trim()}>
-              <Icon name="plus" size={14} /> Agregar nota
+              <Icon name="plus" size={14} /> {t("Agregar nota")}
             </Button>
           </div>
         </div>
       ) : (
         <p style={{ fontSize: 12.5, color: "#94A3B8", margin: "0 0 10px" }}>
-          Su perfil puede leer las notas pero no escribirlas (permiso note:write).
+          {t("Su perfil puede leer las notas pero no escribirlas (permiso note:write).")}
         </p>
       )}
 
       {loading ? (
-        <p style={{ fontSize: 13, color: "#94A3B8" }}>Cargando notas...</p>
+        <p style={{ fontSize: 13, color: "#94A3B8" }}>{t("Cargando notas...")}</p>
       ) : notes.length === 0 ? (
         <p style={{ fontSize: 13, color: "#94A3B8", fontStyle: "italic" }}>
-          {canWrite ? "Aún no hay notas. Use el cuadro de arriba para documentar observaciones del equipo." : "Sin notas registradas."}
+          {canWrite ? t("Aún no hay notas. Use el cuadro de arriba para documentar observaciones del equipo.") : t("Sin notas registradas.")}
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: compact ? 280 : 420, overflowY: "auto" }}>
@@ -217,54 +218,54 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
                   <>
                     <input
                       value={editTitle}
-                      aria-label="Título de la nota"
+                      aria-label={t("Título de la nota")}
                       onChange={(e) => setEditTitle(e.target.value)}
                       style={{ width: "100%", padding: "6px 8px", border: "1px solid #E2E8F0", borderRadius: 6, fontSize: 13, marginBottom: 6 }}
                     />
                     <textarea
                       value={editContent}
-                      aria-label="Contenido de la nota"
+                      aria-label={t("Contenido de la nota")}
                       onChange={(e) => setEditContent(e.target.value)}
                       rows={3}
                       style={{ width: "100%", padding: "8px", border: "1px solid #E2E8F0", borderRadius: 6, fontSize: 13 }}
                     />
                     <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                      <Button size="sm" onClick={() => saveEdit(n)} loading={saving}>Guardar</Button>
-                      <Button size="sm" variant="secondary" onClick={() => setEditId(null)}>Cancelar</Button>
+                      <Button size="sm" onClick={() => saveEdit(n)} loading={saving}>{t("Guardar")}</Button>
+                      <Button size="sm" variant="secondary" onClick={() => setEditId(null)}>{t("Cancelar")}</Button>
                     </div>
                   </>
                 ) : (
                   <>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
                       <div>
-                        {n.pinned && <span title="Nota fijada">📌 </span>}
+                        {n.pinned && <span title={t("Nota fijada##indicador")}>📌 </span>}
                         {n.title && <strong style={{ fontSize: 13 }}>{n.title}</strong>}
                       </div>
-                      <span style={{ fontSize: 11, color: "#94A3B8", whiteSpace: "nowrap" }}>{new Date(n.updated_at).toLocaleString()}</span>
+                      <span style={{ fontSize: 11, color: "#94A3B8", whiteSpace: "nowrap" }}>{new Date(n.updated_at).toLocaleString(intlLocale())}</span>
                     </div>
                     <p style={{ fontSize: 13, color: "#334155", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{n.content}</p>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
                       <span style={{ fontSize: 11, color: "#94A3B8" }}>{n.author_name || n.author_email}</span>
                       <div style={{ display: "flex", gap: 4 }}>
-                        <IconAction label="Descargar nota" onClick={() => downloadNote(n)}><Icon name="doc" size={13} /></IconAction>
+                        <IconAction label={t("Descargar nota")} onClick={() => downloadNote(n)}><Icon name="doc" size={13} /></IconAction>
                         {canWrite && (
                           <>
                             <IconAction
-                              label={!aiOn ? GLOSSARY.fb_ia_apagada : !own ? GLOSSARY.fb_nota_autor : "Mejorar redacción con IA"}
+                              label={!aiOn ? GLOSSARY.fb_ia_apagada : !own ? GLOSSARY.fb_nota_autor : t("Mejorar redacción con IA")}
                               onClick={() => enhanceNote(n)}
                               disabled={!aiOn || !own || enhancingId === n.id}
                             >
                               <Icon name="spark" size={13} />
                             </IconAction>
-                            <IconAction label={n.pinned ? "Soltar nota" : "Fijar nota"} onClick={() => togglePin(n)}>{n.pinned ? "📌" : "📍"}</IconAction>
+                            <IconAction label={n.pinned ? t("Soltar nota") : t("Fijar nota")} onClick={() => togglePin(n)}>{n.pinned ? "📌" : "📍"}</IconAction>
                             <IconAction
-                              label={own ? "Editar nota" : GLOSSARY.fb_nota_autor}
+                              label={own ? t("Editar nota") : GLOSSARY.fb_nota_autor}
                               disabled={!own}
                               onClick={() => { setEditId(n.id); setEditContent(n.content); setEditTitle(n.title || ""); }}
                             >
                               <Icon name="edit" size={13} />
                             </IconAction>
-                            <IconAction label={own ? "Eliminar nota" : GLOSSARY.fb_nota_autor} disabled={!own} danger onClick={() => setConfirmDel(n)}>
+                            <IconAction label={own ? t("Eliminar nota") : GLOSSARY.fb_nota_autor} disabled={!own} danger onClick={() => setConfirmDel(n)}>
                               <Icon name="trash" size={13} />
                             </IconAction>
                           </>
@@ -283,9 +284,9 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
         onClose={() => setConfirmDel(null)}
         onConfirm={remove}
         loading={deleting}
-        title="Eliminar nota"
-        message="La nota se eliminará para todo el equipo. Esta acción no se puede deshacer."
-        confirmLabel="Eliminar"
+        title={t("Eliminar nota")}
+        message={t("La nota se eliminará para todo el equipo. Esta acción no se puede deshacer.")}
+        confirmLabel={t("Eliminar")}
       />
     </div>
   );

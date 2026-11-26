@@ -1,4 +1,5 @@
 import InfoTip from "./InfoTip";
+import { t } from "../i18n";
 
 /**
  * Tarjeta de indicador. `hint` explica que mide y como se calcula.
@@ -42,7 +43,7 @@ export default function KPICard({ label, value, icon, accent = "#2563EB", sub, h
           }}
         >
           {label}
-          {!interactive && <InfoTip text={hint} label={`Qué es ${label}`} />}
+          {!interactive && <InfoTip text={hint} label={t("Qué es {label}", { label })} />}
         </div>
         {icon && (
           <div
@@ -90,7 +91,7 @@ export default function KPICard({ label, value, icon, accent = "#2563EB", sub, h
       </button>
       {hint && (
         <span style={{ position: "absolute", top: 10, right: 10 }}>
-          <InfoTip text={hint} label={`Qué es ${label}`} position="bottom" />
+          <InfoTip text={hint} label={t("Qué es {label}", { label })} position="bottom" />
         </span>
       )}
     </div>

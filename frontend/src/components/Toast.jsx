@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { t } from "../i18n";
 
 const ToastContext = createContext(null);
 
@@ -13,13 +14,13 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const remove = useCallback((id) => {
-    setToasts((t) => t.filter((x) => x.id !== id));
+    setToasts((list) => list.filter((x) => x.id !== id));
   }, []);
 
   const push = useCallback(
     (message, type = "info", ttl = 4200) => {
       const id = Date.now() + Math.random();
-      setToasts((t) => [...t, { id, message, type }]);
+      setToasts((list) => [...list, { id, message, type }]);
       setTimeout(() => remove(id), ttl);
     },
     [remove]
@@ -39,20 +40,20 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={toast}>
       {children}
       <div className="toast-stack" aria-live="polite">
-        {toasts.map((t) => {
-          const s = STATUS[t.type] || STATUS.info;
+        {toasts.map((item) => {
+          const s = STATUS[item.type] || STATUS.info;
           return (
             <div
-              key={t.id}
-              role={t.type === "error" ? "alert" : "status"}
-              className={`toast toast--${t.type}`}
+              key={item.id}
+              role={item.type === "error" ? "alert" : "status"}
+              className={`toast toast--${item.type}`}
               style={{ "--toast-accent": s.border, "--toast-bg": s.bg, "--toast-ink": s.color }}
             >
               <span className="toast-icon" aria-hidden="true">
                 {s.icon}
               </span>
-              <span className="toast-msg">{t.message}</span>
-              <button type="button" className="toast-close" onClick={() => remove(t.id)} aria-label="Cerrar aviso">
+              <span className="toast-msg">{item.message}</span>
+              <button type="button" className="toast-close" onClick={() => remove(item.id)} aria-label={t("Cerrar aviso")}>
                 ×
               </button>
             </div>

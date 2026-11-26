@@ -1,3 +1,5 @@
+import { t } from "../i18n";
+
 /** Descarga un blob como archivo en el navegador. */
 export function downloadBlob(content, filename, mime = "text/plain;charset=utf-8") {
   const blob = content instanceof Blob ? content : new Blob([content], { type: mime });
@@ -34,7 +36,7 @@ export async function downloadFromApi(api, path, filename, config = {}) {
       try {
         error.response.data = JSON.parse(await data.text());
       } catch {
-        error.response.data = { detail: `No se pudo descargar (HTTP ${error.response.status}).` };
+        error.response.data = { detail: t("No se pudo descargar (HTTP {status}).", { status: error.response.status }) };
       }
     }
     throw error;

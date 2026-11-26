@@ -1,0 +1,37 @@
+// src/pages/PublicCatalog.jsx
+export default {
+  "No se pudo cargar el catálogo público. Intente de nuevo.": "The public catalog could not be loaded. Try again.",
+  "Consulta pública": "Public access",
+  "Expedientes de tecnologías emergentes": "Emerging technology dossiers",
+  "Fichas técnicas ya publicadas por el IETS. No incluye modelaciones presupuestales, comparadores estratégicos ni documentos confidenciales.":
+    "Technical sheets already published by IETS. Does not include budget models, strategic comparators or confidential documents.",
+  "Tecnologías cuyo informe ya fue publicado. Algunas pueden no tener ficha pública por confidencialidad.":
+    "Technologies whose report has already been published. Some may not have a public fact sheet for confidentiality reasons.",
+  "Tecnologías publicadas": "Published technologies",
+  "Ciclos formales": "Formal cycles",
+  "Buscar por nombre comercial, denominación común internacional o indicación":
+    "Search by brand name, international nonproprietary name or indication",
+  "Buscar expediente": "Search dossiers",
+  "Buscar": "Search",
+  "Filtrar por clúster": "Filter by cluster",
+  "Todos los clústeres": "All clusters",
+  "Filtrar por tipo de tecnología": "Filter by technology type",
+  "Todos los tipos de tecnología": "All technology types",
+  "Filtrar por fase de desarrollo": "Filter by development phase",
+  "Todas las fases": "All phases",
+  "Filtrar por año de publicación": "Filter by publication year",
+  "Todos los años": "All years",
+  "Quitar filtros": "Clear filters",
+  "Cargando expedientes...": "Loading dossiers...",
+  "No hay expedientes públicos que coincidan con la búsqueda.": "No public dossiers match the search.",
+  "Aún no hay expedientes publicados.": "No dossiers have been published yet.",
+  "1 expediente": "1 dossier",
+  "{n} expedientes": "{n} dossiers",
+  "1 expediente con estos criterios": "1 dossier matching these criteria",
+  "{n} expedientes con estos criterios": "{n} dossiers matching these criteria",
+  "Ensayos: {ids}": "Trials: {ids}",
+  "Páginas de resultados": "Result pages",
+  "Anterior": "Previous",
+  "Página {page} de {pages}": "Page {page} of {pages}",
+  "Siguiente": "Next",
+};

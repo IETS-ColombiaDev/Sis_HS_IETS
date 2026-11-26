@@ -34,19 +34,22 @@ import {
   pageForStatus,
   useTechDeepLink,
 } from "../utils/techLink";
+import { intlLocale, t, tr, ts } from "../i18n";
 
 const PAGE_SIZE = 100;
-const RELIABILITY_LABEL = { confiable: "Confiable", verificar: "Verificar", baja: "Baja confiabilidad" };
+const RELIABILITY_LABEL = { confiable: t("Confiable"), verificar: t("Verificar"), baja: t("Baja confiabilidad") };
+// Etiqueta de la condición; el valor (`emergente`, `nueva`) es el que viaja al servidor.
+const CONDITION_NAME = { emergente: t("emergente"), nueva: t("nueva") };
 
 /** Datos de producto bajo el nombre de la senal (RF-003): forma, concentracion, marca, modelo. */
 function ProductFacts({ item }) {
   const facts = [
     item.dosage_form,
     item.strength,
-    item.route && `Vía ${item.route.toLowerCase()}`,
-    item.brand && `Marca: ${item.brand}`,
-    item.device_model && `Modelo: ${item.device_model}`,
-    item.manufacturer && `Fabricante: ${item.manufacturer}`,
+    item.route && t("Vía {route}", { route: item.route.toLowerCase() }),
+    item.brand && t("Marca: {brand}", { brand: item.brand }),
+    item.device_model && t("Modelo: {model}", { model: item.device_model }),
+    item.manufacturer && t("Fabricante: {name}", { name: item.manufacturer }),
   ].filter(Boolean);
   if (!facts.length) return null;
   return (
@@ -120,8 +123,8 @@ export default function Staging() {
   // La busqueda espera a que el usuario deje de escribir: antes cada tecla
   // disparaba dos consultas al servidor.
   useEffect(() => {
-    const t = setTimeout(() => setQuery(filters), 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setQuery(filters), 300);
+    return () => clearTimeout(timer);
   }, [filters]);
 
   const params = useCallback(
@@ -153,7 +156,7 @@ export default function Staging() {
       setLoadError("");
       retries.current = 0;
     } else {
-      setLoadError(apiError(list.reason, "No se pudo cargar la bandeja de entrada"));
+      setLoadError(apiError(list.reason, t("No se pudo cargar la bandeja de entrada")));
     }
     if (st.status === "fulfilled") setStats(st.value.data);
     firstLoad.current = false;
@@ -188,7 +191,7 @@ export default function Staging() {
       setItems((prev) => [...prev, ...data.filter((d) => !prev.some((p) => p.id === d.id))]);
       setTotal(Number(headers?.["x-total-count"] ?? total));
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar más señales"));
+      toast.error(apiError(e, t("No se pudieron cargar más señales")));
     } finally {
       setLoadingMore(false);
     }
@@ -197,13 +200,13 @@ export default function Staging() {
   useEffect(() => {
     (async () => {
       try {
-        const [c, t, s] = await Promise.all([
+        const [c, ty, s] = await Promise.all([
           api.get("/clusters"),
           api.get("/tech-types"),
           api.get("/sources"),
         ]);
         setClusters(c.data);
-        setTypes(t.data);
+        setTypes(ty.data);
         setSources(s.data);
       } catch {
         /* los catalogos no bloquean la vista */
@@ -250,7 +253,7 @@ export default function Staging() {
   // la bandeja, dice a que ciclo y pantalla fue y ofrece ir alla.
   useEffect(() => {
     if (invalidParam) {
-      setLinkNotice({ tone: "warn", message: "El enlace de tecnología no es válido.", actions: [] });
+      setLinkNotice({ tone: "warn", message: t("El enlace de tecnología no es válido."), actions: [] });
       return;
     }
     if (!techId || loading || handledLink.current === techId) return;
@@ -261,7 +264,7 @@ export default function Staging() {
         const loc = await locateTech(api, techId);
         if (cancelled) return;
         if (!loc) {
-          setLinkNotice({ tone: "warn", message: `La señal #${techId} no existe o fue eliminada. Revise el enlace.`, actions: [] });
+          setLinkNotice({ tone: "warn", message: t("La señal #{id} no existe o fue eliminada. Revise el enlace.", { id: techId }), actions: [] });
           return;
         }
         const live = (loc.entries || []).filter((e) => !e.is_historic);
@@ -278,7 +281,7 @@ export default function Staging() {
         if (entry) {
           const target = pageForStatus(entry.status);
           actions.push({
-            label: `Ir a ${PAGE_LABEL[target]} (${entry.cycle_code})`,
+            label: t("Ir a {page} ({cycle})", { page: PAGE_LABEL[target], cycle: entry.cycle_code }),
             testId: `tech-link-go-${target}`,
             onClick: () => {
               if (entry.cycle_id !== cycleId) setCycleId(entry.cycle_id);
@@ -288,7 +291,7 @@ export default function Staging() {
         }
         if (loc.merged_into_id) {
           actions.push({
-            label: `Ver la tecnología que la absorbió (#${loc.merged_into_id})`,
+            label: t("Ver la tecnología que la absorbió (#{id})", { id: loc.merged_into_id }),
             testId: "tech-link-merged",
             onClick: () => navigate(`${PAGE_PATH.filtrado}?${TECH_PARAM}=${loc.merged_into_id}`),
           });
@@ -296,12 +299,16 @@ export default function Staging() {
         setLinkNotice({
           tone: "info",
           message: entry
-            ? `"${loc.name.slice(0, 90)}" ya no está en la bandeja: fue asignada a ${entry.cycle_code} (${entry.status_label}).`
-            : `"${loc.name.slice(0, 90)}" ya no está en la bandeja (${loc.status_label}).`,
+            ? t('"{name}" ya no está en la bandeja: fue asignada a {cycle} ({status}).', {
+                name: loc.name.slice(0, 90),
+                cycle: entry.cycle_code,
+                status: ts(entry.status_label),
+              })
+            : t('"{name}" ya no está en la bandeja ({status}).', { name: loc.name.slice(0, 90), status: ts(loc.status_label) }),
           actions,
         });
       } catch (e) {
-        toast.error(apiError(e, "No se pudo abrir la señal del enlace"));
+        toast.error(apiError(e, t("No se pudo abrir la señal del enlace")));
       }
     })();
     return () => {
@@ -337,12 +344,12 @@ export default function Staging() {
         suggested_cluster_reason: "",
       }));
       if (!data.cluster_id && !data.tech_type_id) {
-        toast.info("El clasificador no encontró evidencia suficiente. Clasifique manualmente.");
+        toast.info(t("El clasificador no encontró evidencia suficiente. Clasifique manualmente."));
       } else {
-        toast.success("Sugerencia aplicada. Revísela y guarde para confirmarla.");
+        toast.success(t("Sugerencia aplicada. Revísela y guarde para confirmarla."));
       }
     } catch (e) {
-      toast.error(apiError(e, "No se pudo generar la sugerencia"));
+      toast.error(apiError(e, t("No se pudo generar la sugerencia")));
     } finally {
       setSuggesting(false);
     }
@@ -371,13 +378,13 @@ export default function Staging() {
       });
       toast.success(
         editing.cluster_id && editing.tech_type_id
-          ? "Clasificación guardada. La señal ya se puede asignar al ciclo."
-          : "Cambios guardados. Falta clúster o tipología para poder asignarla."
+          ? t("Clasificación guardada. La señal ya se puede asignar al ciclo.")
+          : t("Cambios guardados. Falta clúster o tipología para poder asignarla.")
       );
       closeEdit();
       await load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo guardar"));
+      toast.error(apiError(e, t("No se pudo guardar")));
     } finally {
       setSaving(false);
     }
@@ -405,10 +412,10 @@ export default function Staging() {
       setDiscardIds(null);
       setSelected(new Set());
       await load();
-      if (data.affected) toast.success(`${data.affected} señal(es) descartadas como tecnología ya conocida.`);
-      if (data.rejected?.length) toast.info(data.rejected.join(" "));
+      if (data.affected) toast.success(t("{n} señal(es) descartadas como tecnología ya conocida.", { n: data.affected }));
+      if (data.rejected?.length) toast.info(data.rejected.map((r) => ts(r)).join(" "));
     } catch (e) {
-      toast.error(apiError(e, "No se pudo descartar"));
+      toast.error(apiError(e, t("No se pudo descartar")));
     } finally {
       setSaving(false);
     }
@@ -420,10 +427,10 @@ export default function Staging() {
       const { data } = await api.post("/technologies/staging/restore", { technology_ids: ids });
       setSelected(new Set());
       await load();
-      if (data.affected) toast.success(`${data.affected} señal(es) restauradas a la bandeja.`);
-      if (data.rejected?.length) toast.info(data.rejected.join(" "));
+      if (data.affected) toast.success(t("{n} señal(es) restauradas a la bandeja.", { n: data.affected }));
+      if (data.rejected?.length) toast.info(data.rejected.map((r) => ts(r)).join(" "));
     } catch (e) {
-      toast.error(apiError(e, "No se pudo restaurar"));
+      toast.error(apiError(e, t("No se pudo restaurar")));
     } finally {
       setSaving(false);
     }
@@ -436,10 +443,10 @@ export default function Staging() {
       const { data } = await api.post("/technologies/staging/recover", { technology_ids: ids });
       setSelected(new Set());
       await load();
-      if (data.affected) toast.success(`${data.affected} señal(es) recuperadas a Pendientes.`);
-      if (data.rejected?.length) toast.info(data.rejected.join(" "));
+      if (data.affected) toast.success(t("{n} señal(es) recuperadas a Pendientes.", { n: data.affected }));
+      if (data.rejected?.length) toast.info(data.rejected.map((r) => ts(r)).join(" "));
     } catch (e) {
-      toast.error(apiError(e, "No se pudo recuperar"));
+      toast.error(apiError(e, t("No se pudo recuperar")));
     } finally {
       setSaving(false);
     }
@@ -463,35 +470,37 @@ export default function Staging() {
       await load();
       await reloadCycles();
       if (data.assigned) {
-        toast.success(`${data.assigned} señal(es) asignadas a ${data.cycle_code}. Continúe en Filtrado y depuración.`);
+        toast.success(
+          t("{n} señal(es) asignadas a {cycle}. Continúe en Filtrado y depuración.", { n: data.assigned, cycle: data.cycle_code })
+        );
       } else if (data.skipped) {
-        toast.info(`Las ${data.skipped} señal(es) ya estaban en ${data.cycle_code}.`);
+        toast.info(t("Las {n} señal(es) ya estaban en {cycle}.", { n: data.skipped, cycle: data.cycle_code }));
       }
     } catch (e) {
-      toast.error(apiError(e, "No se pudo asignar al ciclo"));
+      toast.error(apiError(e, t("No se pudo asignar al ciclo")));
     } finally {
       setSaving(false);
     }
   };
 
   let assignBlock = "";
-  if (!cycleId) assignBlock = "Seleccione o cree un ciclo antes de asignar.";
-  else if (isHistoric) assignBlock = "El ciclo histórico no admite asignaciones. Seleccione un ciclo formal.";
-  else if (isClosed) assignBlock = `${cycle?.code} está cerrado y no admite asignaciones. Seleccione un ciclo abierto.`;
-  else if (selected.size === 0) assignBlock = "Marque en la tabla las señales que quiere asignar.";
+  if (!cycleId) assignBlock = t("Seleccione o cree un ciclo antes de asignar.");
+  else if (isHistoric) assignBlock = t("El ciclo histórico no admite asignaciones. Seleccione un ciclo formal.");
+  else if (isClosed) assignBlock = t("{code} está cerrado y no admite asignaciones. Seleccione un ciclo abierto.", { code: cycle?.code });
+  else if (selected.size === 0) assignBlock = t("Marque en la tabla las señales que quiere asignar.");
 
-  if (loading) return <LoadingBlock label="Cargando bandeja de entrada..." />;
+  if (loading) return <LoadingBlock label={t("Cargando bandeja de entrada...")} />;
 
   return (
     <div>
       <PageHeader
-        title="Bandeja de entrada"
+        title={t("Bandeja de entrada")}
         titleHint={GLOSSARY.bandeja_entrada}
-        subtitle="Staging de señales capturadas que aún no pertenecen a ningún ciclo. Clasifique clúster y tipología, y arrastre por lotes al ciclo en pantalla."
+        subtitle={t("Staging de señales capturadas que aún no pertenecen a ningún ciclo. Clasifique clúster y tipología, y arrastre por lotes al ciclo en pantalla.")}
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Button variant="secondary" onClick={() => navigate("/postulaciones")}>
-              <Icon name="note" size={16} /> Postulaciones
+              <Icon name="note" size={16} /> {t("Postulaciones")}
             </Button>
             {can(PERM.CONFIG_MANAGE) && <NoiseCleanup toast={toast} onDone={load} />}
             {canAssign && view === "pendientes" && (
@@ -499,10 +508,10 @@ export default function Staging() {
                 variant="secondary"
                 onClick={() => openDiscard([...selected])}
                 disabled={selected.size === 0}
-                title="Descartar las señales seleccionadas: tecnología ya conocida"
+                title={t("Descartar las señales seleccionadas: tecnología ya conocida")}
                 data-testid="staging-discard-batch"
               >
-                <Icon name="x" size={16} /> Descartar {selected.size || ""}
+                <Icon name="x" size={16} /> {t("Descartar {n}", { n: selected.size || "" })}
               </Button>
             )}
             {canAssign && view === "legacy" && (
@@ -511,10 +520,10 @@ export default function Staging() {
                 onClick={() => doRecover([...selected])}
                 disabled={selected.size === 0}
                 loading={saving}
-                title="Devolver las señales seleccionadas a Pendientes"
+                title={t("Devolver las señales seleccionadas a Pendientes")}
                 data-testid="staging-recover-batch"
               >
-                Recuperar {selected.size || ""}
+                {t("Recuperar {n}", { n: selected.size || "" })}
               </Button>
             )}
             {canAssign && view === "descartadas" && (
@@ -525,7 +534,7 @@ export default function Staging() {
                 loading={saving}
                 data-testid="staging-restore-batch"
               >
-                Restaurar {selected.size || ""}
+                {t("Restaurar {n}", { n: selected.size || "" })}
               </Button>
             )}
             {canAssign && view === "pendientes" && (
@@ -536,7 +545,7 @@ export default function Staging() {
                 hint={GLOSSARY.fa_asignar_lote}
                 data-testid="staging-assign"
               >
-                <Icon name="layers" size={17} /> Asignar {selected.size || ""} al ciclo
+                <Icon name="layers" size={17} /> {t("Asignar {n} al ciclo", { n: selected.size || "" })}
               </HintButton>
             )}
           </div>
@@ -550,15 +559,16 @@ export default function Staging() {
           </div>
           <div className="mr-banner-text">
             <strong>
-              Por favor valide manualmente {manual.due} fuente{manual.due === 1 ? "" : "s"} de consulta (tipo E)
+              {manual.due === 1
+                ? t("Por favor valide manualmente {n} fuente de consulta (tipo E)", { n: manual.due })
+                : t("Por favor valide manualmente {n} fuentes de consulta (tipo E)", { n: manual.due })}
             </strong>
             <span>
-              La vigilancia automática no entra a estas fuentes (licencia, usuario o captcha). Consúltelas, registre lo que encuentre
-              y márquelas como validadas.
+              {t("La vigilancia automática no entra a estas fuentes (licencia, usuario o captcha). Consúltelas, registre lo que encuentre y márquelas como validadas.")}
             </span>
           </div>
           <Button onClick={() => setManualOpen(true)} data-testid="manual-review-open">
-            <Icon name="check" size={16} /> Validar ahora
+            <Icon name="check" size={16} /> {t("Validar ahora")}
           </Button>
         </div>
       )}
@@ -566,11 +576,11 @@ export default function Staging() {
       <Modal
         open={manualOpen}
         onClose={() => setManualOpen(false)}
-        title={`Fuentes de consulta manual por validar (${manual.due} de ${manual.total})`}
+        title={t("Fuentes de consulta manual por validar ({due} de {total})", { due: manual.due, total: manual.total })}
         width={760}
         footer={
           <Button variant="secondary" onClick={() => setManualOpen(false)}>
-            Cerrar
+            {t("Cerrar")}
           </Button>
         }
       >
@@ -578,55 +588,55 @@ export default function Staging() {
       </Modal>
 
       <PhaseGuide
-        phase="Fase 1 · Identificación"
+        phase={t("Fase 1 · Identificación")}
         hint={GLOSSARY.vigilancia}
         tasks={[
-          "Revise las señales capturadas por vigilancia y por el canal reactivo.",
-          "Confirme clúster y tipología: son obligatorios para entrar al ciclo.",
-          "Seleccione por lotes y arrastre al ciclo en pantalla.",
+          t("Revise las señales capturadas por vigilancia y por el canal reactivo."),
+          t("Confirme clúster y tipología: son obligatorios para entrar al ciclo."),
+          t("Seleccione por lotes y arrastre al ciclo en pantalla."),
         ]}
-        nextLabel="Filtrado y depuración"
+        nextLabel={t("Filtrado y depuración")}
         nextTo="/filtrado"
       />
 
       {stats && (
         <ModuleStatsRow
           items={[
-            { label: "Sin asignar", value: stats.unassigned, color: "#1D4ED8", hint: GLOSSARY.fa_sin_asignar },
-            { label: "Total capturadas", value: stats.total, hint: GLOSSARY.fa_total_capturadas },
+            { label: t("Sin asignar"), value: stats.unassigned, color: "#1D4ED8", hint: GLOSSARY.fa_sin_asignar },
+            { label: t("Total capturadas"), value: stats.total, hint: GLOSSARY.fa_total_capturadas },
             {
-              label: "Sin clúster",
+              label: t("Sin clúster"),
               value: stats.without_cluster,
               color: stats.without_cluster ? "#D97706" : undefined,
-              sub: "Bloquea la asignación",
+              sub: t("Bloquea la asignación"),
               hint: GLOSSARY.fa_sin_cluster,
             },
             {
-              label: "Sin tipología",
+              label: t("Sin tipología"),
               value: stats.without_tech_type,
               color: stats.without_tech_type ? "#D97706" : undefined,
-              sub: "Bloquea la asignación",
+              sub: t("Bloquea la asignación"),
               hint: GLOSSARY.fa_sin_tipologia,
             },
             {
-              label: "En varias fuentes",
+              label: t("En varias fuentes"),
               value: stats.corroborated ?? 0,
               color: stats.corroborated ? "#0E7490" : undefined,
-              sub: "Corroboradas",
+              sub: t("Corroboradas"),
               hint: GLOSSARY.fa_corroborada,
             },
             {
-              label: "Descartadas",
+              label: t("Descartadas"),
               value: stats.discarded ?? 0,
               color: stats.discarded ? "#64748B" : undefined,
-              sub: "Tecnología ya conocida",
-              hint: "Señales descartadas desde la bandeja. Siguen contando en Total capturadas y se pueden restaurar.",
+              sub: t("Tecnología ya conocida"),
+              hint: t("Señales descartadas desde la bandeja. Siguen contando en Total capturadas y se pueden restaurar."),
             },
             {
-              label: "Listas para asignar",
+              label: t("Listas para asignar"),
               value: classifiable.length,
               color: "#059669",
-              sub: items.length < total ? "En las filas cargadas" : undefined,
+              sub: items.length < total ? t("En las filas cargadas") : undefined,
               hint: GLOSSARY.fa_listas_asignar,
             },
           ]}
@@ -638,17 +648,21 @@ export default function Staging() {
       {(!cycleId || isClosed || isHistoric) && (
         <div className="fa-notice fa-notice--warn">
           <div>
-            <strong>{!cycleId ? "No hay un ciclo seleccionado." : `${cycle?.code} no admite asignaciones.`}</strong>{" "}
-            Cree o seleccione un ciclo abierto en{" "}
-            <button
-              type="button"
-              className="clamp-text-toggle"
-              style={{ color: "#92400E", fontSize: 13 }}
-              onClick={() => navigate("/ciclos")}
-            >
-              Ciclos de escaneo
-            </button>{" "}
-            para poder arrastrar señales.
+            <strong>
+              {!cycleId ? t("No hay un ciclo seleccionado.") : t("{code} no admite asignaciones.", { code: cycle?.code })}
+            </strong>{" "}
+            {tr("Cree o seleccione un ciclo abierto en <a>Ciclos de escaneo</a> para poder arrastrar señales.", null, {
+              a: (c) => (
+                <button
+                  type="button"
+                  className="clamp-text-toggle"
+                  style={{ color: "#92400E", fontSize: 13 }}
+                  onClick={() => navigate("/ciclos")}
+                >
+                  {c}
+                </button>
+              ),
+            })}
           </div>
         </div>
       )}
@@ -656,19 +670,19 @@ export default function Staging() {
       <Card style={{ marginBottom: 18 }} padding={16}>
         <div className="staging-filters">
           <Input
-            aria-label="Buscar señales"
-            placeholder="Buscar por nombre, DCI o resumen..."
+            aria-label={t("Buscar señales")}
+            placeholder={t("Buscar por nombre, DCI o resumen...")}
             value={filters.q}
             onChange={(e) => setFilters({ ...filters, q: e.target.value })}
             style={{ marginBottom: 0 }}
           />
           <Select
-            aria-label="Filtrar por fuente"
+            aria-label={t("Filtrar por fuente")}
             value={filters.source_id}
             onChange={(e) => setFilters({ ...filters, source_id: e.target.value })}
             style={{ marginBottom: 0 }}
           >
-            <option value="">Todas las fuentes</option>
+            <option value="">{t("Todas las fuentes")}</option>
             {sources.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.title}
@@ -676,19 +690,19 @@ export default function Staging() {
             ))}
           </Select>
           <Select
-            aria-label="Filtrar por canal"
+            aria-label={t("Filtrar por canal")}
             value={filters.channel}
             onChange={(e) => setFilters({ ...filters, channel: e.target.value })}
             style={{ marginBottom: 0 }}
           >
-            <option value="">Todos los canales</option>
-            <option value="proactiva">Búsqueda proactiva</option>
-            <option value="reactiva">Postulación reactiva</option>
+            <option value="">{t("Todos los canales")}</option>
+            <option value="proactiva">{t("Búsqueda proactiva")}</option>
+            <option value="reactiva">{t("Postulación reactiva")}</option>
           </Select>
           <Input
             type="date"
-            aria-label="Capturadas desde"
-            title="Capturadas desde (fecha)"
+            aria-label={t("Capturadas desde")}
+            title={t("Capturadas desde (fecha)")}
             value={filters.date_from}
             max={filters.date_to || undefined}
             onChange={(e) => setFilters({ ...filters, date_from: e.target.value })}
@@ -696,8 +710,8 @@ export default function Staging() {
           />
           <Input
             type="date"
-            aria-label="Capturadas hasta"
-            title="Capturadas hasta (fecha, inclusive)"
+            aria-label={t("Capturadas hasta")}
+            title={t("Capturadas hasta (fecha, inclusive)")}
             value={filters.date_to}
             min={filters.date_from || undefined}
             onChange={(e) => setFilters({ ...filters, date_to: e.target.value })}
@@ -709,18 +723,18 @@ export default function Staging() {
               checked={filters.corroborated}
               onChange={(e) => setFilters({ ...filters, corroborated: e.target.checked })}
             />
-            Solo detectadas en varias fuentes
-            <InfoTip text={GLOSSARY.fa_corroborada} label="Qué es una señal corroborada" />
+            {t("Solo detectadas en varias fuentes")}
+            <InfoTip text={GLOSSARY.fa_corroborada} label={t("Qué es una señal corroborada")} />
           </label>
           <Select
-            aria-label="Ordenar por"
-            title="Ordenar por"
+            aria-label={t("Ordenar por")}
+            title={t("Ordenar por")}
             value={filters.sort}
             onChange={(e) => setFilters({ ...filters, sort: e.target.value })}
             style={{ marginBottom: 0 }}
           >
-            <option value="puntaje">Ordenar por: puntaje</option>
-            <option value="recientes">Ordenar por: más recientes</option>
+            <option value="puntaje">{t("Ordenar por: puntaje")}</option>
+            <option value="recientes">{t("Ordenar por: más recientes")}</option>
           </Select>
         </div>
       </Card>
@@ -728,11 +742,11 @@ export default function Staging() {
       {result && result.rejected?.length > 0 && (
         <Card style={{ marginBottom: 18, background: "#FEF2F2", borderColor: "#FECACA" }}>
           <div style={{ fontSize: 14, color: "#991B1B", fontWeight: 600, marginBottom: 6 }}>
-            {result.rejected.length} señal(es) no se pudieron asignar
+            {t("{n} señal(es) no se pudieron asignar", { n: result.rejected.length })}
           </div>
           <ul style={{ fontSize: 13, color: "#7F1D1D", paddingLeft: 18 }}>
             {result.rejected.map((r) => (
-              <li key={r}>{r}</li>
+              <li key={r}>{ts(r)}</li>
             ))}
           </ul>
         </Card>
@@ -740,36 +754,34 @@ export default function Staging() {
 
       <div className="screening-tabs" role="tablist">
         {[
-          { key: "pendientes", label: "Pendientes" },
-          { key: "descartadas", label: "Descartadas" },
-          { key: "legacy", label: `Legacy${stats?.legacy ? ` (${stats.legacy})` : ""}` },
-        ].map((t) => (
+          { key: "pendientes", label: t("Pendientes") },
+          { key: "descartadas", label: t("Descartadas") },
+          { key: "legacy", label: stats?.legacy ? t("Legacy ({n})", { n: stats.legacy }) : t("Legacy") },
+        ].map((tab) => (
           <button
-            key={t.key}
+            key={tab.key}
             type="button"
             role="tab"
-            aria-selected={view === t.key}
-            className={`screening-tab${view === t.key ? " is-active" : ""}`}
-            onClick={() => changeView(t.key)}
-            data-testid={`staging-tab-${t.key}`}
+            aria-selected={view === tab.key}
+            className={`screening-tab${view === tab.key ? " is-active" : ""}`}
+            onClick={() => changeView(tab.key)}
+            data-testid={`staging-tab-${tab.key}`}
           >
-            {t.label}
+            {tab.label}
           </button>
         ))}
       </div>
 
       {view === "legacy" && (
         <p className="source-section-note" data-testid="staging-legacy-note" style={{ margin: "0 0 10px" }}>
-          Señales capturadas por las fuentes del inventario anterior, retiradas al cargar la matriz de escaneo por enlace
-          (17-11-2026). No se borraron: siguen en el sistema y en la bitácora. Use (Recuperar) para devolver las que
-          sirvan a Pendientes y clasificarlas como cualquier otra.
+          {t("Señales capturadas por las fuentes del inventario anterior, retiradas al cargar la matriz de escaneo por enlace (17-11-2026). No se borraron: siguen en el sistema y en la bitácora. Use (Recuperar) para devolver las que sirvan a Pendientes y clasificarlas como cualquier otra.")}
         </p>
       )}
 
       {loadError && items.length > 0 && (
         <p className="sl-muted" role="status" data-testid="staging-load-stale">
-          No se pudo actualizar la lista ({loadError}). Se muestra la última que llegó.{" "}
-          <button type="button" className="so-linkbtn" onClick={retryLoad}>Reintentar</button>
+          {t("No se pudo actualizar la lista ({error}). Se muestra la última que llegó.", { error: loadError })}{" "}
+          <button type="button" className="so-linkbtn" onClick={retryLoad}>{t("Reintentar")}</button>
         </p>
       )}
       {loadError && items.length === 0 ? (
@@ -777,37 +789,37 @@ export default function Staging() {
           <div data-testid="staging-load-error" role="alert">
             <EmptyState
               icon="⚠️"
-              title="No se pudo cargar la bandeja de entrada"
-              message={`${loadError} Las señales capturadas siguen guardadas: la bandeja no está vacía, solo no se pudo leer. Si el sistema llevaba un rato sin uso o hay una vigilancia en curso, puede tardar un par de minutos. Se reintenta sola cada 20 segundos.`}
-              action={<Button onClick={retryLoad}>Reintentar ahora</Button>}
+              title={t("No se pudo cargar la bandeja de entrada")}
+              message={t("{error} Las señales capturadas siguen guardadas: la bandeja no está vacía, solo no se pudo leer. Si el sistema llevaba un rato sin uso o hay una vigilancia en curso, puede tardar un par de minutos. Se reintenta sola cada 20 segundos.", { error: loadError })}
+              action={<Button onClick={retryLoad}>{t("Reintentar ahora")}</Button>}
             />
           </div>
         </Card>
       ) : items.length === 0 && view === "legacy" ? (
         <Card>
-          <EmptyState icon="🗄️" title="Bandeja Legacy vacía" message="No hay señales pendientes de fuentes del inventario anterior." />
+          <EmptyState icon="🗄️" title={t("Bandeja Legacy vacía")} message={t("No hay señales pendientes de fuentes del inventario anterior.")} />
         </Card>
       ) : items.length === 0 && view === "descartadas" ? (
         <Card>
-          <EmptyState icon="🗂️" title="Sin descartadas" message="No hay señales descartadas desde la bandeja." />
+          <EmptyState icon="🗂️" title={t("Sin descartadas")} message={t("No hay señales descartadas desde la bandeja.")} />
         </Card>
       ) : items.length === 0 ? (
         <Card>
           <EmptyState
             icon="📥"
-            title={query.q || query.source_id || query.channel || query.date_from || query.date_to ? "Sin resultados" : "La bandeja está vacía"}
+            title={query.q || query.source_id || query.channel || query.date_from || query.date_to ? t("Sin resultados") : t("La bandeja está vacía")}
             message={
               query.q || query.source_id || query.channel || query.date_from || query.date_to
-                ? "Ninguna señal sin asignar coincide con los filtros. Limpie la búsqueda, cambie de fuente o amplíe las fechas."
-                : "Ejecute la vigilancia para capturar señales nuevas desde los referentes internacionales."
+                ? t("Ninguna señal sin asignar coincide con los filtros. Limpie la búsqueda, cambie de fuente o amplíe las fechas.")
+                : t("Ejecute la vigilancia para capturar señales nuevas desde los referentes internacionales.")
             }
             action={
               query.q || query.source_id || query.channel || query.date_from || query.date_to ? (
                 <Button variant="secondary" onClick={() => setFilters({ q: "", source_id: "", channel: "" })}>
-                  Limpiar filtros
+                  {t("Limpiar filtros")}
                 </Button>
               ) : (
-                <Button onClick={() => navigate("/vigilancia")}>Ir a vigilancia</Button>
+                <Button onClick={() => navigate("/vigilancia")}>{t("Ir a vigilancia")}</Button>
               )
             }
           />
@@ -823,21 +835,21 @@ export default function Staging() {
                       type="checkbox"
                       checked={allVisibleSelected}
                       onChange={toggleAll}
-                      aria-label="Seleccionar todas las filas cargadas"
+                      aria-label={t("Seleccionar todas las filas cargadas")}
                     />
                   </th>
-                  <th>Señal</th>
+                  <th>{t("Señal")}</th>
                   <th>
-                    <TermLabel tip={GLOSSARY.cluster}>Clúster</TermLabel>
+                    <TermLabel tip={GLOSSARY.cluster}>{t("Clúster")}</TermLabel>
                   </th>
                   <th>
-                    <TermLabel tip={GLOSSARY.tipologia}>Tipología</TermLabel>
+                    <TermLabel tip={GLOSSARY.tipologia}>{t("Tipología")}</TermLabel>
                   </th>
                   <th>
-                    <TermLabel tip={GLOSSARY.fa_condicion}>Condición</TermLabel>
+                    <TermLabel tip={GLOSSARY.fa_condicion}>{t("Condición")}</TermLabel>
                   </th>
                   <th>
-                    <TermLabel tip={GLOSSARY.cribado}>Cribado</TermLabel>
+                    <TermLabel tip={GLOSSARY.cribado}>{t("Cribado")}</TermLabel>
                   </th>
                   <th style={{ width: 110 }}></th>
                 </tr>
@@ -845,7 +857,7 @@ export default function Staging() {
               <tbody>
                 {items.map((item) => {
                   const ready = Boolean(item.cluster_id && item.tech_type_id);
-                  const name = item.commercial_name || item.inn_name || `Señal #${item.id}`;
+                  const name = item.commercial_name || item.inn_name || t("Señal #{id}", { id: item.id });
                   return (
                     <tr key={item.id} className={selected.has(item.id) ? "row-selected" : ""} data-testid={`staging-row-${item.id}`}>
                       <td>
@@ -853,26 +865,26 @@ export default function Staging() {
                           type="checkbox"
                           checked={selected.has(item.id)}
                           onChange={() => toggle(item.id)}
-                          aria-label={`Seleccionar ${name.slice(0, 80)}`}
+                          aria-label={t("Seleccionar {name}", { name: name.slice(0, 80) })}
                         />
                       </td>
                       <td style={{ maxWidth: 520 }}>
                         <ClampText className="staging-name" text={name} lines={2} expandable />
                         <ProductFacts item={item} />
                         <div className="staging-meta">
-                          {item.source_title || "Sin fuente"} ·{" "}
+                          {item.source_title || t("Sin fuente")} ·{" "}
                           {/* captured_at se guarda en UTC; con SQLite llega sin zona. */}
                           {new Date(
                             /[zZ]|[+-]\d{2}:?\d{2}$/.test(item.captured_at)
                               ? item.captured_at
                               : `${item.captured_at}Z`,
-                          ).toLocaleString("es-CO", {
+                          ).toLocaleString(intlLocale(), {
                             timeZone: "America/Bogota",
                             dateStyle: "short",
                             timeStyle: "short",
                           })}{" "}
                           ·{" "}
-                          {item.source_channel === "reactiva" ? "Reactiva" : "Proactiva"}
+                          {item.source_channel === "reactiva" ? t("Reactiva") : t("Proactiva")}
                           <span className="staging-links">
                             {item.signal_url && item.link_type !== "exacto" && item.evidence?.locator_url ? (
                               <a
@@ -881,8 +893,10 @@ export default function Staging() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 data-testid="staging-open-located"
-                                title={`Abre la página y resalta la señal «${item.evidence.locator_text || name.slice(0, 60)}» (la fuente no tiene enlace por ítem)`}
-                                aria-label={`Abrir la página y resaltar la señal ${name.slice(0, 60)}`}
+                                title={t("Abre la página y resalta la señal «{text}» (la fuente no tiene enlace por ítem)", {
+                                  text: item.evidence.locator_text || name.slice(0, 60),
+                                })}
+                                aria-label={t("Abrir la página y resaltar la señal {name}", { name: name.slice(0, 60) })}
                               >
                                 <Icon name="search" size={13} />
                               </a>
@@ -893,8 +907,18 @@ export default function Staging() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 data-testid="staging-open-source"
-                                title={`${item.link_type === "exacto" ? "Enlace exacto" : item.link_type === "consulta" ? "Página de consulta (la fuente no ofrece enlace directo)" : "Abrir la fuente original"}: ${item.signal_url}`}
-                                aria-label={`${item.link_type === "consulta" ? "Abrir la página de consulta" : "Abrir la fuente original"} de ${name.slice(0, 60)}`}
+                                title={
+                                  item.link_type === "exacto"
+                                    ? t("Enlace exacto: {url}", { url: item.signal_url })
+                                    : item.link_type === "consulta"
+                                      ? t("Página de consulta (la fuente no ofrece enlace directo): {url}", { url: item.signal_url })
+                                      : t("Abrir la fuente original: {url}", { url: item.signal_url })
+                                }
+                                aria-label={
+                                  item.link_type === "consulta"
+                                    ? t("Abrir la página de consulta de {name}", { name: name.slice(0, 60) })
+                                    : t("Abrir la fuente original de {name}", { name: name.slice(0, 60) })
+                                }
                               >
                                 <Icon name="external" size={13} />
                               </a>
@@ -902,15 +926,17 @@ export default function Staging() {
                             {item.corroboration_count > 1 && (
                               <span
                                 className="staging-corro"
-                                title={`También en: ${(item.corroborating || []).map((c) => c.source_title).join(" · ")}`}
+                                title={t("También en: {sources}", {
+                                  sources: (item.corroborating || []).map((c) => c.source_title).join(" · "),
+                                })}
                               >
-                                En {item.corroboration_count} fuentes
+                                {t("En {n} fuentes", { n: item.corroboration_count })}
                               </span>
                             )}
                             {RELIABILITY_LABEL[item.reliability_verdict] && (
                               <span
                                 className={`staging-rel staging-rel--${item.reliability_verdict}`}
-                                title={`Confiabilidad ${item.reliability_score ?? "-"}/100`}
+                                title={t("Confiabilidad {score}/100", { score: item.reliability_score ?? "-" })}
                               >
                                 {RELIABILITY_LABEL[item.reliability_verdict]}
                               </span>
@@ -922,19 +948,19 @@ export default function Staging() {
                         {item.cluster_name ? (
                           <Badge tone="info">{item.cluster_name}</Badge>
                         ) : item.suggested_cluster_name ? (
-                          <span className="staging-suggestion" title={item.suggested_cluster_reason || undefined}>
-                            Sugerido: {item.suggested_cluster_name}
+                          <span className="staging-suggestion" title={ts(item.suggested_cluster_reason) || undefined}>
+                            {t("Sugerido: {name}", { name: item.suggested_cluster_name })}
                           </span>
                         ) : (
-                          <span className="staging-missing">Sin clasificar</span>
+                          <span className="staging-missing">{t("Sin clasificar")}</span>
                         )}
                       </td>
                       <td>
-                        {item.tech_type_name || <span className="staging-missing">Sin clasificar</span>}
+                        {item.tech_type_name || <span className="staging-missing">{t("Sin clasificar")}</span>}
                       </td>
                       <td>
                         {item.condition ? (
-                          <Badge tone={item.condition}>{item.condition}</Badge>
+                          <Badge tone={item.condition}>{CONDITION_NAME[item.condition] || item.condition}</Badge>
                         ) : (
                           <span className="staging-missing">-</span>
                         )}
@@ -944,7 +970,10 @@ export default function Staging() {
                         {item.corroboration_bonus > 0 && (
                           <span
                             className="staging-bonus"
-                            title={`+${item.corroboration_bonus} al orden por corroboración en ${item.corroboration_count} fuentes`}
+                            title={t("+{bonus} al orden por corroboración en {n} fuentes", {
+                              bonus: item.corroboration_bonus,
+                              n: item.corroboration_count,
+                            })}
                           >
                             +{item.corroboration_bonus}
                           </span>
@@ -953,7 +982,7 @@ export default function Staging() {
                       <td>
                         {canWrite && view === "pendientes" && (
                           <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>
-                            {ready ? "Editar" : "Clasificar"}
+                            {ready ? t("Editar") : t("Clasificar")}
                           </Button>
                         )}
                         {canAssign && view === "pendientes" && (
@@ -961,10 +990,10 @@ export default function Staging() {
                             variant="ghost"
                             size="sm"
                             onClick={() => openDiscard([item.id])}
-                            title="Descartar: tecnología ya conocida"
+                            title={t("Descartar: tecnología ya conocida")}
                             data-testid={`staging-discard-${item.id}`}
                           >
-                            Descartar
+                            {t("Descartar")}
                           </Button>
                         )}
                         {canAssign && view === "legacy" && (
@@ -975,7 +1004,7 @@ export default function Staging() {
                             disabled={saving}
                             data-testid={`staging-recover-${item.id}`}
                           >
-                            Recuperar
+                            {t("Recuperar")}
                           </Button>
                         )}
                         {canAssign && view === "descartadas" && (
@@ -986,7 +1015,7 @@ export default function Staging() {
                             disabled={saving}
                             data-testid={`staging-restore-${item.id}`}
                           >
-                            Restaurar
+                            {t("Restaurar")}
                           </Button>
                         )}
                       </td>
@@ -998,12 +1027,16 @@ export default function Staging() {
           </div>
           <div className="fa-pager">
             <span data-testid="staging-count">
-              Mostrando {items.length} de {total} señal(es) {view === "descartadas" ? "descartadas" : view === "legacy" ? "en Legacy" : "sin asignar"}
-              {selected.size ? ` · ${selected.size} seleccionada(s)` : ""}
+              {view === "descartadas"
+                ? t("Mostrando {n} de {total} señal(es) descartadas", { n: items.length, total })
+                : view === "legacy"
+                  ? t("Mostrando {n} de {total} señal(es) en Legacy", { n: items.length, total })
+                  : t("Mostrando {n} de {total} señal(es) sin asignar", { n: items.length, total })}
+              {selected.size ? ` · ${t("{n} seleccionada(s)", { n: selected.size })}` : ""}
             </span>
             {items.length < total && (
               <Button variant="secondary" size="sm" onClick={loadMore} loading={loadingMore}>
-                Cargar {Math.min(PAGE_SIZE, total - items.length)} más
+                {t("Cargar {n} más", { n: Math.min(PAGE_SIZE, total - items.length) })}
               </Button>
             )}
           </div>
@@ -1013,16 +1046,16 @@ export default function Staging() {
       <Modal
         open={Boolean(editing)}
         onClose={closeEdit}
-        title={editing?.readOnly ? "Detalle de la señal" : "Clasificar señal"}
+        title={editing?.readOnly ? t("Detalle de la señal") : t("Clasificar señal")}
         width={720}
         footer={
           <>
             <Button variant="secondary" onClick={closeEdit}>
-              {editing?.readOnly ? "Cerrar" : "Cancelar"}
+              {editing?.readOnly ? t("Cerrar") : t("Cancelar")}
             </Button>
             {!editing?.readOnly && (
               <Button onClick={saveEdit} loading={saving} data-testid="staging-save">
-                Guardar clasificación
+                {t("Guardar clasificación")}
               </Button>
             )}
           </>
@@ -1032,7 +1065,7 @@ export default function Staging() {
           <>
             {editing.readOnly && (
               <p className="muted-note" data-testid="staging-readonly">
-                Su perfil consulta la señal; clasificarla corresponde a los evaluadores.
+                {t("Su perfil consulta la señal; clasificarla corresponde a los evaluadores.")}
               </p>
             )}
             <SignalOrigin
@@ -1056,11 +1089,11 @@ export default function Staging() {
                 loading={suggesting}
                 hint={GLOSSARY.fa_sugerir}
               >
-                <Icon name="pulse" size={15} /> Sugerir clasificación
+                <Icon name="pulse" size={15} /> {t("Sugerir clasificación")}
               </HintButton>
               {editing.suggested_cluster_reason && !suggestion && (
                 <div style={{ fontSize: 12, color: "#64748B", marginTop: 6 }}>
-                  {editing.suggested_cluster_reason}
+                  {ts(editing.suggested_cluster_reason)}
                 </div>
               )}
               <ClassificationSuggestion data={suggestion} />
@@ -1069,65 +1102,65 @@ export default function Staging() {
             <Input
               id="stg-commercial"
               disabled={editing.readOnly}
-              label="Nombre comercial"
+              label={t("Nombre comercial")}
               value={editing.commercial_name || ""}
               onChange={(e) => setEditing({ ...editing, commercial_name: e.target.value })}
             />
             <Input
               id="stg-inn"
               disabled={editing.readOnly}
-              label="Denominación común internacional (DCI)"
-              hint="Nombre genérico del principio activo (INN). Mejora la desduplicación y el cruce con el INVIMA."
+              label={t("Denominación común internacional (DCI)")}
+              hint={t("Nombre genérico del principio activo (INN). Mejora la desduplicación y el cruce con el INVIMA.")}
               value={editing.inn_name || ""}
               onChange={(e) => setEditing({ ...editing, inn_name: e.target.value })}
             />
             <Input
               id="stg-manufacturer"
               disabled={editing.readOnly}
-              label="Fabricante"
+              label={t("Fabricante")}
               value={editing.manufacturer || ""}
               onChange={(e) => setEditing({ ...editing, manufacturer: e.target.value })}
             />
             <fieldset className="staging-product">
               <legend>
-                <TermLabel tip={GLOSSARY.fa_datos_producto}>Datos de producto</TermLabel>
+                <TermLabel tip={GLOSSARY.fa_datos_producto}>{t("Datos de producto")}</TermLabel>
               </legend>
               <div className="form-two-col">
                 <Input
                   id="stg-dosage-form"
                   disabled={editing.readOnly}
-                  label="Forma farmacéutica"
-                  placeholder="Ej. tableta, solución inyectable"
+                  label={t("Forma farmacéutica")}
+                  placeholder={t("Ej. tableta, solución inyectable")}
                   value={editing.dosage_form || ""}
                   onChange={(e) => setEditing({ ...editing, dosage_form: e.target.value })}
                 />
                 <Input
                   id="stg-strength"
                   disabled={editing.readOnly}
-                  label="Concentración"
-                  placeholder="Ej. 100 mg, 2,5 mg/ml"
+                  label={t("Concentración")}
+                  placeholder={t("Ej. 100 mg, 2,5 mg/ml")}
                   value={editing.strength || ""}
                   onChange={(e) => setEditing({ ...editing, strength: e.target.value })}
                 />
                 <Input
                   id="stg-route"
                   disabled={editing.readOnly}
-                  label="Vía de administración"
-                  placeholder="Ej. oral, intravenosa"
+                  label={t("Vía de administración")}
+                  placeholder={t("Ej. oral, intravenosa")}
                   value={editing.route || ""}
                   onChange={(e) => setEditing({ ...editing, route: e.target.value })}
                 />
                 <Input
                   id="stg-brand"
                   disabled={editing.readOnly}
-                  label="Marca"
+                  label={t("Marca")}
                   value={editing.brand || ""}
                   onChange={(e) => setEditing({ ...editing, brand: e.target.value })}
                 />
                 <Input
                   id="stg-model"
                   disabled={editing.readOnly}
-                  label="Modelo (dispositivos)"
+                  label={t("Modelo (dispositivos)")}
                   value={editing.device_model || ""}
                   onChange={(e) => setEditing({ ...editing, device_model: e.target.value })}
                 />
@@ -1136,14 +1169,14 @@ export default function Staging() {
             {editing.corroboration_count > 1 && (
               <div className="staging-corro-list" role="note">
                 <strong>
-                  <TermLabel tip={GLOSSARY.fa_corroborada}>Detectada en {editing.corroboration_count} fuentes</TermLabel>
+                  <TermLabel tip={GLOSSARY.fa_corroborada}>{t("Detectada en {n} fuentes", { n: editing.corroboration_count })}</TermLabel>
                 </strong>
                 <ul>
                   {(editing.corroborating || []).map((c) => (
                     <li key={c.technology_id}>
-                      {c.source_title}: {c.name || `Señal #${c.technology_id}`}{" "}
+                      {c.source_title}: {c.name || t("Señal #{id}", { id: c.technology_id })}{" "}
                       <span className="staging-meta">
-                        ({c.matched_on?.includes("nct") ? "mismo NCT" : `similitud ${Math.round(c.score)} %`})
+                        ({c.matched_on?.includes("nct") ? t("mismo NCT") : t("similitud {n} %", { n: Math.round(c.score) })})
                       </span>
                       {c.url && (
                         <>
@@ -1152,7 +1185,7 @@ export default function Staging() {
                             href={c.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            aria-label={`Abrir la señal en ${c.source_title}`}
+                            aria-label={t("Abrir la señal en {source}", { source: c.source_title })}
                           >
                             <Icon name="external" size={12} />
                           </a>
@@ -1166,8 +1199,8 @@ export default function Staging() {
             <Input
               id="stg-indication"
               disabled={editing.readOnly}
-              label="Indicación / patología"
-              hint="Enfermedad o condición a la que se destina. Alimenta la sugerencia de clúster (CIE-10 y MeSH)."
+              label={t("Indicación / patología")}
+              hint={t("Enfermedad o condición a la que se destina. Alimenta la sugerencia de clúster (CIE-10 y MeSH).")}
               value={editing.indication || ""}
               onChange={(e) => setEditing({ ...editing, indication: e.target.value })}
             />
@@ -1175,13 +1208,13 @@ export default function Staging() {
             <Select
               id="stg-cluster"
               disabled={editing.readOnly}
-              label="Clúster de salud"
+              label={t("Clúster de salud")}
               hint={GLOSSARY.cluster}
               required
               value={editing.cluster_id || ""}
               onChange={(e) => setEditing({ ...editing, cluster_id: e.target.value })}
             >
-              <option value="">Seleccione un clúster...</option>
+              <option value="">{t("Seleccione un clúster...")}</option>
               {clusters.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -1192,16 +1225,16 @@ export default function Staging() {
             <Select
               id="stg-type"
               disabled={editing.readOnly}
-              label="Tipología tecnológica"
+              label={t("Tipología tecnológica")}
               hint={GLOSSARY.tipologia}
               required
               value={editing.tech_type_id || ""}
               onChange={(e) => setEditing({ ...editing, tech_type_id: e.target.value })}
             >
-              <option value="">Seleccione una tipología...</option>
-              {types.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
+              <option value="">{t("Seleccione una tipología...")}</option>
+              {types.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.name}
                 </option>
               ))}
             </Select>
@@ -1209,12 +1242,12 @@ export default function Staging() {
             <Select
               id="stg-condition"
               disabled={editing.readOnly}
-              label="Condición de la tecnología"
+              label={t("Condición de la tecnología")}
               hint={GLOSSARY.fa_condicion}
               value={editing.condition || ""}
               onChange={(e) => setEditing({ ...editing, condition: e.target.value })}
             >
-              <option value="">Sin definir</option>
+              <option value="">{t("Sin definir")}</option>
               {Object.entries(CONDITION_LABELS).map(([key, label]) => (
                 <option key={key} value={key}>
                   {label}
@@ -1226,7 +1259,7 @@ export default function Staging() {
               <Input
                 id="stg-fda"
                 disabled={editing.readOnly}
-                label="Aprobación FDA"
+                label={t("Aprobación FDA")}
                 hint={GLOSSARY.fa_fechas_regulatorias}
                 type="date"
                 value={editing.fda_approval_date || ""}
@@ -1235,7 +1268,7 @@ export default function Staging() {
               <Input
                 id="stg-ema"
                 disabled={editing.readOnly}
-                label="Aprobación EMA"
+                label={t("Aprobación EMA")}
                 hint={GLOSSARY.fa_fechas_regulatorias}
                 type="date"
                 value={editing.ema_approval_date || ""}
@@ -1246,7 +1279,7 @@ export default function Staging() {
               <Input
                 id="stg-phase3"
                 disabled={editing.readOnly}
-                label="Fin de fase III"
+                label={t("Fin de fase III")}
                 hint={GLOSSARY.fa_fechas_regulatorias}
                 type="date"
                 value={editing.phase3_completion_date || ""}
@@ -1255,16 +1288,15 @@ export default function Staging() {
               <Input
                 id="stg-regulatory"
                 disabled={editing.readOnly}
-                label="Estado regulatorio"
+                label={t("Estado regulatorio")}
                 hint={GLOSSARY.fa_estado_regulatorio}
-                placeholder="Sometido a FDA, en revisión EMA..."
+                placeholder={t("Sometido a FDA, en revisión EMA...")}
                 value={editing.regulatory_status || ""}
                 onChange={(e) => setEditing({ ...editing, regulatory_status: e.target.value })}
               />
             </div>
             <p style={{ fontSize: 12, color: "#64748B" }}>
-              Las fechas alimentan el pre-llenado de los criterios P1, P5 y P6 y el cálculo de
-              time-to-market.
+              {t("Las fechas alimentan el pre-llenado de los criterios P1, P5 y P6 y el cálculo de time-to-market.")}
             </p>
           </>
         )}
@@ -1273,36 +1305,35 @@ export default function Staging() {
       <Modal
         open={Boolean(discardIds)}
         onClose={() => setDiscardIds(null)}
-        title="Descartar: tecnología ya conocida"
+        title={t("Descartar: tecnología ya conocida")}
         footer={
           <>
             <Button variant="secondary" onClick={() => setDiscardIds(null)}>
-              Cancelar
+              {t("Cancelar")}
             </Button>
             <HintButton
               onClick={doDiscard}
               loading={saving}
               disabled={!discardReasonOk}
-              disabledHint="El motivo es obligatorio (mínimo 5 caracteres)."
+              disabledHint={t("El motivo es obligatorio (mínimo 5 caracteres).")}
               data-testid="staging-discard-confirm"
             >
-              Descartar {discardIds?.length || ""}
+              {t("Descartar {n}", { n: discardIds?.length || "" })}
             </HintButton>
           </>
         }
       >
         <p style={{ fontSize: 14, color: "#475569" }}>
-          {discardIds?.length || 0} señal(es) saldrán de la bandeja. No se borran: quedan en la pestaña
-          «Descartadas» y el motivo se registra en la bitácora.
+          {t("{n} señal(es) saldrán de la bandeja. No se borran: quedan en la pestaña «Descartadas» y el motivo se registra en la bitácora.", { n: discardIds?.length || 0 })}
         </p>
         <Textarea
-          label="Motivo"
+          label={t("Motivo")}
           required
           rows={3}
           maxLength={1000}
           value={discardReason}
           onChange={(e) => setDiscardReason(e.target.value)}
-          placeholder="Ej.: ya evaluada en el ciclo 2025; duplicado de la señal #123"
+          placeholder={t("Ej.: ya evaluada en el ciclo 2025; duplicado de la señal #123")}
           data-testid="staging-discard-reason"
         />
       </Modal>
@@ -1310,32 +1341,34 @@ export default function Staging() {
       <Modal
         open={assignOpen}
         onClose={() => setAssignOpen(false)}
-        title="Asignar al ciclo"
+        title={t("Asignar al ciclo")}
         footer={
           <>
             <Button variant="secondary" onClick={() => setAssignOpen(false)}>
-              Cancelar
+              {t("Cancelar")}
             </Button>
             <HintButton
               onClick={doAssign}
               loading={saving}
               disabled={selectedReady.length === 0}
-              disabledHint="Ninguna de las señales seleccionadas tiene clúster y tipología. Clasifíquelas primero."
+              disabledHint={t("Ninguna de las señales seleccionadas tiene clúster y tipología. Clasifíquelas primero.")}
               data-testid="staging-assign-confirm"
             >
-              Asignar {selectedReady.length}
+              {t("Asignar {n}", { n: selectedReady.length })}
             </HintButton>
           </>
         }
       >
         <p style={{ fontSize: 14, color: "#475569" }}>
-          Se asignarán <strong>{selectedReady.length}</strong> de {selected.size} señal(es)
-          seleccionadas al ciclo <strong>{cycle?.code}</strong>.
+          {tr(
+            "Se asignarán <b>{n}</b> de {total} señal(es) seleccionadas al ciclo <b>{code}</b>.",
+            { n: selectedReady.length, total: selected.size, code: cycle?.code },
+            { b: (c) => <strong>{c}</strong> }
+          )}
         </p>
         {selected.size > selectedReady.length && (
           <div className="fa-notice fa-notice--warn" style={{ marginTop: 12 }}>
-            {selected.size - selectedReady.length} señal(es) quedan fuera porque les falta clúster o
-            tipología. La metodología exige ambos antes de entrar al ciclo.
+            {t("{n} señal(es) quedan fuera porque les falta clúster o tipología. La metodología exige ambos antes de entrar al ciclo.", { n: selected.size - selectedReady.length })}
           </div>
         )}
       </Modal>

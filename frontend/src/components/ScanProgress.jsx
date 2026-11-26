@@ -6,6 +6,7 @@ import Icon from "./Icon";
 import { Card } from "./Card";
 import { Spinner } from "./Spinner";
 import { elapsedSince, formatClock, formatDateTime, formatDuration, formatRange, formatSpan } from "../scan/format";
+import { t, tr, ts, intlLocale } from "../i18n";
 
 /**
  * Estado en vivo de la vigilancia: barra global y, por fuente, en qué paso va
@@ -14,12 +15,12 @@ import { elapsedSince, formatClock, formatDateTime, formatDuration, formatRange,
  */
 
 export const STEPS = [
-  { key: "cola", label: "Cola" },
-  { key: "acceso", label: "Acceso" },
-  { key: "recorrido", label: "Recorrido" },
-  { key: "extraccion", label: "Extracción" },
-  { key: "guardado", label: "Guardado" },
-  { key: "lista", label: "Lista" },
+  { key: "cola", label: t("Cola") },
+  { key: "acceso", label: t("Acceso") },
+  { key: "recorrido", label: t("Recorrido##etapa") },
+  { key: "extraccion", label: t("Extracción") },
+  { key: "guardado", label: t("Guardado##etapa") },
+  { key: "lista", label: t("Lista##etapa") },
 ];
 
 const STAGE_STEP = {
@@ -73,7 +74,7 @@ export function isRunning(row) {
 export function StageTrack({ row, compact = false }) {
   const { current, failed, done } = stepState(row);
   return (
-    <ol className={`stage-track${compact ? " stage-track--compact" : ""}`} aria-label="Avance de la fuente">
+    <ol className={`stage-track${compact ? " stage-track--compact" : ""}`} aria-label={t("Avance de la fuente")}>
       {STEPS.map((step, i) => {
         let cls = "stage-step";
         if (done || i < current) cls += " stage-step--done";
@@ -106,43 +107,46 @@ export function SourceProgress({ row }) {
       <div className="source-progress-head">
         <StageTrack row={row} />
         <Badge tone={STAGE_TONE[row.stage] || "viewer"}>
-          {running && <span className="pulse-dot" aria-hidden="true" />} {row.stage_label}
+          {running && <span className="pulse-dot" aria-hidden="true" />} {ts(row.stage_label)}
         </Badge>
-        {row.attempts > 1 && <span className="source-progress-meta">intento {row.attempts}/{row.max_attempts}</span>}
+        {row.attempts > 1 && <span className="source-progress-meta">{t("intento {n}/{max}", { n: row.attempts, max: row.max_attempts })}</span>}
         {running && row.started_at && (
           <span className="source-progress-meta">
             {elapsed(row.started_at)}
-            {row.typical_seconds ? ` · suele tardar ${formatDuration(row.typical_seconds)}` : ""}
+            {row.typical_seconds ? ` · ${t("suele tardar {tiempo}", { tiempo: formatDuration(row.typical_seconds) })}` : ""}
           </span>
         )}
         {row.stage === "en_cola" && row.typical_seconds ? (
-          <span className="source-progress-meta">suele tardar {formatDuration(row.typical_seconds)}</span>
+          <span className="source-progress-meta">{t("suele tardar {tiempo}", { tiempo: formatDuration(row.typical_seconds) })}</span>
         ) : null}
       </div>
       <div className="source-progress-facts">
-        <span title="¿El sistema ya entró a la fuente?">
-          <Icon name={row.accessed ? "check" : "clock"} size={13} /> {row.accessed ? "Accedió" : "Sin acceso aún"}
+        <span title={t("¿El sistema ya entró a la fuente?")}>
+          <Icon name={row.accessed ? "check" : "clock"} size={13} /> {row.accessed ? t("Accedió") : t("Sin acceso aún")}
           {row.http_status ? ` · HTTP ${row.http_status}` : ""}
         </span>
-        {row.access_via && <Badge tone={VIA_TONE[row.access_via] || "viewer"}>{row.access_label || row.access_via}</Badge>}
+        {row.access_via && <Badge tone={VIA_TONE[row.access_via] || "viewer"}>{ts(row.access_label) || row.access_via}</Badge>}
         {(row.pages_visited > 0 || row.stage === "recorriendo") && (
           <span>
-            {row.pages_visited}
-            {row.pages_planned ? ` de ~${row.pages_planned}` : ""} página(s)
+            {row.pages_planned
+              ? t("{n} de ~{total} página(s)", { n: row.pages_visited, total: row.pages_planned })
+              : t("{n} página(s)", { n: row.pages_visited })}
           </span>
         )}
         {(row.items_found > 0 || row.stage === "terminada") && (
           <span>
-            <strong className={row.items_new > 0 ? "txt-ok" : ""}>+{row.items_new}</strong> nuevas de {row.items_found}
+            {tr("<b>+{n}</b> nuevas de {found}", { n: row.items_new, found: row.items_found }, {
+              b: (c) => <strong className={row.items_new > 0 ? "txt-ok" : ""}>{c}</strong>,
+            })}
           </span>
         )}
       </div>
-      {row.detail && <p className="source-progress-detail">{row.detail}</p>}
+      {row.detail && <p className="source-progress-detail">{ts(row.detail)}</p>}
       <SearchAndAiLine search={row.search} ai={row.ai} />
       {(row.events?.length > 1 || row.access_attempts?.length > 0) && (
         <>
           <button type="button" className="scan-log-link" onClick={() => setOpen((v) => !v)}>
-            {open ? "Ocultar detalle" : "Ver detalle: rutas, búsqueda, IA y pasos"}
+            {open ? t("Ocultar detalle") : t("Ver detalle: rutas, búsqueda, IA y pasos")}
           </button>
           {open && <SourceRunDetail row={row} />}
         </>
@@ -151,18 +155,43 @@ export function SourceProgress({ row }) {
   );
 }
 
-const ENGINE_LABEL = { base_conocimiento: "base de conocimiento", sitemap: "mapa del sitio", brave_api: "Brave", searxng: "SearXNG" };
+const ENGINE_LABEL = { base_conocimiento: t("base de conocimiento"), sitemap: t("mapa del sitio"), brave_api: "Brave", searxng: "SearXNG" };
 const engineLabel = (e) => ENGINE_LABEL[e] || e;
 
 const ROUTE_LABEL = {
-  sitio: "Sitio",
-  navegador: "Sitio (cliente compatible con navegador)",
-  ruta_matriz: "Ruta de la matriz",
-  rss_oficial: "RSS oficial",
-  indice_pubmed: "Índice de PubMed",
+  sitio: t("Sitio"),
+  navegador: t("Sitio (cliente compatible con navegador)"),
+  ruta_matriz: t("Ruta de la matriz"),
+  rss_oficial: t("RSS oficial"),
+  indice_pubmed: t("Índice de PubMed"),
   google_news: "Google News",
   api: "API",
 };
+
+// Cada combinación es una frase entera: en inglés el orden de las palabras cambia.
+function aiLine(ai) {
+  const vars = { n: ai.kept ?? 0, ev: ai.with_evidence, ung: ai.ungrounded };
+  if (ai.with_evidence && ai.ungrounded) return t("IA: {n} señal(es) ({ev} con cita verificada) · {ung} descartada(s) por no estar en el texto", vars);
+  if (ai.with_evidence) return t("IA: {n} señal(es) ({ev} con cita verificada)", vars);
+  if (ai.ungrounded) return t("IA: {n} señal(es) · {ung} descartada(s) por no estar en el texto", vars);
+  return t("IA: {n} señal(es)", vars);
+}
+
+function aiSummary(ai) {
+  const vars = { n: ai.returned ?? 0, kept: ai.kept ?? 0, ev: ai.with_evidence, ung: ai.ungrounded };
+  let first;
+  if (ai.with_evidence && ai.ungrounded) {
+    first = t("La IA devolvió {n} señal(es); se conservaron {kept} ({ev} con cita textual verificada en la fuente) y se descartaron {ung} porque no aparecen en el texto visitado.", vars);
+  } else if (ai.with_evidence) {
+    first = t("La IA devolvió {n} señal(es); se conservaron {kept} ({ev} con cita textual verificada en la fuente).", vars);
+  } else if (ai.ungrounded) {
+    first = t("La IA devolvió {n} señal(es); se conservaron {kept} y se descartaron {ung} porque no aparecen en el texto visitado.", vars);
+  } else {
+    first = t("La IA devolvió {n} señal(es); se conservaron {kept}.", vars);
+  }
+  const second = t("Reemplazó {n} de {total} candidato(s) por reglas.", { n: ai.heuristic_replaced ?? 0, total: ai.heuristic_candidates ?? 0 });
+  return `${first} ${second}${ai.ocr ? ` ${t("OCR activo.")}` : ""}`;
+}
 
 /** Línea corta: qué buscó en la web y qué hizo la IA. */
 export function SearchAndAiLine({ search, ai }) {
@@ -173,18 +202,20 @@ export function SearchAndAiLine({ search, ai }) {
         <span title={(search.queries || []).join("\n")}>
           <Icon name="search" size={13} />{" "}
           {search.enabled === false
-            ? "Búsqueda web apagada"
-            : `Búsqueda web: ${search.results ?? 0} resultado(s) de ${search.domain}${search.engines?.length ? ` (${search.engines.map(engineLabel).join(", ")})` : ""}`}
+            ? t("Búsqueda web apagada")
+            : search.engines?.length
+              ? t("Búsqueda web: {n} resultado(s) de {domain} ({engines})", { n: search.results ?? 0, domain: search.domain, engines: search.engines.map(engineLabel).join(", ") })
+              : t("Búsqueda web: {n} resultado(s) de {domain}", { n: search.results ?? 0, domain: search.domain })}
         </span>
       )}
       {ai && Object.keys(ai).length > 0 && (
         <span>
           <Icon name="spark" size={13} />{" "}
           {ai.used === false
-            ? "Sin IA (solo reglas)"
+            ? t("Sin IA (solo reglas)")
             : ai.error
-              ? `IA falló: ${ai.error}`
-              : `IA: ${ai.kept ?? 0} señal(es)${ai.with_evidence ? ` (${ai.with_evidence} con cita verificada)` : ""}${ai.ungrounded ? ` · ${ai.ungrounded} descartada(s) por no estar en el texto` : ""}`}
+              ? t("IA falló: {error}", { error: ts(ai.error) })
+              : aiLine(ai)}
         </span>
       )}
     </div>
@@ -199,14 +230,14 @@ export function SourceRunDetail({ row }) {
     <div className="source-run-detail">
       {row.access_attempts?.length > 0 && (
         <>
-          <h5>Rutas de acceso probadas</h5>
+          <h5>{t("Rutas de acceso probadas")}</h5>
           <ul>
             {row.access_attempts.map((a, i) => (
               <li key={i}>
                 <Badge tone={a.status === "ok" ? "success" : "danger"}>{a.status.replace("http_", "HTTP ")}</Badge>{" "}
                 {ROUTE_LABEL[a.route] || a.route} ·{" "}
                 <a href={a.url} target="_blank" rel="noreferrer">{a.url.replace(/^https?:\/\//, "").slice(0, 90)}</a>
-                {a.detail ? <span className="muted"> · {a.detail}</span> : null}
+                {a.detail ? <span className="muted"> · {ts(a.detail)}</span> : null}
               </li>
             ))}
           </ul>
@@ -214,20 +245,22 @@ export function SourceRunDetail({ row }) {
       )}
       {Object.keys(search).length > 0 && (
         <>
-          <h5>Búsqueda web</h5>
+          <h5>{t("Búsqueda web")}</h5>
           {search.enabled === false ? (
-            <p>{search.reason || "Apagada"}</p>
+            <p>{ts(search.reason) || t("Apagada")}</p>
           ) : (
             <>
               <p>
-                Consultas redactadas por {search.query_origin === "ia" ? "la IA" : "reglas"} en {search.domain}:{" "}
-                {(search.queries || []).map((q) => `«${q}»`).join(", ") || "ninguna"}
+                {search.query_origin === "ia"
+                  ? t("Consultas redactadas por la IA en {domain}: {queries}", { domain: search.domain, queries: (search.queries || []).map((q) => `«${q}»`).join(", ") || t("ninguna") })
+                  : t("Consultas redactadas por reglas en {domain}: {queries}", { domain: search.domain, queries: (search.queries || []).map((q) => `«${q}»`).join(", ") || t("ninguna") })}
               </p>
               <p>
-                Motores: {(search.engine_attempts || []).join(" | ") || "-"}. Resultados útiles: {search.results ?? 0}
-                {search.from_knowledge ? ` (${search.from_knowledge} de la base de conocimiento de búsqueda)` : ""}.
+                {search.from_knowledge
+                  ? t("Motores: {motores}. Resultados útiles: {n} ({k} de la base de conocimiento de búsqueda).", { motores: (search.engine_attempts || []).join(" | ") || "-", n: search.results ?? 0, k: search.from_knowledge })
+                  : t("Motores: {motores}. Resultados útiles: {n}.", { motores: (search.engine_attempts || []).join(" | ") || "-", n: search.results ?? 0 })}
               </p>
-              {search.skipped ? <p>No se consultó ningún buscador: {search.skipped}.</p> : null}
+              {search.skipped ? <p>{t("No se consultó ningún buscador: {motivo}.", { motivo: ts(search.skipped) })}</p> : null}
               {search.urls?.length > 0 && (
                 <ul>
                   {search.urls.map((u) => (
@@ -241,30 +274,26 @@ export function SourceRunDetail({ row }) {
       )}
       {Object.keys(ai).length > 0 && (
         <>
-          <h5>Extracción con IA</h5>
+          <h5>{t("Extracción con IA")}</h5>
           {ai.used === false ? (
-            <p>{ai.reason}</p>
+            <p>{ts(ai.reason)}</p>
           ) : (
             <p>
               {ai.error
-                ? `La IA falló (${ai.error}); quedaron los candidatos por reglas.`
-                : `La IA devolvió ${ai.returned ?? 0} señal(es); se conservaron ${ai.kept ?? 0}` +
-                  (ai.with_evidence ? ` (${ai.with_evidence} con cita textual verificada en la fuente)` : "") +
-                  (ai.ungrounded ? ` y se descartaron ${ai.ungrounded} porque no aparecen en el texto visitado` : "") +
-                  `. Reemplazó ${ai.heuristic_replaced ?? 0} de ${ai.heuristic_candidates ?? 0} candidato(s) por reglas` +
-                  (ai.ocr ? ". OCR activo." : ".")}
-              {ai.ungrounded_titles?.length > 0 && <span className="muted"> Descartadas: {ai.ungrounded_titles.join(" · ")}</span>}
+                ? t("La IA falló ({error}); quedaron los candidatos por reglas.", { error: ts(ai.error) })
+                : aiSummary(ai)}
+              {ai.ungrounded_titles?.length > 0 && <span className="muted"> {t("Descartadas: {titulos}", { titulos: ai.ungrounded_titles.join(" · ") })}</span>}
             </p>
           )}
         </>
       )}
       {row.events?.length > 0 && (
         <>
-          <h5>Pasos</h5>
+          <h5>{t("Pasos")}</h5>
           <ol className="source-progress-events">
             {row.events.map((e, i) => (
               <li key={i}>
-                <time>{new Date(e.at).toLocaleTimeString()}</time> <strong>{e.stage}</strong> {e.detail}
+                <time>{new Date(e.at).toLocaleTimeString(intlLocale())}</time> <strong>{ts(e.stage)}</strong> {ts(e.detail)}
               </li>
             ))}
           </ol>
@@ -303,19 +332,19 @@ export function AccessReport({ report, onReload, live = false, updatedAt = null 
   const entered = (c.entro_directo || 0) + (c.entro_respaldo || 0) + (c.entro_sin_senales || 0);
   const rows = report.sources.filter((r) => !filter || r.outcome === filter);
   const download = () => {
-    const head = ["Fuente", "URL", "Resultado", "Ruta", "HTTP", "Páginas", "Búsqueda web", "IA", "Detectadas", "Nuevas", "Detalle", "Fecha"];
+    const head = [t("Fuente"), "URL", t("Resultado"), t("Ruta"), "HTTP", t("Páginas"), t("Búsqueda web"), t("IA"), t("Detectadas"), t("Nuevas"), t("Detalle"), t("Fecha")];
     const lines = report.sources.map((r) => [
       r.title,
       r.url,
-      r.outcome_label,
-      r.access_label || "",
+      ts(r.outcome_label),
+      ts(r.access_label) || "",
       r.http_status || "",
       r.pages_visited ?? "",
-      r.search?.enabled === false ? "apagada" : r.search?.domain ? `${r.search.results ?? 0} resultado(s)` : "",
-      r.ai?.used === false ? "sin IA" : r.ai?.used ? `${r.ai.kept ?? 0} conservadas / ${r.ai.ungrounded ?? 0} descartadas` : "",
+      r.search?.enabled === false ? t("apagada") : r.search?.domain ? t("{n} resultado(s)", { n: r.search.results ?? 0 }) : "",
+      r.ai?.used === false ? t("sin IA") : r.ai?.used ? t("{kept} conservadas / {ung} descartadas", { kept: r.ai.kept ?? 0, ung: r.ai.ungrounded ?? 0 }) : "",
       r.items_found ?? "",
       r.items_new ?? "",
-      r.detail || r.message || "",
+      ts(r.detail || r.message || ""),
       r.at || "",
     ]);
     const csv = [head, ...lines].map((l) => l.map(csvCell).join(";")).join("\n");
@@ -340,18 +369,18 @@ export function AccessReport({ report, onReload, live = false, updatedAt = null 
           {live ? <Spinner size={16} /> : <Icon name="doc" size={16} />}
         </span>
         <span className="fold-text">
-          <span className="fold-title">Informe de acceso por fuente</span>
+          <span className="fold-title">{t("Informe de acceso por fuente")}</span>
           <span className="fold-sub">
-            {live ? "Ver informe en tiempo real" : open ? "Ocultar el informe" : "Ver el informe"}
+            {live ? t("Ver informe en tiempo real") : open ? t("Ocultar el informe") : t("Ver el informe")}
             {" · "}
-            {entered} de {report.total} fuente(s) entraron
-            {c.no_entro ? ` · ${c.no_entro} no pudo entrar` : ""}
-            {c.sin_ejecutar ? ` · ${c.sin_ejecutar} sin ejecutar` : ""}
-            {updatedAt ? ` · actualizado ${formatClock(updatedAt)}` : ""}
+            {t("{n} de {total} fuente(s) entraron", { n: entered, total: report.total })}
+            {c.no_entro ? ` · ${t("{n} no pudo entrar", { n: c.no_entro })}` : ""}
+            {c.sin_ejecutar ? ` · ${t("{n} sin ejecutar", { n: c.sin_ejecutar })}` : ""}
+            {updatedAt ? ` · ${t("actualizado {hora}", { hora: formatClock(updatedAt) })}` : ""}
           </span>
         </span>
-        {c.no_entro > 0 && <Badge tone="danger">{String(c.no_entro)} sin acceso</Badge>}
-        {live && <Badge tone="info">En vivo</Badge>}
+        {c.no_entro > 0 && <Badge tone="danger">{t("{n} sin acceso", { n: c.no_entro })}</Badge>}
+        {live && <Badge tone="info">{t("En vivo")}</Badge>}
         <span className="fold-chevron" aria-hidden="true">
           <Icon name="chevron" size={18} />
         </span>
@@ -360,24 +389,23 @@ export function AccessReport({ report, onReload, live = false, updatedAt = null 
       <div className="fold-body" id="access-report-body">
       <div className="scan-run-head">
         <div className="scan-run-sub" style={{ marginTop: 0 }}>
-          Último resultado real de cada una de las {report.total} fuentes con ingesta activa: si entró, por dónde, qué buscó y qué encontró.
-          {live ? " Se actualiza solo cada 15 segundos mientras corre la vigilancia." : ""}
+          {t("Último resultado real de cada una de las {total} fuentes con ingesta activa: si entró, por dónde, qué buscó y qué encontró.", { total: report.total })}
+          {live ? ` ${t("Se actualiza solo cada 15 segundos mientras corre la vigilancia.")}` : ""}
         </div>
         <div className="fb-toolbar">
-          <Button size="sm" variant="ghost" onClick={onReload}>Actualizar</Button>
+          <Button size="sm" variant="ghost" onClick={onReload}>{t("Actualizar")}</Button>
           <Button size="sm" variant="secondary" onClick={download}><Icon name="doc" size={14} /> CSV</Button>
         </div>
       </div>
       <SearchHealth health={report.search_health} />
       {report.access_routes && (
         <div className="search-health" data-testid="access-routes">
-          <Icon name="globe" size={14} /> Rutas de acceso: sitio de la fuente
+          <Icon name="globe" size={14} />{" "}
           {report.access_routes.browser_enabled
-            ? " → cliente compatible con navegador (encendido)"
+            ? t("Rutas de acceso: sitio de la fuente → cliente compatible con navegador (encendido) → rutas de la matriz → RSS oficial → índice de la revista en PubMed → Google News.")
             : report.access_routes.browser_allowed && report.access_routes.browser_installed
-              ? " → cliente compatible con navegador (apagado; se enciende en Configuración › Parámetros de fuentes)"
-              : " → cliente compatible con navegador (no disponible en este servidor)"}
-          {" → rutas de la matriz → RSS oficial → índice de la revista en PubMed → Google News."}
+              ? t("Rutas de acceso: sitio de la fuente → cliente compatible con navegador (apagado; se enciende en Configuración › Parámetros de fuentes) → rutas de la matriz → RSS oficial → índice de la revista en PubMed → Google News.")
+              : t("Rutas de acceso: sitio de la fuente → cliente compatible con navegador (no disponible en este servidor) → rutas de la matriz → RSS oficial → índice de la revista en PubMed → Google News.")}
         </div>
       )}
       <div className="scan-run-chips" style={{ marginTop: 10 }}>
@@ -389,7 +417,7 @@ export function AccessReport({ report, onReload, live = false, updatedAt = null 
             onClick={() => setFilter(filter === key ? "" : key)}
             aria-pressed={filter === key}
           >
-            <Badge tone={OUTCOME_TONE[key]}>{String(report.counts[key] || 0)}</Badge> {label}
+            <Badge tone={OUTCOME_TONE[key]}>{String(report.counts[key] || 0)}</Badge> {ts(label)}
           </button>
         ))}
       </div>
@@ -397,13 +425,13 @@ export function AccessReport({ report, onReload, live = false, updatedAt = null 
         <table className="access-report-table">
           <thead>
             <tr>
-              <th>Fuente</th>
-              <th>Resultado</th>
-              <th>Ruta / HTTP</th>
-              <th>Búsqueda web</th>
-              <th>IA</th>
-              <th>Señales</th>
-              <th>Detalle</th>
+              <th>{t("Fuente")}</th>
+              <th>{t("Resultado")}</th>
+              <th>{t("Ruta / HTTP")}</th>
+              <th>{t("Búsqueda web")}</th>
+              <th>{t("IA")}</th>
+              <th>{t("Señales")}</th>
+              <th>{t("Detalle")}</th>
             </tr>
           </thead>
           <tbody>
@@ -412,30 +440,30 @@ export function AccessReport({ report, onReload, live = false, updatedAt = null 
                 <tr className={`access-row access-row--${r.outcome}`}>
                   <td>
                     <strong>{r.title}</strong>
-                    <div className="muted">{r.connector}{r.access_level ? ` · nivel ${r.access_level}` : ""}</div>
+                    <div className="muted">{r.connector}{r.access_level ? ` · ${t("nivel {nivel}", { nivel: r.access_level })}` : ""}</div>
                   </td>
-                  <td><Badge tone={OUTCOME_TONE[r.outcome]}>{r.outcome_label}</Badge></td>
-                  <td>{r.access_label || "-"}{r.http_status ? ` · ${r.http_status}` : ""}</td>
+                  <td><Badge tone={OUTCOME_TONE[r.outcome]}>{ts(r.outcome_label)}</Badge></td>
+                  <td>{ts(r.access_label) || "-"}{r.http_status ? ` · ${r.http_status}` : ""}</td>
                   <td>
                     {r.search?.enabled === false
-                      ? "Apagada"
+                      ? t("Apagada")
                       : r.search?.domain
-                        ? `${r.search.results ?? 0} resultado(s)${r.search.engines?.length ? ` · ${r.search.engines.map(engineLabel).join(", ")}` : ""}`
+                        ? `${t("{n} resultado(s)", { n: r.search.results ?? 0 })}${r.search.engines?.length ? ` · ${r.search.engines.map(engineLabel).join(", ")}` : ""}`
                         : "-"}
                   </td>
                   <td>
                     {r.ai?.used === false
-                      ? "Sin IA"
+                      ? t("Sin IA")
                       : r.ai?.used
-                        ? `${r.ai.kept ?? 0} conservadas${r.ai.ungrounded ? ` · ${r.ai.ungrounded} descartadas` : ""}`
+                        ? `${t("{n} conservadas", { n: r.ai.kept ?? 0 })}${r.ai.ungrounded ? ` · ${t("{n} descartadas", { n: r.ai.ungrounded })}` : ""}`
                         : "-"}
                   </td>
                   <td>{r.outcome === "sin_ejecutar" ? "-" : `+${r.items_new ?? 0} / ${r.items_found ?? 0}`}</td>
                   <td className="access-detail">
-                    {(r.detail || r.message || "").slice(0, 160)}
+                    {ts(r.detail || r.message || "").slice(0, 160)}
                     {r.outcome !== "sin_ejecutar" && (
                       <button type="button" className="scan-log-link" onClick={() => setOpenId(openId === r.source_id ? null : r.source_id)}>
-                        {openId === r.source_id ? "Ocultar" : "Ver todo"}
+                        {openId === r.source_id ? t("Ocultar") : t("Ver todo")}
                       </button>
                     )}
                   </td>
@@ -457,19 +485,20 @@ export function AccessReport({ report, onReload, live = false, updatedAt = null 
 }
 
 const HISTORY_STATUS = {
-  en_curso: { label: "En curso", tone: "info" },
-  ok: { label: "Completa", tone: "success" },
-  parcial: { label: "Con novedades", tone: "warning" },
-  error: { label: "Con error", tone: "danger" },
+  en_curso: { label: t("En curso"), tone: "info" },
+  ok: { label: t("Completa"), tone: "success" },
+  parcial: { label: t("Con novedades"), tone: "warning" },
+  error: { label: t("Con error"), tone: "danger" },
 };
 const HISTORY_PAGE = 5;
+const BOLD = { b: (c) => <strong>{c}</strong> };
 
 /** Línea bajo el botón de ejecutar: cuándo terminó la última vigilancia. */
 export function LastRunCaption({ history, active }) {
   if (active) {
     return (
       <span className="last-run-caption" data-testid="last-run-caption">
-        Vigilancia en curso…
+        {t("Vigilancia en curso…")}
       </span>
     );
   }
@@ -477,8 +506,8 @@ export function LastRunCaption({ history, active }) {
   return (
     <span className="last-run-caption" data-testid="last-run-caption">
       {last
-        ? `Última realizada: ${formatDateTime(last.finished_at || last.started_at)} · duró ${formatSpan(last.duration_seconds)}`
-        : "Última realizada: aún no hay vigilancias registradas"}
+        ? t("Última realizada: {fecha} · duró {duracion}", { fecha: formatDateTime(last.finished_at || last.started_at), duracion: formatSpan(last.duration_seconds) })
+        : t("Última realizada: aún no hay vigilancias registradas")}
     </span>
   );
 }
@@ -495,31 +524,31 @@ export function ScanHistory({ history, onReload }) {
       <div className="scan-run-head">
         <div>
           <div className="scan-run-title">
-            <Icon name="clock" size={16} /> Historial de vigilancias
+            <Icon name="clock" size={16} /> {t("Historial de vigilancias")}
           </div>
           <div className="scan-run-sub">
-            Cada corrida con su fecha y hora, cuánto tardó, quién la lanzó y qué dejó. Pulse una fila para ver el resumen.
+            {t("Cada corrida con su fecha y hora, cuánto tardó, quién la lanzó y qué dejó. Pulse una fila para ver el resumen.")}
           </div>
         </div>
-        <Button size="sm" variant="ghost" onClick={onReload}>Actualizar</Button>
+        <Button size="sm" variant="ghost" onClick={onReload}>{t("Actualizar")}</Button>
       </div>
       {runs.length === 0 ? (
         <p className="scan-history-empty">
-          Aún no hay vigilancias registradas. El historial empieza con la próxima corrida, manual o programada.
+          {t("Aún no hay vigilancias registradas. El historial empieza con la próxima corrida, manual o programada.")}
         </p>
       ) : (
         <div className="access-report-table-wrap" style={{ maxHeight: "none" }}>
           <table className="access-report-table scan-history-table">
             <thead>
               <tr>
-                <th>Inicio</th>
-                <th>Duración</th>
-                <th>Estado</th>
-                <th>Alcance</th>
-                <th>Fuentes</th>
-                <th>Acceso</th>
-                <th>Señales</th>
-                <th>Lanzada por</th>
+                <th>{t("Inicio##hora")}</th>
+                <th>{t("Duración")}</th>
+                <th>{t("Estado")}</th>
+                <th>{t("Alcance")}</th>
+                <th>{t("Fuentes")}</th>
+                <th>{t("Acceso")}</th>
+                <th>{t("Señales")}</th>
+                <th>{t("Lanzada por")}</th>
               </tr>
             </thead>
             <tbody>
@@ -538,54 +567,54 @@ export function ScanHistory({ history, onReload }) {
                       <td>
                         <strong>{formatDateTime(run.started_at)}</strong>
                         <div className="muted">
-                          {run.finished_at ? `terminó ${formatDateTime(run.finished_at)}` : "sin terminar"}
+                          {run.finished_at ? t("terminó {fecha}", { fecha: formatDateTime(run.finished_at) }) : t("sin terminar")}
                         </div>
                       </td>
-                      <td>{formatSpan(run.duration_seconds)}{run.status === "en_curso" ? " (va)" : ""}</td>
+                      <td>{formatSpan(run.duration_seconds)}{run.status === "en_curso" ? ` ${t("(va)")}` : ""}</td>
                       <td><Badge tone={st.tone}>{st.label}</Badge></td>
                       <td>
-                        {run.scope_label}
-                        <div className="muted">{run.origin === "manual" ? "Manual" : "Programada"}</div>
+                        {ts(run.scope_label)}
+                        <div className="muted">{run.origin === "manual" ? t("Manual") : t("Programada")}</div>
                       </td>
                       <td>
                         {run.sources_total}
-                        {run.sources_pending ? <div className="muted">{run.sources_pending} pendiente(s)</div> : null}
+                        {run.sources_pending ? <div className="muted">{t("{n} pendiente(s)", { n: run.sources_pending })}</div> : null}
                       </td>
                       <td>
-                        {entered} entraron
-                        {o.no_entro ? <div className="txt-danger">{o.no_entro} sin acceso</div> : null}
+                        {t("{n} entraron", { n: entered })}
+                        {o.no_entro ? <div className="txt-danger">{t("{n} sin acceso", { n: o.no_entro })}</div> : null}
                       </td>
                       <td>
-                        <strong className={run.items_new > 0 ? "txt-ok" : ""}>+{run.items_new}</strong> nuevas
-                        <div className="muted">{run.items_found} detectadas</div>
+                        {tr("<b>+{n}</b> nuevas", { n: run.items_new }, { b: (c) => <strong className={run.items_new > 0 ? "txt-ok" : ""}>{c}</strong> })}
+                        <div className="muted">{t("{n} detectadas", { n: run.items_found })}</div>
                       </td>
                       <td className="scan-history-who">
-                        {run.origin === "manual" ? run.triggered_by : "Programador"}
+                        {run.origin === "manual" ? run.triggered_by : t("Programador")}
                         <button type="button" className="scan-log-link" aria-expanded={isOpen} onClick={(e) => { e.stopPropagation(); setOpenId(isOpen ? null : run.id); }}>
-                          {isOpen ? "Ocultar resumen" : "Ver resumen"}
+                          {isOpen ? t("Ocultar resumen") : t("Ver resumen")}
                         </button>
                       </td>
                     </tr>
                     {isOpen && (
                       <tr className="scan-history-detail">
                         <td colSpan={8}>
-                          <p>{run.message}</p>
+                          <p>{ts(run.message)}</p>
                           <ul className="scan-history-facts">
-                            <li><strong>{o.entro_directo || 0}</strong> entraron a la fuente</li>
-                            <li><strong>{o.entro_respaldo || 0}</strong> por ruta de respaldo</li>
-                            <li><strong>{o.entro_sin_senales || 0}</strong> entraron sin señales</li>
-                            <li><strong>{o.fallo_despues || 0}</strong> fallaron al extraer</li>
-                            <li><strong>{o.no_entro || 0}</strong> no pudieron entrar</li>
-                            <li><strong>{run.counts?.cancelado || 0}</strong> canceladas</li>
+                            <li>{tr("<b>{n}</b> entraron a la fuente", { n: o.entro_directo || 0 }, BOLD)}</li>
+                            <li>{tr("<b>{n}</b> por ruta de respaldo", { n: o.entro_respaldo || 0 }, BOLD)}</li>
+                            <li>{tr("<b>{n}</b> entraron sin señales", { n: o.entro_sin_senales || 0 }, BOLD)}</li>
+                            <li>{tr("<b>{n}</b> fallaron al extraer", { n: o.fallo_despues || 0 }, BOLD)}</li>
+                            <li>{tr("<b>{n}</b> no pudieron entrar", { n: o.no_entro || 0 }, BOLD)}</li>
+                            <li>{tr("<b>{n}</b> canceladas", { n: run.counts?.cancelado || 0 }, BOLD)}</li>
                           </ul>
                           {run.failed?.length > 0 && (
                             <>
-                              <h5>Fuentes con problema en esta corrida</h5>
+                              <h5>{t("Fuentes con problema en esta corrida")}</h5>
                               <ul className="scan-history-failed">
                                 {run.failed.map((f) => (
                                   <li key={f.source_id}>
                                     <strong>{f.title}</strong>
-                                    <span className="muted"> · {f.message || "Sin detalle"}</span>
+                                    <span className="muted"> · {ts(f.message) || t("Sin detalle")}</span>
                                   </li>
                                 ))}
                               </ul>
@@ -603,7 +632,7 @@ export function ScanHistory({ history, onReload }) {
       )}
       {runs.length > HISTORY_PAGE && (
         <button type="button" className="scan-log-link" style={{ marginTop: 8 }} onClick={() => setAll((v) => !v)}>
-          {all ? "Ver solo las últimas" : `Ver las ${runs.length} vigilancias registradas`}
+          {all ? t("Ver solo las últimas") : t("Ver las {n} vigilancias registradas", { n: runs.length })}
         </button>
       )}
     </Card>
@@ -635,11 +664,11 @@ export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter
     progress.active && running === 0 && queued > 0 && next.every((r) => r.scheduled_for && new Date(r.scheduled_for).getTime() > Date.now());
   const stale = progress.active && lastFetch && Date.now() - lastFetch > 60000;
   const chips = [
-    { key: "ejecutando", label: "En curso", value: running, tone: "info" },
-    { key: "pendiente", label: "En cola", value: queued, tone: "viewer" },
-    { key: "ok", label: "Terminadas", value: done, tone: "success" },
-    { key: "error", label: "Con error", value: failed, tone: "danger" },
-    { key: "cancelado", label: "Canceladas", value: cancelled, tone: "viewer" },
+    { key: "ejecutando", label: t("En curso"), value: running, tone: "info" },
+    { key: "pendiente", label: t("En cola"), value: queued, tone: "viewer" },
+    { key: "ok", label: t("Terminadas"), value: done, tone: "success" },
+    { key: "error", label: t("Con error"), value: failed, tone: "danger" },
+    { key: "cancelado", label: t("Canceladas"), value: cancelled, tone: "viewer" },
   ];
   return (
     <Card
@@ -653,16 +682,16 @@ export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter
           <div className="scan-run-title">
             {progress.active ? (
               <>
-                <span className="pulse-dot" aria-hidden="true" /> Vigilancia en curso
+                <span className="pulse-dot" aria-hidden="true" /> {t("Vigilancia en curso")}
               </>
             ) : (
-              <>Última vigilancia · {pct} %</>
+              <>{t("Última vigilancia · {pct} %", { pct })}</>
             )}
           </div>
           <div className="scan-run-sub">
             {progress.active
-              ? "Corre en el servidor: puede cambiar de módulo o de pestaña, o cerrar el navegador. Sigue sola y le avisamos al terminar."
-              : `${finished} de ${progress.total} fuente(s) procesadas: ${done} terminadas${failed ? `, ${failed} con error` : ""}${cancelled ? `, ${cancelled} canceladas` : ""}.`}
+              ? t("Corre en el servidor: puede cambiar de módulo o de pestaña, o cerrar el navegador. Sigue sola y le avisamos al terminar.")
+              : `${t("{n} de {total} fuente(s) procesadas: {done} terminadas", { n: finished, total: progress.total, done })}${failed ? `, ${t("{n} con error", { n: failed })}` : ""}${cancelled ? `, ${t("{n} canceladas", { n: cancelled })}` : ""}.`}
           </div>
         </div>
         {progress.active && canScan && (
@@ -671,40 +700,40 @@ export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter
             variant="outline"
             loading={cancelling}
             onClick={onCancel}
-            hint="Cancela las fuentes que siguen en cola. Las que ya se están rastreando terminan su paso actual."
+            hint={t("Cancela las fuentes que siguen en cola. Las que ya se están rastreando terminan su paso actual.")}
           >
-            <Icon name="x" size={14} /> Detener
+            <Icon name="x" size={14} /> {t("Detener")}
           </HintButton>
         )}
       </div>
 
       {progress.active && (
-        <div className="scan-kpis" role="group" aria-label="Avance de la vigilancia">
+        <div className="scan-kpis" role="group" aria-label={t("Avance de la vigilancia")}>
           <div className="scan-kpi">
-            <span className="scan-kpi-label">Avance</span>
+            <span className="scan-kpi-label">{t("Avance")}</span>
             <strong className="scan-kpi-value">
-              {finished} de {progress.total}
+              {t("{n} de {total}", { n: finished, total: progress.total })}
             </strong>
             <span className="scan-kpi-sub">
-              {pct} % · {done} ok{failed ? ` · ${failed} con error` : ""}
+              {t("{pct} % · {done} ok", { pct, done })}{failed ? ` · ${t("{n} con error", { n: failed })}` : ""}
             </span>
           </div>
           {eta && (
             <>
               <div className="scan-kpi">
-                <span className="scan-kpi-label">Transcurrido</span>
+                <span className="scan-kpi-label">{t("Transcurrido")}</span>
                 <strong className="scan-kpi-value">{formatDuration(eta.elapsed_seconds)}</strong>
-                <span className="scan-kpi-sub">Inició {formatClock(eta.run_started_at)}</span>
+                <span className="scan-kpi-sub">{t("Inició {hora}", { hora: formatClock(eta.run_started_at) })}</span>
               </div>
               <div className="scan-kpi scan-kpi--accent">
-                <span className="scan-kpi-label">Tiempo restante</span>
+                <span className="scan-kpi-label">{t("Tiempo restante")}</span>
                 <strong className="scan-kpi-value">~{formatDuration(eta.eta_seconds)}</strong>
-                <span className="scan-kpi-sub">entre {formatRange(eta.eta_low_seconds, eta.eta_high_seconds)}</span>
+                <span className="scan-kpi-sub">{t("entre {rango}", { rango: formatRange(eta.eta_low_seconds, eta.eta_high_seconds) })}</span>
               </div>
               <div className="scan-kpi">
-                <span className="scan-kpi-label">Fin estimado</span>
+                <span className="scan-kpi-label">{t("Fin estimado")}</span>
                 <strong className="scan-kpi-value">{formatClock(eta.eta_at)}</strong>
-                <span className="scan-kpi-sub">{progress.parallel} fuente(s) a la vez</span>
+                <span className="scan-kpi-sub">{t("{n} fuente(s) a la vez", { n: progress.parallel })}</span>
               </div>
             </>
           )}
@@ -717,7 +746,7 @@ export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter
         aria-valuenow={pct}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={`${pct} % de las fuentes procesadas`}
+        aria-label={t("{pct} % de las fuentes procesadas", { pct })}
       >
         <span className="seg-ok" style={{ width: seg(done) }} />
         <span className="seg-error" style={{ width: seg(failed + cancelled) }} />
@@ -728,27 +757,27 @@ export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter
         <div className="scan-now">
           {stale && (
             <p className="scan-warn" role="status">
-              <Icon name="info" size={14} /> Sin respuesta del servidor hace {formatDuration((Date.now() - lastFetch) / 1000)}. Si se
-              reinició, la vigilancia se reanuda sola donde quedó.
+              <Icon name="info" size={14} />{" "}
+              {t("Sin respuesta del servidor hace {tiempo}. Si se reinició, la vigilancia se reanuda sola donde quedó.", { tiempo: formatDuration((Date.now() - lastFetch) / 1000) })}
             </p>
           )}
           {!progress.worker_running && (
             progress.guardian_running ? (
               <p className="scan-note" role="status" data-testid="scan-guardian">
-                <Icon name="info" size={14} /> Este servidor no tiene un trabajador permanente: la cola la cuida un vigilante que
-                revisa cada minuto. Si el servicio se reinicia o se suspende, la vigilancia se reanuda sola donde quedó.
+                <Icon name="info" size={14} />{" "}
+                {t("Este servidor no tiene un trabajador permanente: la cola la cuida un vigilante que revisa cada minuto. Si el servicio se reinicia o se suspende, la vigilancia se reanuda sola donde quedó.")}
               </p>
             ) : (
               <p className="scan-warn" role="status">
-                <Icon name="info" size={14} /> El trabajador de vigilancia no está en marcha en este servidor: la cola se atiende
-                desde la corrida que la lanzó.
+                <Icon name="info" size={14} />{" "}
+                {t("El trabajador de vigilancia no está en marcha en este servidor: la cola se atiende desde la corrida que la lanzó.")}
               </p>
             )
           )}
           {retryWait && (
             <p className="scan-note">
-              <Icon name="clock" size={14} /> Esperando reintentos: la próxima fuente se vuelve a intentar a las{" "}
-              {formatClock(next[0]?.scheduled_for)}.
+              <Icon name="clock" size={14} />{" "}
+              {t("Esperando reintentos: la próxima fuente se vuelve a intentar a las {hora}.", { hora: formatClock(next[0]?.scheduled_for) })}
             </p>
           )}
           {now.map((r) => {
@@ -756,37 +785,36 @@ export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter
             const quiet = r.updated_at ? elapsedSince(r.updated_at) : null;
             return (
               <div key={r.source_id} className="scan-now-row">
-                <span className="scan-now-tag">Ahora</span>
+                <span className="scan-now-tag">{t("Ahora")}</span>
                 <strong>{r.source_title}</strong>
                 <span className="muted">
-                  {r.stage_label}
-                  {took != null ? ` · lleva ${formatDuration(took)}` : ""}
-                  {r.typical_seconds ? ` · suele tardar ${formatDuration(r.typical_seconds)}` : ""}
-                  {quiet != null && quiet > 180 ? ` · sin novedades hace ${formatDuration(quiet)}` : ""}
+                  {ts(r.stage_label)}
+                  {took != null ? ` · ${t("lleva {tiempo}", { tiempo: formatDuration(took) })}` : ""}
+                  {r.typical_seconds ? ` · ${t("suele tardar {tiempo}", { tiempo: formatDuration(r.typical_seconds) })}` : ""}
+                  {quiet != null && quiet > 180 ? ` · ${t("sin novedades hace {tiempo}", { tiempo: formatDuration(quiet) })}` : ""}
                 </span>
               </div>
             );
           })}
           {next.length > 0 && (
             <div className="scan-now-row">
-              <span className="scan-now-tag scan-now-tag--next">Siguen</span>
+              <span className="scan-now-tag scan-now-tag--next">{t("Siguen")}</span>
               <span className="muted">
                 {next.map((r) => r.source_title).join(" · ")}
-                {queued > next.length ? ` y ${queued - next.length} más` : ""}
+                {queued > next.length ? ` ${t("y {n} más", { n: queued - next.length })}` : ""}
               </span>
             </div>
           )}
           {eta && (
             <details className="scan-eta-basis">
-              <summary>¿Cómo se calcula el tiempo?</summary>
+              <summary>{t("¿Cómo se calcula el tiempo?")}</summary>
               <p>
-                Cada fuente se estima con el promedio de sus 3 últimas corridas en este servidor y se ajusta a la velocidad
-                real de esta corrida. Luego se reparte la cola entre {progress.parallel} carril(es) en el orden en que el
-                servidor la atenderá, incluidos los reintentos programados. El rango va de lo que la fuente tarda en sus
-                corridas rápidas a lo que tarda en las lentas.
-                Ninguna fuente pasa de {progress.job_timeout_minutes} min: si los supera, se cierra con error y la corrida sigue.
+                {t(
+                  "Cada fuente se estima con el promedio de sus 3 últimas corridas en este servidor y se ajusta a la velocidad real de esta corrida. Luego se reparte la cola entre {parallel} carril(es) en el orden en que el servidor la atenderá, incluidos los reintentos programados. El rango va de lo que la fuente tarda en sus corridas rápidas a lo que tarda en las lentas. Ninguna fuente pasa de {minutos} min: si los supera, se cierra con error y la corrida sigue.",
+                  { parallel: progress.parallel, minutos: progress.job_timeout_minutes }
+                )}
               </p>
-              <p className="muted">{eta.basis}</p>
+              <p className="muted">{ts(eta.basis)}</p>
             </details>
           )}
         </div>
@@ -806,7 +834,7 @@ export function ScanRunSummary({ progress, canScan, onCancel, cancelling, filter
         ))}
         {filter && (
           <Button size="sm" variant="ghost" onClick={() => onFilter("")}>
-            Ver todas
+            {t("Ver todas")}
           </Button>
         )}
       </div>
@@ -825,7 +853,7 @@ export function ScanDock({ progress, onOpen }) {
   const current = (progress.sources || []).find((r) => r.job_status === "ejecutando");
   if (collapsed) {
     return (
-      <button type="button" className="scan-dock scan-dock--mini" onClick={() => setCollapsed(false)} aria-label="Mostrar el avance de la vigilancia">
+      <button type="button" className="scan-dock scan-dock--mini" onClick={() => setCollapsed(false)} aria-label={t("Mostrar el avance de la vigilancia")}>
         <span className="pulse-dot" aria-hidden="true" /> {pct} % · {finished}/{progress.total}
         {eta ? ` · ~${formatDuration(eta.eta_seconds)}` : ""}
       </button>
@@ -835,8 +863,8 @@ export function ScanDock({ progress, onOpen }) {
     <div className="scan-dock" role="status" aria-live="polite" data-testid="scan-dock">
       <div className="scan-dock-head">
         <span className="pulse-dot" aria-hidden="true" />
-        <strong>Vigilancia en curso</strong>
-        <button type="button" className="scan-dock-x" onClick={() => setCollapsed(true)} aria-label="Minimizar">
+        <strong>{t("Vigilancia en curso")}</strong>
+        <button type="button" className="scan-dock-x" onClick={() => setCollapsed(true)} aria-label={t("Minimizar")}>
           <Icon name="x" size={13} />
         </button>
       </div>
@@ -844,16 +872,16 @@ export function ScanDock({ progress, onOpen }) {
         <span style={{ width: `${pct}%` }} />
       </div>
       <div className="scan-dock-line">
-        {finished} de {progress.total} fuentes · {pct} %
+        {t("{n} de {total} fuentes · {pct} %", { n: finished, total: progress.total, pct })}
       </div>
       {eta && (
         <div className="scan-dock-line">
-          Faltan ~{formatDuration(eta.eta_seconds)} · termina ~{formatClock(eta.eta_at)}
+          {t("Faltan ~{tiempo} · termina ~{hora}", { tiempo: formatDuration(eta.eta_seconds), hora: formatClock(eta.eta_at) })}
         </div>
       )}
-      {current && <div className="scan-dock-line muted">Ahora: {current.source_title}</div>}
+      {current && <div className="scan-dock-line muted">{t("Ahora: {fuente}", { fuente: current.source_title })}</div>}
       <button type="button" className="scan-log-link" onClick={onOpen}>
-        Ver el detalle en Vigilancia →
+        {t("Ver el detalle en Vigilancia →")}
       </button>
     </div>
   );
@@ -867,20 +895,32 @@ function SearchHealth({ health }) {
     <div className={`search-health${health.note ? " search-health--warn" : ""}`} data-testid="search-health">
       <Icon name="search" size={14} />{" "}
       {!health.enabled ? (
-        "Búsqueda web apagada en Parámetros de fuentes."
+        t("Búsqueda web apagada en Parámetros de fuentes.")
       ) : (
         <>
-          Búsqueda web: {health.sources_with_results} de {health.sources_searched} fuente(s) obtuvieron resultados del dominio en su última corrida.
-          {" "}Motores: {health.engines.join(", ")}{health.api_configured ? " · API configurada" : " · sin API"}.
-          {cooling.length > 0 && <> En pausa por bloqueo: {cooling.map(([e, sec]) => `${e} (${Math.ceil(sec / 60)} min)`).join(", ")}.</>}
+          {t("Búsqueda web: {n} de {total} fuente(s) obtuvieron resultados del dominio en su última corrida.", { n: health.sources_with_results, total: health.sources_searched })}
+          {" "}
+          {health.api_configured
+            ? t("Motores: {motores} · API configurada.", { motores: health.engines.join(", ") })
+            : t("Motores: {motores} · sin API.", { motores: health.engines.join(", ") })}
+          {cooling.length > 0 && <> {t("En pausa por bloqueo: {lista}.", { lista: cooling.map(([e, sec]) => `${e} (${Math.ceil(sec / 60)} min)`).join(", ") })}</>}
           {health.knowledge ? (
             <div style={{ marginTop: 4 }} data-testid="search-knowledge-line">
-              Base de conocimiento de búsqueda: {health.knowledge.pages} página(s) de {health.knowledge.domains} sitio(s),{" "}
-              {health.knowledge.with_signals} ya aportaron señales. La vigilancia las visita sin consultar buscadores
-              {health.sources_from_knowledge ? ` (${health.sources_from_knowledge} fuente(s) la usaron en su última corrida)` : ""}.
+              {health.sources_from_knowledge
+                ? t("Base de conocimiento de búsqueda: {pages} página(s) de {domains} sitio(s), {signals} ya aportaron señales. La vigilancia las visita sin consultar buscadores ({n} fuente(s) la usaron en su última corrida).", {
+                    pages: health.knowledge.pages,
+                    domains: health.knowledge.domains,
+                    signals: health.knowledge.with_signals,
+                    n: health.sources_from_knowledge,
+                  })
+                : t("Base de conocimiento de búsqueda: {pages} página(s) de {domains} sitio(s), {signals} ya aportaron señales. La vigilancia las visita sin consultar buscadores.", {
+                    pages: health.knowledge.pages,
+                    domains: health.knowledge.domains,
+                    signals: health.knowledge.with_signals,
+                  })}
             </div>
           ) : null}
-          {health.note && <div style={{ marginTop: 4 }}>{health.note}</div>}
+          {health.note && <div style={{ marginTop: 4 }}>{ts(health.note)}</div>}
         </>
       )}
     </div>

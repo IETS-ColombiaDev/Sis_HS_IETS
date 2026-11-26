@@ -6,12 +6,13 @@ import Button from "./Button";
 import Badge from "./Badge";
 import Icon from "./Icon";
 import { Input } from "./Field";
+import { t, intlLocale } from "../i18n";
 
 function fmtDate(value) {
-  return value ? new Date(value).toLocaleDateString("es-CO") : "nunca";
+  return value ? new Date(value).toLocaleDateString(intlLocale()) : t("nunca");
 }
 
-const ENGINE = { sitemap: "Mapa del sitio", base_conocimiento: "Base", brave_api: "Brave", searxng: "SearXNG" };
+const ENGINE = { sitemap: t("Mapa del sitio"), base_conocimiento: t("Base##conocimiento"), brave_api: "Brave", searxng: "SearXNG" };
 
 /**
  * Base de conocimiento de busqueda: paginas utiles de cada fuente que la
@@ -39,7 +40,7 @@ export default function SearchKnowledgePanel({ toast }) {
         setData(d);
         setCoverage(c);
       } catch (e) {
-        toast?.error(apiError(e, "No se pudo leer la base de conocimiento de búsqueda"));
+        toast?.error(apiError(e, t("No se pudo leer la base de conocimiento de búsqueda")));
       }
     },
     [toast]
@@ -59,7 +60,7 @@ export default function SearchKnowledgePanel({ toast }) {
     try {
       await downloadFromApi(api, "/search-knowledge/export", "base_busqueda_eh.json");
     } catch (e) {
-      toast?.error(apiError(e, "No se pudo descargar el paquete"));
+      toast?.error(apiError(e, t("No se pudo descargar el paquete")));
     } finally {
       setBusy("");
     }
@@ -73,10 +74,10 @@ export default function SearchKnowledgePanel({ toast }) {
     try {
       const pack = JSON.parse(await file.text());
       const { data: out } = await api.post("/search-knowledge/import", pack);
-      toast?.success(`Paquete cargado: ${out.added} página(s) nuevas y ${out.updated} ya conocidas. No se borró nada.`);
+      toast?.success(t("Paquete cargado: {added} página(s) nuevas y {updated} ya conocidas. No se borró nada.", { added: out.added, updated: out.updated }));
       load(q.trim());
     } catch (e) {
-      toast?.error(e instanceof SyntaxError ? "El archivo no es un paquete JSON válido." : apiError(e, "No se pudo cargar el paquete"));
+      toast?.error(e instanceof SyntaxError ? t("El archivo no es un paquete JSON válido.") : apiError(e, t("No se pudo cargar el paquete")));
     } finally {
       setBusy("");
     }
@@ -89,53 +90,54 @@ export default function SearchKnowledgePanel({ toast }) {
         right={
           <div className="fb-toolbar">
             <Button size="sm" variant="secondary" onClick={exportPack} loading={busy === "export"} data-testid="knowledge-export">
-              <Icon name="doc" size={14} /> Descargar paquete
+              <Icon name="doc" size={14} /> {t("Descargar paquete")}
             </Button>
             <Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()} loading={busy === "import"} data-testid="knowledge-import">
-              Cargar paquete
+              {t("Cargar paquete")}
             </Button>
             <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={importPack} data-testid="knowledge-file" />
           </div>
         }
       >
-        Base de conocimiento de búsqueda
+        {t("Base de conocimiento de búsqueda")}
       </SectionTitle>
       <p style={{ fontSize: 13, color: "#475569", marginTop: 0 }}>
-        Páginas de cada fuente que ya se encontraron y que la vigilancia visita sin consultar buscadores. Sirve a todas las
-        corridas y a todos los ciclos, y se respalda con la base del sistema. Una página que no aporta señales en{" "}
-        {st?.silent_after_visits ?? 2} visitas deja de visitarse y se vuelve a probar a los {st?.retry_silent_days ?? 45} días.
+        {t(
+          "Páginas de cada fuente que ya se encontraron y que la vigilancia visita sin consultar buscadores. Sirve a todas las corridas y a todos los ciclos, y se respalda con la base del sistema. Una página que no aporta señales en {visitas} visitas deja de visitarse y se vuelve a probar a los {dias} días.",
+          { visitas: st?.silent_after_visits ?? 2, dias: st?.retry_silent_days ?? 45 }
+        )}
       </p>
       {st && (
         <div className="fb-toolbar" style={{ marginBottom: 10 }} data-testid="knowledge-stats">
-          <Badge tone="ok">{st.pages} página(s)</Badge>
-          <Badge tone="viewer">{st.domains} sitio(s)</Badge>
-          <Badge tone="ok">{st.with_signals} han aportado señales</Badge>
-          <Badge tone="warning">{st.silent} sin señal (en pausa)</Badge>
+          <Badge tone="ok">{t("{n} página(s)", { n: st.pages })}</Badge>
+          <Badge tone="viewer">{t("{n} sitio(s)", { n: st.domains })}</Badge>
+          <Badge tone="ok">{t("{n} han aportado señales", { n: st.with_signals })}</Badge>
+          <Badge tone="warning">{t("{n} sin señal (en pausa)", { n: st.silent })}</Badge>
           {coverage ? (
             <Badge tone="viewer">
-              {coverage.covered} de {coverage.total} fuentes activas con páginas conocidas
+              {t("{n} de {total} fuentes activas con páginas conocidas", { n: coverage.covered, total: coverage.total })}
             </Badge>
           ) : null}
-          <span style={{ fontSize: 12, color: "#64748b" }}>Última actualización: {fmtDate(st.last_seen_at)}</span>
+          <span style={{ fontSize: 12, color: "#64748b" }}>{t("Última actualización: {fecha}", { fecha: fmtDate(st.last_seen_at) })}</span>
         </div>
       )}
       <form onSubmit={submit} className="fb-toolbar" style={{ alignItems: "flex-end", marginBottom: 10 }}>
         <div style={{ flex: 1, minWidth: 220 }}>
           <Input
             id="knowledge-q"
-            label="Consultar la base"
-            placeholder="Por ejemplo: terapia génica, pipeline, nice.org.uk"
+            label={t("Consultar la base")}
+            placeholder={t("Por ejemplo: terapia génica, pipeline, nice.org.uk")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
         <Button size="sm" type="submit" data-testid="knowledge-search">
-          <Icon name="search" size={14} /> Buscar
+          <Icon name="search" size={14} /> {t("Buscar")}
         </Button>
       </form>
       {data && data.items.length === 0 ? (
         <p style={{ fontSize: 13, color: "#64748b" }} data-testid="knowledge-empty">
-          {st?.pages ? "Ninguna página coincide con esa consulta." : "La base está vacía. Se llena con el paquete del sistema, con una vigilancia o cargando un paquete."}
+          {st?.pages ? t("Ninguna página coincide con esa consulta.") : t("La base está vacía. Se llena con el paquete del sistema, con una vigilancia o cargando un paquete.")}
         </p>
       ) : null}
       {data && data.items.length > 0 ? (
@@ -143,12 +145,12 @@ export default function SearchKnowledgePanel({ toast }) {
           <table className="data-table" style={{ width: "100%", fontSize: 13 }} data-testid="knowledge-table">
             <thead>
               <tr>
-                <th style={{ textAlign: "left" }}>Página</th>
-                <th style={{ textAlign: "left" }}>Sitio</th>
-                <th>Origen</th>
-                <th>Visitas</th>
-                <th>Señales</th>
-                <th>Estado</th>
+                <th style={{ textAlign: "left" }}>{t("Página")}</th>
+                <th style={{ textAlign: "left" }}>{t("Sitio")}</th>
+                <th>{t("Origen")}</th>
+                <th>{t("Visitas")}</th>
+                <th>{t("Señales")}</th>
+                <th>{t("Estado")}</th>
               </tr>
             </thead>
             <tbody>
@@ -165,7 +167,7 @@ export default function SearchKnowledgePanel({ toast }) {
                   <td style={{ textAlign: "center" }}>{row.visits}</td>
                   <td style={{ textAlign: "center" }}>{row.signals}</td>
                   <td style={{ textAlign: "center" }}>
-                    <Badge tone={row.status === "activa" ? "ok" : "warning"}>{row.status === "activa" ? "Activa" : "Sin señal"}</Badge>
+                    <Badge tone={row.status === "activa" ? "ok" : "warning"}>{row.status === "activa" ? t("Activa") : t("Sin señal")}</Badge>
                   </td>
                 </tr>
               ))}

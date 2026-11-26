@@ -5,7 +5,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.5.0 · actualizada el 26 de noviembre de 2026 (entrega final: rutas de acceso a las fuentes, historial de vigilancias con fecha, hora y duración, informe de acceso plegable y ficha de modelos de inteligencia; antes, 7.4.2: búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
+| **Versión del sistema** | 7.6.0 · actualizada el 26 de noviembre de 2026 (interfaz en español, inglés británico e inglés americano con selector de idioma; antes, 7.5.0: entrega final: rutas de acceso a las fuentes, historial de vigilancias con fecha, hora y duración, informe de acceso plegable y ficha de modelos de inteligencia; antes, 7.4.2: búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
@@ -177,6 +177,16 @@ En servidores de prueba puede verse «Acceso rápido como administrador». **En 
 Use el menú de su perfil → salir. En equipos compartidos, cierre siempre la sesión.
 
 ---
+
+### Idioma de la interfaz
+
+El selector con el globo (🌐) está en la cabecera, en la pantalla de ingreso y en las pantallas públicas. Ofrece **Español**, **English (UK)** e **English (US)**.
+
+- Al cambiarlo la página se recarga y todo el sistema queda en ese idioma: menú, pantallas, ayudas, guía, mensajes y errores. El navegador recuerda la elección.
+- El inglés británico y el americano difieren en ortografía (*prioritisation / prioritization*, *catalogue / catalog*, *programme / program*) y en el formato de fechas y números (26/11/2026 frente a 11/26/2026).
+- El Asistente IA y el asistente de navegación responden en el idioma elegido.
+- **No se traduce el contenido**: nombres y descripciones de las fuentes, títulos de señales, notas, boletines, postulaciones y lo que escriben las personas se muestran como se guardaron. Los documentos que se descargan (PDF, Excel, CSV) salen en español.
+- Si un texto no tiene traducción se muestra en español; nunca queda un espacio vacío.
 
 ## 3. Perfiles: quién hace qué
 

@@ -9,39 +9,40 @@ import { Input, Textarea } from "./Field";
 import { LoadingBlock } from "./Spinner";
 import { TermLabel } from "./InfoTip";
 import SearchKnowledgePanel from "./SearchKnowledgePanel";
+import { t, tr, ts } from "../i18n";
 
 const LISTS = [
-  { key: "source_level", title: "Nivel de fuente (primaria, secundaria...)", tip: GLOSSARY.fb_nivel_fuente },
-  { key: "tech_type", title: "Tipos de tecnología", tip: GLOSSARY.fb_tipos_tecnologia, hint: "Código en mayúscula (MED, DM, IA...)." },
-  { key: "matrix_origin", title: "Origen en la matriz", tip: GLOSSARY.fb_origen_matriz },
+  { key: "source_level", title: t("Nivel de fuente (primaria, secundaria...)"), tip: GLOSSARY.fb_nivel_fuente },
+  { key: "tech_type", title: t("Tipos de tecnología"), tip: GLOSSARY.fb_tipos_tecnologia, hint: t("Código en mayúscula (MED, DM, IA...).") },
+  { key: "matrix_origin", title: t("Origen en la matriz"), tip: GLOSSARY.fb_origen_matriz },
 ];
 
 const NUMBERS = [
-  { key: "max_queries", label: "Consultas por fuente" },
-  { key: "max_results", label: "Resultados a conservar" },
-  { key: "fetch_results", label: "Resultados a abrir y leer" },
-  { key: "timeout", label: "Tiempo por consulta (s)" },
-  { key: "pause_ms", label: "Pausa entre consultas (ms)" },
-  { key: "cooldown_minutes", label: "Pausa de un motor bloqueado (min)" },
-  { key: "time_budget_s", label: "Tiempo máximo de búsqueda por fuente (s)" },
-  { key: "knowledge_fresh_days", label: "Días que la base cuenta como reciente" },
+  { key: "max_queries", label: t("Consultas por fuente") },
+  { key: "max_results", label: t("Resultados a conservar") },
+  { key: "fetch_results", label: t("Resultados a abrir y leer") },
+  { key: "timeout", label: t("Tiempo por consulta (s)") },
+  { key: "pause_ms", label: t("Pausa entre consultas (ms)") },
+  { key: "cooldown_minutes", label: t("Pausa de un motor bloqueado (min)") },
+  { key: "time_budget_s", label: t("Tiempo máximo de búsqueda por fuente (s)") },
+  { key: "knowledge_fresh_days", label: t("Días que la base cuenta como reciente") },
 ];
 
 const SWITCHES = [
-  { key: "enabled", title: "Búsqueda web activa", text: "Interruptor global. Cada fuente además tiene su casilla en el flujo." },
-  { key: "ai_queries", title: "Consultas redactadas por la IA", text: "La IA escribe las consultas con el contexto de la matriz. Si la IA no responde se usan reglas." },
-  { key: "same_domain_only", title: "Solo resultados del dominio de la fuente", text: "Descarta resultados de otros sitios (recomendado)." },
-  { key: "prefer_documents", title: "Priorizar documentos", text: "PDF, informes y publicaciones se leen primero." },
-  { key: "knowledge_enabled", title: "Usar la base de conocimiento de búsqueda", text: "Visita las páginas ya encontradas sin consultar buscadores. Si son recientes, no se busca en vivo." },
-  { key: "sitemap_fallback", title: "Respaldo por mapa del sitio", text: "Si los buscadores bloquean o no traen nada, lee el mapa del sitio de la propia fuente. No requiere llave." },
+  { key: "enabled", title: t("Búsqueda web activa"), text: t("Interruptor global. Cada fuente además tiene su casilla en el flujo.") },
+  { key: "ai_queries", title: t("Consultas redactadas por la IA"), text: t("La IA escribe las consultas con el contexto de la matriz. Si la IA no responde se usan reglas.") },
+  { key: "same_domain_only", title: t("Solo resultados del dominio de la fuente"), text: t("Descarta resultados de otros sitios (recomendado).") },
+  { key: "prefer_documents", title: t("Priorizar documentos"), text: t("PDF, informes y publicaciones se leen primero.") },
+  { key: "knowledge_enabled", title: t("Usar la base de conocimiento de búsqueda"), text: t("Visita las páginas ya encontradas sin consultar buscadores. Si son recientes, no se busca en vivo.") },
+  { key: "sitemap_fallback", title: t("Respaldo por mapa del sitio"), text: t("Si los buscadores bloquean o no traen nada, lee el mapa del sitio de la propia fuente. No requiere llave.") },
   {
     key: "browser_fetch",
-    title: "Acceso con cliente compatible con navegador",
-    text: "Si un sitio público rechaza al rastreador (HTTP 403 o 406, o no responde), repite la descarga como lo haría un navegador. Respeta robots.txt y no resuelve captchas ni inicia sesión. Enciéndalo solo si las condiciones de uso de las fuentes lo permiten: es decisión del IETS.",
+    title: t("Acceso con cliente compatible con navegador"),
+    text: t("Si un sitio público rechaza al rastreador (HTTP 403 o 406, o no responde), repite la descarga como lo haría un navegador. Respeta robots.txt y no resuelve captchas ni inicia sesión. Enciéndalo solo si las condiciones de uso de las fuentes lo permiten: es decisión del IETS."),
   },
 ];
 
-const splitList = (t) => String(t || "").split(/[\n,;]/).map((x) => x.trim()).filter(Boolean);
+const splitList = (text) => String(text || "").split(/[\n,;]/).map((x) => x.trim()).filter(Boolean);
 
 function OptionListEditor({ spec, items, onChange }) {
   const update = (idx, patch) => onChange(items.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
@@ -58,27 +59,27 @@ function OptionListEditor({ spec, items, onChange }) {
       </h4>
       {spec.hint && <p className="source-section-note">{spec.hint}</p>}
       <div className="option-list-row muted" aria-hidden>
-        <span>Valor</span><span>Etiqueta visible</span><span>Descripción</span><span>{spec.rank ? "Rango" : ""}</span><span />
+        <span>{t("Valor")}</span><span>{t("Etiqueta visible")}</span><span>{t("Descripción")}</span><span>{spec.rank ? t("Rango") : ""}</span><span />
       </div>
       {items.map((it, idx) => (
         <div key={idx} className="option-list-row">
-          <input aria-label={`Valor ${idx + 1}`} value={it.value} onChange={(e) => update(idx, { value: e.target.value })} />
-          <input aria-label={`Etiqueta ${idx + 1}`} value={it.label} onChange={(e) => update(idx, { label: e.target.value })} />
-          <input aria-label={`Descripción ${idx + 1}`} value={it.description || ""} onChange={(e) => update(idx, { description: e.target.value })} />
+          <input aria-label={t("Valor {n}", { n: idx + 1 })} value={it.value} onChange={(e) => update(idx, { value: e.target.value })} />
+          <input aria-label={t("Etiqueta {n}", { n: idx + 1 })} value={it.label} onChange={(e) => update(idx, { label: e.target.value })} />
+          <input aria-label={t("Descripción {n}", { n: idx + 1 })} value={it.description || ""} onChange={(e) => update(idx, { description: e.target.value })} />
           {spec.rank ? (
-            <input aria-label={`Rango ${idx + 1}`} type="number" min={1} max={99} value={it.rank ?? idx + 1} onChange={(e) => update(idx, { rank: Number(e.target.value) })} />
+            <input aria-label={t("Rango {n}", { n: idx + 1 })} type="number" min={1} max={99} value={it.rank ?? idx + 1} onChange={(e) => update(idx, { rank: Number(e.target.value) })} />
           ) : (
             <span />
           )}
           <span style={{ display: "flex", gap: 2 }}>
-            <Button size="sm" variant="ghost" disabled={idx === 0} onClick={() => move(idx, -1)} aria-label="Subir">↑</Button>
-            <Button size="sm" variant="ghost" disabled={idx === items.length - 1} onClick={() => move(idx, 1)} aria-label="Bajar">↓</Button>
-            <Button size="sm" variant="ghost" style={{ color: "#DC2626" }} onClick={() => onChange(items.filter((_, i) => i !== idx))} aria-label="Quitar">✕</Button>
+            <Button size="sm" variant="ghost" disabled={idx === 0} onClick={() => move(idx, -1)} aria-label={t("Subir##mover")}>↑</Button>
+            <Button size="sm" variant="ghost" disabled={idx === items.length - 1} onClick={() => move(idx, 1)} aria-label={t("Bajar##mover")}>↓</Button>
+            <Button size="sm" variant="ghost" style={{ color: "#DC2626" }} onClick={() => onChange(items.filter((_, i) => i !== idx))} aria-label={t("Quitar")}>✕</Button>
           </span>
         </div>
       ))}
       <Button size="sm" variant="secondary" onClick={() => onChange([...items, { value: "", label: "", description: "", ...(spec.rank ? { rank: items.length + 1 } : {}) }])}>
-        <Icon name="plus" size={14} /> Agregar opción
+        <Icon name="plus" size={14} /> {t("Agregar opción")}
       </Button>
     </div>
   );
@@ -107,7 +108,7 @@ export default function SourceParamsPanel({ toast }) {
       setOptions(o.data);
       applySearch(s.data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar los parámetros de fuentes"));
+      toast.error(apiError(e, t("No se pudieron cargar los parámetros de fuentes")));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -130,9 +131,9 @@ export default function SourceParamsPanel({ toast }) {
       try {
         const { data } = await api.put("/config/source-options", options);
         setOptions(data);
-        toast.success("Listas de la matriz guardadas");
+        toast.success(t("Listas de la matriz guardadas"));
       } catch (e) {
-        toast.error(apiError(e, "No se pudieron guardar las listas"));
+        toast.error(apiError(e, t("No se pudieron guardar las listas")));
       }
     });
 
@@ -141,9 +142,9 @@ export default function SourceParamsPanel({ toast }) {
       try {
         const { data } = await api.post("/config/source-options/reset");
         setOptions(data);
-        toast.success("Listas restauradas a los valores de la matriz EH");
+        toast.success(t("Listas restauradas a los valores de la matriz EH"));
       } catch (e) {
-        toast.error(apiError(e, "No se pudieron restaurar las listas"));
+        toast.error(apiError(e, t("No se pudieron restaurar las listas")));
       }
     });
 
@@ -162,9 +163,9 @@ export default function SourceParamsPanel({ toast }) {
         const { data } = await api.put("/config/web-search", payload);
         applySearch(data);
         setBraveKey("");
-        toast.success("Búsqueda web guardada");
+        toast.success(t("Búsqueda web guardada"));
       } catch (e) {
-        toast.error(apiError(e, "No se pudo guardar la búsqueda web"));
+        toast.error(apiError(e, t("No se pudo guardar la búsqueda web")));
       }
     });
 
@@ -173,9 +174,9 @@ export default function SourceParamsPanel({ toast }) {
       try {
         const { data } = await api.put("/config/web-search", { brave_api_key: "" });
         applySearch(data);
-        toast.success("Llave de Brave eliminada");
+        toast.success(t("Llave de Brave eliminada"));
       } catch (e) {
-        toast.error(apiError(e, "No se pudo eliminar la llave"));
+        toast.error(apiError(e, t("No se pudo eliminar la llave")));
       }
     });
 
@@ -184,9 +185,9 @@ export default function SourceParamsPanel({ toast }) {
       try {
         const { data } = await api.post("/config/web-search/reset");
         applySearch(data);
-        toast.success("Búsqueda web restaurada a los valores por defecto");
+        toast.success(t("Búsqueda web restaurada a los valores por defecto"));
       } catch (e) {
-        toast.error(apiError(e, "No se pudo restaurar"));
+        toast.error(apiError(e, t("No se pudo restaurar")));
       }
     });
 
@@ -195,9 +196,9 @@ export default function SourceParamsPanel({ toast }) {
       try {
         const { data } = await api.post("/config/web-search/cooldowns/clear");
         applySearch(data);
-        toast.success("Motores reactivados");
+        toast.success(t("Motores reactivados"));
       } catch (e) {
-        toast.error(apiError(e, "No se pudieron reactivar los motores"));
+        toast.error(apiError(e, t("No se pudieron reactivar los motores")));
       }
     });
 
@@ -210,7 +211,7 @@ export default function SourceParamsPanel({ toast }) {
         const s = await api.get("/config/web-search");
         setSearch((prev) => ({ ...prev, cooldown: s.data.cooldown }));
       } catch (e) {
-        toast.error(apiError(e, "No se pudo ejecutar la consulta"));
+        toast.error(apiError(e, t("No se pudo ejecutar la consulta")));
       }
     });
 
@@ -221,7 +222,7 @@ export default function SourceParamsPanel({ toast }) {
       const file = fileRef.current?.files?.[0];
       if (withFile) {
         if (!file) {
-          toast.warning("Elija el Excel de la matriz EH (.xlsx)");
+          toast.warning(t("Elija el Excel de la matriz EH (.xlsx)"));
           return;
         }
         form.append("file", file);
@@ -229,14 +230,14 @@ export default function SourceParamsPanel({ toast }) {
       try {
         const { data } = await api.post("/sources/matrix/import", form);
         setImportResult(data);
-        toast.success(`Matriz aplicada: ${data.updated} actualizadas, ${data.created} nuevas`);
+        toast.success(t("Matriz aplicada: {updated} actualizadas, {created} nuevas", { updated: data.updated, created: data.created }));
         if (withFile) load();
       } catch (e) {
-        toast.error(apiError(e, "No se pudo importar la matriz"));
+        toast.error(apiError(e, t("No se pudo importar la matriz")));
       }
     });
 
-  if (!options || !search) return <LoadingBlock label="Cargando parámetros de fuentes..." />;
+  if (!options || !search) return <LoadingBlock label={t("Cargando parámetros de fuentes...")} />;
 
   const engines = Object.keys(search.engine_labels || {});
   const toggleEngine = (code) => {
@@ -259,29 +260,28 @@ export default function SourceParamsPanel({ toast }) {
   return (
     <div style={{ display: "grid", gap: 16 }} data-testid="source-params-panel">
       <Card>
-        <SectionTitle hint={GLOSSARY.fb_importar_matriz}>Matriz EH (Excel)</SectionTitle>
+        <SectionTitle hint={GLOSSARY.fb_importar_matriz}>{t("Matriz EH (Excel)")}</SectionTitle>
         <p style={{ fontSize: 13, color: "#64748B", marginTop: -6 }}>
-          Cargue el Excel «Fuentes de información proactiva EH» para actualizar nivel de fuente, tipos de
-          tecnología, URLs de entrada, ruta de acceso, qué consultar y los criterios de búsqueda.
+          {t("Cargue el Excel «Fuentes de información proactiva EH» para actualizar nivel de fuente, tipos de tecnología, URLs de entrada, ruta de acceso, qué consultar y los criterios de búsqueda.")}
         </p>
         <div className="fb-toolbar" style={{ alignItems: "center" }}>
-          <input ref={fileRef} type="file" accept=".xlsx,.xlsm" aria-label="Excel de la matriz EH" data-testid="matrix-file" />
+          <input ref={fileRef} type="file" accept=".xlsx,.xlsm" aria-label={t("Excel de la matriz EH")} data-testid="matrix-file" />
           <label className="catalog-check">
             <input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} />
-            <span>Sobrescribir lo editado en el panel</span>
+            <span>{t("Sobrescribir lo editado en el panel")}</span>
           </label>
           <Button onClick={() => importMatrix(true)} loading={busy === "import"}>
-            <Icon name="doc" size={15} /> Importar Excel
+            <Icon name="doc" size={15} /> {t("Importar Excel")}
           </Button>
           <Button variant="secondary" onClick={() => importMatrix(false)} loading={busy === "import"}>
-            Reaplicar matriz cargada
+            {t("Reaplicar matriz cargada")}
           </Button>
         </div>
         {importResult && (
           <p style={{ fontSize: 13, marginBottom: 0 }} data-testid="matrix-import-result">
-            {importResult.rows} filas · {importResult.updated} fuentes actualizadas · {importResult.created} nuevas
-            {importResult.search_terms ? ` · ${importResult.search_terms} criterios de búsqueda` : ""}
-            {(importResult.unmatched || []).length > 0 && ` · sin URL: ${importResult.unmatched.join(", ")}`}
+            {t("{rows} filas · {updated} fuentes actualizadas · {created} nuevas", { rows: importResult.rows, updated: importResult.updated, created: importResult.created })}
+            {importResult.search_terms ? " · " + t("{n} criterios de búsqueda", { n: importResult.search_terms }) : ""}
+            {(importResult.unmatched || []).length > 0 && " · " + t("sin URL: {lista}", { lista: importResult.unmatched.join(", ") })}
           </p>
         )}
       </Card>
@@ -290,12 +290,12 @@ export default function SourceParamsPanel({ toast }) {
         <SectionTitle hint={GLOSSARY.fb_matriz_eh}
           right={
             <div className="fb-toolbar">
-              <Button size="sm" variant="secondary" onClick={resetOptions} loading={busy === "options"}>Restaurar</Button>
-              <Button size="sm" onClick={saveOptions} loading={busy === "options"}>Guardar listas</Button>
+              <Button size="sm" variant="secondary" onClick={resetOptions} loading={busy === "options"}>{t("Restaurar")}</Button>
+              <Button size="sm" onClick={saveOptions} loading={busy === "options"}>{t("Guardar listas")}</Button>
             </div>
           }
         >
-          Listas desplegables de las fuentes
+          {t("Listas desplegables de las fuentes")}
         </SectionTitle>
         {LISTS.map((spec) => (
           <OptionListEditor key={spec.key} spec={spec} items={options[spec.key] || []} onChange={(items) => setOptions({ ...options, [spec.key]: items })} />
@@ -306,12 +306,12 @@ export default function SourceParamsPanel({ toast }) {
         <SectionTitle hint={GLOSSARY.fb_flujo_busqueda}
           right={
             <div className="fb-toolbar">
-              <Button size="sm" variant="secondary" onClick={resetSearch} loading={busy === "search"}>Restaurar</Button>
-              <Button size="sm" onClick={saveSearch} loading={busy === "search"}>Guardar búsqueda web</Button>
+              <Button size="sm" variant="secondary" onClick={resetSearch} loading={busy === "search"}>{t("Restaurar")}</Button>
+              <Button size="sm" onClick={saveSearch} loading={busy === "search"}>{t("Guardar búsqueda web")}</Button>
             </div>
           }
         >
-          Búsqueda web impulsada por IA
+          {t("Búsqueda web impulsada por IA")}
         </SectionTitle>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0 16px" }}>
           {SWITCHES.map((s) => (
@@ -322,21 +322,21 @@ export default function SourceParamsPanel({ toast }) {
           ))}
         </div>
 
-        <h4 className="source-section-title"><TermLabel tip={GLOSSARY.fb_motores_busqueda}>Motores (en orden de uso)</TermLabel></h4>
+        <h4 className="source-section-title"><TermLabel tip={GLOSSARY.fb_motores_busqueda}>{t("Motores (en orden de uso)")}</TermLabel></h4>
         <div style={{ display: "grid", gap: 6 }}>
           {[...search.engines, ...engines.filter((e) => !search.engines.includes(e))].map((code) => {
             const on = search.engines.includes(code);
             return (
               <div key={code} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                <input type="checkbox" checked={on} onChange={() => toggleEngine(code)} aria-label={search.engine_labels?.[code] || code} />
-                <span style={{ flex: 1 }}>{search.engine_labels?.[code] || code}</span>
-                {cooling[code] > 0 && <Badge tone="warning">En pausa {Math.ceil(cooling[code] / 60)} min</Badge>}
-                {code === "brave_api" && <Badge tone={search.brave_api_key_set ? "ok" : "viewer"}>{search.brave_api_key_set ? "Llave configurada" : "Sin llave"}</Badge>}
-                {code === "searxng" && <Badge tone={search.searxng_url ? "ok" : "viewer"}>{search.searxng_url ? "URL configurada" : "Sin URL"}</Badge>}
+                <input type="checkbox" checked={on} onChange={() => toggleEngine(code)} aria-label={ts(search.engine_labels?.[code]) || code} />
+                <span style={{ flex: 1 }}>{ts(search.engine_labels?.[code]) || code}</span>
+                {cooling[code] > 0 && <Badge tone="warning">{t("En pausa {n} min", { n: Math.ceil(cooling[code] / 60) })}</Badge>}
+                {code === "brave_api" && <Badge tone={search.brave_api_key_set ? "ok" : "viewer"}>{search.brave_api_key_set ? t("Llave configurada") : t("Sin llave")}</Badge>}
+                {code === "searxng" && <Badge tone={search.searxng_url ? "ok" : "viewer"}>{search.searxng_url ? t("URL configurada") : t("Sin URL")}</Badge>}
                 {on && (
                   <>
-                    <Button size="sm" variant="ghost" onClick={() => moveEngine(code, -1)} aria-label={`Subir ${code}`}>↑</Button>
-                    <Button size="sm" variant="ghost" onClick={() => moveEngine(code, 1)} aria-label={`Bajar ${code}`}>↓</Button>
+                    <Button size="sm" variant="ghost" onClick={() => moveEngine(code, -1)} aria-label={t("Subir {motor}", { motor: code })}>↑</Button>
+                    <Button size="sm" variant="ghost" onClick={() => moveEngine(code, 1)} aria-label={t("Bajar {motor}", { motor: code })}>↓</Button>
                   </>
                 )}
               </div>
@@ -345,7 +345,7 @@ export default function SourceParamsPanel({ toast }) {
         </div>
         {Object.keys(cooling).length > 0 && (
           <Button size="sm" variant="secondary" style={{ marginTop: 8 }} onClick={clearCooldowns} loading={busy === "search"}>
-            Reactivar motores en pausa
+            {t("Reactivar motores en pausa")}
           </Button>
         )}
         <div className="fb-grid-2" style={{ marginTop: 12 }}>
@@ -353,23 +353,23 @@ export default function SourceParamsPanel({ toast }) {
             id="brave-key"
             type="password"
             autoComplete="off"
-            label="Llave de Brave Search API"
-            hint="Opcional. Plan gratuito con cupo mensual; es el motor más estable."
-            placeholder={search.brave_api_key_masked || "Pegue la llave para guardarla"}
+            label={t("Llave de Brave Search API")}
+            hint={t("Opcional. Plan gratuito con cupo mensual; es el motor más estable.")}
+            placeholder={search.brave_api_key_masked || t("Pegue la llave para guardarla")}
             value={braveKey}
             onChange={(e) => setBraveKey(e.target.value)}
           />
           <Input
             id="searxng-url"
-            label="URL de SearXNG propio"
-            hint="Opcional. Instancia SearXNG del IETS con formato JSON habilitado."
+            label={t("URL de SearXNG propio")}
+            hint={t("Opcional. Instancia SearXNG del IETS con formato JSON habilitado.")}
             placeholder="https://buscador.iets.org.co"
             value={search.searxng_url || ""}
             onChange={(e) => setSearch({ ...search, searxng_url: e.target.value })}
           />
         </div>
         {search.brave_api_key_set && (
-          <Button size="sm" variant="ghost" style={{ color: "#DC2626", marginTop: -8 }} onClick={removeBrave}>Eliminar llave de Brave</Button>
+          <Button size="sm" variant="ghost" style={{ color: "#DC2626", marginTop: -8 }} onClick={removeBrave}>{t("Eliminar llave de Brave")}</Button>
         )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0 12px", marginTop: 8 }}>
           {NUMBERS.map((n) => {
@@ -379,13 +379,14 @@ export default function SourceParamsPanel({ toast }) {
             );
           })}
         </div>
-        <Textarea id="search-generic" label="Términos genéricos (coma)" hint="Se combinan con los de cada fuente y categoría." rows={2} value={genericText} onChange={(e) => setGenericText(e.target.value)} />
+        <Textarea id="search-generic" label={t("Términos genéricos (coma)")} hint={t("Se combinan con los de cada fuente y categoría.")} rows={2} value={genericText} onChange={(e) => setGenericText(e.target.value)} />
 
-        <h4 className="source-section-title">Criterios de búsqueda por categoría (hoja «Criterios de búsqueda»)</h4>
+        <h4 className="source-section-title">{t("Criterios de búsqueda por categoría (hoja «Criterios de búsqueda»)")}</h4>
         <p className="source-section-note" data-testid="categories-scope-note">
-          El escaneo usa solo las categorías marcadas como activas. Alcance vigente: Medicamentos y Dispositivos médicos.
-          Las demás quedan inactivas (no se borran) y se pueden activar aquí cuando se amplíe el alcance.
-          {" "}Activas: {(search.terms_by_category || []).filter((c) => c.active !== false).length} de {(search.terms_by_category || []).length}.
+          {t(
+            "El escaneo usa solo las categorías marcadas como activas. Alcance vigente: Medicamentos y Dispositivos médicos. Las demás quedan inactivas (no se borran) y se pueden activar aquí cuando se amplíe el alcance. Activas: {n} de {total}.",
+            { n: (search.terms_by_category || []).filter((c) => c.active !== false).length, total: (search.terms_by_category || []).length }
+          )}
         </p>
         <div style={{ display: "grid", gap: 8 }}>
           {(search.terms_by_category || []).map((c, idx) => (
@@ -395,42 +396,42 @@ export default function SourceParamsPanel({ toast }) {
                   type="checkbox"
                   checked={c.active !== false}
                   onChange={(e) => updateCategory(idx, { active: e.target.checked })}
-                  aria-label={`Categoría ${c.category || idx + 1} activa`}
+                  aria-label={t("Categoría {nombre} activa", { nombre: c.category || idx + 1 })}
                   data-testid={`category-active-${idx}`}
                 />
-                <span>{c.active !== false ? "Activa" : "Inactiva"}</span>
+                <span>{c.active !== false ? t("Activa") : t("Inactiva")}</span>
               </label>
-              <input className="filter-input" aria-label={`Categoría ${idx + 1}`} value={c.category} onChange={(e) => updateCategory(idx, { category: e.target.value })} />
-              <select className="filter-select" aria-label={`Tecnología ${idx + 1}`} value={c.tech_type} onChange={(e) => updateCategory(idx, { tech_type: e.target.value })}>
+              <input className="filter-input" aria-label={t("Categoría {n}", { n: idx + 1 })} value={c.category} onChange={(e) => updateCategory(idx, { category: e.target.value })} />
+              <select className="filter-select" aria-label={t("Tecnología {n}", { n: idx + 1 })} value={c.tech_type} onChange={(e) => updateCategory(idx, { tech_type: e.target.value })}>
                 {(options.tech_type || []).map((o) => <option key={o.value} value={o.value}>{o.value}</option>)}
               </select>
               <textarea
                 className="filter-input"
                 rows={2}
-                aria-label={`Términos ${idx + 1}`}
+                aria-label={t("Términos {n}", { n: idx + 1 })}
                 value={(c.terms || []).join(", ")}
                 onChange={(e) => updateCategory(idx, { terms: splitList(e.target.value) })}
               />
-              <Button size="sm" variant="ghost" style={{ color: "#DC2626" }} aria-label="Quitar categoría" onClick={() => setSearch({ ...search, terms_by_category: search.terms_by_category.filter((_, i) => i !== idx) })}>✕</Button>
+              <Button size="sm" variant="ghost" style={{ color: "#DC2626" }} aria-label={t("Quitar categoría")} onClick={() => setSearch({ ...search, terms_by_category: search.terms_by_category.filter((_, i) => i !== idx) })}>✕</Button>
             </div>
           ))}
         </div>
         <Button size="sm" variant="secondary" style={{ marginTop: 8 }} onClick={() => setSearch({ ...search, terms_by_category: [...(search.terms_by_category || []), { category: "", tech_type: "MT", terms: [], active: true }] })}>
-          <Icon name="plus" size={14} /> Agregar categoría
+          <Icon name="plus" size={14} /> {t("Agregar categoría")}
         </Button>
 
-        <h4 className="source-section-title">Probar motores</h4>
+        <h4 className="source-section-title">{t("Probar motores")}</h4>
         <div className="fb-toolbar">
-          <input className="filter-input" style={{ flex: 1, minWidth: 240 }} aria-label="Consulta de prueba" value={testQuery} onChange={(e) => setTestQuery(e.target.value)} />
+          <input className="filter-input" style={{ flex: 1, minWidth: 240 }} aria-label={t("Consulta de prueba")} value={testQuery} onChange={(e) => setTestQuery(e.target.value)} />
           <Button variant="outline" onClick={testSearch} loading={busy === "test"}>
-            <Icon name="radar" size={15} /> Probar consulta
+            <Icon name="radar" size={15} /> {t("Probar consulta")}
           </Button>
         </div>
         {testResult && (
           <div className="web-search-result" data-testid="engine-test-result">
             <p className="source-section-note">
-              Respondió: <strong>{testResult.engine || "ningún motor"}</strong> ·{" "}
-              {(testResult.attempts || []).map((a) => `${a.engine}: ${a.status}`).join(" · ")}
+              {tr("Respondió: <b>{motor}</b>", { motor: testResult.engine || t("ningún motor") }, { b: (c) => <strong>{c}</strong> })} ·{" "}
+              {(testResult.attempts || []).map((a) => `${a.engine}: ${ts(a.status)}`).join(" · ")}
             </p>
             <ol className="web-search-results">
               {(testResult.results || []).slice(0, 8).map((r) => (

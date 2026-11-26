@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from "react";
 import Icon from "./Icon";
+import { t } from "../i18n";
 
 /**
  * Ventana modal. Cabecera y pie quedan fijos y el cuerpo se desplaza, asi los
@@ -23,14 +24,14 @@ export default function Modal({ open, onClose, title, children, footer, width = 
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     // Foco al primer campo editable; si no hay, al dialogo.
-    const t = setTimeout(() => {
+    const focusTimer = setTimeout(() => {
       const field = box.current?.querySelector(
         ".ui-modal-body input:not([type=hidden]):not([disabled]), .ui-modal-body select:not([disabled]), .ui-modal-body textarea:not([disabled])"
       );
       (field || box.current)?.focus({ preventScroll: true });
     }, 30);
     return () => {
-      clearTimeout(t);
+      clearTimeout(focusTimer);
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
       if (previous && typeof previous.focus === "function") previous.focus({ preventScroll: true });
@@ -57,7 +58,7 @@ export default function Modal({ open, onClose, title, children, footer, width = 
       >
         <div className="ui-modal-head">
           <h3 id={titleId}>{title}</h3>
-          <button type="button" onClick={onClose} aria-label="Cerrar" className="ui-modal-close">
+          <button type="button" onClick={onClose} aria-label={t("Cerrar")} className="ui-modal-close">
             <Icon name="x" size={18} />
           </button>
         </div>

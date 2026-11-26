@@ -2,7 +2,7 @@
 
 Aplicación web del **Instituto de Evaluación Tecnológica en Salud (IETS)** de Colombia para el escaneo de horizonte (*horizon scanning*) de tecnologías sanitarias: vigila fuentes públicas, captura señales, las depura y cruza con el registro sanitario, las prioriza con la matriz %P, soporta la evaluación temprana con revisión por pares y publica los resultados. Todo cambio queda en una bitácora de auditoría y el acceso se gobierna por perfiles.
 
-**Versión de esta entrega:** `7.5.0` (`backend/app/__init__.py`, `frontend/package.json`).
+**Versión de esta entrega:** `7.6.0` (`backend/app/__init__.py`, `frontend/package.json`).
 
 ---
 
@@ -525,6 +525,12 @@ La documentación interactiva está en `/docs` (OpenAPI) con el servidor en marc
 Las respuestas de `/api/` llevan `Cache-Control: no-store`. El servidor añade cabeceras de seguridad (política de contenido, `X-Frame-Options`, HSTS en producción) y un identificador `X-Request-ID` por petición.
 
 ---
+
+## Idiomas de la interfaz
+
+La interfaz está en español, inglés británico (`en-GB`) e inglés americano (`en-US`); el selector está en la cabecera, en el ingreso y en las pantallas públicas. El español es el idioma de origen y la llave de cada texto (`t("Guardar cambios")`); los diccionarios de inglés están en `frontend/src/i18n/locales/en/` y la ortografía británica se deriva del americano. El contenido capturado y los documentos exportados no se traducen.
+
+Reglas para agregar textos, glosario y formato de los diccionarios: [`frontend/src/i18n/README.md`](frontend/src/i18n/README.md). Verificación: `node scripts/i18n-check.mjs` desde `frontend/`.
 
 ## Pruebas
 

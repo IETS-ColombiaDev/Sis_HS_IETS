@@ -10,12 +10,13 @@ import EmptyState from "../components/EmptyState";
 import ConfirmDialog from "../components/ConfirmDialog";
 import InfoTip from "../components/InfoTip";
 import { GLOSSARY } from "../constants/glossary";
+import { t } from "../i18n";
 
 const SUGGESTIONS = [
-  "¿Qué tecnologías emergentes de oncología se han detectado?",
-  "Resume los referentes internacionales de horizon scanning disponibles.",
-  "¿Qué dispositivos médicos debería priorizar el IETS?",
-  "¿Cómo se define el escaneo de horizonte y sus fases en el IETS?",
+  t("¿Qué tecnologías emergentes de oncología se han detectado?"),
+  t("Resume los referentes internacionales de horizon scanning disponibles."),
+  t("¿Qué dispositivos médicos debería priorizar el IETS?"),
+  t("¿Cómo se define el escaneo de horizonte y sus fases en el IETS?"),
 ];
 
 export default function Chat() {
@@ -37,7 +38,7 @@ export default function Chat() {
       const { data } = await api.get("/chat/sessions");
       setSessions(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar las conversaciones"));
+      toast.error(apiError(e, t("No se pudieron cargar las conversaciones")));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -56,7 +57,7 @@ export default function Chat() {
       setActiveId(id);
       setMessages(data.messages);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo abrir la conversación"));
+      toast.error(apiError(e, t("No se pudo abrir la conversación")));
     }
   };
 
@@ -71,11 +72,11 @@ export default function Chat() {
     try {
       await api.delete(`/chat/sessions/${id}`);
       if (activeId === id) newChat();
-      toast.success("Conversación eliminada");
+      toast.success(t("Conversación eliminada"));
       setConfirmDel(null);
       loadSessions();
     } catch (err) {
-      toast.error(apiError(err, "No se pudo eliminar la conversación"));
+      toast.error(apiError(err, t("No se pudo eliminar la conversación")));
     } finally {
       setDeleting(false);
     }
@@ -93,7 +94,7 @@ export default function Chat() {
       setMessages((m) => [...m, data.answer]);
       loadSessions();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo enviar el mensaje"));
+      toast.error(apiError(e, t("No se pudo enviar el mensaje")));
       setMessages((m) => m.filter((x) => !String(x.id).startsWith("tmp-")));
     } finally {
       setSending(false);
@@ -106,13 +107,13 @@ export default function Chat() {
       <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, display: "flex", flexDirection: "column", overflow: "hidden" }} className="chat-sessions">
         <div style={{ padding: 14, borderBottom: "1px solid #E2E8F0" }}>
           <Button onClick={newChat} style={{ width: "100%" }}>
-            <Icon name="plus" size={16} /> Nueva conversación
+            <Icon name="plus" size={16} /> {t("Nueva conversación")}
           </Button>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
           {sessions.length === 0 && (
             <div style={{ padding: 16, fontSize: 13, color: "#94A3B8", textAlign: "center" }}>
-              Sin conversaciones aún.
+              {t("Sin conversaciones aún.")}
             </div>
           )}
           {sessions.map((s) => (
@@ -143,8 +144,8 @@ export default function Chat() {
                 type="button"
                 onClick={() => setConfirmDel(s)}
                 style={{ border: "none", background: "none", color: "#94A3B8", fontSize: 16, cursor: "pointer", padding: "0 10px" }}
-                aria-label={`Eliminar conversación ${s.title}`}
-                title="Eliminar conversación"
+                aria-label={t("Eliminar conversación {title}", { title: s.title })}
+                title={t("Eliminar conversación")}
               >
                 ×
               </button>
@@ -161,12 +162,12 @@ export default function Chat() {
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, display: "inline-flex", alignItems: "center", gap: 6 }}>
-              Asistente de Escaneo de Horizonte <InfoTip text={GLOSSARY.fb_chat} label="Cómo responde el asistente" />
+              {t("Asistente de Escaneo de Horizonte")} <InfoTip text={GLOSSARY.fb_chat} label={t("Cómo responde el asistente")} />
             </div>
             <div style={{ fontSize: 12, color: "#94A3B8" }}>
               {status?.ai_enabled || status?.gemini_enabled
-                ? `${status.ai_provider === "gemini" ? "Gemini" : "MiniMax"} · ${status.ai_model || status.gemini_model || "modelo automático"}`
-                : "Modo sin IA: muestra lo encontrado en el sistema sin redactar (un superadministrador puede activar la IA en Configuración)"}
+                ? `${status.ai_provider === "gemini" ? "Gemini" : "MiniMax"} · ${status.ai_model || status.gemini_model || t("modelo automático")}`
+                : t("Modo sin IA: muestra lo encontrado en el sistema sin redactar (un superadministrador puede activar la IA en Configuración)")}
             </div>
           </div>
         </div>
@@ -176,12 +177,12 @@ export default function Chat() {
             <div style={{ maxWidth: 560, margin: "0 auto", paddingTop: 20 }}>
               <EmptyState
                 icon="💬"
-                title="Converse con la base de conocimiento"
-                message="Pregunte sobre las fuentes, señales y tecnologías emergentes registradas en el sistema."
+                title={t("Converse con la base de conocimiento")}
+                message={t("Pregunte sobre las fuentes, señales y tecnologías emergentes registradas en el sistema.")}
               />
               {!aiOn && (
                 <p className="fb-public-note" data-testid="chat-degraded">
-                  La IA no está configurada: el asistente responderá mostrando la información relevante que encuentre en el sistema, sin redactar.
+                  {t("La IA no está configurada: el asistente responderá mostrando la información relevante que encuentre en el sistema, sin redactar.")}
                 </p>
               )}
               <div style={{ display: "grid", gap: 10, marginTop: 8 }}>
@@ -205,7 +206,7 @@ export default function Chat() {
               ))}
               {sending && (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#64748B", fontSize: 14 }}>
-                  <Spinner size={18} /> Analizando la información disponible...
+                  <Spinner size={18} /> {t("Analizando la información disponible...")}
                 </div>
               )}
             </div>
@@ -223,8 +224,8 @@ export default function Chat() {
                   send();
                 }
               }}
-              placeholder="Escriba su pregunta... (Enter para enviar, Shift+Enter nueva línea)"
-              aria-label="Pregunta para el asistente"
+              placeholder={t("Escriba su pregunta... (Enter para enviar, Shift+Enter nueva línea)")}
+              aria-label={t("Pregunta para el asistente")}
               rows={1}
               style={{
                 flex: 1,
@@ -240,7 +241,7 @@ export default function Chat() {
               onBlur={(e) => (e.target.style.borderColor = "#E2E8F0")}
             />
             <Button onClick={() => send()} loading={sending} disabled={!input.trim()}>
-              Enviar
+              {t("Enviar")}
             </Button>
           </div>
         </div>
@@ -250,9 +251,9 @@ export default function Chat() {
         onClose={() => setConfirmDel(null)}
         onConfirm={deleteSession}
         loading={deleting}
-        title="Eliminar conversación"
-        message={`Se eliminará "${confirmDel?.title || ""}" con todos sus mensajes. Esta acción no se puede deshacer.`}
-        confirmLabel="Eliminar"
+        title={t("Eliminar conversación")}
+        message={t('Se eliminará "{title}" con todos sus mensajes. Esta acción no se puede deshacer.', { title: confirmDel?.title || "" })}
+        confirmLabel={t("Eliminar")}
       />
     </div>
   );
@@ -278,8 +279,8 @@ function Bubble({ message }) {
           <>
             <Markdown>{message.content}</Markdown>
             {message.sources_used && (
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #E2E8F0", fontSize: 11, color: "#64748B" }} title="Registros del sistema que se usaron como contexto para esta respuesta">
-                📎 Fuentes: {message.sources_used}
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #E2E8F0", fontSize: 11, color: "#64748B" }} title={t("Registros del sistema que se usaron como contexto para esta respuesta")}>
+                📎 {t("Fuentes: {list}", { list: message.sources_used })}
               </div>
             )}
           </>

@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import Icon from "./Icon";
 import InfoTip from "./InfoTip";
 import { IETS_PHASES } from "../constants/methodology";
+import { t } from "../i18n";
 
 /** Flujograma metodologico IETS visible en cada modulo operativo. */
 export default function WorkflowStrip({ active }) {
@@ -38,7 +39,7 @@ export default function WorkflowStrip({ active }) {
   const current = resolveActive();
 
   return (
-    <nav className="workflow-strip methodology-strip" aria-label="Metodología IETS">
+    <nav className="workflow-strip methodology-strip" aria-label={t("Metodología IETS")}>
       {IETS_PHASES.map((step, i) => {
         const isActive = step.key === current;
         return (
@@ -52,7 +53,7 @@ export default function WorkflowStrip({ active }) {
               <Icon name={step.icon} size={15} />
               <span className="workflow-step-label">{step.label}</span>
             </button>
-            <InfoTip text={step.help || step.hint} position="bottom" label={`Qué es ${step.label}`} />
+            <InfoTip text={step.help || step.hint} position="bottom" label={t("Qué es {name}", { name: step.label })} />
             {i < IETS_PHASES.length - 1 && <span className="workflow-arrow" aria-hidden="true" />}
           </div>
         );
