@@ -157,7 +157,7 @@ export default function NotesPanel({ entityType, entityId, compact = false }) {
   return (
     <div className="notes-panel" data-testid="notes-panel" style={{ marginTop: compact ? 0 : 18, borderTop: compact ? "none" : "1px solid #E2E8F0", paddingTop: compact ? 0 : 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <Icon name="note" size={18} color="#4F46E5" />
+        <Icon name="note" size={18} color="#1D4ED8" />
         <h4 style={{ fontSize: 14, fontWeight: 700, flex: 1, display: "inline-flex", alignItems: "center", gap: 6 }}>
           Notas del equipo {notes.length > 0 && <span style={{ color: "#94A3B8", fontWeight: 500 }}>({notes.length})</span>}
           <InfoTip text={`${GLOSSARY.fb_nota_autor} ${GLOSSARY.fb_nota_fijar}`} label="Reglas de las notas" />

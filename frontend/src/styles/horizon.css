@@ -1,0 +1,356 @@
+/*
+ * Capa de presentacion (noviembre 2026). Se carga al final y afina lo que
+ * definen globals.css, ui.css y los estilos de cada componente:
+ *
+ *  - Cabecera de pantalla en una sola franja azul: seccion, titulo, proposito,
+ *    flujo de fases y acciones. Antes eran cuatro bloques apilados.
+ *  - Indicadores en fichas compactas: rotulo arriba, cifra grande, detalle.
+ *  - Guia de fase en dos columnas y con el paso siguiente en su cabecera.
+ *  - Densidad general mas ajustada, para que los datos queden a la vista sin
+ *    desplazarse y sin quitar informacion.
+ *
+ * Aqui solo hay presentacion: ninguna regla oculta contenido.
+ */
+
+:root {
+  --navy-900: #0b2a5b;
+  --navy-800: #0d3270;
+  --navy-700: #114091;
+  --brand: #2563eb;
+  --gradient: linear-gradient(135deg, #0d3270 0%, #2563eb 100%);
+  --hero: radial-gradient(560px 220px at 100% 0%, rgba(96, 165, 250, 0.38), transparent 70%),
+    linear-gradient(120deg, #0b2a5b 0%, #11408f 60%, #1b57c2 100%);
+  --bg-app: #f3f6fb;
+}
+
+body {
+  font-size: 14px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Cabecera de pantalla                                               */
+/* ------------------------------------------------------------------ */
+.page-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 16px 22px;
+  margin-bottom: 14px;
+  border-radius: 16px;
+  background: var(--hero);
+  color: #fff;
+  box-shadow: 0 12px 26px -16px rgba(11, 42, 91, 0.6);
+}
+.page-header-text {
+  flex: 1 1 380px;
+  max-width: 880px;
+}
+.page-eyebrow {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  color: #a9c8f5;
+  margin-bottom: 3px;
+}
+.page-header .page-title {
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: -0.015em;
+  color: #fff;
+  margin: 0;
+}
+.page-header .page-subtitle {
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin-top: 4px;
+  color: #d8e5fa;
+}
+.page-header .page-subtitle strong,
+.page-header .page-subtitle b {
+  color: #fff;
+}
+.page-header a:not(.btn) {
+  color: #fff;
+  text-decoration: underline;
+}
+.page-header .page-actions {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 100%;
+  color: #e6eefc;
+}
+
+/* Acciones sobre el azul: la principal en blanco, el resto translucidas. */
+.page-header .btn {
+  min-height: 34px;
+  padding: 6px 13px;
+  font-size: 13px;
+}
+.page-header .btn--secondary,
+.page-header .btn--outline,
+.page-header .btn--ghost {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #fff;
+}
+.page-header .btn--secondary:hover:not(:disabled),
+.page-header .btn--outline:hover:not(:disabled),
+.page-header .btn--ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.page-header .btn--primary {
+  background: #fff;
+  border-color: #fff;
+  color: var(--navy-900);
+  box-shadow: 0 2px 8px rgba(4, 18, 48, 0.3);
+}
+.page-header .btn--primary:hover:not(:disabled) {
+  background: #e6effe;
+  border-color: #e6effe;
+  box-shadow: 0 4px 12px rgba(4, 18, 48, 0.36);
+}
+.page-header .btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5);
+}
+.page-header .info-tip,
+.module-header .workflow-strip .info-tip {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+.page-header .info-tip:hover,
+.page-header .info-tip:focus-visible,
+.module-header .workflow-strip .info-tip:hover,
+.module-header .workflow-strip .info-tip:focus-visible {
+  background: #fff;
+  color: var(--navy-900);
+  box-shadow: none;
+}
+
+/* Modulos de la metodologia: el flujo de fases va dentro de la misma franja. */
+.module-header {
+  padding: 10px 22px 16px;
+  margin-bottom: 14px;
+  border-radius: 16px;
+  background: var(--hero);
+  box-shadow: 0 12px 26px -16px rgba(11, 42, 91, 0.6);
+}
+.module-header .page-header {
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.module-header .workflow-strip {
+  padding: 0 0 9px;
+  margin: 0 0 12px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0;
+}
+.module-header .workflow-step {
+  padding: 4px 11px 4px 5px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: #cfe0fa;
+}
+.module-header .workflow-step:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.module-header .workflow-step--active,
+.module-header .workflow-step--active:hover {
+  background: #fff;
+  border-color: #fff;
+  color: var(--navy-900);
+}
+.module-header .workflow-step-num {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+.module-header .workflow-step--active .workflow-step-num {
+  background: var(--navy-900);
+  color: #fff;
+}
+.module-header .workflow-arrow {
+  background: rgba(255, 255, 255, 0.32);
+}
+.module-header .workflow-step:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Indicadores                                                        */
+/* ------------------------------------------------------------------ */
+.module-stats {
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.module-stat {
+  display: flex;
+  flex-direction: column;
+  padding: 11px 14px 12px;
+  border-radius: 12px;
+}
+.module-stat-label {
+  order: -1;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 5px;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  line-height: 1.3;
+  /* Dos renglones reservados: las cifras de una fila quedan a la misma altura. */
+  min-height: 2.6em;
+  color: #5b6b82;
+}
+.module-stat-label .info-tip {
+  margin-left: 0;
+}
+.module-stat-value {
+  font-size: 24px;
+  letter-spacing: -0.01em;
+}
+.module-stat-sub {
+  font-size: 11px;
+  line-height: 1.35;
+  margin-top: 3px;
+  color: #64748b;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Guia de fase                                                       */
+/* ------------------------------------------------------------------ */
+.phase-guide {
+  padding: 9px 14px 10px;
+  margin-bottom: 14px;
+  border-left-width: 3px;
+  border-radius: 12px;
+  background: #fff;
+}
+.phase-guide-head {
+  margin-bottom: 5px;
+}
+.phase-guide-label {
+  font-size: 12.5px;
+}
+.phase-guide-tasks {
+  columns: 2;
+  column-gap: 36px;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #55637a;
+}
+.phase-guide-tasks li {
+  break-inside: avoid;
+}
+.phase-guide .phase-guide-next {
+  margin-left: auto;
+  font-size: 12.5px;
+}
+.phase-guide-next + .phase-guide-toggle {
+  margin-left: 4px;
+}
+@media (max-width: 900px) {
+  .phase-guide-tasks {
+    columns: 1;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Densidad general                                                   */
+/* ------------------------------------------------------------------ */
+.btn--md {
+  padding: 7px 14px;
+  font-size: 13.5px;
+  min-height: 36px;
+}
+.ui-card {
+  border-radius: 14px;
+}
+.section-title {
+  margin-bottom: 12px;
+}
+.section-title h3 {
+  font-size: 15px;
+}
+.ui-card-hint {
+  margin-bottom: 12px;
+}
+.env-banner {
+  padding: 3px 24px;
+  font-size: 12px;
+}
+.data-table th {
+  padding: 9px 14px;
+}
+.data-table td {
+  padding: 9px 14px;
+}
+
+/* El foco del menu se ve sobre el azul. */
+.sb .sb-link:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+@media (max-width: 640px) {
+  .page-header {
+    padding: 14px 16px;
+  }
+  .module-header {
+    padding: 10px 16px 14px;
+  }
+  .page-header .page-title {
+    font-size: 19px;
+  }
+  .page-header .page-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* Al imprimir la franja azul gastaria tinta: titulo oscuro sobre blanco. */
+@media print {
+  .page-header,
+  .module-header {
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    color: #0f172a;
+  }
+  .page-header .page-title {
+    color: #0f172a;
+  }
+  .page-header .page-subtitle,
+  .page-eyebrow {
+    color: #475569;
+  }
+  .module-header .workflow-strip {
+    display: none;
+  }
+}
+
+/* Bandeja de trabajo: su saludo usa la misma franja. */
+.page-header.bandeja-header {
+  align-items: center;
+}
+.page-header .dc-hello,
+.page-header .dc-hello strong {
+  color: #d8e5fa;
+}
+.page-header .dc-hello strong {
+  color: #fff;
+}

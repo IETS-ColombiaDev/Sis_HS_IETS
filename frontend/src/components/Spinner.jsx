@@ -1,4 +1,4 @@
-export function Spinner({ size = 22, color = "#6366F1" }) {
+export function Spinner({ size = 22, color = "#2563EB" }) {
   return (
     <span
       style={{
