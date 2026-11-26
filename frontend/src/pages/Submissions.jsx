@@ -17,17 +17,18 @@ import SubmissionCrossCheck from "../components/SubmissionCrossCheck";
 import { LoadingBlock } from "../components/Spinner";
 import { PERM } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
+import { t, ts, intlLocale } from "../i18n";
 
 const TONE = { recibida: "warning", aceptada: "ok", rechazada: "error" };
-const STATUS_LABEL = { recibida: "Por moderar", aceptada: "Aceptada", rechazada: "Rechazada" };
+const STATUS_LABEL = { recibida: t("Por moderar"), aceptada: t("Aceptada"), rechazada: t("Rechazada") };
 const TABS = [
-  { key: "recibida", label: "Por moderar" },
-  { key: "aceptada", label: "Aceptadas" },
-  { key: "rechazada", label: "Rechazadas" },
-  { key: "", label: "Todas" },
+  { key: "recibida", label: t("Por moderar") },
+  { key: "aceptada", label: t("Aceptadas") },
+  { key: "rechazada", label: t("Rechazadas") },
+  { key: "", label: t("Todas") },
 ];
 
-const submissionName = (row) => row.commercial_name || row.inn_name || `Postulación #${row.id}`;
+const submissionName = (row) => row.commercial_name || row.inn_name || t("Postulación #{id}", { id: row.id });
 
 const show = (value) => (value && String(value).trim() ? value : "-");
 
@@ -35,15 +36,15 @@ function SubmissionFields({ row }) {
   const links = row.evidence_links || [];
   return (
     <div style={{ fontSize: 13.5, color: "#334155" }} data-testid={`submission-fields-${row.id}`}>
-      <p style={{ fontSize: 13, fontWeight: 600, margin: "4px 0" }}>Datos obligatorios</p>
+      <p style={{ fontSize: 13, fontWeight: 600, margin: "4px 0" }}>{t("Datos obligatorios")}</p>
       <p style={{ margin: "0 0 8px" }}>
-        <strong>Nombre comercial:</strong> {show(row.commercial_name)}
+        <strong>{t("Nombre comercial:")}</strong> {show(row.commercial_name)}
         <br />
-        <strong>DCI:</strong> {show(row.inn_name)}
+        <strong>{t("DCI:")}</strong> {show(row.inn_name)}
         <br />
-        <strong>Indicación propuesta:</strong> {show(row.indication)}
+        <strong>{t("Indicación propuesta:")}</strong> {show(row.indication)}
       </p>
-      <p style={{ fontSize: 13, fontWeight: 600, margin: "4px 0" }}>Fuente de información</p>
+      <p style={{ fontSize: 13, fontWeight: 600, margin: "4px 0" }}>{t("Fuente de información")}</p>
       {links.length ? (
         <ul style={{ fontSize: 13, overflowWrap: "anywhere", margin: "0 0 8px" }}>
           {links.map((lk) => (
@@ -55,27 +56,27 @@ function SubmissionFields({ row }) {
       ) : (
         <p style={{ margin: "0 0 8px" }}>-</p>
       )}
-      <p style={{ fontSize: 13, fontWeight: 600, margin: "4px 0" }}>Información complementaria</p>
+      <p style={{ fontSize: 13, fontWeight: 600, margin: "4px 0" }}>{t("Información complementaria")}</p>
       <p style={{ margin: "0 0 8px" }}>
-        <strong>Fabricante o desarrollador:</strong> {show(row.manufacturer)}
+        <strong>{t("Fabricante o desarrollador:")}</strong> {show(row.manufacturer)}
         <br />
-        <strong>Fase de desarrollo:</strong> {show(row.development_phase)}
+        <strong>{t("Fase de desarrollo:")}</strong> {show(row.development_phase)}
         <br />
-        <strong>Mecanismo de acción:</strong> {show(row.mechanism)}
+        <strong>{t("Mecanismo de acción:")}</strong> {show(row.mechanism)}
       </p>
-      <p style={{ fontSize: 13, fontWeight: 600, margin: "4px 0" }}>Quien postula</p>
+      <p style={{ fontSize: 13, fontWeight: 600, margin: "4px 0" }}>{t("Quien postula")}</p>
       <p style={{ margin: "0 0 8px" }}>
-        <strong>Nombre:</strong> {show(row.submitter_name)}
+        <strong>{t("Nombre:")}</strong> {show(row.submitter_name)}
         <br />
-        <strong>Correo:</strong> {show(row.submitter_email)}
+        <strong>{t("Correo:")}</strong> {show(row.submitter_email)}
         <br />
-        <strong>Organización:</strong> {show(row.submitter_org)}
+        <strong>{t("Organización:")}</strong> {show(row.submitter_org)}
         <br />
-        <strong>Recibida:</strong> {row.created_at ? new Date(row.created_at).toLocaleString() : "-"}
+        <strong>{t("Recibida:")}</strong> {row.created_at ? new Date(row.created_at).toLocaleString(intlLocale()) : "-"}
       </p>
       <p style={{ fontSize: 13, background: row.has_conflict ? "#FEF3C7" : "#F1F5F9", padding: 10, borderRadius: 8 }}>
-        <strong>Conflicto de interés:</strong>{" "}
-        {row.has_conflict ? show(row.conflict_statement) : "No declara conflicto (declaración firmada)."}
+        <strong>{t("Conflicto de interés:")}</strong>{" "}
+        {row.has_conflict ? show(row.conflict_statement) : t("No declara conflicto (declaración firmada).")}
       </p>
     </div>
   );
@@ -96,14 +97,14 @@ export default function Submissions() {
   const toast = useToast();
   const navigate = useNavigate();
   const canReview = can(PERM.STAGING_ASSIGN);
-  const noReview = `Su perfil (${user?.role_label || user?.role}) puede consultar la cola pero no moderarla (permiso staging:assign).`;
+  const noReview = t("Su perfil ({role}) puede consultar la cola pero no moderarla (permiso staging:assign).", { role: ts(user?.role_label) || user?.role });
 
   const load = useCallback(async () => {
     try {
       const { data } = await api.get("/submissions", { params: { status: filter || undefined } });
       setRows(data);
     } catch (e) {
-      if (firstLoad.current) toast.error(apiError(e, "No se pudieron cargar las postulaciones"));
+      if (firstLoad.current) toast.error(apiError(e, t("No se pudieron cargar las postulaciones")));
     } finally {
       firstLoad.current = false;
       setLoading(false);
@@ -128,19 +129,19 @@ export default function Submissions() {
   const decide = async (action) => {
     if (!current) return;
     if (action === "reject" && !note.trim()) {
-      toast.error("El rechazo exige un motivo visible para la bitácora.");
+      toast.error(t("El rechazo exige un motivo visible para la bitácora."));
       return;
     }
     setSaving(action);
     try {
       const { data } = await api.post(`/submissions/${current.id}/${action}`, { note });
-      if (action === "accept") toast.success(`Postulación aceptada: quedó en la bandeja de entrada como señal reactiva (tecnología #${data.technology_id}).`);
-      else toast.success("Postulación rechazada. El motivo quedó registrado.");
+      if (action === "accept") toast.success(t("Postulación aceptada: quedó en la bandeja de entrada como señal reactiva (tecnología #{id}).", { id: data.technology_id }));
+      else toast.success(t("Postulación rechazada. El motivo quedó registrado."));
       setCurrent(null);
       setNote("");
       await load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo resolver la postulación"));
+      toast.error(apiError(e, t("No se pudo resolver la postulación")));
     } finally {
       setSaving(null);
     }
@@ -150,27 +151,27 @@ export default function Submissions() {
     const url = `${window.location.origin}/postular`;
     try {
       await navigator.clipboard.writeText(url);
-      toast.success("Enlace del formulario público copiado");
+      toast.success(t("Enlace del formulario público copiado"));
     } catch {
       toast.info(url);
     }
   };
 
-  if (loading) return <LoadingBlock label="Cargando postulaciones..." />;
+  if (loading) return <LoadingBlock label={t("Cargando postulaciones...")} />;
 
   return (
     <div>
       <PageHeader
-        title="Postulaciones reactivas"
+        title={t("Postulaciones reactivas")}
         titleHint={GLOSSARY.postulacion}
-        subtitle="Cola de moderación del canal público. Nada entra al staging sin revisión humana y declaración de conflicto de interés."
+        subtitle={t("Cola de moderación del canal público. Nada entra al staging sin revisión humana y declaración de conflicto de interés.")}
         actions={
           <>
-            <HintButton variant="secondary" hint="Copiar el enlace del formulario público /postular para compartirlo" onClick={copyPortal}>
-              <Icon name="link" size={16} /> Enlace del formulario
+            <HintButton variant="secondary" hint={t("Copiar el enlace del formulario público /postular para compartirlo")} onClick={copyPortal}>
+              <Icon name="link" size={16} /> {t("Enlace del formulario")}
             </HintButton>
             <Button variant="secondary" onClick={() => navigate("/bandeja-entrada")}>
-              <Icon name="inbox" size={16} /> Bandeja de entrada
+              <Icon name="inbox" size={16} /> {t("Bandeja de entrada")}
             </Button>
           </>
         }
@@ -178,40 +179,46 @@ export default function Submissions() {
 
       {portal && (
         <div className={`fb-public-note${portal.recaptcha_enabled ? " is-ok" : ""}`} data-testid="captcha-mode">
-          <strong>Anti-robot del formulario: {portal.recaptcha_enabled ? "reCAPTCHA activo" : portal.mode === "incompleto" ? "configuración incompleta" : "modo degradado"}.</strong>{" "}
-          {portal.message} <InfoTip text={GLOSSARY.fb_recaptcha} label="Qué es reCAPTCHA" />
+          <strong>
+            {portal.recaptcha_enabled
+              ? t("Anti-robot del formulario: reCAPTCHA activo.")
+              : portal.mode === "incompleto"
+                ? t("Anti-robot del formulario: configuración incompleta.")
+                : t("Anti-robot del formulario: modo degradado.")}
+          </strong>{" "}
+          {ts(portal.message)} <InfoTip text={GLOSSARY.fb_recaptcha} label={t("Qué es reCAPTCHA")} />
         </div>
       )}
 
       {!canReview && (
         <div className="fb-readonly-note">
           <Icon name="info" size={16} />
-          <span>Modo consulta: {noReview}</span>
+          <span>{t("Modo consulta: {detail}", { detail: noReview })}</span>
         </div>
       )}
 
       <div className="screening-tabs" style={{ marginBottom: 16, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
-        {TABS.map((t) => (
+        {TABS.map((tab) => (
           <button
-            key={t.key || "todas"}
+            key={tab.key || "todas"}
             type="button"
-            className={`screening-tab${filter === t.key ? " is-active" : ""}`}
-            aria-pressed={filter === t.key}
-            onClick={() => setFilter(t.key)}
+            className={`screening-tab${filter === tab.key ? " is-active" : ""}`}
+            aria-pressed={filter === tab.key}
+            onClick={() => setFilter(tab.key)}
           >
-            {t.label}
+            {tab.label}
           </button>
         ))}
-        <InfoTip text={GLOSSARY.fb_estado_postulacion} label="Qué significa cada estado" />
+        <InfoTip text={GLOSSARY.fb_estado_postulacion} label={t("Qué significa cada estado")} />
       </div>
 
       {rows.length === 0 ? (
         <Card>
           <EmptyState
             icon="📬"
-            title="No hay postulaciones en este filtro"
-            message="El formulario público vive en /postular. Las que lleguen aparecen aquí como 'por moderar'."
-            action={<Button variant="secondary" onClick={copyPortal}>Copiar enlace del formulario</Button>}
+            title={t("No hay postulaciones en este filtro")}
+            message={t("El formulario público vive en /postular. Las que lleguen aparecen aquí como 'por moderar'.")}
+            action={<Button variant="secondary" onClick={copyPortal}>{t("Copiar enlace del formulario")}</Button>}
           />
         </Card>
       ) : (
@@ -221,29 +228,34 @@ export default function Submissions() {
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }} data-testid={`submission-${row.id}`}>
                 <span title={GLOSSARY.fb_estado_postulacion}><Badge tone={TONE[row.status] || "neutral"}>{STATUS_LABEL[row.status] || row.status}</Badge></span>
                 {row.has_conflict ? (
-                  <span title={GLOSSARY.coi}><Badge tone="warning">Declara conflicto de interés</Badge></span>
+                  <span title={GLOSSARY.coi}><Badge tone="warning">{t("Declara conflicto de interés")}</Badge></span>
                 ) : (
-                  <span title={GLOSSARY.coi}><Badge tone="viewer">Sin conflicto declarado</Badge></span>
+                  <span title={GLOSSARY.coi}><Badge tone="viewer">{t("Sin conflicto declarado")}</Badge></span>
                 )}
               </div>
               <SubmissionFields row={row} />
               <SubmissionCrossCheck row={row} canRun={canReview} onUpdated={replaceRow} toast={toast} compact />
               {row.status !== "recibida" && (
                 <p style={{ fontSize: 12.5, color: "#64748B" }}>
-                  {row.status === "aceptada" ? "Aceptada" : "Rechazada"} por {row.reviewed_by || "-"}
-                  {row.reviewed_at ? ` el ${new Date(row.reviewed_at).toLocaleString()}` : ""}
-                  {row.review_note ? `. Nota: ${row.review_note}` : ""}
+                  {row.status === "aceptada"
+                    ? row.reviewed_at
+                      ? t("Aceptada por {name} el {date}", { name: row.reviewed_by || "-", date: new Date(row.reviewed_at).toLocaleString(intlLocale()) })
+                      : t("Aceptada por {name}", { name: row.reviewed_by || "-" })
+                    : row.reviewed_at
+                      ? t("Rechazada por {name} el {date}", { name: row.reviewed_by || "-", date: new Date(row.reviewed_at).toLocaleString(intlLocale()) })
+                      : t("Rechazada por {name}", { name: row.reviewed_by || "-" })}
+                  {row.review_note ? ". " + t("Nota: {note}", { note: row.review_note }) : ""}
                 </p>
               )}
               <div className="fb-toolbar" style={{ marginTop: 8 }}>
                 {row.status === "recibida" && (
                   <HintButton size="sm" hint={GLOSSARY.fb_moderar} disabled={!canReview} disabledHint={noReview} onClick={() => { setCurrent(row); setNote(""); }}>
-                    Revisar y decidir
+                    {t("Revisar y decidir")}
                   </HintButton>
                 )}
                 {row.status === "aceptada" && row.technology_id && (
                   <Button size="sm" variant="ghost" onClick={() => navigate("/bandeja-entrada")}>
-                    Ver en la bandeja (#{row.technology_id})
+                    {t("Ver en la bandeja (#{id})", { id: row.technology_id })}
                   </Button>
                 )}
               </div>
@@ -255,23 +267,23 @@ export default function Submissions() {
       <Modal
         open={Boolean(current)}
         onClose={() => setCurrent(null)}
-        title={current ? `Revisar ${submissionName(current)}` : ""}
+        title={current ? t("Revisar {name}", { name: submissionName(current) }) : ""}
         width={640}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setCurrent(null)} disabled={Boolean(saving)}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => setCurrent(null)} disabled={Boolean(saving)}>{t("Cancelar")}</Button>
             <HintButton
               variant="danger"
               onClick={() => decide("reject")}
               loading={saving === "reject"}
               disabled={!note.trim() || Boolean(saving)}
-              hint="Rechazar la postulación. El motivo queda en la bitácora."
-              disabledHint="Escriba el motivo del rechazo en la nota de revisión."
+              hint={t("Rechazar la postulación. El motivo queda en la bitácora.")}
+              disabledHint={t("Escriba el motivo del rechazo en la nota de revisión.")}
             >
-              Rechazar
+              {t("Rechazar")}
             </HintButton>
             <HintButton onClick={() => decide("accept")} loading={saving === "accept"} disabled={Boolean(saving)} hint={GLOSSARY.fb_moderar}>
-              Aceptar y enviar a bandeja
+              {t("Aceptar y enviar a bandeja")}
             </HintButton>
           </>
         }
@@ -280,7 +292,7 @@ export default function Submissions() {
           <>
             <SubmissionFields row={current} />
             <SubmissionCrossCheck row={current} canRun={canReview} onUpdated={replaceRow} toast={toast} />
-            <Textarea id="submission-note" label="Nota de revisión (obligatoria si rechaza)" value={note} onChange={(e) => setNote(e.target.value)} />
+            <Textarea id="submission-note" label={t("Nota de revisión (obligatoria si rechaza)")} value={note} onChange={(e) => setNote(e.target.value)} />
           </>
         )}
       </Modal>

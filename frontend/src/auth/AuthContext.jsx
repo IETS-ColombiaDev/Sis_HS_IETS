@@ -7,6 +7,7 @@ import api, {
   getActingRole,
   setActingRole,
 } from "../api/client";
+import { t } from "../i18n";
 
 const AuthContext = createContext(null);
 
@@ -35,7 +36,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
-      if (getToken()) logout("Su sesión terminó. Ingrese de nuevo para continuar.");
+      if (getToken()) logout(t("Su sesión terminó. Ingrese de nuevo para continuar."));
     });
   }, [logout]);
 

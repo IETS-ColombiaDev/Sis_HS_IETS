@@ -6,6 +6,7 @@ import Button from "./Button";
 import Icon from "./Icon";
 import Modal from "./Modal";
 import "./manual-review.css";
+import { t, tr } from "../i18n";
 
 const KEY = "iets.manualReviewPrompt";
 
@@ -57,32 +58,41 @@ export default function ManualReviewPrompt({ suppressed = false }) {
     <Modal
       open={open}
       onClose={close}
-      title="Por favor valide manualmente estas fuentes"
+      title={t("Por favor valide manualmente estas fuentes")}
       width={560}
       footer={
         <>
           <Button variant="secondary" onClick={close} data-testid="manual-prompt-later">
-            Más tarde
+            {t("Más tarde")}
           </Button>
           <Button onClick={go} data-testid="manual-prompt-go">
-            <Icon name="check" size={16} /> Validar ahora
+            <Icon name="check" size={16} /> {t("Validar ahora")}
           </Button>
         </>
       }
     >
       <div data-testid="manual-review-prompt">
         <p style={{ marginTop: 0 }}>
-          Hay <strong>{due}</strong> fuente{due === 1 ? "" : "s"} de consulta manual (tipo E) por validar. La vigilancia automática
-          no entra a ellas (licencia, usuario o captcha): una persona del equipo debe consultarlas y registrar lo que encuentre.
+          {due === 1
+            ? tr(
+                "Hay <b>{n}</b> fuente de consulta manual (tipo E) por validar. La vigilancia automática no entra a ellas (licencia, usuario o captcha): una persona del equipo debe consultarlas y registrar lo que encuentre.",
+                { n: due },
+                { b: (c) => <strong>{c}</strong> }
+              )
+            : tr(
+                "Hay <b>{n}</b> fuentes de consulta manual (tipo E) por validar. La vigilancia automática no entra a ellas (licencia, usuario o captcha): una persona del equipo debe consultarlas y registrar lo que encuentre.",
+                { n: due },
+                { b: (c) => <strong>{c}</strong> }
+              )}
         </p>
         <ul className="mr-steps" style={{ marginBottom: 0 }}>
           {pending.slice(0, 6).map((i) => (
             <li key={i.id}>
               {i.title}
-              <span style={{ color: "#64748b" }}> - {i.never_reviewed ? "nunca validada" : `vencida hace ${i.overdue_days} día(s)`}</span>
+              <span style={{ color: "#64748b" }}> - {i.never_reviewed ? t("nunca validada") : t("vencida hace {n} día(s)", { n: i.overdue_days })}</span>
             </li>
           ))}
-          {pending.length > 6 && <li>… y {pending.length - 6} más.</li>}
+          {pending.length > 6 && <li>{t("… y {n} más.", { n: pending.length - 6 })}</li>}
         </ul>
       </div>
     </Modal>

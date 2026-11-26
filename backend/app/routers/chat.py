@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -144,7 +144,12 @@ def delete_session(session_id: int, db: Session = Depends(get_db), user: User = 
 
 
 @router.post("/send", response_model=ChatSendOut)
-def send_message(payload: ChatSendIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def send_message(
+    payload: ChatSendIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    ui_language: str = Header(default="es", alias="X-UI-Language"),
+):
     if not payload.message.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El mensaje no puede estar vacío")
 
@@ -188,7 +193,7 @@ def send_message(payload: ChatSendIn, db: Session = Depends(get_db), user: User 
             )
             context = f"{node_ctx}\n\n{context}"
             used = [payload.node_key, *used]
-    answer_text, model = ai_service.chat_answer(payload.message, context, history)
+    answer_text, model = ai_service.chat_answer(payload.message, context, history, language=ui_language)
 
     assistant_msg = ChatMessage(
         session_id=session.id,
@@ -225,6 +230,7 @@ NAV_SYSTEM = (
 def navigate_help(
     payload: dict,
     user: User = Depends(get_current_user),
+    ui_language: str = Header(default="es", alias="X-UI-Language"),
 ):
     """Responde "como llego a / como hago" con el mapa que envia la interfaz.
 
@@ -258,8 +264,11 @@ Pregunta: {question}
 
 Responde SOLO con JSON:
 {{"answer": "respuesta breve con pasos", "routes": ["/ruta-mas-util", "/otra-si-aplica"]}}
-Las rutas deben existir en el mapa. Si el perfil no tiene permiso, dilo y sugiere a quien pedirlo."""
-    text, model = ai_service.generate(prompt, system=NAV_SYSTEM, temperature=0.2, max_tokens=700)
+Las rutas deben existir en el mapa. Si el perfil no tiene permiso, dilo y sugiere a quien pedirlo.
+{ai_service.language_rule(ui_language)}"""
+    text, model = ai_service.generate(
+        prompt, system=ai_service._localized(NAV_SYSTEM, ui_language), temperature=0.2, max_tokens=700
+    )
     if not text or text.startswith("[Error"):
         return {"answer": "", "routes": [], "ai_used": False, "model": model or ""}
     answer, routes = text.strip(), []

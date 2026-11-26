@@ -23,9 +23,14 @@ import { Input, Select } from "../components/Field";
 import { LoadingBlock } from "../components/Spinner";
 import EmptyState from "../components/EmptyState";
 import { downloadFromApi } from "../utils/download";
+import { t, tr, ts, intlLocale } from "../i18n";
 
 const IMPACTS = ["", "alto", "medio", "bajo"];
 const EMPTY_NEW = { title: "", content: "", impact: "", finding_id: "" };
+// Etiquetas para mostrar el impacto; el valor que viaja al servidor no cambia.
+const IMPACT_LABELS = { alto: t("alto"), medio: t("medio"), bajo: t("bajo") };
+const IMPACT_BADGES = { alto: t("Impacto alto"), medio: t("Impacto medio"), bajo: t("Impacto bajo") };
+const impactBadge = (impact) => IMPACT_BADGES[impact] || t("Impacto {nivel}", { nivel: impact });
 
 export default function Recommendations() {
   const { can, status, user } = useAuth();
@@ -36,7 +41,9 @@ export default function Recommendations() {
   const canWrite = can(PERM.REPORT_WRITE);
   const canPackage = canWrite || can(PERM.RESTRICTED_ANALYTICS);
   const aiOn = Boolean(status?.ai_enabled ?? status?.gemini_enabled);
-  const noWrite = `Su perfil (${user?.role_label || user?.role}) puede leer los informes pero no redactarlos (permiso report:write).`;
+  const noWrite = t("Su perfil ({perfil}) puede leer los informes pero no redactarlos (permiso report:write).", {
+    perfil: ts(user?.role_label) || user?.role,
+  });
 
   const [recs, setRecs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +76,7 @@ export default function Recommendations() {
       const { data } = await api.get("/recommendations");
       setRecs(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar los informes"));
+      toast.error(apiError(e, t("No se pudieron cargar los informes")));
     } finally {
       setLoading(false);
     }
@@ -82,13 +89,13 @@ export default function Recommendations() {
 
   useEffect(() => {
     if (!createMode) return undefined;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       api
         .get("/findings", { params: { q: findingQuery || undefined, limit: 50 } })
         .then(({ data }) => setFindings(data))
-        .catch((e) => toast.error(apiError(e, "No se pudieron cargar las señales")));
+        .catch((e) => toast.error(apiError(e, t("No se pudieron cargar las señales"))));
     }, 250);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createMode, findingQuery]);
 
@@ -107,12 +114,12 @@ export default function Recommendations() {
     setDeleting(true);
     try {
       await api.delete(`/recommendations/${confirmDel.id}`);
-      toast.success("Informe eliminado");
+      toast.success(t("Informe eliminado"));
       setConfirmDel(null);
       setDetail(null);
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo eliminar"));
+      toast.error(apiError(e, t("No se pudo eliminar")));
     } finally {
       setDeleting(false);
     }
@@ -125,18 +132,18 @@ export default function Recommendations() {
 
   const saveEdit = async () => {
     if (!edit.title.trim() || !edit.content.trim()) {
-      toast.warning("El título y el contenido no pueden quedar vacíos");
+      toast.warning(t("El título y el contenido no pueden quedar vacíos"));
       return;
     }
     setSaving(true);
     try {
       const { data } = await api.put(`/recommendations/${edit.id}`, { title: edit.title, content: edit.content, impact: edit.impact || "" });
-      toast.success("Informe actualizado");
+      toast.success(t("Informe actualizado"));
       setEdit(null);
       setDetail((d) => (d && d.id === data.id ? data : d));
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo guardar"));
+      toast.error(apiError(e, t("No se pudo guardar")));
     } finally {
       setSaving(false);
     }
@@ -153,11 +160,11 @@ export default function Recommendations() {
     setFormError("");
     if (createMode === "ia") {
       if (!draft.finding_id) {
-        setFormError("Elija la señal sobre la que se genera el informe.");
+        setFormError(t("Elija la señal sobre la que se genera el informe."));
         return;
       }
     } else if (!draft.title.trim() || !draft.content.trim()) {
-      setFormError("El título y el contenido son obligatorios.");
+      setFormError(t("El título y el contenido son obligatorios."));
       return;
     }
     setSaving(true);
@@ -165,8 +172,8 @@ export default function Recommendations() {
       let data;
       if (createMode === "ia") {
         ({ data } = await api.post("/recommendations/generate", { finding_id: Number(draft.finding_id) }, { timeout: AI_TIMEOUT }));
-        if (/sin IA|fallback/i.test(data.model_used || "")) toast.warning("IA no configurada: se creó un informe preliminar para completar a mano.");
-        else toast.success(`Informe generado con ${data.model_used}`);
+        if (/sin IA|fallback/i.test(data.model_used || "")) toast.warning(t("IA no configurada: se creó un informe preliminar para completar a mano."));
+        else toast.success(t("Informe generado con {modelo}", { modelo: data.model_used }));
       } else {
         ({ data } = await api.post("/recommendations", {
           title: draft.title.trim(),
@@ -174,13 +181,13 @@ export default function Recommendations() {
           impact: draft.impact,
           finding_id: draft.finding_id ? Number(draft.finding_id) : null,
         }));
-        toast.success("Informe creado");
+        toast.success(t("Informe creado"));
       }
       setCreateMode(null);
       await load();
       setDetail(data);
     } catch (e) {
-      setFormError(apiError(e, "No se pudo crear el informe"));
+      setFormError(apiError(e, t("No se pudo crear el informe")));
     } finally {
       setSaving(false);
     }
@@ -188,7 +195,7 @@ export default function Recommendations() {
 
   const downloadPackage = async () => {
     if (!pkgCycle) {
-      toast.warning("Elija un ciclo");
+      toast.warning(t("Elija un ciclo"));
       return;
     }
     setPackaging(true);
@@ -198,15 +205,19 @@ export default function Recommendations() {
       });
       const recsN = res.headers?.["x-package-recommendations"];
       const docsN = res.headers?.["x-package-evaluation-docs"];
-      toast.success(`Paquete descargado${recsN != null ? `: ${docsN} informe(s) de evaluación y ${recsN} recomendación(es)` : ""}`);
+      toast.success(
+        recsN != null
+          ? t("Paquete descargado: {docs} informe(s) de evaluación y {recs} recomendación(es)", { docs: docsN, recs: recsN })
+          : t("Paquete descargado")
+      );
     } catch (e) {
-      toast.error(apiError(e, "No se pudo generar el paquete"));
+      toast.error(apiError(e, t("No se pudo generar el paquete")));
     } finally {
       setPackaging(false);
     }
   };
 
-  if (loading) return <LoadingBlock label="Cargando informes..." />;
+  if (loading) return <LoadingBlock label={t("Cargando informes...")} />;
 
   const findingOptions = findings.map((f) => ({ id: f.id, label: f.title }));
 
@@ -214,47 +225,50 @@ export default function Recommendations() {
     <div>
       <ModuleHeader
         step="diseminacion"
-        title="Diseminación e informes"
+        title={t("Diseminación e informes")}
         titleHint={GLOSSARY.diseminacion}
-        purpose="Recomendaciones de adopción para Colombia a partir de las señales, y paquete de diseminación por ciclo."
+        purpose={t("Recomendaciones de adopción para Colombia a partir de las señales, y paquete de diseminación por ciclo.")}
         actions={
           <div className="fb-toolbar">
-            <HintButton variant="secondary" hint="Redactar un informe a mano, con o sin señal de origen" disabled={!canWrite} disabledHint={noWrite} onClick={() => openCreate("manual")}>
-              <Icon name="plus" size={16} /> Nuevo informe
+            <HintButton variant="secondary" hint={t("Redactar un informe a mano, con o sin señal de origen")} disabled={!canWrite} disabledHint={noWrite} onClick={() => openCreate("manual")}>
+              <Icon name="plus" size={16} /> {t("Nuevo informe")}
             </HintButton>
             <HintButton hint={GLOSSARY.fb_generar_informe} disabled={!canWrite} disabledHint={noWrite} onClick={() => openCreate("ia")}>
-              <Icon name="spark" size={16} /> Generar desde una señal
+              <Icon name="spark" size={16} /> {t("Generar desde una señal")}
             </HintButton>
           </div>
         }
       />
 
       <PhaseGuide
-        phase="Fase 4 · Diseminación"
+        phase={t("Fase 4 · Diseminación")}
         hint={GLOSSARY.diseminacion}
         tasks={[
-          "Generar informes de adopción para el sistema de salud colombiano (IA como borrador + revisión humana).",
-          "Clasificar el impacto esperado: alto, medio o bajo.",
-          "Descargar el paquete del ciclo para compartirlo con quien decide.",
+          t("Generar informes de adopción para el sistema de salud colombiano (IA como borrador + revisión humana)."),
+          t("Clasificar el impacto esperado: alto, medio o bajo."),
+          t("Descargar el paquete del ciclo para compartirlo con quien decide."),
         ]}
-        nextLabel="Notas del equipo"
+        nextLabel={t("Notas del equipo")}
         onNext={() => navigate("/notas")}
       />
 
       <ModuleStatsRow
         items={[
-          { label: "Informes emitidos", value: recs.length, hint: "Recomendaciones de adopción registradas, de todos los ciclos." },
-          { label: "Impacto alto", value: impactStats.alto, color: "#EF4444", hint: GLOSSARY.fb_impacto },
-          { label: "Impacto medio", value: impactStats.medio, color: "#F59E0B", hint: GLOSSARY.fb_impacto },
-          { label: "Impacto bajo", value: impactStats.bajo, hint: GLOSSARY.fb_impacto },
+          { label: t("Informes emitidos"), value: recs.length, hint: t("Recomendaciones de adopción registradas, de todos los ciclos.") },
+          { label: t("Impacto alto"), value: impactStats.alto, color: "#EF4444", hint: GLOSSARY.fb_impacto },
+          { label: t("Impacto medio"), value: impactStats.medio, color: "#F59E0B", hint: GLOSSARY.fb_impacto },
+          { label: t("Impacto bajo"), value: impactStats.bajo, hint: GLOSSARY.fb_impacto },
         ]}
       />
 
       {status && !aiOn && (
         <Card style={{ marginBottom: 16, borderLeft: "4px solid #F59E0B", background: "#FFFBEB" }}>
           <div style={{ fontSize: 14, color: "#92400E" }}>
-            <strong>IA no configurada.</strong> Los informes generados desde una señal saldrán como versión preliminar para
-            completar a mano. Un superadministrador puede activar la IA en Configuración.
+            {tr(
+              "<b>IA no configurada.</b> Los informes generados desde una señal saldrán como versión preliminar para completar a mano. Un superadministrador puede activar la IA en Configuración.",
+              null,
+              { b: (c) => <strong>{c}</strong> }
+            )}
           </div>
         </Card>
       )}
@@ -263,30 +277,30 @@ export default function Recommendations() {
         <div className="fb-inline-row" data-testid="package-card">
           <div style={{ flex: "2 1 260px" }}>
             <strong style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-              <Icon name="layers" size={16} /> Paquete de diseminación del ciclo <InfoTip text={GLOSSARY.fb_paquete} label="Qué es el paquete" />
+              <Icon name="layers" size={16} /> {t("Paquete de diseminación del ciclo")} <InfoTip text={GLOSSARY.fb_paquete} label={t("Qué es el paquete")} />
             </strong>
-            <p style={{ fontSize: 13, color: "#64748B", margin: "4px 0 0" }}>ZIP con Listado Único, informes de evaluación, recomendaciones, notas y boletín publicado.</p>
+            <p style={{ fontSize: 13, color: "#64748B", margin: "4px 0 0" }}>{t("ZIP con Listado Único, informes de evaluación, recomendaciones, notas y boletín publicado.")}</p>
           </div>
-          <Select id="package-cycle" aria-label="Ciclo del paquete" value={pkgCycle} onChange={(e) => setPkgCycle(e.target.value)} style={{ marginBottom: 0 }}>
-            {formalCycles.length === 0 && <option value="">No hay ciclos</option>}
+          <Select id="package-cycle" aria-label={t("Ciclo del paquete")} value={pkgCycle} onChange={(e) => setPkgCycle(e.target.value)} style={{ marginBottom: 0 }}>
+            {formalCycles.length === 0 && <option value="">{t("No hay ciclos")}</option>}
             {formalCycles.map((c) => (
               <option key={c.id} value={c.id}>{c.code}</option>
             ))}
           </Select>
           <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13, flex: "0 1 auto", marginBottom: 14 }}>
             <input type="checkbox" checked={pkgDrafts} onChange={(e) => setPkgDrafts(e.target.checked)} />
-            <TermLabel tip="Incluye también los informes que aún están en redacción o revisión. Los confidenciales nunca se incluyen.">Incluir borradores</TermLabel>
+            <TermLabel tip={t("Incluye también los informes que aún están en redacción o revisión. Los confidenciales nunca se incluyen.")}>{t("Incluir borradores")}</TermLabel>
           </label>
           <div style={{ flex: "0 0 auto", marginBottom: 14 }}>
             <HintButton
               variant="outline"
               hint={GLOSSARY.fb_paquete}
               disabled={!canPackage || !pkgCycle}
-              disabledHint={!canPackage ? "Su perfil no puede descargar el paquete: trae notas internas del equipo (requiere report:write o analytics:restricted)." : "No hay ciclos para empaquetar."}
+              disabledHint={!canPackage ? t("Su perfil no puede descargar el paquete: trae notas internas del equipo (requiere report:write o analytics:restricted).") : t("No hay ciclos para empaquetar.")}
               loading={packaging}
               onClick={downloadPackage}
             >
-              <Icon name="doc" size={15} /> Descargar ZIP
+              <Icon name="doc" size={15} /> {t("Descargar ZIP")}
             </HintButton>
           </div>
         </div>
@@ -296,13 +310,13 @@ export default function Recommendations() {
         <Card>
           <EmptyState
             icon="💡"
-            title="Sin informes de diseminación"
-            message="Genere el primero desde una señal, o redáctelo a mano."
+            title={t("Sin informes de diseminación")}
+            message={t("Genere el primero desde una señal, o redáctelo a mano.")}
             action={
               canWrite ? (
-                <Button onClick={() => openCreate("ia")}><Icon name="spark" size={16} /> Generar desde una señal</Button>
+                <Button onClick={() => openCreate("ia")}><Icon name="spark" size={16} /> {t("Generar desde una señal")}</Button>
               ) : (
-                <Button variant="secondary" onClick={() => navigate("/senales")}>Ver señales</Button>
+                <Button variant="secondary" onClick={() => navigate("/senales")}>{t("Ver señales")}</Button>
               )
             }
           />
@@ -311,20 +325,20 @@ export default function Recommendations() {
         <>
           <Card padding={16} style={{ marginBottom: 16 }}>
             <div className="fb-toolbar">
-              <input placeholder="Buscar en informes..." aria-label="Buscar informe" value={search} onChange={(e) => setSearch(e.target.value)} className="filter-input" style={{ flex: 1, minWidth: 180 }} />
+              <input placeholder={t("Buscar en informes...")} aria-label={t("Buscar informe")} value={search} onChange={(e) => setSearch(e.target.value)} className="filter-input" style={{ flex: 1, minWidth: 180 }} />
               <span style={{ fontSize: 13, fontWeight: 600, color: "#64748B" }}>
-                <TermLabel tip={GLOSSARY.fb_impacto}>Impacto</TermLabel>
+                <TermLabel tip={GLOSSARY.fb_impacto}>{t("Impacto")}</TermLabel>
               </span>
               {IMPACTS.map((i) => (
                 <button key={i || "all"} type="button" className={`view-toggle${impactFilter === i ? " active" : ""}`} onClick={() => setImpactFilter(i)}>
-                  {i || "Todos"}
+                  {i ? IMPACT_LABELS[i] : t("Todos")}
                 </button>
               ))}
-              <span style={{ fontSize: 13, color: "#64748B" }} data-testid="recs-count">{filtered.length} informes</span>
+              <span style={{ fontSize: 13, color: "#64748B" }} data-testid="recs-count">{t("{n} informes", { n: filtered.length })}</span>
             </div>
           </Card>
           {filtered.length === 0 ? (
-            <Card><EmptyState icon="🔎" title="Ningún informe coincide" message="Ajuste la búsqueda o el filtro de impacto." /></Card>
+            <Card><EmptyState icon="🔎" title={t("Ningún informe coincide")} message={t("Ajuste la búsqueda o el filtro de impacto.")} /></Card>
           ) : (
             <div className="informe-list">
               {filtered.map((r) => (
@@ -332,10 +346,10 @@ export default function Recommendations() {
                   <div className="informe-card-inner" data-testid={`rec-${r.id}`}>
                     <div className="informe-card-head">
                       <div>
-                        {r.impact ? <Badge tone={r.impact}>Impacto {r.impact}</Badge> : <Badge tone="viewer">Sin impacto</Badge>}
-                        <span className="informe-meta">Informe #{r.id} · {new Date(r.created_at).toLocaleDateString()}</span>
+                        {r.impact ? <Badge tone={r.impact}>{impactBadge(r.impact)}</Badge> : <Badge tone="viewer">{t("Sin impacto")}</Badge>}
+                        <span className="informe-meta">{t("Informe #{id}", { id: r.id })} · {new Date(r.created_at).toLocaleDateString(intlLocale())}</span>
                       </div>
-                      <span title={GLOSSARY.fb_origen_informe}><Badge tone="viewer">{r.model_used || "manual"}</Badge></span>
+                      <span title={GLOSSARY.fb_origen_informe}><Badge tone="viewer">{ts(r.model_used) || t("manual")}</Badge></span>
                     </div>
                     <h3 className="informe-title">{r.title}</h3>
                     <p className="informe-excerpt">
@@ -343,13 +357,13 @@ export default function Recommendations() {
                       {r.content.length > 280 ? "…" : ""}
                     </p>
                     <div className="informe-actions">
-                      <Button size="sm" onClick={() => setDetail(r)}>Leer informe completo</Button>
+                      <Button size="sm" onClick={() => setDetail(r)}>{t("Leer informe completo")}</Button>
                       {canWrite && (
                         <>
-                          <HintButton size="sm" variant="outline" hint="Corregir título, contenido e impacto" onClick={() => openEdit(r)}>
-                            <Icon name="edit" size={14} /> Editar
+                          <HintButton size="sm" variant="outline" hint={t("Corregir título, contenido e impacto")} onClick={() => openEdit(r)}>
+                            <Icon name="edit" size={14} /> {t("Editar")}
                           </HintButton>
-                          <HintButton size="sm" variant="ghost" style={{ color: "#EF4444" }} hint="Eliminar el informe" onClick={() => setConfirmDel(r)} aria-label={`Eliminar informe ${r.id}`}>
+                          <HintButton size="sm" variant="ghost" style={{ color: "#EF4444" }} hint={t("Eliminar el informe")} onClick={() => setConfirmDel(r)} aria-label={t("Eliminar informe {id}", { id: r.id })}>
                             <Icon name="trash" size={15} />
                           </HintButton>
                         </>
@@ -367,16 +381,16 @@ export default function Recommendations() {
       <Modal
         open={!!detail}
         onClose={() => setDetail(null)}
-        title={detail?.title || "Informe"}
+        title={detail?.title || t("Informe")}
         width={720}
         footer={
           detail && canWrite ? (
             <>
               <Button variant="ghost" style={{ color: "#EF4444" }} onClick={() => setConfirmDel(detail)}>
-                <Icon name="trash" size={15} /> Eliminar
+                <Icon name="trash" size={15} /> {t("Eliminar")}
               </Button>
               <Button variant="secondary" onClick={() => openEdit(detail)}>
-                <Icon name="edit" size={15} /> Editar informe
+                <Icon name="edit" size={15} /> {t("Editar informe")}
               </Button>
             </>
           ) : null
@@ -385,9 +399,9 @@ export default function Recommendations() {
         {detail && (
           <div data-testid="rec-detail">
             <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-              {detail.impact && <Badge tone={detail.impact}>Impacto {detail.impact}</Badge>}
-              <span title={GLOSSARY.fb_origen_informe}><Badge tone="viewer">{detail.model_used || "manual"}</Badge></span>
-              <Badge tone="viewer">{new Date(detail.created_at).toLocaleString()}</Badge>
+              {detail.impact && <Badge tone={detail.impact}>{impactBadge(detail.impact)}</Badge>}
+              <span title={GLOSSARY.fb_origen_informe}><Badge tone="viewer">{ts(detail.model_used) || t("manual")}</Badge></span>
+              <Badge tone="viewer">{new Date(detail.created_at).toLocaleString(intlLocale())}</Badge>
               {detail.created_by && <Badge tone="viewer">{detail.created_by}</Badge>}
             </div>
             <Markdown>{detail.content}</Markdown>
@@ -400,25 +414,25 @@ export default function Recommendations() {
       <Modal
         open={!!createMode}
         onClose={() => setCreateMode(null)}
-        title={createMode === "ia" ? "Generar informe desde una señal" : "Nuevo informe"}
+        title={createMode === "ia" ? t("Generar informe desde una señal") : t("Nuevo informe")}
         width={760}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setCreateMode(null)} disabled={saving}>Cancelar</Button>
-            <Button onClick={submitCreate} loading={saving}>{createMode === "ia" ? (aiOn ? "Generar con IA" : "Crear versión preliminar") : "Guardar informe"}</Button>
+            <Button variant="secondary" onClick={() => setCreateMode(null)} disabled={saving}>{t("Cancelar")}</Button>
+            <Button onClick={submitCreate} loading={saving}>{createMode === "ia" ? (aiOn ? t("Generar con IA") : t("Crear versión preliminar")) : t("Guardar informe")}</Button>
           </>
         }
       >
         {formError && <p className="public-submit-error" role="alert">{formError}</p>}
         {createMode === "ia" && (
           <p style={{ fontSize: 13, color: aiOn ? "#64748B" : "#92400E", marginTop: 0 }}>
-            {aiOn ? "La IA redacta un borrador de recomendación para Colombia; revise y edite antes de difundirlo." : `${GLOSSARY.fb_ia_apagada} Se creará una versión preliminar.`}
+            {aiOn ? t("La IA redacta un borrador de recomendación para Colombia; revise y edite antes de difundirlo.") : `${GLOSSARY.fb_ia_apagada} ${t("Se creará una versión preliminar.")}`}
           </p>
         )}
         <div className="fb-grid-2">
-          <Input id="rec-finding-search" label="Buscar señal" placeholder="Nombre de la tecnología..." value={findingQuery} onChange={(e) => setFindingQuery(e.target.value)} />
-          <Select id="rec-finding" label={createMode === "ia" ? "Señal de origen" : "Señal de origen (opcional)"} required={createMode === "ia"} value={draft.finding_id} onChange={(e) => setDraft({ ...draft, finding_id: e.target.value })}>
-            <option value="">{createMode === "ia" ? "Seleccione una señal..." : "Sin señal (informe general)"}</option>
+          <Input id="rec-finding-search" label={t("Buscar señal")} placeholder={t("Nombre de la tecnología...")} value={findingQuery} onChange={(e) => setFindingQuery(e.target.value)} />
+          <Select id="rec-finding" label={createMode === "ia" ? t("Señal de origen") : t("Señal de origen (opcional)")} required={createMode === "ia"} value={draft.finding_id} onChange={(e) => setDraft({ ...draft, finding_id: e.target.value })}>
+            <option value="">{createMode === "ia" ? t("Seleccione una señal...") : t("Sin señal (informe general)")}</option>
             {findingOptions.map((o) => (
               <option key={o.id} value={o.id}>{(o.label || `#${o.id}`).slice(0, 90)}</option>
             ))}
@@ -427,13 +441,13 @@ export default function Recommendations() {
         {createMode === "manual" && (
           <>
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 170px", gap: 12 }}>
-              <Input id="rec-title" label="Título" required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
-              <Select id="rec-impact" label="Impacto" hint={GLOSSARY.fb_impacto} value={draft.impact} onChange={(e) => setDraft({ ...draft, impact: e.target.value })}>
-                {IMPACTS.map((i) => <option key={i || "none"} value={i}>{i || "Sin definir"}</option>)}
+              <Input id="rec-title" label={t("Título")} required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+              <Select id="rec-impact" label={t("Impacto")} hint={GLOSSARY.fb_impacto} value={draft.impact} onChange={(e) => setDraft({ ...draft, impact: e.target.value })}>
+                {IMPACTS.map((i) => <option key={i || "none"} value={i}>{i ? IMPACT_LABELS[i] : t("Sin definir")}</option>)}
               </Select>
             </div>
-            <label htmlFor="rec-content" style={lbl}>Contenido (Markdown) *</label>
-            <textarea id="rec-content" value={draft.content} onChange={(e) => setDraft({ ...draft, content: e.target.value })} rows={10} style={{ ...inp, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }} placeholder="## Síntesis" />
+            <label htmlFor="rec-content" style={lbl}>{t("Contenido (Markdown) *")}</label>
+            <textarea id="rec-content" value={draft.content} onChange={(e) => setDraft({ ...draft, content: e.target.value })} rows={10} style={{ ...inp, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }} placeholder={`## ${t("Síntesis")}`} />
           </>
         )}
       </Modal>
@@ -442,13 +456,13 @@ export default function Recommendations() {
       <Modal
         open={!!edit}
         onClose={() => setEdit(null)}
-        title="Editar informe"
+        title={t("Editar informe")}
         width={860}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setEdit(null)} disabled={saving}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => setEdit(null)} disabled={saving}>{t("Cancelar")}</Button>
             <Button onClick={saveEdit} loading={saving}>
-              <Icon name="save" size={15} /> Guardar cambios
+              <Icon name="save" size={15} /> {t("Guardar cambios")}
             </Button>
           </>
         }
@@ -456,29 +470,29 @@ export default function Recommendations() {
         {edit && (
           <div>
             <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 12px" }}>
-              Markdown soportado. Ajuste título, contenido e impacto según relevancia para Colombia.
+              {t("Markdown soportado. Ajuste título, contenido e impacto según relevancia para Colombia.")}
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 160px", gap: 12, marginBottom: 12 }}>
               <div>
-                <label htmlFor="edit-rec-title" style={lbl}>Título</label>
+                <label htmlFor="edit-rec-title" style={lbl}>{t("Título")}</label>
                 <input id="edit-rec-title" value={edit.title} onChange={(e) => setEdit({ ...edit, title: e.target.value })} style={inp} />
               </div>
-              <Select id="edit-rec-impact" label="Impacto" hint={GLOSSARY.fb_impacto} value={edit.impact || ""} onChange={(e) => setEdit({ ...edit, impact: e.target.value })}>
+              <Select id="edit-rec-impact" label={t("Impacto")} hint={GLOSSARY.fb_impacto} value={edit.impact || ""} onChange={(e) => setEdit({ ...edit, impact: e.target.value })}>
                 {IMPACTS.map((i) => (
-                  <option key={i || "none"} value={i}>{i || "Sin definir"}</option>
+                  <option key={i || "none"} value={i}>{i ? IMPACT_LABELS[i] : t("Sin definir")}</option>
                 ))}
               </Select>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <label htmlFor="edit-rec-content" style={lbl}>Contenido (Markdown)</label>
+              <label htmlFor="edit-rec-content" style={lbl}>{t("Contenido (Markdown)")}</label>
               <button
                 type="button"
                 onClick={() => setShowPreview((s) => !s)}
                 style={{ border: "none", background: "transparent", color: "#1D4ED8", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
               >
                 <Icon name={showPreview ? "eyeOff" : "eye"} size={14} />
-                {showPreview ? "Ocultar vista previa" : "Ver vista previa"}
+                {showPreview ? t("Ocultar vista previa") : t("Ver vista previa")}
               </button>
             </div>
 
@@ -492,7 +506,7 @@ export default function Recommendations() {
               />
               {showPreview && (
                 <div style={{ minHeight: 360, maxHeight: 480, overflowY: "auto", padding: "12px 16px", border: "1px solid #E2E8F0", borderRadius: 10, background: "#F8FAFC" }}>
-                  <Markdown>{edit.content || "_Vista previa..._"}</Markdown>
+                  <Markdown>{edit.content || `_${t("Vista previa...")}_`}</Markdown>
                 </div>
               )}
             </div>
@@ -505,9 +519,11 @@ export default function Recommendations() {
         onClose={() => setConfirmDel(null)}
         onConfirm={doDelete}
         loading={deleting}
-        title="Eliminar informe"
-        message={`Se eliminará "${confirmDel?.title?.slice(0, 120)}". Esta acción no se puede deshacer.`}
-        confirmLabel="Eliminar"
+        title={t("Eliminar informe")}
+        message={t('Se eliminará "{titulo}". Esta acción no se puede deshacer.', {
+          titulo: confirmDel?.title?.slice(0, 120),
+        })}
+        confirmLabel={t("Eliminar")}
       />
     </div>
   );

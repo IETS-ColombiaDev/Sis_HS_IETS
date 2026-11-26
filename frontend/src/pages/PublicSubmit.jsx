@@ -4,6 +4,7 @@ import axios from "axios";
 import Button from "../components/Button";
 import { Input, Textarea, Select } from "../components/Field";
 import PublicShell from "../components/PublicShell";
+import { t, ts } from "../i18n";
 
 const empty = {
   commercial_name: "",
@@ -23,13 +24,13 @@ const empty = {
 };
 
 const HINTS = {
-  commercial_name: "Nombre con el que se comercializa o se conoce la tecnología (marca o nombre del dispositivo).",
-  inn_name: "Denominación Común Internacional: el nombre genérico del principio activo (ej. pembrolizumab). Para dispositivos, el nombre genérico del equipo.",
-  mechanism: "Cómo actúa la tecnología: mecanismo biológico, principio de funcionamiento o innovación que introduce.",
-  indication: "Enfermedad o condición de salud para la que se propone, y la población objetivo.",
-  development_phase: "Etapa actual: ensayos fase II o III, fase IV (poscomercialización) o ya aprobada por una agencia de referencia (FDA, EMA...).",
-  evidence_links: "Enlaces públicos que respaldan la postulación: registro del ensayo, artículo, decisión regulatoria. Uno por línea; deben iniciar con http:// o https://.",
-  coi: "Conflicto de interés: cualquier relación económica o profesional con el fabricante que pueda sesgar la postulación. Declararlo no descarta la postulación.",
+  commercial_name: t("Nombre con el que se comercializa o se conoce la tecnología (marca o nombre del dispositivo)."),
+  inn_name: t("Denominación Común Internacional: el nombre genérico del principio activo (ej. pembrolizumab). Para dispositivos, el nombre genérico del equipo."),
+  mechanism: t("Cómo actúa la tecnología: mecanismo biológico, principio de funcionamiento o innovación que introduce."),
+  indication: t("Enfermedad o condición de salud para la que se propone, y la población objetivo."),
+  development_phase: t("Etapa actual: ensayos fase II o III, fase IV (poscomercialización) o ya aprobada por una agencia de referencia (FDA, EMA...)."),
+  evidence_links: t("Enlaces públicos que respaldan la postulación: registro del ensayo, artículo, decisión regulatoria. Uno por línea; deben iniciar con http:// o https://."),
+  coi: t("Conflicto de interés: cualquier relación económica o profesional con el fabricante que pueda sesgar la postulación. Declararlo no descarta la postulación."),
 };
 
 /** Carga el script de reCAPTCHA v3 una sola vez. React no ejecuta <script> de JSX. */
@@ -73,7 +74,7 @@ export default function PublicSubmit() {
               recaptcha.current = g;
               setCaptchaReady(true);
             })
-            .catch(() => setError("No se pudo cargar la verificación anti-robot. Revise su conexión y recargue la página."));
+            .catch(() => setError(t("No se pudo cargar la verificación anti-robot. Revise su conexión y recargue la página.")));
         }
       })
       .catch(() => setCaptcha({ recaptcha_enabled: false, mode: "desconocido", message: "" }));
@@ -88,11 +89,11 @@ export default function PublicSubmit() {
     e.preventDefault();
     setError("");
     if (!form.commercial_name.trim() && !form.inn_name.trim()) {
-      setError("La tecnología reportada es obligatoria (nombre comercial o DCI).");
+      setError(t("La tecnología reportada es obligatoria (nombre comercial o DCI)."));
       return;
     }
     if (!form.indication.trim()) {
-      setError("La indicación propuesta es obligatoria.");
+      setError(t("La indicación propuesta es obligatoria."));
       return;
     }
     const links = form.evidence_links
@@ -100,16 +101,16 @@ export default function PublicSubmit() {
       .map((s) => s.trim())
       .filter(Boolean);
     if (links.length === 0) {
-      setError("La fuente de información es obligatoria: adjunte al menos un enlace.");
+      setError(t("La fuente de información es obligatoria: adjunte al menos un enlace."));
       return;
     }
     const bad = links.find((l) => !/^https?:\/\//i.test(l));
     if (bad) {
-      setError(`Los enlaces deben iniciar con http:// o https:// (revise: ${bad.slice(0, 60)}).`);
+      setError(t("Los enlaces deben iniciar con http:// o https:// (revise: {link}).", { link: bad.slice(0, 60) }));
       return;
     }
     if (form.has_conflict && form.conflict_statement.trim().length < 20) {
-      setError("Describa el conflicto de interés (al menos 20 caracteres).");
+      setError(t("Describa el conflicto de interés (al menos 20 caracteres)."));
       return;
     }
     setSending(true);
@@ -117,7 +118,7 @@ export default function PublicSubmit() {
       let token = "";
       if (captcha?.recaptcha_enabled) {
         if (!recaptcha.current) {
-          setError("La verificación anti-robot aún no está lista. Espere unos segundos e intente de nuevo.");
+          setError(t("La verificación anti-robot aún no está lista. Espere unos segundos e intente de nuevo."));
           setSending(false);
           return;
         }
@@ -131,9 +132,9 @@ export default function PublicSubmit() {
       setDone(data);
     } catch (err) {
       const detail = err?.response?.data?.detail;
-      if (typeof detail === "string") setError(detail);
-      else if (Array.isArray(detail)) setError("Revise los campos obligatorios del formulario.");
-      else setError("No se pudo enviar la postulación. Intente de nuevo en unos minutos.");
+      if (typeof detail === "string") setError(ts(detail));
+      else if (Array.isArray(detail)) setError(t("Revise los campos obligatorios del formulario."));
+      else setError(t("No se pudo enviar la postulación. Intente de nuevo en unos minutos."));
     } finally {
       setSending(false);
     }
@@ -141,19 +142,19 @@ export default function PublicSubmit() {
 
   return (
     <PublicShell
-      kicker="Canal reactivo"
-      title="Postular una tecnología sanitaria"
-      lead="La postulación no entra sola al catálogo metodológico: el equipo del IETS la revisa, con declaración de conflicto de interés, antes de asignarla a un ciclo."
+      kicker={t("Canal reactivo")}
+      title={t("Postular una tecnología sanitaria")}
+      lead={t("La postulación no entra sola al catálogo metodológico: el equipo del IETS la revisa, con declaración de conflicto de interés, antes de asignarla a un ciclo.")}
     >
       {done ? (
         <div className="public-submit-ok" data-testid="submit-ok">
-          <strong>Postulación recibida.</strong>
-          <p>{done.message}</p>
+          <strong>{t("Postulación recibida.")}</strong>
+          <p>{ts(done.message)}</p>
           <p style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             <button type="button" className="linkish" onClick={() => { setDone(null); setForm(empty); }}>
-              Enviar otra postulación
+              {t("Enviar otra postulación")}
             </button>
-            <Link to="/expedientes">Consultar expedientes publicados</Link>
+            <Link to="/expedientes">{t("Consultar expedientes publicados")}</Link>
           </p>
         </div>
       ) : (
@@ -162,76 +163,76 @@ export default function PublicSubmit() {
             <p className={`fb-public-note${captcha.recaptcha_enabled ? " is-ok" : ""}`} data-testid="captcha-note">
               {captcha.recaptcha_enabled
                 ? captchaReady
-                  ? "Formulario protegido con reCAPTCHA de Google. La verificación es invisible."
-                  : "Cargando la verificación anti-robot..."
-                : "Verificación anti-robot en modo degradado: el formulario funciona con controles básicos (límite de envíos por conexión)."}
+                  ? t("Formulario protegido con reCAPTCHA de Google. La verificación es invisible.")
+                  : t("Cargando la verificación anti-robot...")
+                : t("Verificación anti-robot en modo degradado: el formulario funciona con controles básicos (límite de envíos por conexión).")}
             </p>
           )}
           <fieldset className="ps-section">
-            <legend><span>1</span> Datos obligatorios</legend>
+            <legend><span>1</span> {t("Datos obligatorios")}</legend>
             <p className="fb-public-note">
-              Tecnología reportada: escriba el nombre comercial, la DCI o ambos. Basta con uno.
+              {t("Tecnología reportada: escriba el nombre comercial, la DCI o ambos. Basta con uno.")}
             </p>
             <div className="form-two-col">
-              <Input id="ps-commercial" label="Tecnología reportada: nombre comercial" hint={HINTS.commercial_name} value={form.commercial_name} onChange={set("commercial_name")} />
-              <Input id="ps-inn" label="Tecnología reportada: DCI" hint={HINTS.inn_name} value={form.inn_name} onChange={set("inn_name")} />
+              <Input id="ps-commercial" label={t("Tecnología reportada: nombre comercial")} hint={HINTS.commercial_name} value={form.commercial_name} onChange={set("commercial_name")} />
+              <Input id="ps-inn" label={t("Tecnología reportada: DCI")} hint={HINTS.inn_name} value={form.inn_name} onChange={set("inn_name")} />
             </div>
-            <Textarea id="ps-indication" label="Indicación propuesta" hint={HINTS.indication} required rows={3} value={form.indication} onChange={set("indication")} help="Enfermedad o condición y población a la que se destina." />
+            <Textarea id="ps-indication" label={t("Indicación propuesta")} hint={HINTS.indication} required rows={3} value={form.indication} onChange={set("indication")} help={t("Enfermedad o condición y población a la que se destina.")} />
             <Textarea
               id="ps-links"
-              label="Fuente de información (enlaces, uno por línea)"
+              label={t("Fuente de información (enlaces, uno por línea)")}
               hint={HINTS.evidence_links}
               required
               rows={3}
               value={form.evidence_links}
               onChange={set("evidence_links")}
               placeholder="https://clinicaltrials.gov/study/NCT..."
-              help="ClinicalTrials.gov, FDA, EMA, artículos o comunicados oficiales. Deben iniciar con http:// o https://."
+              help={t("ClinicalTrials.gov, FDA, EMA, artículos o comunicados oficiales. Deben iniciar con http:// o https://.")}
             />
           </fieldset>
 
           <fieldset className="ps-section">
-            <legend><span>2</span> Información complementaria</legend>
+            <legend><span>2</span> {t("Información complementaria")}</legend>
             <p className="fb-public-note" data-testid="complementary-note">
-              Estos campos son opcionales. Si no tiene el dato, puede escribir «No disponible».
+              {t("Estos campos son opcionales. Si no tiene el dato, puede escribir «No disponible».")}
             </p>
             <div className="form-two-col">
-              <Input id="ps-manufacturer" label="Fabricante o desarrollador" value={form.manufacturer} onChange={set("manufacturer")} />
-              <Select id="ps-phase" label="Fase de desarrollo" hint={HINTS.development_phase} value={form.development_phase} onChange={set("development_phase")}>
-                <option value="">Seleccione...</option>
-                <option value="Fase II">Fase II</option>
-                <option value="Fase III">Fase III</option>
-                <option value="Fase IV">Fase IV</option>
-                <option value="Aprobado en agencia de referencia">Aprobado en agencia de referencia</option>
-                <option value="Otro">Otro</option>
-                <option value="No disponible">No disponible</option>
+              <Input id="ps-manufacturer" label={t("Fabricante o desarrollador")} value={form.manufacturer} onChange={set("manufacturer")} />
+              <Select id="ps-phase" label={t("Fase de desarrollo")} hint={HINTS.development_phase} value={form.development_phase} onChange={set("development_phase")}>
+                <option value="">{t("Seleccione...")}</option>
+                <option value="Fase II">{t("Fase II")}</option>
+                <option value="Fase III">{t("Fase III")}</option>
+                <option value="Fase IV">{t("Fase IV")}</option>
+                <option value="Aprobado en agencia de referencia">{t("Aprobado en agencia de referencia")}</option>
+                <option value="Otro">{t("Otro")}</option>
+                <option value="No disponible">{t("No disponible")}</option>
               </Select>
             </div>
-            <Textarea id="ps-mechanism" label="Mecanismo de acción" hint={HINTS.mechanism} rows={3} value={form.mechanism} onChange={set("mechanism")} />
+            <Textarea id="ps-mechanism" label={t("Mecanismo de acción")} hint={HINTS.mechanism} rows={3} value={form.mechanism} onChange={set("mechanism")} />
           </fieldset>
 
           <fieldset className="ps-section">
-            <legend><span>3</span> Conflicto de interés</legend>
+            <legend><span>3</span> {t("Conflicto de interés")}</legend>
             <label className="public-check" title={HINTS.coi}>
               <input type="checkbox" checked={form.has_conflict} onChange={set("has_conflict")} />
-              <span>Declaro que existe un conflicto de interés</span>
+              <span>{t("Declaro que existe un conflicto de interés")}</span>
             </label>
             {form.has_conflict && (
-              <Textarea id="ps-conflict" label="Descripción del conflicto" hint={HINTS.coi} required value={form.conflict_statement} onChange={set("conflict_statement")} />
+              <Textarea id="ps-conflict" label={t("Descripción del conflicto")} hint={HINTS.coi} required value={form.conflict_statement} onChange={set("conflict_statement")} />
             )}
             <label className="public-check">
               <input type="checkbox" checked={form.coi_accepted} onChange={set("coi_accepted")} required />
-              <span>Firmo la declaración de conflicto de interés. Sin esta firma la postulación no se guarda.</span>
+              <span>{t("Firmo la declaración de conflicto de interés. Sin esta firma la postulación no se guarda.")}</span>
             </label>
           </fieldset>
 
           <fieldset className="ps-section">
-            <legend><span>4</span> Sus datos de contacto</legend>
+            <legend><span>4</span> {t("Sus datos de contacto")}</legend>
             <div className="form-two-col">
-              <Input id="ps-name" label="Su nombre" value={form.submitter_name} onChange={set("submitter_name")} help="Opcional." />
-              <Input id="ps-email" label="Correo" type="email" required value={form.submitter_email} onChange={set("submitter_email")} help="Le escribimos solo sobre esta postulación." />
+              <Input id="ps-name" label={t("Su nombre")} value={form.submitter_name} onChange={set("submitter_name")} help={t("Opcional.")} />
+              <Input id="ps-email" label={t("Correo")} type="email" required value={form.submitter_email} onChange={set("submitter_email")} help={t("Le escribimos solo sobre esta postulación.")} />
             </div>
-            <Input id="ps-org" label="Organización" value={form.submitter_org} onChange={set("submitter_org")} help="Opcional." />
+            <Input id="ps-org" label={t("Organización")} value={form.submitter_org} onChange={set("submitter_org")} help={t("Opcional.")} />
           </fieldset>
           <div className="honeypot" aria-hidden="true">
             <input tabIndex={-1} autoComplete="off" value={form.website} onChange={set("website")} />
@@ -239,7 +240,7 @@ export default function PublicSubmit() {
 
           {error && <p className="public-submit-error" role="alert">{error}</p>}
           <Button type="submit" loading={sending} disabled={captcha?.recaptcha_enabled && !captchaReady} style={{ width: "100%", marginTop: 8 }}>
-            Enviar postulación
+            {t("Enviar postulación")}
           </Button>
         </form>
       )}

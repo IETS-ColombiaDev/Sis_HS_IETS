@@ -1,11 +1,12 @@
 import Icon from "./Icon";
 import Tooltip from "./Tooltip";
+import { t } from "../i18n";
 
 /**
  * Icono (i) con explicacion en hover o al enfocar.
  * Sirve para glosario de terminos tecnicos sin saturar la pantalla.
  */
-export default function InfoTip({ text, position = "top", label = "Más información" }) {
+export default function InfoTip({ text, position = "top", label = t("Más información") }) {
   if (!text) return null;
   return (
     <Tooltip text={text} position={position} maxWidth={300}>
@@ -37,8 +38,8 @@ export default function InfoTip({ text, position = "top", label = "Más informac
 export function TermLabel({ children, tip, position = "top", label }) {
   const auto =
     typeof children === "string" || typeof children === "number"
-      ? `Qué significa ${children}`
-      : "Más información";
+      ? t("Qué significa {term}", { term: children })
+      : t("Más información");
   return (
     <span className="term-label">
       {children}

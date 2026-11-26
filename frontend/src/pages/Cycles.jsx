@@ -17,14 +17,15 @@ import EmptyState from "../components/EmptyState";
 import { LoadingBlock } from "../components/Spinner";
 import { CYCLE_STATUS_LABELS, PERM } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
+import { t, tr, ts } from "../i18n";
 
 const FUNNEL = [
-  { key: "assigned", label: "Asignadas", hint: GLOSSARY.fa_embudo_asignadas },
-  { key: "filtered", label: "Filtradas", hint: GLOSSARY.fa_embudo_filtradas },
-  { key: "prioritized", label: "Priorizadas", hint: GLOSSARY.fa_embudo_priorizadas },
-  { key: "watchlist", label: "Bajo vigilancia", hint: GLOSSARY.fa_embudo_vigilancia },
-  { key: "in_evaluation", label: "En evaluación", hint: GLOSSARY.fa_embudo_evaluacion },
-  { key: "published", label: "Publicadas", hint: GLOSSARY.fa_embudo_publicadas },
+  { key: "assigned", label: t("Asignadas"), hint: GLOSSARY.fa_embudo_asignadas },
+  { key: "filtered", label: t("Filtradas"), hint: GLOSSARY.fa_embudo_filtradas },
+  { key: "prioritized", label: t("Priorizadas"), hint: GLOSSARY.fa_embudo_priorizadas },
+  { key: "watchlist", label: t("Bajo vigilancia"), hint: GLOSSARY.fa_embudo_vigilancia },
+  { key: "in_evaluation", label: t("En evaluación"), hint: GLOSSARY.fa_embudo_evaluacion },
+  { key: "published", label: t("Publicadas"), hint: GLOSSARY.fa_embudo_publicadas },
 ];
 
 // Orden de la maquina de estados: sirve para distinguir avanzar de retroceder.
@@ -72,7 +73,7 @@ function CycleFunnel({ summary }) {
             <div className="cycle-funnel-meta">
               <span className="term-label">
                 {f.label}
-                <InfoTip text={f.hint} label={`Qué cuenta ${f.label}`} />
+                <InfoTip text={f.hint} label={t("Qué cuenta {label}", { label: f.label })} />
               </span>
               <strong>{value}</strong>
             </div>
@@ -113,25 +114,30 @@ function CycleCard({
             <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{cycle.code}</h3>
             <Tooltip text={STATUS_HINT[cycle.status]}>
               <Badge tone={cycle.status}>
-                {cycle.status_label || CYCLE_STATUS_LABELS[cycle.status] || cycle.status}
+                {ts(cycle.status_label) || CYCLE_STATUS_LABELS[cycle.status] || cycle.status}
               </Badge>
             </Tooltip>
-            {cycle.is_historic && <Badge tone="historico">Histórico</Badge>}
-            {isSelected && <Badge tone="info">Ciclo en pantalla</Badge>}
+            {cycle.is_historic && <Badge tone="historico">{t("Histórico")}</Badge>}
+            {isSelected && <Badge tone="info">{t("Ciclo en pantalla")}</Badge>}
           </div>
           <p className="cycle-card-dates">
-            Apertura {cycle.opened_on} · Corte {cycle.data_cutoff_on}
-            {cycle.bulletin_due_on ? ` · Boletín ${cycle.bulletin_due_on}` : ""} ·{" "}
+            {cycle.bulletin_due_on
+              ? t("Apertura {apertura} · Corte {corte} · Boletín {boletin}", {
+                  apertura: cycle.opened_on,
+                  corte: cycle.data_cutoff_on,
+                  boletin: cycle.bulletin_due_on,
+                })
+              : t("Apertura {apertura} · Corte {corte}", { apertura: cycle.opened_on, corte: cycle.data_cutoff_on })} ·{" "}
             <span className="term-label">
-              Ventana {weeks} semanas
-              <InfoTip text={GLOSSARY.fa_ventana} label="Qué es la ventana operativa" />
+              {t("Ventana {n} semanas", { n: weeks })}
+              <InfoTip text={GLOSSARY.fa_ventana} label={t("Qué es la ventana operativa")} />
             </span>
           </p>
         </div>
         {!isSelected && (
-          <Tooltip text="Todas las pantallas del flujo (bandeja, filtrado, priorización, evaluación) pasan a trabajar sobre este ciclo.">
+          <Tooltip text={t("Todas las pantallas del flujo (bandeja, filtrado, priorización, evaluación) pasan a trabajar sobre este ciclo.")}>
             <Button variant="outline" size="sm" onClick={() => onSelect(cycle.id)}>
-              Trabajar aquí
+              {t("Trabajar aquí")}
             </Button>
           </Tooltip>
         )}
@@ -153,9 +159,9 @@ function CycleCard({
                   size="sm"
                   variant="secondary"
                   disabled
-                  disabledHint="Solo el superadministrador cierra y consolida un ciclo."
+                  disabledHint={t("Solo el superadministrador cierra y consolida un ciclo.")}
                 >
-                  Cerrar y consolidar
+                  {t("Cerrar y consolidar")}
                 </HintButton>
               );
             }
@@ -167,19 +173,25 @@ function CycleCard({
                 hint={
                   isClose
                     ? GLOSSARY.fa_cerrar
-                    : `${backwards ? "Retrocede" : "Avanza"} a '${CYCLE_STATUS_LABELS[target]}'. ${STATUS_HINT[target] || ""}`
+                    : `${
+                        backwards
+                          ? t("Retrocede a '{estado}'.", { estado: CYCLE_STATUS_LABELS[target] })
+                          : t("Avanza a '{estado}'.", { estado: CYCLE_STATUS_LABELS[target] })
+                      } ${STATUS_HINT[target] || ""}`
                 }
                 onClick={() => onTransition(cycle, target)}
               >
                 {isClose
-                  ? "Cerrar y consolidar"
-                  : `${backwards ? "Devolver a" : "Pasar a"}: ${CYCLE_STATUS_LABELS[target]}`}
+                  ? t("Cerrar y consolidar")
+                  : backwards
+                  ? t("Devolver a: {estado}", { estado: CYCLE_STATUS_LABELS[target] })
+                  : t("Pasar a: {estado}", { estado: CYCLE_STATUS_LABELS[target] })}
               </HintButton>
             );
           })}
           {!isClosed && (
-            <HintButton variant="ghost" size="sm" hint="Corrija código, fechas o notas del ciclo." onClick={() => onEdit(cycle)}>
-              <Icon name="edit" size={14} /> Editar
+            <HintButton variant="ghost" size="sm" hint={t("Corrija código, fechas o notas del ciclo.")} onClick={() => onEdit(cycle)}>
+              <Icon name="edit" size={14} /> {t("Editar")}
             </HintButton>
           )}
           {cycle.status === "en_configuracion" && (
@@ -189,15 +201,15 @@ function CycleCard({
               style={{ color: "#DC2626" }}
               disabled={hasWork}
               hint={GLOSSARY.fa_eliminar_ciclo}
-              disabledHint="Tiene tecnologías asignadas: ya no se elimina. Edite sus datos o aváncelo."
+              disabledHint={t("Tiene tecnologías asignadas: ya no se elimina. Edite sus datos o aváncelo.")}
               onClick={() => onDelete(cycle)}
             >
-              <Icon name="trash" size={14} /> Eliminar
+              <Icon name="trash" size={14} /> {t("Eliminar")}
             </HintButton>
           )}
           {isClosed && (cycle.summary?.watchlist || 0) > 0 && (
             <HintButton variant="outline" size="sm" hint={GLOSSARY.fa_arrastre} onClick={() => onCarryOver(cycle)}>
-              <Icon name="layers" size={15} /> Arrastrar {cycle.summary.watchlist} bajo vigilancia
+              <Icon name="layers" size={15} /> {t("Arrastrar {n} bajo vigilancia", { n: cycle.summary.watchlist })}
             </HintButton>
           )}
         </div>
@@ -277,22 +289,26 @@ export default function Cycles() {
   const formCheck = useMemo(() => {
     if (!form) return { errors: {}, window: 0, yearCount: 0, year: null };
     const errors = {};
-    if (!form.code?.trim()) errors.code = "El código es obligatorio.";
+    if (!form.code?.trim()) errors.code = t("El código es obligatorio.");
     else if (cycles.some((c) => c.code.trim() === form.code.trim() && c.id !== form.id))
-      errors.code = "Ya existe un ciclo con este código.";
-    if (!form.opened_on) errors.opened_on = "Indique la fecha de apertura.";
-    if (!form.data_cutoff_on) errors.data_cutoff_on = "Indique el corte de datos.";
+      errors.code = t("Ya existe un ciclo con este código.");
+    if (!form.opened_on) errors.opened_on = t("Indique la fecha de apertura.");
+    if (!form.data_cutoff_on) errors.data_cutoff_on = t("Indique el corte de datos.");
     else if (form.opened_on && form.data_cutoff_on <= form.opened_on)
-      errors.data_cutoff_on = "El corte debe ser posterior a la apertura.";
+      errors.data_cutoff_on = t("El corte debe ser posterior a la apertura.");
     if (form.bulletin_due_on && form.data_cutoff_on && form.bulletin_due_on < form.data_cutoff_on)
-      errors.bulletin_due_on = "El boletín no puede ser anterior al corte de datos.";
+      errors.bulletin_due_on = t("El boletín no puede ser anterior al corte de datos.");
     const window = weeksBetween(form.opened_on, form.bulletin_due_on || form.data_cutoff_on);
     if (form.opened_on && form.data_cutoff_on && (window < wmin || window > wmax))
-      errors.window = `La ventana es de ${window} semanas y debe estar entre ${wmin} y ${wmax}.`;
+      errors.window = t("La ventana es de {n} semanas y debe estar entre {min} y {max}.", { n: window, min: wmin, max: wmax });
     const year = form.opened_on ? Number(form.opened_on.slice(0, 4)) : null;
     const yearCount = cycles.filter((c) => !c.is_historic && c.year === year && c.id !== form.id).length;
     if (year && yearCount >= quota)
-      errors.quota = `El año ${year} ya tiene ${yearCount} ciclos formales (máximo ${quota}). Use otro año o cierre uno existente.`;
+      errors.quota = t("El año {year} ya tiene {n} ciclos formales (máximo {max}). Use otro año o cierre uno existente.", {
+        year,
+        n: yearCount,
+        max: quota,
+      });
     return { errors, window, yearCount, year };
   }, [form, cycles, wmin, wmax, quota]);
 
@@ -310,16 +326,16 @@ export default function Cycles() {
     try {
       if (form.id) {
         const { data } = await api.put(`/cycles/${form.id}`, payload);
-        toast.success(`Ciclo ${data.code} actualizado.`);
+        toast.success(t("Ciclo {code} actualizado.", { code: data.code }));
       } else {
         const { data } = await api.post("/cycles", payload);
-        toast.success(`Ciclo ${data.code} creado.`);
+        toast.success(t("Ciclo {code} creado.", { code: data.code }));
         setCycleId(data.id);
       }
       setFormOpen(false);
       await reload();
     } catch (e) {
-      toast.error(apiError(e, form.id ? "No se pudo actualizar el ciclo" : "No se pudo crear el ciclo"));
+      toast.error(apiError(e, form.id ? t("No se pudo actualizar el ciclo") : t("No se pudo crear el ciclo")));
     } finally {
       setSaving(false);
     }
@@ -329,11 +345,11 @@ export default function Cycles() {
     setSaving(true);
     try {
       await api.delete(`/cycles/${deleting.id}`);
-      toast.success(`Ciclo ${deleting.code} eliminado.`);
+      toast.success(t("Ciclo {code} eliminado.", { code: deleting.code }));
       setDeleting(null);
       await reload();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo eliminar el ciclo"));
+      toast.error(apiError(e, t("No se pudo eliminar el ciclo")));
     } finally {
       setSaving(false);
     }
@@ -347,7 +363,7 @@ export default function Cycles() {
         setCloseTarget(cycle);
         setJustification("");
       } catch (e) {
-        toast.error(apiError(e, "No se pudo verificar el cierre"));
+        toast.error(apiError(e, t("No se pudo verificar el cierre")));
       }
       return;
     }
@@ -356,7 +372,7 @@ export default function Cycles() {
       toast.success(`${cycle.code}: ${CYCLE_STATUS_LABELS[target]}.`);
       await reload();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cambiar el estado"));
+      toast.error(apiError(e, t("No se pudo cambiar el estado")));
     }
   };
 
@@ -367,16 +383,18 @@ export default function Cycles() {
         status: "cerrado_consolidado",
         justification,
       });
-      toast.success(`${closeTarget.code} cerrado. Puntajes congelados y boletín compilado.`);
+      toast.success(t("{code} cerrado. Puntajes congelados y boletín compilado.", { code: closeTarget.code }));
       setCloseTarget(null);
       await reload();
       if ((data.summary?.watchlist || 0) > 0) {
         toast.info(
-          `${data.summary.watchlist} tecnología(s) quedaron bajo vigilancia. Use "Arrastrar" en la tarjeta del ciclo para proponerlas en un ciclo abierto.`
+          t('{n} tecnología(s) quedaron bajo vigilancia. Use "Arrastrar" en la tarjeta del ciclo para proponerlas en un ciclo abierto.', {
+            n: data.summary.watchlist,
+          })
         );
       }
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cerrar el ciclo"));
+      toast.error(apiError(e, t("No se pudo cerrar el ciclo")));
     } finally {
       setSaving(false);
     }
@@ -388,31 +406,34 @@ export default function Cycles() {
       const { data } = await api.post(`/cycles/${carrySource.id}/carry-over`, {
         target_cycle_id: Number(carryTarget),
       });
-      if (data.carried > 0) toast.success(data.message);
-      else toast.info("No había tecnologías nuevas por arrastrar: ya estaban en el ciclo destino.");
+      if (data.carried > 0) toast.success(ts(data.message));
+      else toast.info(t("No había tecnologías nuevas por arrastrar: ya estaban en el ciclo destino."));
       setCarrySource(null);
       await reload();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo arrastrar el monitoreo activo"));
+      toast.error(apiError(e, t("No se pudo arrastrar el monitoreo activo")));
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <LoadingBlock label="Cargando ciclos..." />;
+  if (loading) return <LoadingBlock label={t("Cargando ciclos...")} />;
 
   const windowOk = !formCheck.errors.window;
 
   return (
     <div>
       <PageHeader
-        title="Ciclos de escaneo"
+        title={t("Ciclos de escaneo")}
         titleHint={GLOSSARY.ciclo}
-        subtitle={`Eje de la metodología. Máximo ${quota} ciclos formales por año, con ventana de ${wmin} a ${wmax} semanas. Al cerrar, los puntajes quedan congelados y las tecnologías bajo vigilancia se pueden arrastrar al ciclo siguiente.`}
+        subtitle={t(
+          "Eje de la metodología. Máximo {max} ciclos formales por año, con ventana de {wmin} a {wmax} semanas. Al cerrar, los puntajes quedan congelados y las tecnologías bajo vigilancia se pueden arrastrar al ciclo siguiente.",
+          { max: quota, wmin, wmax }
+        )}
         actions={
           canWrite && (
             <Button onClick={startCreate} data-testid="cycle-new">
-              <Icon name="plus" size={17} /> Nuevo ciclo
+              <Icon name="plus" size={17} /> {t("Nuevo ciclo")}
             </Button>
           )
         }
@@ -422,9 +443,9 @@ export default function Cycles() {
         <Card>
           <EmptyState
             icon="🗓️"
-            title="Todavía no hay ciclos"
-            message="El ciclo operativo ordena el filtrado, la priorización, la evaluación y la diseminación. Cree el primero para habilitar el flujo metodológico completo."
-            action={canWrite && <Button onClick={startCreate}>Crear el primer ciclo</Button>}
+            title={t("Todavía no hay ciclos")}
+            message={t("El ciclo operativo ordena el filtrado, la priorización, la evaluación y la diseminación. Cree el primero para habilitar el flujo metodológico completo.")}
+            action={canWrite && <Button onClick={startCreate}>{t("Crear el primer ciclo")}</Button>}
           />
         </Card>
       ) : (
@@ -452,11 +473,11 @@ export default function Cycles() {
       <Modal
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        title={form?.id ? `Editar ${form.code}` : "Nuevo ciclo de escaneo"}
+        title={form?.id ? t("Editar {name}", { name: form.code }) : t("Nuevo ciclo de escaneo")}
         footer={
           <>
             <Button variant="secondary" onClick={() => setFormOpen(false)}>
-              Cancelar
+              {t("Cancelar")}
             </Button>
             <HintButton
               onClick={submitForm}
@@ -465,7 +486,7 @@ export default function Cycles() {
               disabledHint={firstError}
               data-testid="cycle-submit"
             >
-              {form?.id ? "Guardar cambios" : "Crear ciclo"}
+              {form?.id ? t("Guardar cambios") : t("Crear ciclo")}
             </HintButton>
           </>
         }
@@ -474,7 +495,7 @@ export default function Cycles() {
           <>
             <Input
               id="cycle-code"
-              label="Código del ciclo"
+              label={t("Código del ciclo")}
               hint={GLOSSARY.fa_codigo_ciclo}
               required
               value={form.code}
@@ -483,7 +504,7 @@ export default function Cycles() {
             />
             <Input
               id="cycle-opened"
-              label="Fecha de apertura"
+              label={t("Fecha de apertura")}
               hint={GLOSSARY.fa_apertura}
               type="date"
               required
@@ -493,7 +514,7 @@ export default function Cycles() {
             />
             <Input
               id="cycle-cutoff"
-              label="Corte de datos"
+              label={t("Corte de datos")}
               hint={GLOSSARY.corte_datos}
               type="date"
               required
@@ -503,7 +524,7 @@ export default function Cycles() {
             />
             <Input
               id="cycle-bulletin"
-              label="Fecha proyectada de boletín"
+              label={t("Fecha proyectada de boletín")}
               hint={GLOSSARY.boletin}
               type="date"
               value={form.bulletin_due_on || ""}
@@ -520,10 +541,12 @@ export default function Cycles() {
               }}
             >
               <span className="term-label">
-                Ventana operativa: {formCheck.window} semanas
-                <InfoTip text={GLOSSARY.fa_ventana} label="Qué es la ventana operativa" />
+                {t("Ventana operativa: {n} semanas", { n: formCheck.window })}
+                <InfoTip text={GLOSSARY.fa_ventana} label={t("Qué es la ventana operativa")} />
               </span>
-              {windowOk ? " (dentro del rango metodológico)" : ` - el sistema exige entre ${wmin} y ${wmax} semanas`}
+              {windowOk
+                ? " " + t("(dentro del rango metodológico)")
+                : " - " + t("el sistema exige entre {min} y {max} semanas", { min: wmin, max: wmax })}
             </div>
             {formCheck.year && (
               <div
@@ -535,15 +558,15 @@ export default function Cycles() {
                 }}
               >
                 <span className="term-label">
-                  Ciclos formales en {formCheck.year}: {formCheck.yearCount} de {quota}
-                  <InfoTip text={GLOSSARY.fa_cuota} label="Qué es la cuota anual" />
+                  {t("Ciclos formales en {year}: {n} de {max}", { year: formCheck.year, n: formCheck.yearCount, max: quota })}
+                  <InfoTip text={GLOSSARY.fa_cuota} label={t("Qué es la cuota anual")} />
                 </span>
                 {formCheck.errors.quota ? ` - ${formCheck.errors.quota}` : ""}
               </div>
             )}
             <Textarea
               id="cycle-notes"
-              label="Notas"
+              label={t("Notas")}
               rows={3}
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -557,56 +580,57 @@ export default function Cycles() {
         onClose={() => setDeleting(null)}
         onConfirm={confirmDelete}
         loading={saving}
-        title={`Eliminar ${deleting?.code || ""}`}
-        message="El ciclo está en configuración y no tiene trabajo asociado. Se eliminará de forma definitiva; la baja queda registrada en la bitácora."
-        confirmLabel="Eliminar ciclo"
+        title={t("Eliminar {name}", { name: deleting?.code || "" })}
+        message={t("El ciclo está en configuración y no tiene trabajo asociado. Se eliminará de forma definitiva; la baja queda registrada en la bitácora.")}
+        confirmLabel={t("Eliminar ciclo")}
       />
 
       <Modal
         open={Boolean(closeTarget)}
         onClose={() => setCloseTarget(null)}
-        title={`Cerrar ${closeTarget?.code || ""}`}
+        title={t("Cerrar {name}", { name: closeTarget?.code || "" })}
         footer={
           <>
             <Button variant="secondary" onClick={() => setCloseTarget(null)}>
-              Cancelar
+              {t("Cancelar")}
             </Button>
             <HintButton
               onClick={confirmClose}
               loading={saving}
               disabled={Boolean(closeCheck && !closeCheck.can_close && !justification.trim())}
-              disabledHint="Registre la justificación de cierre: hay tecnologías en evaluación sin informe publicado."
+              disabledHint={t("Registre la justificación de cierre: hay tecnologías en evaluación sin informe publicado.")}
               data-testid="cycle-close-confirm"
             >
-              Cerrar y consolidar
+              {t("Cerrar y consolidar")}
             </HintButton>
           </>
         }
       >
         <p style={{ fontSize: 14, color: "#475569", marginBottom: 14 }}>
-          Al cerrar, todos los puntajes del ciclo quedan congelados, se compila el boletín y se
-          refresca el tablero. Una reevaluación posterior crea registros nuevos y nunca modifica los
-          actuales. <strong>Esta acción no se deshace.</strong>
+          {tr(
+            "Al cerrar, todos los puntajes del ciclo quedan congelados, se compila el boletín y se refresca el tablero. Una reevaluación posterior crea registros nuevos y nunca modifica los actuales. <b>Esta acción no se deshace.</b>",
+            null,
+            { b: (c) => <strong>{c}</strong> }
+          )}
         </p>
         {closeCheck && !closeCheck.can_close && (
           <>
             <div className="fa-notice fa-notice--warn">
               <div>
-                <strong>{closeCheck.message}</strong>
+                <strong>{ts(closeCheck.message)}</strong>
                 <div style={{ marginTop: 4 }}>
-                  Publique el informe correspondiente o registre la justificación de cierre. La
-                  justificación queda en la bitácora inmutable.
+                  {t("Publique el informe correspondiente o registre la justificación de cierre. La justificación queda en la bitácora inmutable.")}
                 </div>
               </div>
             </div>
             <Textarea
               id="cycle-close-justification"
-              label="Justificación de cierre"
+              label={t("Justificación de cierre")}
               required
               rows={3}
               value={justification}
               onChange={(e) => setJustification(e.target.value)}
-              placeholder="Motivo por el cual el ciclo se cierra con tecnologías en evaluación"
+              placeholder={t("Motivo por el cual el ciclo se cierra con tecnologías en evaluación")}
             />
           </>
         )}
@@ -615,20 +639,20 @@ export default function Cycles() {
       <Modal
         open={Boolean(carrySource)}
         onClose={() => setCarrySource(null)}
-        title="Arrastrar monitoreo activo"
+        title={t("Arrastrar monitoreo activo")}
         footer={
           <>
             <Button variant="secondary" onClick={() => setCarrySource(null)}>
-              Cancelar
+              {t("Cancelar")}
             </Button>
             <HintButton
               onClick={confirmCarryOver}
               loading={saving}
               disabled={!carryTarget}
-              disabledHint="Cree o reabra un ciclo destino antes de arrastrar."
+              disabledHint={t("Cree o reabra un ciclo destino antes de arrastrar.")}
               data-testid="cycle-carry-confirm"
             >
-              Arrastrar
+              {t("Arrastrar")}
             </HintButton>
           </>
         }
@@ -637,7 +661,7 @@ export default function Cycles() {
         {openCycles.length ? (
           <Select
             id="cycle-carry-target"
-            label="Ciclo destino"
+            label={t("Ciclo destino")}
             value={carryTarget}
             onChange={(e) => setCarryTarget(e.target.value)}
           >
@@ -649,7 +673,7 @@ export default function Cycles() {
           </Select>
         ) : (
           <div className="fa-notice fa-notice--warn">
-            No hay ciclos abiertos. Cree un ciclo destino antes de arrastrar el monitoreo activo.
+            {t("No hay ciclos abiertos. Cree un ciclo destino antes de arrastrar el monitoreo activo.")}
           </div>
         )}
       </Modal>

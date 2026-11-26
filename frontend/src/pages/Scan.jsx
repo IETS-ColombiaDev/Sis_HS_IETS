@@ -22,6 +22,7 @@ import LinkPreview from "../components/LinkPreview";
 import { AccessReport, LastRunCaption, ScanHistory, ScanRunSummary, SourceProgress } from "../components/ScanProgress";
 import { useScan } from "../scan/ScanContext";
 import { UrlOriginTag } from "../components/UrlOrigin";
+import { t, tr, ts, intlLocale } from "../i18n";
 
 const PROGRESS_POLL_MS = 2500;
 const REPORT_POLL_MS = 15000;
@@ -29,33 +30,33 @@ const FILTER_STATUS = { ejecutando: ["ejecutando"], pendiente: ["pendiente"], ok
 const RUN_ORDER = { ejecutando: 0, pendiente: 1, error: 2 };
 
 const JOB_LABELS = {
-  pendiente: "Pendiente",
-  ejecutando: "Ejecutando",
-  ok: "Ok",
-  parcial: "Parcial",
-  error: "Error",
-  cancelado: "Cancelado",
+  pendiente: t("Pendiente"),
+  ejecutando: t("Ejecutando"),
+  ok: t("Ok"),
+  parcial: t("Parcial"),
+  error: t("Error"),
+  cancelado: t("Cancelado"),
 };
 const JOB_TONE = { ok: "success", parcial: "warning", error: "danger", cancelado: "danger" };
-const RUN_LABELS = { en_curso: "En curso", ok: "Ok", parcial: "Parcial", error: "Error", sin_trabajo: "Sin trabajo" };
+const RUN_LABELS = { en_curso: t("En curso"), ok: t("Ok"), parcial: t("Parcial"), error: t("Error"), sin_trabajo: t("Sin trabajo") };
 const RUN_TONE = { ok: "success", parcial: "warning", error: "danger", sin_trabajo: "viewer", en_curso: "info" };
 
 function daysSince(iso) {
   if (!iso) return null;
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  if (d <= 0) return "Hoy";
-  if (d === 1) return "Ayer";
-  return `Hace ${d} días`;
+  if (d <= 0) return t("Hoy");
+  if (d === 1) return t("Ayer");
+  return t("Hace {d} días", { d });
 }
 
 function when(iso) {
-  return iso ? new Date(iso).toLocaleString() : "-";
+  return iso ? new Date(iso).toLocaleString(intlLocale()) : "-";
 }
 
 /** Proxima ejecucion; si ya vencio, corre en la siguiente vuelta del worker. */
 function nextRun(iso) {
   if (!iso) return "-";
-  return new Date(iso).getTime() <= Date.now() ? "En la próxima vuelta del worker" : when(iso);
+  return new Date(iso).getTime() <= Date.now() ? t("En la próxima vuelta del worker") : when(iso);
 }
 
 export default function Scan() {
@@ -65,7 +66,7 @@ export default function Scan() {
   const navigate = useNavigate();
   const canScan = can(PERM.SCAN_RUN);
   const canConfig = can(PERM.CONFIG_MANAGE);
-  const noScan = `Su perfil (${user?.role_label || user?.role}) no puede ejecutar la vigilancia (permiso scan:run).`;
+  const noScan = t("Su perfil ({role}) no puede ejecutar la vigilancia (permiso scan:run).", { role: ts(user?.role_label) || user?.role });
 
   const [sources, setSources] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -105,7 +106,7 @@ export default function Scan() {
       setJobs(j.data);
       setSchedule(sc.data);
     } catch (e) {
-      if (firstLoad.current) toast.error(apiError(e, "No se pudo cargar la vigilancia"));
+      if (firstLoad.current) toast.error(apiError(e, t("No se pudo cargar la vigilancia")));
     } finally {
       firstLoad.current = false;
       setLoading(false);
@@ -200,7 +201,7 @@ export default function Scan() {
   const staleCount = enabled.filter((s) => !s.last_scraped_at || Date.now() - new Date(s.last_scraped_at).getTime() > 7 * 86400000).length;
   const recentErrors = logs.slice(0, 20).filter((l) => l.status === "error").length;
   const lastNew = logs[0]?.items_new || 0;
-  const scanTask = schedule?.tasks?.find((t) => t.task === "vigilancia");
+  const scanTask = schedule?.tasks?.find((task) => task.task === "vigilancia");
 
   const toggle = (id) => {
     setSelected((prev) => {
@@ -215,13 +216,13 @@ export default function Scan() {
     setRunning(true);
     try {
       const { data } = await api.post("/ingest/run", { source_ids: ids?.length ? ids : [], process_now: false }, { timeout: 60000 });
-      toast.success(`Vigilancia encolada: ${data.queued} fuente(s). Siga el estado de cada una abajo; puede seguir trabajando.`);
+      toast.success(t("Vigilancia encolada: {n} fuente(s). Siga el estado de cada una abajo; puede seguir trabajando.", { n: data.queued }));
       setSelected(new Set());
       load();
       loadProgress();
       loadHistory();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo ejecutar la vigilancia"));
+      toast.error(apiError(e, t("No se pudo ejecutar la vigilancia")));
     } finally {
       setRunning(false);
     }
@@ -231,10 +232,10 @@ export default function Scan() {
     setCancelling(true);
     try {
       const { data } = await api.post("/ingest/cancel", {});
-      toast.info(`Se cancelaron ${data.cancelled} fuente(s) en cola. Las que ya corrían terminan su paso actual.`);
+      toast.info(t("Se cancelaron {n} fuente(s) en cola. Las que ya corrían terminan su paso actual.", { n: data.cancelled }));
       loadProgress();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo detener la vigilancia"));
+      toast.error(apiError(e, t("No se pudo detener la vigilancia")));
     } finally {
       setCancelling(false);
     }
@@ -244,12 +245,12 @@ export default function Scan() {
     setRunningScheduled(true);
     try {
       const { data } = await api.post("/config/schedule/vigilancia/run", null, { timeout: 60000 });
-      if (data.status === "sin_trabajo") toast.info(data.message);
-      else toast.success(data.message || "Vigilancia programada ejecutada");
+      if (data.status === "sin_trabajo") toast.info(ts(data.message));
+      else toast.success(ts(data.message) || t("Vigilancia programada ejecutada"));
       load();
       loadHistory();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo ejecutar la vigilancia programada"));
+      toast.error(apiError(e, t("No se pudo ejecutar la vigilancia programada")));
     } finally {
       setRunningScheduled(false);
     }
@@ -262,14 +263,14 @@ export default function Scan() {
     const timer = setInterval(loadProgress, PROGRESS_POLL_MS);
     try {
       const { data } = await api.post(`/scan/source/${s.id}`, null, { timeout: SCAN_TIMEOUT });
-      if (data.status === "error") toast.error(`${s.title}: ${data.message || "error de ingesta"}`);
-      else toast.success(`${s.title}: ${data.items_new} señales nuevas de ${data.items_found}`);
+      if (data.status === "error") toast.error(`${s.title}: ${ts(data.message) || t("error de ingesta")}`);
+      else toast.success(t("{title}: {n} señales nuevas de {total}", { title: s.title, n: data.items_new, total: data.items_found }));
       load();
       loadProgress();
       loadReport();
       loadHistory();
     } catch (err) {
-      toast.error(apiError(err, "No se pudo escanear"));
+      toast.error(apiError(err, t("No se pudo escanear")));
     } finally {
       clearInterval(timer);
       setScanningId(null);
@@ -279,7 +280,7 @@ export default function Scan() {
   const runPreview = async (e) => {
     e?.preventDefault();
     if (!/^https?:\/\//i.test(previewUrl.trim())) {
-      toast.warning("Escriba una URL que inicie con http:// o https://");
+      toast.warning(t("Escriba una URL que inicie con http:// o https://"));
       return;
     }
     setPreviewing(true);
@@ -288,25 +289,25 @@ export default function Scan() {
       const { data } = await api.post("/scan/preview", { url: previewUrl.trim() }, { timeout: SCAN_TIMEOUT });
       setPreview(data);
     } catch (err) {
-      toast.error(apiError(err, "No se pudo previsualizar el enlace"));
+      toast.error(apiError(err, t("No se pudo previsualizar el enlace")));
     } finally {
       setPreviewing(false);
     }
   };
 
-  if (loading) return <LoadingBlock label="Cargando vigilancia..." />;
+  if (loading) return <LoadingBlock label={t("Cargando vigilancia...")} />;
 
   return (
     <div>
       <ModuleHeader
         step="identificacion"
-        title="Vigilancia de fuentes"
+        title={t("Vigilancia de fuentes")}
         titleHint={GLOSSARY.vigilancia}
-        purpose="Fase 1 · Identificación: el rastreador entra a cada fuente, sigue hasta las fichas internas y, si MiniMax está activo, extrae las señales."
+        purpose={t("Fase 1 · Identificación: el rastreador entra a cada fuente, sigue hasta las fichas internas y, si MiniMax está activo, extrae las señales.")}
         actions={
           <div className="fb-toolbar">
             <Button variant="secondary" onClick={() => navigate("/fuentes")}>
-              <Icon name="globe" size={16} /> Inventario
+              <Icon name="globe" size={16} /> {t("Inventario")}
             </Button>
             <div className="run-with-caption">
               <HintButton
@@ -314,10 +315,10 @@ export default function Scan() {
                 onClick={() => runScan(null)}
                 loading={running}
                 disabled={!canScan || enabled.length === 0}
-                hint={`Encola las ${enabled.length} fuentes con ingesta activa. El worker las procesa en segundo plano: puede seguir trabajando.`}
-                disabledHint={!canScan ? noScan : "No hay fuentes con ingesta activa. Habilite alguna en el catálogo de fuentes."}
+                hint={t("Encola las {n} fuentes con ingesta activa. El worker las procesa en segundo plano: puede seguir trabajando.", { n: enabled.length })}
+                disabledHint={!canScan ? noScan : t("No hay fuentes con ingesta activa. Habilite alguna en el catálogo de fuentes.")}
               >
-                <Icon name="radar" size={17} /> Ejecutar vigilancia ({enabled.length})
+                <Icon name="radar" size={17} /> {t("Ejecutar vigilancia ({n})", { n: enabled.length })}
               </HintButton>
               <LastRunCaption history={history} active={Boolean(progress?.active)} />
             </div>
@@ -328,29 +329,29 @@ export default function Scan() {
       {!canScan && (
         <div className="fb-readonly-note" data-testid="scan-readonly">
           <Icon name="info" size={16} />
-          <span>Modo consulta: {noScan} Puede revisar la cola, el registro y la programación.</span>
+          <span>{t("Modo consulta: {motivo} Puede revisar la cola, el registro y la programación.", { motivo: noScan })}</span>
         </div>
       )}
 
       <PhaseGuide
-        phase="Fase 1 · Identificación"
+        phase={t("Fase 1 · Identificación")}
         hint={GLOSSARY.vigilancia}
         tasks={[
-          "Pulse «Ejecutar vigilancia»: corre en el servidor y puede seguir trabajando en otros módulos; la barra flotante muestra el avance y el tiempo restante.",
-          "Si un sitio rechaza al rastreador se prueban las rutas de respaldo (RSS oficial, índice de la revista en PubMed, Google News). El informe de acceso dice por dónde entró cada fuente.",
-          "Cada corrida queda en el historial con su fecha y hora, su duración y su resumen.",
-          "Las señales nuevas llegan a la bandeja de entrada; el nivel D no pisa campos ya llenados por A/B.",
+          t("Pulse «Ejecutar vigilancia»: corre en el servidor y puede seguir trabajando en otros módulos; la barra flotante muestra el avance y el tiempo restante."),
+          t("Si un sitio rechaza al rastreador se prueban las rutas de respaldo (RSS oficial, índice de la revista en PubMed, Google News). El informe de acceso dice por dónde entró cada fuente."),
+          t("Cada corrida queda en el historial con su fecha y hora, su duración y su resumen."),
+          t("Las señales nuevas llegan a la bandeja de entrada; el nivel D no pisa campos ya llenados por A/B."),
         ]}
-        nextLabel="Bandeja de entrada"
+        nextLabel={t("Bandeja de entrada")}
         onNext={() => navigate("/bandeja-entrada")}
       />
 
       <ModuleStatsRow
         items={[
-          { label: "Referentes vigilados", value: enabled.length, sub: `${sources.length} en inventario`, hint: GLOSSARY.fb_ingesta },
-          { label: "Señales capturadas", value: totalSignals, sub: "Total acumulado", hint: "Señales que ya produjeron las fuentes vigiladas, desde siempre." },
-          { label: "Sin rastrear >7 días", value: staleCount, sub: "Requieren vigilancia", color: staleCount > 0 ? "#F59E0B" : undefined, hint: "Fuentes activas que no se consultan hace más de una semana (o nunca). Puede ser normal si su frecuencia es mensual." },
-          { label: "Último lote nuevo", value: lastNew, sub: "Señales en el último rastreo", color: lastNew > 0 ? "#10B981" : undefined, hint: "Señales nuevas que trajo el rastreo más reciente del registro." },
+          { label: t("Referentes vigilados"), value: enabled.length, sub: t("{n} en inventario", { n: sources.length }), hint: GLOSSARY.fb_ingesta },
+          { label: t("Señales capturadas"), value: totalSignals, sub: t("Total acumulado"), hint: t("Señales que ya produjeron las fuentes vigiladas, desde siempre.") },
+          { label: t("Sin rastrear >7 días"), value: staleCount, sub: t("Requieren vigilancia"), color: staleCount > 0 ? "#F59E0B" : undefined, hint: t("Fuentes activas que no se consultan hace más de una semana (o nunca). Puede ser normal si su frecuencia es mensual.") },
+          { label: t("Último lote nuevo"), value: lastNew, sub: t("Señales en el último rastreo"), color: lastNew > 0 ? "#10B981" : undefined, hint: t("Señales nuevas que trajo el rastreo más reciente del registro.") },
         ]}
       />
 
@@ -371,19 +372,19 @@ export default function Scan() {
       <div className="fb-schedule-grid" style={{ marginBottom: 16 }}>
         <Card padding={18} className="fb-schedule-card">
           <h4>
-            <Icon name="clock" size={16} /> Vigilancia programada
-            <InfoTip text={GLOSSARY.fb_programada} label="Qué es la vigilancia programada" />
+            <Icon name="clock" size={16} /> {t("Vigilancia programada")}
+            <InfoTip text={GLOSSARY.fb_programada} label={t("Qué es la vigilancia programada")} />
           </h4>
           {scanTask ? (
             <>
               <dl className="fb-schedule-meta" data-testid="scan-schedule">
-                <dt>Estado</dt>
-                <dd>{scanTask.enabled ? <Badge tone="ok">Activa</Badge> : <Badge tone="viewer">Apagada</Badge>}</dd>
-                <dt>Cada</dt>
+                <dt>{t("Estado")}</dt>
+                <dd>{scanTask.enabled ? <Badge tone="ok">{t("Activa")}</Badge> : <Badge tone="viewer">{t("Apagada")}</Badge>}</dd>
+                <dt>{t("Cada")}</dt>
                 <dd>{scanTask.interval_hours} h <InfoTip text={GLOSSARY.fb_intervalo_vigilancia} /></dd>
-                <dt>Próxima</dt>
+                <dt>{t("Próxima")}</dt>
                 <dd>{scanTask.enabled ? nextRun(scanTask.next_run_at) : "-"}</dd>
-                <dt>Última</dt>
+                <dt>{t("Última")}</dt>
                 <dd>
                   {scanTask.last_run ? (
                     <>
@@ -391,52 +392,52 @@ export default function Scan() {
                       {when(scanTask.last_run.started_at)}
                     </>
                   ) : (
-                    "Aún no ha corrido"
+                    t("Aún no ha corrido")
                   )}
                 </dd>
                 <dt>Worker <InfoTip text={GLOSSARY.fb_worker} /></dt>
-                <dd>{schedule.worker_running ? "En marcha" : schedule.worker_enabled ? "Detenido" : "Deshabilitado en este servidor"}</dd>
+                <dd>{schedule.worker_running ? t("En marcha") : schedule.worker_enabled ? t("Detenido") : t("Deshabilitado en este servidor")}</dd>
               </dl>
-              {scanTask.last_run?.message && <p style={{ fontSize: 12.5, color: "#64748B", margin: "0 0 10px" }}>{scanTask.last_run.message}</p>}
+              {scanTask.last_run?.message && <p style={{ fontSize: 12.5, color: "#64748B", margin: "0 0 10px" }}>{ts(scanTask.last_run.message)}</p>}
               <div className="fb-toolbar">
                 <HintButton
                   size="sm"
                   variant="outline"
                   loading={runningScheduled}
                   disabled={!canScan}
-                  hint="Corre ya la vigilancia programada: encola solo las fuentes cuya frecuencia venció."
+                  hint={t("Corre ya la vigilancia programada: encola solo las fuentes cuya frecuencia venció.")}
                   disabledHint={noScan}
                   onClick={runScheduledNow}
                 >
-                  Ejecutar ahora
+                  {t("Ejecutar ahora")}
                 </HintButton>
                 <HintButton
                   size="sm"
                   variant="ghost"
                   disabled={!canConfig}
-                  hint="Cambiar el intervalo o apagar la tarea"
-                  disabledHint="Solo el superadministrador cambia la programación (permiso config:manage)."
+                  hint={t("Cambiar el intervalo o apagar la tarea")}
+                  disabledHint={t("Solo el superadministrador cambia la programación (permiso config:manage).")}
                   onClick={() => navigate("/configuracion?tab=programacion")}
                 >
-                  Configurar
+                  {t("Configurar")}
                 </HintButton>
               </div>
             </>
           ) : (
-            <p style={{ fontSize: 13, color: "#64748B" }}>No se pudo leer la programación.</p>
+            <p style={{ fontSize: 13, color: "#64748B" }}>{t("No se pudo leer la programación.")}</p>
           )}
         </Card>
 
         <Card padding={18} className="fb-schedule-card">
           <h4>
-            <Icon name="eye" size={16} /> Vista previa de un enlace
-            <InfoTip text={GLOSSARY.fb_vista_previa} label="Qué es la vista previa" />
+            <Icon name="eye" size={16} /> {t("Vista previa de un enlace")}
+            <InfoTip text={GLOSSARY.fb_vista_previa} label={t("Qué es la vista previa")} />
           </h4>
           <form onSubmit={runPreview} className="fb-inline-row" style={{ marginTop: 10 }}>
-            <Input id="preview-url" placeholder="https://..." aria-label="URL a previsualizar" value={previewUrl} onChange={(e) => setPreviewUrl(e.target.value)} style={{ marginBottom: 0 }} />
+            <Input id="preview-url" placeholder="https://..." aria-label={t("URL a previsualizar")} value={previewUrl} onChange={(e) => setPreviewUrl(e.target.value)} style={{ marginBottom: 0 }} />
             <div style={{ flex: "0 0 auto", marginBottom: 14 }}>
               <HintButton type="submit" variant="outline" loading={previewing} disabled={!canScan} hint={GLOSSARY.fb_vista_previa} disabledHint={noScan}>
-                Previsualizar
+                {t("Previsualizar")}
               </HintButton>
             </div>
           </form>
@@ -447,23 +448,23 @@ export default function Scan() {
       <Card
         title={
           <span className="term-label">
-            Cola de ingesta <InfoTip text={GLOSSARY.fb_cola} label="Qué es la cola de ingesta" />
+            {t("Cola de ingesta")} <InfoTip text={GLOSSARY.fb_cola} label={t("Qué es la cola de ingesta")} />
           </span>
         }
-        actions={<Button size="sm" variant="ghost" onClick={load}>Actualizar</Button>}
-        hint="La extracción no corre en el hilo de la petición: el worker toma los trabajos en orden."
+        actions={<Button size="sm" variant="ghost" onClick={load}>{t("Actualizar")}</Button>}
+        hint={t("La extracción no corre en el hilo de la petición: el worker toma los trabajos en orden.")}
         style={{ marginBottom: 16 }}
       >
         {jobs.length === 0 ? (
-          <p style={{ fontSize: 13, color: "#94A3B8", margin: 0 }}>La cola está vacía. Ejecute la vigilancia o espere a la programada.</p>
+          <p style={{ fontSize: 13, color: "#94A3B8", margin: 0 }}>{t("La cola está vacía. Ejecute la vigilancia o espere a la programada.")}</p>
         ) : (
           <div className="ingest-job-list" data-testid="ingest-jobs">
             {jobs.slice(0, 8).map((job) => (
-              <div key={job.id} className="ingest-job-row" title={job.message || ""}>
+              <div key={job.id} className="ingest-job-row" title={ts(job.message) || ""}>
                 <Badge tone={JOB_TONE[job.status] || "warning"}>{JOB_LABELS[job.status] || job.status}</Badge>
                 <span className="ingest-job-src">{job.source_title || job.connector}</span>
                 <span className="ingest-job-meta">
-                  {job.connector} · +{job.items_new}/{job.items_found} · {job.origin === "programado" ? "programado" : "manual"}
+                  {job.connector} · +{job.items_new}/{job.items_found} · {job.origin === "programado" ? t("programado") : t("manual")}
                 </span>
               </div>
             ))}
@@ -476,8 +477,8 @@ export default function Scan() {
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
             <Spinner />
             <div>
-              <div style={{ fontWeight: 600 }}>Encolando la vigilancia</div>
-              <div style={{ fontSize: 13, color: "#64748B" }}>El worker procesa las fuentes en segundo plano.</div>
+              <div style={{ fontWeight: 600 }}>{t("Encolando la vigilancia")}</div>
+              <div style={{ fontSize: 13, color: "#64748B" }}>{t("El worker procesa las fuentes en segundo plano.")}</div>
             </div>
           </div>
         </Card>
@@ -487,23 +488,23 @@ export default function Scan() {
         <Card padding={0} className="vigilancia-sources-panel">
           <div className="panel-toolbar">
             <SectionTitle
-              hint="Fuentes con ingesta activa. Marque varias para rastrearlas juntas."
+              hint={t("Fuentes con ingesta activa. Marque varias para rastrearlas juntas.")}
               right={
                 canScan && selected.size > 0 ? (
                   <Button size="sm" onClick={() => runScan([...selected])} loading={running}>
-                    Rastrear selección ({selected.size})
+                    {t("Rastrear selección ({n})", { n: selected.size })}
                   </Button>
                 ) : null
               }
             >
-              Referentes en vigilancia
+              {t("Referentes en vigilancia")}
             </SectionTitle>
             <div className="panel-filters">
-              <input placeholder="Buscar referente..." aria-label="Buscar referente" value={search} onChange={(e) => setSearch(e.target.value)} className="filter-input" />
-              <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="filter-select" aria-label="Filtrar por categoría">
-                <option value="">Todas las categorías</option>
+              <input placeholder={t("Buscar referente...")} aria-label={t("Buscar referente")} value={search} onChange={(e) => setSearch(e.target.value)} className="filter-input" />
+              <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} className="filter-select" aria-label={t("Filtrar por categoría")}>
+                <option value="">{t("Todas las categorías")}</option>
                 {categories.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>{ts(c)}</option>
                 ))}
               </select>
             </div>
@@ -513,8 +514,8 @@ export default function Scan() {
             {filtered.length === 0 ? (
               <EmptyState
                 icon="🌐"
-                message={enabled.length === 0 ? "No hay fuentes con ingesta activa." : "No hay referentes que coincidan con la búsqueda o el filtro de estado."}
-                action={<Button onClick={() => navigate("/fuentes")}>Ir al catálogo de fuentes</Button>}
+                message={enabled.length === 0 ? t("No hay fuentes con ingesta activa.") : t("No hay referentes que coincidan con la búsqueda o el filtro de estado.")}
+                action={<Button onClick={() => navigate("/fuentes")}>{t("Ir al catálogo de fuentes")}</Button>}
               />
             ) : (
               filtered.map((s) => {
@@ -524,7 +525,7 @@ export default function Scan() {
                   <div key={s.id} className={`source-scan-card${selected.has(s.id) ? " source-scan-card--selected" : ""}`} data-testid={`scan-source-${s.id}`}>
                     <div className="source-scan-card-main">
                       {canScan && (
-                        <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="source-scan-check" aria-label={`Seleccionar ${s.title}`} />
+                        <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} className="source-scan-check" aria-label={t("Seleccionar {title}", { title: s.title })} />
                       )}
                       <div className="source-scan-icon">
                         <Icon name="globe" size={18} />
@@ -533,20 +534,20 @@ export default function Scan() {
                         <div className="source-scan-title-row">
                           <span className="source-scan-title" title={s.title}>{s.title}</span>
                           {s.catalog_code && <span className="catalog-code">{s.catalog_code}</span>}
-                          {s.access_level && <span title={GLOSSARY.fb_nivel}><Badge tone={s.access_level}>Nivel {s.access_level}</Badge></span>}
-                          {s.health_status && <span title={GLOSSARY.fb_salud}><Badge tone={s.health_status}>{s.health_status}</Badge></span>}
+                          {s.access_level && <span title={GLOSSARY.fb_nivel}><Badge tone={s.access_level}>{t("Nivel {nivel}", { nivel: s.access_level })}</Badge></span>}
+                          {s.health_status && <span title={GLOSSARY.fb_salud}><Badge tone={s.health_status}>{ts(s.health_status)}</Badge></span>}
                           {tag && <Badge tone={tag.tone}>{tag.label}</Badge>}
                         </div>
                         <div className="source-scan-meta">
-                          <Badge>{s.category || "Referente"}</Badge>
+                          <Badge>{ts(s.category) || t("Referente")}</Badge>
                           <span title={GLOSSARY.fb_adaptador}>{s.connector && s.connector !== "html" ? s.connector : "HTML"}</span>
-                          <span>{s.findings_count || 0} señales</span>
+                          <span>{t("{n} señales", { n: s.findings_count || 0 })}</span>
                           {s.circuit_open_until && (
-                            <span className="meta-warn" title="Tras varios fallos seguidos la fuente se pausa unas horas para no insistir sobre un servicio caído.">
-                              circuito abierto
+                            <span className="meta-warn" title={t("Tras varios fallos seguidos la fuente se pausa unas horas para no insistir sobre un servicio caído.")}>
+                              {t("circuito abierto")}
                             </span>
                           )}
-                          <span className={stale ? "meta-warn" : ""}>{s.last_scraped_at ? daysSince(s.last_scraped_at) : "Nunca rastreado"}</span>
+                          <span className={stale ? "meta-warn" : ""}>{s.last_scraped_at ? daysSince(s.last_scraped_at) : t("Nunca rastreado")}</span>
                         </div>
                         {s.url && (
                           <a href={s.url} target="_blank" rel="noreferrer" className="source-scan-url" onClick={(e) => e.stopPropagation()}>
@@ -560,12 +561,12 @@ export default function Scan() {
                     <div className="source-scan-actions">
                       {(s.findings_count || 0) > 0 && (
                         <Button size="sm" variant="ghost" onClick={() => navigate("/senales")}>
-                          Ver señales
+                          {t("Ver señales")}
                         </Button>
                       )}
                       {canScan && (
                         <HintButton size="sm" variant="outline" hint={GLOSSARY.fb_ingerir} loading={scanningId === s.id} onClick={(e) => scanOne(s, e)}>
-                          <Icon name="radar" size={14} /> Rastrear
+                          <Icon name="radar" size={14} /> {t("Rastrear")}
                         </HintButton>
                       )}
                     </div>
@@ -579,27 +580,27 @@ export default function Scan() {
         <Card padding={0} className="vigilancia-log-panel">
           <div className="panel-toolbar">
             <SectionTitle
-              hint="Bitácora de cada rastreo: cuándo corrió, qué fuente, cuántas señales nuevas y detectadas, y el mensaje del adaptador."
+              hint={t("Bitácora de cada rastreo: cuándo corrió, qué fuente, cuántas señales nuevas y detectadas, y el mensaje del adaptador.")}
               right={
-                <select value={logFilter} onChange={(e) => setLogFilter(e.target.value)} className="filter-select" aria-label="Filtrar registro por estado">
-                  <option value="">Todos</option>
-                  <option value="ok">Ok</option>
-                  <option value="parcial">Parcial</option>
-                  <option value="error">Error</option>
+                <select value={logFilter} onChange={(e) => setLogFilter(e.target.value)} className="filter-select" aria-label={t("Filtrar registro por estado")}>
+                  <option value="">{t("Todos")}</option>
+                  <option value="ok">{t("Ok")}</option>
+                  <option value="parcial">{t("Parcial")}</option>
+                  <option value="error">{t("Error")}</option>
                 </select>
               }
             >
-              Registro de vigilancia
+              {t("Registro de vigilancia")}
             </SectionTitle>
           </div>
           <div className="scan-log-list" data-testid="scan-log">
             {visibleLogs.length === 0 ? (
               <EmptyState
                 icon="🕐"
-                message={logs.length === 0 ? "Aún no hay rastreos registrados." : "Ningún rastreo con ese estado."}
+                message={logs.length === 0 ? t("Aún no hay rastreos registrados.") : t("Ningún rastreo con ese estado.")}
                 action={
                   canScan && enabled.length > 0 && logs.length === 0 ? (
-                    <Button onClick={() => runScan(null)} loading={running}>Ejecutar primer rastreo</Button>
+                    <Button onClick={() => runScan(null)} loading={running}>{t("Ejecutar primer rastreo")}</Button>
                   ) : null
                 }
               />
@@ -608,19 +609,19 @@ export default function Scan() {
                 <div key={log.id} className={`scan-log-item scan-log-item--${log.status}`}>
                   <div className="scan-log-head">
                     <Badge tone={log.status}>{JOB_LABELS[log.status] || log.status}</Badge>
-                    <time>{new Date(log.started_at).toLocaleString()}</time>
+                    <time>{new Date(log.started_at).toLocaleString(intlLocale())}</time>
                   </div>
-                  <div className="scan-log-source">{log.source_title || "Rastreo masivo"}</div>
-                  <p className="scan-log-msg">{log.message}</p>
+                  <div className="scan-log-source">{log.source_title || t("Rastreo masivo")}</div>
+                  <p className="scan-log-msg">{ts(log.message)}</p>
                   <div className="scan-log-foot">
                     <span>
-                      <strong style={{ color: log.items_new > 0 ? "#10B981" : "#64748B" }}>{log.items_new}</strong> nuevas
-                      {" · "}
-                      {log.items_found} detectadas
+                      {tr("<b>{n}</b> nuevas · {found} detectadas", { n: log.items_new, found: log.items_found }, {
+                        b: (c) => <strong style={{ color: log.items_new > 0 ? "#10B981" : "#64748B" }}>{c}</strong>,
+                      })}
                     </span>
                     {log.items_new > 0 && (
                       <button type="button" className="scan-log-link" onClick={() => navigate("/bandeja-entrada")}>
-                        Ir a la bandeja →
+                        {t("Ir a la bandeja →")}
                       </button>
                     )}
                   </div>
@@ -630,7 +631,7 @@ export default function Scan() {
           </div>
           {recentErrors > 0 && (
             <div className="scan-log-alert">
-              {recentErrors} rastreo(s) con error reciente. Revise la salud de la fuente en el catálogo.
+              {t("{n} rastreo(s) con error reciente. Revise la salud de la fuente en el catálogo.", { n: recentErrors })}
             </div>
           )}
         </Card>

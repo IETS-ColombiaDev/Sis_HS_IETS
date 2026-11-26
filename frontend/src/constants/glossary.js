@@ -1,375 +1,377 @@
 /** Explicaciones en lenguaje sencillo para iconos de ayuda en toda la plataforma. */
 
+import { t } from "../i18n";
+
 export const GLOSSARY = {
   bandeja_trabajo:
-    "Pantalla de inicio: resume lo que hay que atender hoy (bandeja, calificaciones pendientes y tecnologías priorizadas).",
+    t("Pantalla de inicio: resume lo que hay que atender hoy (bandeja, calificaciones pendientes y tecnologías priorizadas)."),
   ciclo:
-    "Ciclo de escaneo: periodo de trabajo (unas 10 a 16 semanas) en el que se captura, filtra, prioriza, evalúa y publica un conjunto de tecnologías. La cuota formal es de tres ciclos por año.",
+    t("Ciclo de escaneo: periodo de trabajo (unas 10 a 16 semanas) en el que se captura, filtra, prioriza, evalúa y publica un conjunto de tecnologías. La cuota formal es de tres ciclos por año."),
   ciclo_cierre:
-    "Al cerrar el ciclo se congelan los puntajes. Las tecnologías que quedaron en vigilancia se proponen para el ciclo siguiente.",
+    t("Al cerrar el ciclo se congelan los puntajes. Las tecnologías que quedaron en vigilancia se proponen para el ciclo siguiente."),
   corte_datos:
-    "Fecha límite hasta la cual se aceptan señales nuevas en este ciclo. Lo que llegue después espera al siguiente.",
+    t("Fecha límite hasta la cual se aceptan señales nuevas en este ciclo. Lo que llegue después espera al siguiente."),
   boletin:
-    "Resumen ejecutivo del ciclo (epidemiológico y financiero) para MinSalud, INVIMA y otros tomadores de decisión. Se publica después de la aprobación del líder.",
+    t("Resumen ejecutivo del ciclo (epidemiológico y financiero) para MinSalud, INVIMA y otros tomadores de decisión. Se publica después de la aprobación del líder."),
   vigilancia:
-    "Búsqueda automática o programada en fuentes internacionales (ensayos, agencias, literatura) para detectar tecnologías que aún no están en Colombia.",
+    t("Búsqueda automática o programada en fuentes internacionales (ensayos, agencias, literatura) para detectar tecnologías que aún no están en Colombia."),
   catalogo_fuentes:
-    "Lista de sitios y bases de datos que el sistema vigila. Las de nivel A/B alimentan el pipeline; las demás lo enriquecen.",
+    t("Lista de sitios y bases de datos que el sistema vigila. Las de nivel A/B alimentan el pipeline; las demás lo enriquecen."),
   bandeja_entrada:
-    "Bandeja (staging): señales recién capturadas que todavía no pertenecen a un ciclo. Hay que clasificarlas y arrastrarlas al ciclo activo.",
+    t("Bandeja (staging): señales recién capturadas que todavía no pertenecen a un ciclo. Hay que clasificarlas y arrastrarlas al ciclo activo."),
   staging:
-    "Staging: área temporal donde llegan las señales crudas. Nada entra al ciclo sin clasificar clúster y tipología.",
+    t("Staging: área temporal donde llegan las señales crudas. Nada entra al ciclo sin clasificar clúster y tipología."),
   postulacion:
-    "Canal público: un fabricante o investigador propone una tecnología. Una persona del IETS debe aceptarla o rechazarla; no entra sola.",
+    t("Canal público: un fabricante o investigador propone una tecnología. Una persona del IETS debe aceptarla o rechazarla; no entra sola."),
   coi:
-    "Conflicto de interés: relación económica o profesional que podría sesgar el juicio. Debe declararse antes de aceptar una postulación o una revisión.",
+    t("Conflicto de interés: relación económica o profesional que podría sesgar el juicio. Debe declararse antes de aceptar una postulación o una revisión."),
   filtrado:
-    "Quitar duplicados, confirmar que la tecnología es novedosa para Colombia (cruzando con INVIMA) y armar el Listado Único por grupo de enfermedad.",
+    t("Quitar duplicados, confirmar que la tecnología es novedosa para Colombia (cruzando con INVIMA) y armar el Listado Único por grupo de enfermedad."),
   listado_unico:
-    "Listado Único: las tecnologías ya depuradas, sin duplicados, agrupadas por clúster. Es la entrada a la priorización.",
+    t("Listado Único: las tecnologías ya depuradas, sin duplicados, agrupadas por clúster. Es la entrada a la priorización."),
   desduplicacion:
-    "El sistema propone pares que parecen la misma tecnología (nombres parecidos). Usted confirma si se fusionan o si son distintas.",
+    t("El sistema propone pares que parecen la misma tecnología (nombres parecidos). Usted confirma si se fusionan o si son distintas."),
   novedad:
-    "Criterio de novedad: la tecnología no está disponible en el país, o es una nueva indicación, forma o combinación. Se verifica con el índice del INVIMA.",
+    t("Criterio de novedad: la tecnología no está disponible en el país, o es una nueva indicación, forma o combinación. Se verifica con el índice del INVIMA."),
   invima:
-    "INVIMA: autoridad sanitaria de Colombia. El cruce dice si el producto ya tiene registro sanitario en el país.",
+    t("INVIMA: autoridad sanitaria de Colombia. El cruce dice si el producto ya tiene registro sanitario en el país."),
   priorizacion:
-    "Calificar cada tecnología con seis preguntas sí/no (P1 a P6). Las que suman más puntos pasan primero a evaluación.",
+    t("Calificar cada tecnología con seis preguntas sí/no (P1 a P6). Las que suman más puntos pasan primero a evaluación."),
   p16:
-    "P1 a P6 son seis criterios oficiales. Cada sí vale 1 punto. El evaluador técnico califica P1, P5 y P6; el clínico, P2, P3 y P4.",
+    t("P1 a P6 son seis criterios oficiales. Cada sí vale 1 punto. El evaluador técnico califica P1, P5 y P6; el clínico, P2, P3 y P4."),
   pct_p:
-    "%P: porcentaje de priorización. Solo aparece cuando los seis criterios están calificados. Es (puntos / 6) x 100.",
+    t("%P: porcentaje de priorización. Solo aparece cuando los seis criterios están calificados. Es (puntos / 6) x 100."),
   cribado:
-    "Cribado: puntaje automático de la señal (no es la priorización oficial). Un valor alto solo indica que conviene revisarla pronto.",
+    t("Cribado: puntaje automático de la señal (no es la priorización oficial). Un valor alto solo indica que conviene revisarla pronto."),
   senal:
-    "Señal: noticia o registro de una tecnología emergente capturada de una fuente. Todavía no es un expediente completo.",
+    t("Señal: noticia o registro de una tecnología emergente capturada de una fuente. Todavía no es un expediente completo."),
   evaluacion:
-    "Redactar la ficha, el informe o un Mini-HTA y pasarlo por revisión de pares antes de publicarlo.",
+    t("Redactar la ficha, el informe o un Mini-HTA y pasarlo por revisión de pares antes de publicarlo."),
   mini_hta:
-    "Mini-HTA: informe corto de evaluación de tecnología sanitaria, más profundo que una ficha. Suele pedirse cuando hay 6 puntos.",
+    t("Mini-HTA: informe corto de evaluación de tecnología sanitaria, más profundo que una ficha. Suele pedirse cuando hay 6 puntos."),
   ficha:
-    "Ficha técnica: resumen estructurado de la tecnología (indicación, evidencia, fase, horizonte) para quien decide.",
+    t("Ficha técnica: resumen estructurado de la tecnología (indicación, evidencia, fase, horizonte) para quien decide."),
   revision_pares:
-    "Un revisor independiente lee el informe, declara conflicto de interés y lo aprueba o lo devuelve con observaciones.",
+    t("Un revisor independiente lee el informe, declara conflicto de interés y lo aprueba o lo devuelve con observaciones."),
   flujo_editorial:
-    "Camino del informe: borrador → revisión interna → revisión externa → observaciones (si las hay) → comité → publicado.",
-  borrador: "El equipo todavía está escribiendo el informe. No se ha enviado a revisión.",
-  revision_interna: "Un par interno del IETS revisa el texto antes de salir a revisores externos.",
-  revision_externa: "Un experto externo lee el expediente. Debe declarar conflicto de interés.",
-  observado: "El revisor pidió cambios. El equipo corrige y vuelve a enviar.",
-  comite: "El comité institucional da el visto bueno final antes de publicar.",
-  publicado: "El informe ya está aprobado y puede ir al boletín, la ficha pública y el tablero.",
+    t("Camino del informe: borrador → revisión interna → revisión externa → observaciones (si las hay) → comité → publicado."),
+  borrador: t("El equipo todavía está escribiendo el informe. No se ha enviado a revisión."),
+  revision_interna: t("Un par interno del IETS revisa el texto antes de salir a revisores externos."),
+  revision_externa: t("Un experto externo lee el expediente. Debe declarar conflicto de interés."),
+  observado: t("El revisor pidió cambios. El equipo corrige y vuelve a enviar."),
+  comite: t("El comité institucional da el visto bueno final antes de publicar."),
+  publicado: t("El informe ya está aprobado y puede ir al boletín, la ficha pública y el tablero."),
   diseminacion:
-    "Compartir lo ya evaluado: informes, boletín, tablero y alertas para quien decide en el sistema de salud.",
+    t("Compartir lo ya evaluado: informes, boletín, tablero y alertas para quien decide en el sistema de salud."),
   caracterizacion:
-    "Completar los datos de la tecnología (horizonte, fase, área terapéutica, evidencia) que alimentan el informe.",
+    t("Completar los datos de la tecnología (horizonte, fase, área terapéutica, evidencia) que alimentan el informe."),
   horizonte:
-    "Horizonte temporal: qué tan cerca está del mercado (emergente, transicional o inminente), distinto de la condición de novedad.",
+    t("Horizonte temporal: qué tan cerca está del mercado (emergente, transicional o inminente), distinto de la condición de novedad."),
   alertas:
-    "Avisos automáticos: por ejemplo un ensayo fase III en Colombia o un cambio de fase en una tecnología de alto costo.",
+    t("Avisos automáticos: por ejemplo un ensayo fase III en Colombia o un cambio de fase en una tecnología de alto costo."),
   bitacora:
-    "Registro que no se puede borrar ni editar. Cada cambio queda con usuario, fecha y valores antes/después, para reconstruir la historia.",
+    t("Registro que no se puede borrar ni editar. Cada cambio queda con usuario, fecha y valores antes/después, para reconstruir la historia."),
   rbac:
-    "RBAC: cada persona tiene un perfil (superadmin, evaluador técnico, clínico, tomador de decisiones o revisor) y solo ve o hace lo que ese perfil permite.",
+    t("RBAC: cada persona tiene un perfil (superadmin, evaluador técnico, clínico, tomador de decisiones o revisor) y solo ve o hace lo que ese perfil permite."),
   ocr:
-    "OCR: la IA lee texto dentro de imágenes o PDFs de sitios web cuando la página no entrega datos estructurados.",
+    t("OCR: la IA lee texto dentro de imágenes o PDFs de sitios web cuando la página no entrega datos estructurados."),
   minimax:
-    "MiniMax: modelo de inteligencia artificial usado para resumir, extraer datos de sitios y apoyar la redacción. No reemplaza el juicio del analista.",
+    t("MiniMax: modelo de inteligencia artificial usado para resumir, extraer datos de sitios y apoyar la redacción. No reemplaza el juicio del analista."),
   prompt_vigilancia:
-    "Instrucciones que MiniMax sigue al extraer fichas. No debe inventar NCT ni tecnologías ausentes del texto. Variables: {source_title}, {source_url}, {pages_visited}, {content}, {ocr_note} y {max_items}.",
+    t("Instrucciones que MiniMax sigue al extraer fichas. No debe inventar NCT ni tecnologías ausentes del texto. Variables: {source_title}, {source_url}, {pages_visited}, {content}, {ocr_note} y {max_items}."),
   token_ia:
-    "La llave de MiniMax se guarda en el servidor. El panel muestra el saldo del plan y los tokens que esta aplicación ya consumió en llamadas reales.",
+    t("La llave de MiniMax se guarda en el servidor. El panel muestra el saldo del plan y los tokens que esta aplicación ya consumió en llamadas reales."),
   flujo_ingesta:
-    "Orden fijo: cola → descarga HTTP → PDF/HTML → heurística → fichas internas → OCR (opcional) → MiniMax (opcional) → huella y bandeja. Un sitio que falle no tumba las demás fuentes.",
+    t("Orden fijo: cola → descarga HTTP → PDF/HTML → heurística → fichas internas → OCR (opcional) → MiniMax (opcional) → huella y bandeja. Un sitio que falle no tumba las demás fuentes."),
   cluster:
-    "Clúster: grupo de enfermedades o problemas de salud (cáncer, huérfanas, alto costo, etc.) para organizar las tecnologías.",
+    t("Clúster: grupo de enfermedades o problemas de salud (cáncer, huérfanas, alto costo, etc.) para organizar las tecnologías."),
   tipologia:
-    "Tipología: tipo de tecnología (medicamento, terapia avanzada, dispositivo, diagnóstico, procedimiento o salud digital).",
+    t("Tipología: tipo de tecnología (medicamento, terapia avanzada, dispositivo, diagnóstico, procedimiento o salud digital)."),
   fase:
-    "Fase clínica: etapa de investigación en humanos (I, II, III, IV) o si ya está autorizada para venderse.",
+    t("Fase clínica: etapa de investigación en humanos (I, II, III, IV) o si ya está autorizada para venderse."),
   ttm:
-    "Time-to-market: estimación de cuántos meses faltan para que la tecnología pueda llegar al mercado, según fase III y aprobaciones FDA/EMA.",
-  fda: "FDA: agencia reguladora de medicamentos y dispositivos de Estados Unidos. Su aprobación es una señal de cercanía al mercado.",
-  ema: "EMA: agencia reguladora de medicamentos de la Union Europea.",
+    t("Time-to-market: estimación de cuántos meses faltan para que la tecnología pueda llegar al mercado, según fase III y aprobaciones FDA/EMA."),
+  fda: t("FDA: agencia reguladora de medicamentos y dispositivos de Estados Unidos. Su aprobación es una señal de cercanía al mercado."),
+  ema: t("EMA: agencia reguladora de medicamentos de la Union Europea."),
   sgsss:
-    "SGSSS: Sistema General de Seguridad Social en Salud de Colombia. Es el marco contra el que se comparan costos y alternativas.",
+    t("SGSSS: Sistema General de Seguridad Social en Salud de Colombia. Es el marco contra el que se comparan costos y alternativas."),
   comparadores:
-    "Tratamientos que ya se usan en Colombia para la misma enfermedad, contra los que se compara la nueva tecnología.",
+    t("Tratamientos que ya se usan en Colombia para la misma enfermedad, contra los que se compara la nueva tecnología."),
   datamart:
-    "Datamart: copia de los números del ciclo guardada al cerrarlo, para que el tablero cargue rápido.",
+    t("Datamart: copia de los números del ciclo guardada al cerrarlo, para que el tablero cargue rápido."),
   grafo:
-    "Mapa de relaciones del ciclo. Cada nodo (ciclo, clúster, tecnología o detalle) se puede ampliar y consultar con IA. La vista y el chat se pueden guardar.",
+    t("Mapa de relaciones del ciclo. Cada nodo (ciclo, clúster, tecnología o detalle) se puede ampliar y consultar con IA. La vista y el chat se pueden guardar."),
   tablero:
-    "Resumen del ciclo para quien decide: cuántas tecnologías avanzaron, qué tan cerca están del mercado y cuánto podrían costar.",
-  capturadas: "Tecnologías que ya se asignaron a este ciclo de trabajo.",
-  filtradas: "Pasaron el filtro de novedad y no son duplicadas. Ya pueden priorizarse.",
-  priorizadas: "Superaron el umbral de puntos P1-P6 y merecen ficha o informe.",
-  evaluadas: "Ya tienen ficha, informe o Mini-HTA en curso o listo.",
-  publicadas: "El informe ya fue aprobado y puede compartirse.",
+    t("Resumen del ciclo para quien decide: cuántas tecnologías avanzaron, qué tan cerca están del mercado y cuánto podrían costar."),
+  capturadas: t("Tecnologías que ya se asignaron a este ciclo de trabajo."),
+  filtradas: t("Pasaron el filtro de novedad y no son duplicadas. Ya pueden priorizarse."),
+  priorizadas: t("Superaron el umbral de puntos P1-P6 y merecen ficha o informe."),
+  evaluadas: t("Ya tienen ficha, informe o Mini-HTA en curso o listo."),
+  publicadas: t("El informe ya fue aprobado y puede compartirse."),
   bajo_vigilancia:
-    "No se priorizó en este ciclo, pero se sigue observando. Suele proponerse para el ciclo siguiente.",
+    t("No se priorizó en este ciclo, pero se sigue observando. Suele proponerse para el ciclo siguiente."),
   nivel_a:
-    "Fuente de nivel A: contrato de datos estable (API o feed). Es la base más confiable del pipeline automático.",
+    t("Fuente de nivel A: contrato de datos estable (API o feed). Es la base más confiable del pipeline automático."),
 
   // --- Frente A: flujo metodologico (ciclos, bandeja, filtrado, priorizacion, evaluacion, diseminacion) ---
   fa_ventana:
-    "Ventana operativa: semanas entre la apertura y la fecha proyectada de boletín (o el corte de datos si no hay boletín). La metodología exige entre 10 y 16 semanas.",
+    t("Ventana operativa: semanas entre la apertura y la fecha proyectada de boletín (o el corte de datos si no hay boletín). La metodología exige entre 10 y 16 semanas."),
   fa_cuota:
-    "Cuota anual: máximo de ciclos formales por año calendario (parámetro cycle.max_per_year, hoy 3). El ciclo histórico no cuenta.",
-  fa_codigo_ciclo: "Nombre único del ciclo, por ejemplo 'Ciclo I - 2027'. No puede repetirse.",
-  fa_apertura: "Primer día de trabajo del ciclo. Define el año al que cuenta para la cuota.",
-  fa_ciclo_en_configuracion: "El ciclo se está preparando: fechas y notas. Aún no recibe trabajo de filtrado.",
-  fa_ciclo_en_filtrado: "Se depuran duplicados y se verifica la novedad frente al INVIMA.",
-  fa_ciclo_en_priorizacion: "Los evaluadores califican P1 a P6 las tecnologías aptas.",
-  fa_ciclo_en_evaluacion: "Las priorizadas se documentan como ficha, informe o Mini-HTA con revisión por pares.",
+    t("Cuota anual: máximo de ciclos formales por año calendario (parámetro cycle.max_per_year, hoy 3). El ciclo histórico no cuenta."),
+  fa_codigo_ciclo: t("Nombre único del ciclo, por ejemplo 'Ciclo I - 2027'. No puede repetirse."),
+  fa_apertura: t("Primer día de trabajo del ciclo. Define el año al que cuenta para la cuota."),
+  fa_ciclo_en_configuracion: t("El ciclo se está preparando: fechas y notas. Aún no recibe trabajo de filtrado."),
+  fa_ciclo_en_filtrado: t("Se depuran duplicados y se verifica la novedad frente al INVIMA."),
+  fa_ciclo_en_priorizacion: t("Los evaluadores califican P1 a P6 las tecnologías aptas."),
+  fa_ciclo_en_evaluacion: t("Las priorizadas se documentan como ficha, informe o Mini-HTA con revisión por pares."),
   fa_ciclo_cerrado_consolidado:
-    "Ciclo cerrado: puntajes congelados, datamart y boletín compilados. No admite cambios.",
+    t("Ciclo cerrado: puntajes congelados, datamart y boletín compilados. No admite cambios."),
   fa_transicion:
-    "Mueve el ciclo a otra etapa. Solo se permiten los pasos de la máquina de estados; se puede retroceder hasta antes del cierre.",
+    t("Mueve el ciclo a otra etapa. Solo se permiten los pasos de la máquina de estados; se puede retroceder hasta antes del cierre."),
   fa_cerrar:
-    "Cierra y consolida: congela todos los puntajes, compila el boletín y refresca el datamart. Solo el superadministrador. Es irreversible.",
+    t("Cierra y consolida: congela todos los puntajes, compila el boletín y refresca el datamart. Solo el superadministrador. Es irreversible."),
   fa_arrastre:
-    "Lleva a un ciclo abierto las tecnologías que quedaron bajo vigilancia en este ciclo cerrado. Entran como aptas para priorización y muestran su %P anterior como referencia.",
+    t("Lleva a un ciclo abierto las tecnologías que quedaron bajo vigilancia en este ciclo cerrado. Entran como aptas para priorización y muestran su %P anterior como referencia."),
   fa_eliminar_ciclo:
-    "Solo se elimina un ciclo creado por error: en configuración y sin tecnologías, expedientes ni boletines. La baja queda en la bitácora.",
-  fa_embudo_asignadas: "Asignadas al ciclo que aún esperan la verificación de novedad.",
-  fa_embudo_filtradas: "Pasaron el filtro de novedad y esperan calificación P1 a P6.",
-  fa_embudo_priorizadas: "Sumaron 4 o más puntos: pasan a evaluación temprana.",
-  fa_embudo_vigilancia: "Sumaron 3 puntos: se siguen observando y se arrastran al ciclo siguiente.",
-  fa_embudo_evaluacion: "Tienen expediente abierto (ficha, informe o Mini-HTA) en curso.",
-  fa_embudo_publicadas: "Su expediente ya fue publicado tras la revisión por pares.",
-  fa_sin_asignar: "Señales capturadas que todavía no pertenecen a ningún ciclo.",
-  fa_total_capturadas: "Todas las tecnologías registradas en el sistema, asignadas o no.",
-  fa_sin_cluster: "Señales sin clúster confirmado. No pueden entrar a un ciclo hasta clasificarlas.",
-  fa_sin_tipologia: "Señales sin tipología confirmada. No pueden entrar a un ciclo hasta clasificarlas.",
-  fa_listas_asignar: "Señales de esta página con clúster y tipología: se pueden asignar ya.",
+    t("Solo se elimina un ciclo creado por error: en configuración y sin tecnologías, expedientes ni boletines. La baja queda en la bitácora."),
+  fa_embudo_asignadas: t("Asignadas al ciclo que aún esperan la verificación de novedad."),
+  fa_embudo_filtradas: t("Pasaron el filtro de novedad y esperan calificación P1 a P6."),
+  fa_embudo_priorizadas: t("Sumaron 4 o más puntos: pasan a evaluación temprana."),
+  fa_embudo_vigilancia: t("Sumaron 3 puntos: se siguen observando y se arrastran al ciclo siguiente."),
+  fa_embudo_evaluacion: t("Tienen expediente abierto (ficha, informe o Mini-HTA) en curso."),
+  fa_embudo_publicadas: t("Su expediente ya fue publicado tras la revisión por pares."),
+  fa_sin_asignar: t("Señales capturadas que todavía no pertenecen a ningún ciclo."),
+  fa_total_capturadas: t("Todas las tecnologías registradas en el sistema, asignadas o no."),
+  fa_sin_cluster: t("Señales sin clúster confirmado. No pueden entrar a un ciclo hasta clasificarlas."),
+  fa_sin_tipologia: t("Señales sin tipología confirmada. No pueden entrar a un ciclo hasta clasificarlas."),
+  fa_listas_asignar: t("Señales de esta página con clúster y tipología: se pueden asignar ya."),
   fa_corroborada:
-    "La misma tecnología aparece en otras fuentes (mismo NCT o nombre/DCI equivalente según el umbral de desduplicación). Cada fuente adicional suma 5 puntos al orden de la bandeja, máximo 15. Solo ordena: no cambia el cribado, el %P ni la importancia clínica.",
+    t("La misma tecnología aparece en otras fuentes (mismo NCT o nombre/DCI equivalente según el umbral de desduplicación). Cada fuente adicional suma 5 puntos al orden de la bandeja, máximo 15. Solo ordena: no cambia el cribado, el %P ni la importancia clínica."),
   fa_datos_producto:
-    "Datos de producto leídos en la captura (conector, IA o reglas sobre el texto): forma farmacéutica, concentración y vía para medicamentos; marca y modelo para dispositivos. Confírmelos o corríjalos al clasificar.",
+    t("Datos de producto leídos en la captura (conector, IA o reglas sobre el texto): forma farmacéutica, concentración y vía para medicamentos; marca y modelo para dispositivos. Confírmelos o corríjalos al clasificar."),
   fa_condicion:
-    "Condición: emergente (en fase clínica II o III, antes de la aprobación) o nueva (aprobada en agencia de referencia hace 12 meses o menos). Es distinta del horizonte.",
+    t("Condición: emergente (en fase clínica II o III, antes de la aprobación) o nueva (aprobada en agencia de referencia hace 12 meses o menos). Es distinta del horizonte."),
   fa_sugerir:
-    "El clasificador propone clúster y tipología a partir de CIE-10, MeSH y palabras clave de la señal. La propuesta siempre la confirma una persona.",
+    t("El clasificador propone clúster y tipología a partir de CIE-10, MeSH y palabras clave de la señal. La propuesta siempre la confirma una persona."),
   fa_asignar_lote:
-    "Asigna al ciclo en pantalla las señales seleccionadas que ya tienen clúster y tipología. Las demás quedan en la bandeja con el motivo.",
+    t("Asigna al ciclo en pantalla las señales seleccionadas que ya tienen clúster y tipología. Las demás quedan en la bandeja con el motivo."),
   fa_fechas_regulatorias:
-    "Las fechas de aprobación FDA/EMA y de fin de fase III alimentan el pre-llenado de P1, P5 y P6 y el cálculo de time-to-market.",
+    t("Las fechas de aprobación FDA/EMA y de fin de fase III alimentan el pre-llenado de P1, P5 y P6 y el cálculo de time-to-market."),
   fa_estado_regulatorio:
-    "Trámite ante agencias de referencia (ej. 'Sometido a FDA'). Si indica trámite en curso, P6 se sugiere como Sí.",
-  fa_fusiones_revisar: "Pares de registros que el barrido propone como posible misma tecnología. Esperan decisión humana.",
-  fa_fusiones_confirmadas: "Pares que una persona confirmó como la misma tecnología. El absorbido queda trazado, no borrado.",
-  fa_por_filtrar: "Tecnologías del ciclo en estado 'asignada' que aún no pasan la verificación de novedad.",
-  fa_aptas: "Pasaron el filtro de novedad y ya están en la cola de priorización.",
-  fa_excluidas: "Salieron del ciclo con una causa tipificada e inmutable.",
-  fa_novedad_verificada: "Tecnologías con vía de novedad registrada; debajo, cuántas se cruzaron con el índice del INVIMA.",
+    t("Trámite ante agencias de referencia (ej. 'Sometido a FDA'). Si indica trámite en curso, P6 se sugiere como Sí."),
+  fa_fusiones_revisar: t("Pares de registros que el barrido propone como posible misma tecnología. Esperan decisión humana."),
+  fa_fusiones_confirmadas: t("Pares que una persona confirmó como la misma tecnología. El absorbido queda trazado, no borrado."),
+  fa_por_filtrar: t("Tecnologías del ciclo en estado 'asignada' que aún no pasan la verificación de novedad."),
+  fa_aptas: t("Pasaron el filtro de novedad y ya están en la cola de priorización."),
+  fa_excluidas: t("Salieron del ciclo con una causa tipificada e inmutable."),
+  fa_novedad_verificada: t("Tecnologías con vía de novedad registrada; debajo, cuántas se cruzaron con el índice del INVIMA."),
   fa_barrido:
-    "Compara nombre comercial, DCI, NCT y fabricante del acervo del ciclo con tres algoritmos y deja propuestas de fusión sobre el umbral de similitud.",
+    t("Compara nombre comercial, DCI, NCT y fabricante del acervo del ciclo con tres algoritmos y deja propuestas de fusión sobre el umbral de similitud."),
   fa_confirmar_fusion:
-    "Fusiona el par: el registro elegido se conserva y absorbe los datos que solo tenía el otro. El absorbido sale del Listado Único. No se deshace.",
-  fa_descartar_fusion: "Declara que el par son tecnologías distintas. El barrido no lo volverá a proponer.",
-  fa_levenshtein: "Levenshtein: detecta erratas y transliteraciones (Trastuzumab / Trastuzumap).",
-  fa_jaro: "Jaro-Winkler: premia el prefijo común, donde vive la raíz del principio activo.",
-  fa_token_sort: "Token sorting: detecta el mismo nombre con las palabras en otro orden.",
+    t("Fusiona el par: el registro elegido se conserva y absorbe los datos que solo tenía el otro. El absorbido sale del Listado Único. No se deshace."),
+  fa_descartar_fusion: t("Declara que el par son tecnologías distintas. El barrido no lo volverá a proponer."),
+  fa_levenshtein: t("Levenshtein: detecta erratas y transliteraciones (Trastuzumab / Trastuzumap)."),
+  fa_jaro: t("Jaro-Winkler: premia el prefijo común, donde vive la raíz del principio activo."),
+  fa_token_sort: t("Token sorting: detecta el mismo nombre con las palabras en otro orden."),
   fa_fabricante_sim:
-    "Similitud de fabricante: solo pesa en los extremos (misma casa o casas claramente distintas); en la franja media no decide.",
+    t("Similitud de fabricante: solo pesa en los extremos (misma casa o casas claramente distintas); en la franja media no decide."),
   fa_via_novedad:
-    "Por qué la tecnología es nueva para Colombia: no disponible en el país, nueva indicación, nueva forma farmacéutica o nueva combinación.",
+    t("Por qué la tecnología es nueva para Colombia: no disponible en el país, nueva indicación, nueva forma farmacéutica o nueva combinación."),
   fa_justificacion_novedad:
-    "Obligatoria (20 caracteres o más) cuando la vía no es 'no disponible en el país': explique por qué sigue siendo novedosa pese al registro.",
+    t("Obligatoria (20 caracteres o más) cuando la vía no es 'no disponible en el país': explique por qué sigue siendo novedosa pese al registro."),
   fa_cruce_invima:
-    "Busca la tecnología en la copia local del índice de registros sanitarios del INVIMA y deja la evidencia fechada. Es requisito para marcarla apta.",
+    t("Busca la tecnología en la copia local del índice de registros sanitarios del INVIMA y deja la evidencia fechada. Es requisito para marcarla apta."),
   fa_sala_especializada:
-    "Concepto de la Sala Especializada del INVIMA, si existe. Registre el resumen y la referencia del acta (número o enlace).",
+    t("Concepto de la Sala Especializada del INVIMA, si existe. Registre el resumen y la referencia del acta (número o enlace)."),
   fa_marcar_apta:
-    "Pasa la tecnología a la cola de priorización. Exige vía de novedad registrada y cruce con el INVIMA.",
+    t("Pasa la tecnología a la cola de priorización. Exige vía de novedad registrada y cruce con el INVIMA."),
   fa_excluir:
-    "Saca la tecnología del ciclo con una causa tipificada. La causa queda con fecha y evaluador y no se puede cambiar.",
-  fa_listado_csv: "Descarga el Listado Único del ciclo en CSV (separado por punto y coma, abre en Excel).",
-  fa_en_cola: "Tecnologías del ciclo sujetas a calificación: aptas, priorizadas, bajo vigilancia o no priorizadas.",
-  fa_pendientes: "Tecnologías de la cola a las que aún les falta algún criterio P1 a P6.",
-  fa_priorizada: "Priorizada: 4 a 6 puntos. Pasa a evaluación temprana.",
-  fa_bajo_vigilancia: "Bajo vigilancia: 3 puntos. Se sigue observando y se arrastra al ciclo siguiente.",
-  fa_no_priorizada: "No priorizada: 0 a 2 puntos. Queda como archivo histórico del ciclo.",
+    t("Saca la tecnología del ciclo con una causa tipificada. La causa queda con fecha y evaluador y no se puede cambiar."),
+  fa_listado_csv: t("Descarga el Listado Único del ciclo en CSV (separado por punto y coma, abre en Excel)."),
+  fa_en_cola: t("Tecnologías del ciclo sujetas a calificación: aptas, priorizadas, bajo vigilancia o no priorizadas."),
+  fa_pendientes: t("Tecnologías de la cola a las que aún les falta algún criterio P1 a P6."),
+  fa_priorizada: t("Priorizada: 4 a 6 puntos. Pasa a evaluación temprana."),
+  fa_bajo_vigilancia: t("Bajo vigilancia: 3 puntos. Se sigue observando y se arrastra al ciclo siguiente."),
+  fa_no_priorizada: t("No priorizada: 0 a 2 puntos. Queda como archivo histórico del ciclo."),
   fa_franjas:
-    "Franjas por conteo de puntos (decisión D-02): 4 o más priorizada, 3 bajo vigilancia, 2 o menos no priorizada. El porcentaje es solo una etiqueta.",
-  fa_solo_mio: "Muestra solo las tecnologías a las que les falta un criterio que su perfil puede calificar.",
-  fa_le_toca: "Falta al menos un criterio que su perfil califica.",
+    t("Franjas por conteo de puntos (decisión D-02): 4 o más priorizada, 3 bajo vigilancia, 2 o menos no priorizada. El porcentaje es solo una etiqueta."),
+  fa_solo_mio: t("Muestra solo las tecnologías a las que les falta un criterio que su perfil puede calificar."),
+  fa_le_toca: t("Falta al menos un criterio que su perfil califica."),
   fa_pasar_evaluacion:
-    "Abre el expediente de evaluación temprana (ficha, informe o Mini-HTA según los puntos) y saca la tecnología de la matriz: su calificación queda fija.",
-  fa_arrastrada: "Viene arrastrada de un ciclo anterior en el que quedó bajo vigilancia; se muestra su %P previo.",
+    t("Abre el expediente de evaluación temprana (ficha, informe o Mini-HTA según los puntos) y saca la tecnología de la matriz: su calificación queda fija."),
+  fa_arrastrada: t("Viene arrastrada de un ciclo anterior en el que quedó bajo vigilancia; se muestra su %P previo."),
   fa_justificacion_criterio:
-    "Justificación opcional pero recomendada: queda con su calificación en la bitácora y ayuda en auditorías.",
-  fa_criterio_bloqueado: "Este criterio lo califica otro perfil. Usted puede consultarlo pero no modificarlo.",
+    t("Justificación opcional pero recomendada: queda con su calificación en la bitácora y ayuda en auditorías."),
+  fa_criterio_bloqueado: t("Este criterio lo califica otro perfil. Usted puede consultarlo pero no modificarlo."),
   fa_nivel_producto:
-    "Nivel del documento: ficha (resumen), informe (con evidencia) o Mini-HTA (con PICO e impacto presupuestal). Se sugiere por puntos y se puede cambiar.",
-  fa_completitud: "Porcentaje de campos obligatorios del nivel elegido que ya tienen contenido.",
+    t("Nivel del documento: ficha (resumen), informe (con evidencia) o Mini-HTA (con PICO e impacto presupuestal). Se sugiere por puntos y se puede cambiar."),
+  fa_completitud: t("Porcentaje de campos obligatorios del nivel elegido que ya tienen contenido."),
   fa_confidencial:
-    "Un documento confidencial nunca aparece en el catálogo público de expedientes, aunque se publique.",
+    t("Un documento confidencial nunca aparece en el catálogo público de expedientes, aunque se publique."),
   fa_abrir_expediente:
-    "Crea el expediente de evaluación de esta tecnología priorizada y la pasa a 'en evaluación'.",
+    t("Crea el expediente de evaluación de esta tecnología priorizada y la pasa a 'en evaluación'."),
   fa_invitar_revisor:
-    "Externo: recibe un enlace personal que vence en 10 días, sin cuenta institucional. Interno: un par del IETS. Para publicar se necesita al menos uno de cada tipo con COI firmado.",
-  fa_revocar: "Anula la invitación: el enlace deja de abrir el portal. La fila queda en el historial.",
-  fa_observacion: "Comentario anclado a un campo del documento y a la versión vigente. Lo ven el equipo y los revisores.",
-  fa_exportar_html: "Abre la versión institucional imprimible. Use Imprimir > Guardar como PDF para el entregable formal.",
-  fa_historial: "Cada guardado y cada transición crea una versión (mayor.menor) que permite reconstruir el documento.",
-  fa_tr_revision_interna: "Envía el borrador a la revisión interna de calidad. Exige todos los campos obligatorios completos.",
-  fa_tr_revision_externa: "Pasa el documento a los revisores externos invitados.",
-  fa_tr_borrador: "Devuelve el documento a borrador para corregirlo.",
-  fa_tr_con_observaciones: "Registra que la revisión externa pidió cambios; el equipo corrige en borrador.",
-  fa_tr_aprobado_comite: "Registra el visto bueno del comité técnico. El siguiente paso es publicar.",
+    t("Externo: recibe un enlace personal que vence en 10 días, sin cuenta institucional. Interno: un par del IETS. Para publicar se necesita al menos uno de cada tipo con COI firmado."),
+  fa_revocar: t("Anula la invitación: el enlace deja de abrir el portal. La fila queda en el historial."),
+  fa_observacion: t("Comentario anclado a un campo del documento y a la versión vigente. Lo ven el equipo y los revisores."),
+  fa_exportar_html: t("Abre la versión institucional imprimible. Use Imprimir > Guardar como PDF para el entregable formal."),
+  fa_historial: t("Cada guardado y cada transición crea una versión (mayor.menor) que permite reconstruir el documento."),
+  fa_tr_revision_interna: t("Envía el borrador a la revisión interna de calidad. Exige todos los campos obligatorios completos."),
+  fa_tr_revision_externa: t("Pasa el documento a los revisores externos invitados."),
+  fa_tr_borrador: t("Devuelve el documento a borrador para corregirlo."),
+  fa_tr_con_observaciones: t("Registra que la revisión externa pidió cambios; el equipo corrige en borrador."),
+  fa_tr_aprobado_comite: t("Registra el visto bueno del comité técnico. El siguiente paso es publicar."),
   fa_tr_publicado:
-    "Publica el documento en la plataforma. Exige un revisor interno y uno externo con COI firmado. No se deshace.",
+    t("Publica el documento en la plataforma. Exige un revisor interno y uno externo con COI firmado. No se deshace."),
   fa_compilar_boletin:
-    "Recalcula el boletín con las cifras actuales del ciclo. Si ya estaba aprobado, la aprobación se anula porque cambió el contenido.",
-  fa_aprobar_boletin: "Visto bueno del líder sobre las cifras compiladas. Es requisito para publicar.",
-  fa_publicar_boletin: "Publica el boletín aprobado. No se deshace.",
+    t("Recalcula el boletín con las cifras actuales del ciclo. Si ya estaba aprobado, la aprobación se anula porque cambió el contenido."),
+  fa_aprobar_boletin: t("Visto bueno del líder sobre las cifras compiladas. Es requisito para publicar."),
+  fa_publicar_boletin: t("Publica el boletín aprobado. No se deshace."),
   fa_suscripcion:
-    "Reciba avisos de todos los clústeres o solo de los que le interesan. Puede desactivarlos cuando quiera.",
+    t("Reciba avisos de todos los clústeres o solo de los que le interesan. Puede desactivarlos cuando quiera."),
   fa_canal_correo:
-    "Si el IETS configuró el servidor de correo (SMTP), las alertas y las invitaciones también llegan por correo.",
+    t("Si el IETS configuró el servidor de correo (SMTP), las alertas y las invitaciones también llegan por correo."),
 
   // ---------------------------------------------------------------------- //
   // Frente B: operacion, captura y CRUDs (fuentes, vigilancia, senales,
   // notas, diseminacion, postulaciones, chat, configuracion y auditoria).
   // ---------------------------------------------------------------------- //
   fb_adaptador:
-    "Adaptador (conector): el programa que sabe leer esta fuente. Los de API (ClinicalTrials, openFDA, EMA, PubMed...) traen datos estructurados; 'html' y 'pdf' rastrean páginas cuando no hay API; 'manual' es curaduría humana.",
+    t("Adaptador (conector): el programa que sabe leer esta fuente. Los de API (ClinicalTrials, openFDA, EMA, PubMed...) traen datos estructurados; 'html' y 'pdf' rastrean páginas cuando no hay API; 'manual' es curaduría humana."),
   fb_url:
-    "Dirección que consulta el adaptador: la API o la página a rastrear. Debe iniciar con http:// o https://. Algunos adaptadores (manual, fixture) no la necesitan.",
+    t("Dirección que consulta el adaptador: la API o la página a rastrear. Debe iniciar con http:// o https://. Algunos adaptadores (manual, fixture) no la necesitan."),
   fb_frecuencia:
-    "Cada cuánto se vuelve a consultar esta fuente. La vigilancia programada solo la encola cuando su frecuencia ya venció, para no saturar a la fuente.",
+    t("Cada cuánto se vuelve a consultar esta fuente. La vigilancia programada solo la encola cuando su frecuencia ya venció, para no saturar a la fuente."),
   fb_nivel:
-    "Nivel de acceso según el contrato de datos de la fuente: A = API estable, B = feed o descarga oficial, C = página estructurada, D = página que solo confirma, E = curaduría humana. Una fuente D o E nunca sobreescribe un dato que ya trajo una A o B.",
+    t("Nivel de acceso según el contrato de datos de la fuente: A = API estable, B = feed o descarga oficial, C = página estructurada, D = página que solo confirma, E = curaduría humana. Una fuente D o E nunca sobreescribe un dato que ya trajo una A o B."),
   fb_matriz_eh:
-    "Datos de la matriz 'Fuentes de información proactiva EH' (hoja MATRIZ FI EH): nivel de fuente, tipos de tecnología, ruta de acceso y qué consultar. Guían a la IA y al recorrido. Las listas se editan en Configuración › Parámetros de fuentes.",
+    t("Datos de la matriz 'Fuentes de información proactiva EH' (hoja MATRIZ FI EH): nivel de fuente, tipos de tecnología, ruta de acceso y qué consultar. Guían a la IA y al recorrido. Las listas se editan en Configuración › Parámetros de fuentes."),
   fb_nivel_fuente:
-    "Primaria: produce la evidencia o el dato original (registro de ensayos, fabricante, agencia que aprueba). Secundaria: resume o evalúa fuentes primarias (agencias HTA, revistas). Terciaria: compila o difunde (portales, redes de EH).",
+    t("Primaria: produce la evidencia o el dato original (registro de ensayos, fabricante, agencia que aprueba). Secundaria: resume o evalúa fuentes primarias (agencias HTA, revistas). Terciaria: compila o difunde (portales, redes de EH)."),
   fb_origen_matriz:
-    "Cómo llegó la fuente a la matriz (por ejemplo DOC_TEC = documento técnico, PROP = propuesta del equipo). La lista se edita en Parámetros de fuentes.",
+    t("Cómo llegó la fuente a la matriz (por ejemplo DOC_TEC = documento técnico, PROP = propuesta del equipo). La lista se edita en Parámetros de fuentes."),
   fb_tipos_tecnologia:
-    "Tecnologías que cubre la fuente: MED medicamentos, DM dispositivos, BIOM biomarcadores, IA inteligencia artificial, SD software como dispositivo, MT múltiples. Definen los términos de la búsqueda web.",
+    t("Tecnologías que cubre la fuente: MED medicamentos, DM dispositivos, BIOM biomarcadores, IA inteligencia artificial, SD software como dispositivo, MT múltiples. Definen los términos de la búsqueda web."),
   fb_urls_entrada:
-    "Páginas internas que el recorrido visita además de la URL principal (columna 'Link de consulta' de la matriz). Si la URL principal falla, se usan como respaldo.",
+    t("Páginas internas que el recorrido visita además de la URL principal (columna 'Link de consulta' de la matriz). Si la URL principal falla, se usan como respaldo."),
   fb_ruta_acceso:
-    "Pasos de navegación para llegar a la información (por ejemplo 'Medscape → News & Perspective → Cardiology'). El sistema extrae palabras guía y sigue primero los enlaces que las contienen.",
+    t("Pasos de navegación para llegar a la información (por ejemplo 'Medscape → News & Perspective → Cardiology'). El sistema extrae palabras guía y sigue primero los enlaces que las contienen."),
   fb_flujo_fuente:
-    "Casillas del flujo de esta fuente: qué hace el escaneo al consultarla. Apagar una casilla solo afecta a esta fuente; los interruptores globales de IA y OCR siguen mandando.",
+    t("Casillas del flujo de esta fuente: qué hace el escaneo al consultarla. Apagar una casilla solo afecta a esta fuente; los interruptores globales de IA y OCR siguen mandando."),
   fb_flujo_recorrido:
-    "Entra a las URLs de entrada de la matriz y a las fichas internas. Apagado: solo se lee la página principal.",
+    t("Entra a las URLs de entrada de la matriz y a las fichas internas. Apagado: solo se lee la página principal."),
   fb_flujo_enlaces:
-    "Sigue los enlaces internos mejor puntuados (los que coinciden con la ruta de acceso suben). Requiere el recorrido encendido.",
+    t("Sigue los enlaces internos mejor puntuados (los que coinciden con la ruta de acceso suben). Requiere el recorrido encendido."),
   fb_flujo_ocr:
-    "Lee el texto de PDF escaneados e imágenes con el modelo de visión. Útil en agencias que publican informes como imagen.",
+    t("Lee el texto de PDF escaneados e imágenes con el modelo de visión. Útil en agencias que publican informes como imagen."),
   fb_flujo_ia:
-    "La IA lee lo recorrido y extrae tecnologías, fases y NCT verificables, con el contexto de la matriz (prioridad, qué consultar).",
+    t("La IA lee lo recorrido y extrae tecnologías, fases y NCT verificables, con el contexto de la matriz (prioridad, qué consultar)."),
   fb_flujo_busqueda:
-    "Antes de recorrer, la IA redacta consultas 'site:dominio' y las lanza en buscadores (Yahoo, DuckDuckGo, Bing, Brave o SearXNG) para encontrar documentos de la fuente que el menú no muestra.",
+    t("Antes de recorrer, la IA redacta consultas 'site:dominio' y las lanza en buscadores (Yahoo, DuckDuckGo, Bing, Brave o SearXNG) para encontrar documentos de la fuente que el menú no muestra."),
   fb_flujo_paginas:
-    "Fichas internas a seguir en esta fuente. 0 usa el valor global de Configuración › Prompt de IA. Máximo 20.",
+    t("Fichas internas a seguir en esta fuente. 0 usa el valor global de Configuración › Prompt de IA. Máximo 20."),
   fb_dominio_busqueda:
-    "Dominio donde se buscan resultados (por ejemplo 'fda.gov'). Vacío usa el de la URL principal. Los resultados de otros dominios se descartan.",
+    t("Dominio donde se buscan resultados (por ejemplo 'fda.gov'). Vacío usa el de la URL principal. Los resultados de otros dominios se descartan."),
   fb_palabras_guia:
-    "Palabras que, si aparecen en un enlace, hacen que el recorrido lo siga primero. Se suman a las que salen de la ruta de acceso.",
+    t("Palabras que, si aparecen en un enlace, hacen que el recorrido lo siga primero. Se suman a las que salen de la ruta de acceso."),
   fb_terminos_fuente:
-    "Términos propios para la búsqueda web de esta fuente. Vacío usa los de 'Criterios de búsqueda' según sus tipos de tecnología.",
+    t("Términos propios para la búsqueda web de esta fuente. Vacío usa los de 'Criterios de búsqueda' según sus tipos de tecnología."),
   fb_probar_busqueda:
-    "Ejecuta la búsqueda web de esta fuente con lo guardado (sin capturar señales) y muestra consultas, motores y resultados.",
+    t("Ejecuta la búsqueda web de esta fuente con lo guardado (sin capturar señales) y muestra consultas, motores y resultados."),
   fb_parametros_fuentes:
-    "Listas desplegables de la matriz EH, configuración de la búsqueda web y carga del Excel de la matriz.",
+    t("Listas desplegables de la matriz EH, configuración de la búsqueda web y carga del Excel de la matriz."),
   fb_motores_busqueda:
-    "Motores en cascada: si uno bloquea o no trae resultados se prueba el siguiente; el que bloquea queda en pausa unos minutos. Brave (llave) y SearXNG (URL propia) son los más estables.",
+    t("Motores en cascada: si uno bloquea o no trae resultados se prueba el siguiente; el que bloquea queda en pausa unos minutos. Brave (llave) y SearXNG (URL propia) son los más estables."),
   fb_importar_matriz:
-    "Lee el Excel 'Fuentes de información proactiva EH' (hojas MATRIZ FI EH y Criterios de búsqueda), actualiza las fuentes del catálogo y crea las que falten. Sin archivo, reaplica la matriz ya cargada.",
+    t("Lee el Excel 'Fuentes de información proactiva EH' (hojas MATRIZ FI EH y Criterios de búsqueda), actualiza las fuentes del catálogo y crea las que falten. Sin archivo, reaplica la matriz ya cargada."),
   fb_salud:
-    "Resultado de la última sonda. Verde: responde y el formato coincide. Ámbar: responde pero cambió el formato o vino vacía (la ingesta se suspende). Rojo: no responde. Sin sonda: aún no se ha probado.",
+    t("Resultado de la última sonda. Verde: responde y el formato coincide. Ámbar: responde pero cambió el formato o vino vacía (la ingesta se suspende). Rojo: no responde. Sin sonda: aún no se ha probado."),
   fb_ingesta:
-    "Si está activa, la fuente entra en la vigilancia masiva y en la programada. Apagarla no borra nada: solo deja de consultarse.",
+    t("Si está activa, la fuente entra en la vigilancia masiva y en la programada. Apagarla no borra nada: solo deja de consultarse."),
   fb_contraste:
-    "Fuente de contraste: otro sistema de escaneo (PCORI, NIHRIO, CDA-AMC...) que sirve para medir si al IETS se le escapó alguna tecnología.",
+    t("Fuente de contraste: otro sistema de escaneo (PCORI, NIHRIO, CDA-AMC...) que sirve para medir si al IETS se le escapó alguna tecnología."),
   fb_retirada:
-    "Fuente del inventario anterior que ya no está en el catálogo verificado D-06. Se conserva por sus señales, pero la cola de ingesta la ignora.",
+    t("Fuente del inventario anterior que ya no está en el catálogo verificado D-06. Se conserva por sus señales, pero la cola de ingesta la ignora."),
   fb_config_conector:
-    "Parámetros del adaptador en formato JSON (por ejemplo filtros de búsqueda, columnas de un archivo o un lote de registros cargado a mano). Déjelo vacío si no sabe qué poner.",
+    t("Parámetros del adaptador en formato JSON (por ejemplo filtros de búsqueda, columnas de un archivo o un lote de registros cargado a mano). Déjelo vacío si no sabe qué poner."),
   fb_alta_rapida:
-    "Registra una página solo con nombre y URL. Queda como rastreo HTML de nivel D, frecuencia semanal y con ingesta activa; luego puede completarla en Editar.",
+    t("Registra una página solo con nombre y URL. Queda como rastreo HTML de nivel D, frecuencia semanal y con ingesta activa; luego puede completarla en Editar."),
   fb_sonda:
-    "Prueba rápida de salud: consulta la fuente sin guardar datos y dice si responde y si el formato sigue igual.",
+    t("Prueba rápida de salud: consulta la fuente sin guardar datos y dice si responde y si el formato sigue igual."),
   fb_ingerir:
-    "Consulta esta fuente ahora mismo y deja las señales nuevas en la bandeja de entrada. Puede tardar unos segundos.",
+    t("Consulta esta fuente ahora mismo y deja las señales nuevas en la bandeja de entrada. Puede tardar unos segundos."),
   fb_recargar_catalogo:
-    "Vuelve a aplicar el catálogo verificado D-06: actualiza las fuentes oficiales y retira las que ya no están. No borra señales.",
+    t("Vuelve a aplicar el catálogo verificado D-06: actualiza las fuentes oficiales y retira las que ya no están. No borra señales."),
   fb_sondear_ab:
-    "Ejecuta la sonda de salud sobre las fuentes de nivel A y B, que son las que sostienen el pre-llenado de P1, P5 y P6.",
+    t("Ejecuta la sonda de salud sobre las fuentes de nivel A y B, que son las que sostienen el pre-llenado de P1, P5 y P6."),
   fb_eliminar_fuente:
-    "Solo se eliminan fuentes agregadas a mano que aún no produjeron señales. Las del catálogo o con señales se deshabilitan: las señales son registro de captura.",
+    t("Solo se eliminan fuentes agregadas a mano que aún no produjeron señales. Las del catálogo o con señales se deshabilitan: las señales son registro de captura."),
   fb_cobertura:
-    "Tecnologías que aparecen en fuentes de contraste pero no en el ciclo. Cada hueco debe justificarse o incorporarse.",
+    t("Tecnologías que aparecen en fuentes de contraste pero no en el ciclo. Cada hueco debe justificarse o incorporarse."),
   fb_cola:
-    "Trabajos de ingesta: uno por fuente. Pendiente = en espera; ejecutando = en curso; ok = terminó; parcial = trajo parte; error = falló (se reintenta hasta 3 veces con espera creciente).",
+    t("Trabajos de ingesta: uno por fuente. Pendiente = en espera; ejecutando = en curso; ok = terminó; parcial = trajo parte; error = falló (se reintenta hasta 3 veces con espera creciente)."),
   fb_vista_previa:
-    "Muestra qué información extraería el sistema de un enlace, sin guardar nada. Entra al listado y sigue hasta las fichas internas. Útil antes de registrar una fuente nueva.",
+    t("Muestra qué información extraería el sistema de un enlace, sin guardar nada. Entra al listado y sigue hasta las fichas internas. Útil antes de registrar una fuente nueva."),
   fb_programada:
-    "Vigilancia programada: cada cierto número de horas el sistema revisa qué fuentes vencieron según su frecuencia y las encola solo, sin que nadie oprima un botón.",
+    t("Vigilancia programada: cada cierto número de horas el sistema revisa qué fuentes vencieron según su frecuencia y las encola solo, sin que nadie oprima un botón."),
   fb_intervalo_vigilancia:
-    "Cada cuántas horas el sistema revisa qué fuentes vencieron. No cambia la frecuencia de cada fuente: una fuente mensual no se consulta cada 6 horas.",
+    t("Cada cuántas horas el sistema revisa qué fuentes vencieron. No cambia la frecuencia de cada fuente: una fuente mensual no se consulta cada 6 horas."),
   fb_barrido_duplicados:
-    "Barrido de duplicados programado: compara las tecnologías del ciclo activo y deja propuestas de fusión. Nunca fusiona solo; avisa en Alertas cuando hay propuestas nuevas.",
+    t("Barrido de duplicados programado: compara las tecnologías del ciclo activo y deja propuestas de fusión. Nunca fusiona solo; avisa en Alertas cuando hay propuestas nuevas."),
   fb_worker:
-    "Proceso en segundo plano que atiende la cola y las tareas programadas sin frenar la aplicación web.",
+    t("Proceso en segundo plano que atiende la cola y las tareas programadas sin frenar la aplicación web."),
   fb_registro_ejecucion:
-    "Historial de cada ejecución programada o manual: cuándo empezó, cuánto encoló, cuántas señales nuevas trajo y si hubo errores.",
+    t("Historial de cada ejecución programada o manual: cuándo empezó, cuánto encoló, cuántas señales nuevas trajo y si hubo errores."),
   fb_cribado:
-    "Puntaje automático de 0 a 100 que solo ordena la cola: indica que conviene revisar primero. No es la priorización oficial P1-P6.",
+    t("Puntaje automático de 0 a 100 que solo ordena la cola: indica que conviene revisar primero. No es la priorización oficial P1-P6."),
   fb_estado_senal:
-    "Estado de triage de la señal: nuevo (sin revisar), revisado, priorizado (vale la pena seguirla) o descartado (ruido o no pertinente).",
+    t("Estado de triage de la señal: nuevo (sin revisar), revisado, priorizado (vale la pena seguirla) o descartado (ruido o no pertinente)."),
   fb_eliminar_senal:
-    "Elimina una señal capturada por error mientras siga en la bandeja sin asignar. Si ya entró a un ciclo es parte del expediente: márquela como descartada.",
+    t("Elimina una señal capturada por error mientras siga en la bandeja sin asignar. Si ya entró a un ciclo es parte del expediente: márquela como descartada."),
   fb_enriquecer:
-    "La IA reescribe el resumen y sugiere tipo, horizonte, fase y área terapéutica. Revise el resultado: es un borrador.",
+    t("La IA reescribe el resumen y sugiere tipo, horizonte, fase y área terapéutica. Revise el resultado: es un borrador."),
   fb_ia_apagada:
-    "La IA no está configurada. Un superadministrador puede activarla en Configuración > Integración con IA.",
+    t("La IA no está configurada. Un superadministrador puede activarla en Configuración > Integración con IA."),
   fb_generar_informe:
-    "Genera una recomendación de adopción para Colombia a partir de la señal. Sin IA configurada se crea una versión preliminar para completar a mano.",
+    t("Genera una recomendación de adopción para Colombia a partir de la señal. Sin IA configurada se crea una versión preliminar para completar a mano."),
   fb_nota_vinculo:
-    "Elemento al que pertenece la nota: una señal, una fuente, un informe o ninguno (nota general del equipo).",
+    t("Elemento al que pertenece la nota: una señal, una fuente, un informe o ninguno (nota general del equipo)."),
   fb_nota_fijar:
-    "Una nota fijada aparece primero en las listas. Cualquier perfil que escribe notas puede fijarla o soltarla.",
+    t("Una nota fijada aparece primero en las listas. Cualquier perfil que escribe notas puede fijarla o soltarla."),
   fb_nota_autor:
-    "Solo el autor o un superadministrador puede editar o eliminar una nota.",
+    t("Solo el autor o un superadministrador puede editar o eliminar una nota."),
   fb_impacto:
-    "Impacto esperado de adoptar la tecnología en Colombia (clínico, presupuestal y de equidad): alto, medio o bajo.",
+    t("Impacto esperado de adoptar la tecnología en Colombia (clínico, presupuestal y de equidad): alto, medio o bajo."),
   fb_origen_informe:
-    "Cómo se produjo el texto: el modelo de IA usado, 'fallback (sin IA)' para la versión preliminar o 'manual'. 'editado' indica que una persona lo corrigió.",
+    t("Cómo se produjo el texto: el modelo de IA usado, 'fallback (sin IA)' para la versión preliminar o 'manual'. 'editado' indica que una persona lo corrigió."),
   fb_paquete:
-    "Descarga un ZIP del ciclo con el Listado Único, los informes de evaluación aprobados o publicados, las recomendaciones, sus notas y el boletín publicado. Nunca incluye documentos confidenciales.",
+    t("Descarga un ZIP del ciclo con el Listado Único, los informes de evaluación aprobados o publicados, las recomendaciones, sus notas y el boletín publicado. Nunca incluye documentos confidenciales."),
   fb_estado_postulacion:
-    "Recibida: espera moderación. Aceptada: ya está en la bandeja de entrada como señal reactiva. Rechazada: no entra, con el motivo registrado.",
+    t("Recibida: espera moderación. Aceptada: ya está en la bandeja de entrada como señal reactiva. Rechazada: no entra, con el motivo registrado."),
   fb_recaptcha:
-    "Verificación anti-robot de Google (reCAPTCHA v3). Es invisible para la persona. Sin llaves configuradas el formulario opera en modo degradado con tope por IP.",
+    t("Verificación anti-robot de Google (reCAPTCHA v3). Es invisible para la persona. Sin llaves configuradas el formulario opera en modo degradado con tope por IP."),
   fb_moderar:
-    "Aceptar crea la tecnología en la bandeja de entrada marcada como reactiva, con la declaración de conflicto de interés adjunta. Rechazar exige un motivo.",
+    t("Aceptar crea la tecnología en la bandeja de entrada marcada como reactiva, con la declaración de conflicto de interés adjunta. Rechazar exige un motivo."),
   fb_chat:
-    "El asistente responde con lo que hay en el sistema (señales y fuentes) y cita de dónde lo sacó. Sin IA muestra el contexto encontrado en lugar de redactar.",
+    t("El asistente responde con lo que hay en el sistema (señales y fuentes) y cita de dónde lo sacó. Sin IA muestra el contexto encontrado en lugar de redactar."),
   fb_llave_openfda:
-    "Llave gratuita de api.data.gov. Sube el cupo de openFDA de 1.000 a 120.000 consultas por día.",
+    t("Llave gratuita de api.data.gov. Sube el cupo de openFDA de 1.000 a 120.000 consultas por día."),
   fb_llave_ncbi:
-    "Llave gratuita de NCBI. Permite 10 consultas por segundo a PubMed en lugar de 3.",
+    t("Llave gratuita de NCBI. Permite 10 consultas por segundo a PubMed en lugar de 3."),
   fb_correo_ncbi:
-    "NCBI pide un correo de contacto en cada consulta. Use el buzón institucional del equipo.",
+    t("NCBI pide un correo de contacto en cada consulta. Use el buzón institucional del equipo."),
   fb_cluster_codigo:
-    "Identificador corto y estable (minúsculas, números y guion bajo). No se puede cambiar después: las tecnologías quedan ligadas a el.",
+    t("Identificador corto y estable (minúsculas, números y guion bajo). No se puede cambiar después: las tecnologías quedan ligadas a el."),
   fb_palabras_clave:
-    "Palabras separadas por coma que el clasificador busca en la indicación para sugerir este clúster o tipología.",
+    t("Palabras separadas por coma que el clasificador busca en la indicación para sugerir este clúster o tipología."),
   fb_param:
-    "Parámetro metodológico: se aplica de inmediato a los ciclos abiertos; los ciclos cerrados conservan el resultado que obtuvieron. Cada cambio queda en la bitácora.",
+    t("Parámetro metodológico: se aplica de inmediato a los ciclos abiertos; los ciclos cerrados conservan el resultado que obtuvieron. Cada cambio queda en la bitácora."),
   fb_audit_entidad:
-    "Tipo de registro que cambió (fuente, señal, ciclo, calificación...). Use 'Vida' para ver toda la historia de ese registro.",
+    t("Tipo de registro que cambió (fuente, señal, ciclo, calificación...). Use 'Vida' para ver toda la historia de ese registro."),
   fb_audit_accion:
-    "create = alta, update = cambio, delete = baja. Las demás son eventos de negocio (cierre de ciclo, asignación por lotes, ingesta, etc.).",
+    t("create = alta, update = cambio, delete = baja. Las demás son eventos de negocio (cierre de ciclo, asignación por lotes, ingesta, etc.)."),
   fb_audit_ip:
-    "Dirección desde la que se hizo la petición. Si está vacía, la acción la hizo un proceso interno.",
+    t("Dirección desde la que se hizo la petición. Si está vacía, la acción la hizo un proceso interno."),
   fb_audit_vida:
-    "Reconstruye en orden cronológico todo lo que le pasó a este registro, desde su creación.",
+    t("Reconstruye en orden cronológico todo lo que le pasó a este registro, desde su creación."),
 };

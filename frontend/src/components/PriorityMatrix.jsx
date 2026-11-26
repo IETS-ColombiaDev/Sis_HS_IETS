@@ -8,6 +8,7 @@ import { LoadingBlock } from "./Spinner";
 import { TECH_STATUS_LABELS } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
 import InfoTip from "./InfoTip";
+import { t, ts, intlLocale } from "../i18n";
 
 /**
  * Matriz oficial de priorizacion P1 a P6.
@@ -30,17 +31,17 @@ export function PriorityGauge({ state }) {
           <>
             <strong className="term-label">
               {pct}%
-              <InfoTip text={GLOSSARY.pct_p} label="Qué es el porcentaje P" />
+              <InfoTip text={GLOSSARY.pct_p} label={t("Qué es el porcentaje P")} />
             </strong>
             <span>
-              {state.points} de {state.total_criteria} criterios
+              {t("{puntos} de {total} criterios", { puntos: state.points, total: state.total_criteria })}
             </span>
           </>
         ) : (
           <>
             <strong className="pm-gauge-pending">-</strong>
             <span>
-              {state.rated} de {state.total_criteria} calificados
+              {t("{n} de {total} calificados", { n: state.rated, total: state.total_criteria })}
             </span>
           </>
         )}
@@ -56,7 +57,9 @@ export function PriorityGauge({ state }) {
         <Badge tone={classification}>{TECH_STATUS_LABELS[classification]}</Badge>
       ) : (
         <span className="pm-gauge-hint">
-          Faltan {state.missing.join(", ")}. El índice %P no se calcula con criterios pendientes.
+          {t("Faltan {lista}. El índice %P no se calcula con criterios pendientes.", {
+            lista: state.missing.join(", "),
+          })}
         </span>
       )}
     </div>
@@ -64,8 +67,8 @@ export function PriorityGauge({ state }) {
 }
 
 const ROLE_SCOPE_LABEL = {
-  evaluador_tecnico: "evaluador técnico",
-  evaluador_clinico: "evaluador clínico",
+  evaluador_tecnico: t("evaluador técnico"),
+  evaluador_clinico: t("evaluador clínico"),
 };
 
 function CriterionRow({ criterion, score, onRate, disabled, blockedReason, busy }) {
@@ -74,7 +77,8 @@ function CriterionRow({ criterion, score, onRate, disabled, blockedReason, busy 
   const value = score?.value;
   const canRate = score?.can_rate && !disabled;
   const roleLabel = ROLE_SCOPE_LABEL[criterion.role_scope] || (criterion.role_scope || "").replace(/_/g, " ");
-  const lockedWhy = blockedReason || `${GLOSSARY.fa_criterio_bloqueado} Lo califica el ${roleLabel}.`;
+  const lockedWhy =
+    ts(blockedReason) || `${GLOSSARY.fa_criterio_bloqueado} ${t("Lo califica el {rol}.", { rol: roleLabel })}`;
 
   useEffect(() => {
     setJustification(score?.justification || "");
@@ -86,34 +90,39 @@ function CriterionRow({ criterion, score, onRate, disabled, blockedReason, busy 
         <div className="pm-row-head">
           <span className="pm-code term-label">
             {criterion.code}
-            <InfoTip text={criterion.prompt || GLOSSARY.p16} label={`Qué es ${criterion.code}`} />
+            <InfoTip
+              text={ts(criterion.prompt) || GLOSSARY.p16}
+              label={t("Qué es {codigo}", { codigo: criterion.code })}
+            />
           </span>
-          <span className="pm-short">{criterion.short_label}</span>
+          <span className="pm-short">{ts(criterion.short_label)}</span>
           {value != null && (
             <Badge tone={value === 1 ? "priorizada" : "no_priorizada"}>
-              {value === 1 ? "Sí" : "No"}
+              {value === 1 ? t("Sí") : t("No")}
             </Badge>
           )}
           {!canRate && value == null && (
             <span className="pm-locked" title={lockedWhy}>
-              <Icon name="cog" size={13} /> Califica {roleLabel}
+              <Icon name="cog" size={13} /> {t("Califica {rol}", { rol: roleLabel })}
             </span>
           )}
         </div>
-        <p className="pm-prompt">{criterion.prompt}</p>
+        <p className="pm-prompt">{ts(criterion.prompt)}</p>
 
         {score?.auto_suggested != null && value == null && (
           <div className="pm-suggestion">
-            <strong>Sugerencia automática: {score.auto_suggested === 1 ? "Sí" : "No"}</strong>
-            <span>{score.auto_reason}</span>
-            <em>Requiere confirmación del evaluador.</em>
+            <strong>
+              {score.auto_suggested === 1 ? t("Sugerencia automática: Sí") : t("Sugerencia automática: No")}
+            </strong>
+            <span>{ts(score.auto_reason)}</span>
+            <em>{t("Requiere confirmación del evaluador.")}</em>
           </div>
         )}
 
         {score?.rated_by_email && (
           <div className="pm-signature">
-            Calificado por {score.rated_by_email}
-            {score.rated_at ? ` · ${new Date(score.rated_at).toLocaleString()}` : ""}
+            {t("Calificado por {quien}", { quien: score.rated_by_email })}
+            {score.rated_at ? ` · ${new Date(score.rated_at).toLocaleString(intlLocale())}` : ""}
             {score.justification ? ` · "${score.justification}"` : ""}
           </div>
         )}
@@ -122,8 +131,8 @@ function CriterionRow({ criterion, score, onRate, disabled, blockedReason, busy 
           <textarea
             className="pm-justification"
             rows={2}
-            aria-label={`Justificación de ${criterion.code}`}
-            placeholder="Justificación (opcional pero recomendada para auditoría)"
+            aria-label={t("Justificación de {codigo}", { codigo: criterion.code })}
+            placeholder={t("Justificación (opcional pero recomendada para auditoría)")}
             value={justification}
             onChange={(e) => setJustification(e.target.value)}
           />
@@ -138,34 +147,34 @@ function CriterionRow({ criterion, score, onRate, disabled, blockedReason, busy 
               className={`pm-btn pm-btn-yes ${value === 1 ? "pm-btn-active" : ""}`}
               onClick={() => onRate(criterion.code, 1, justification)}
               disabled={busy}
-              title={`Responder Sí a ${criterion.code}: suma 1 punto.`}
-              aria-label={`${criterion.code} Sí`}
+              title={t("Responder Sí a {codigo}: suma 1 punto.", { codigo: criterion.code })}
+              aria-label={`${criterion.code} ${t("Sí")}`}
             >
-              Sí
+              {t("Sí")}
             </button>
             <button
               type="button"
               className={`pm-btn pm-btn-no ${value === 0 ? "pm-btn-active" : ""}`}
               onClick={() => onRate(criterion.code, 0, justification)}
               disabled={busy}
-              title={`Responder No a ${criterion.code}: no suma puntos.`}
-              aria-label={`${criterion.code} No`}
+              title={t("Responder No a {codigo}: no suma puntos.", { codigo: criterion.code })}
+              aria-label={`${criterion.code} ${t("No")}`}
             >
-              No
+              {t("No")}
             </button>
             <button
               type="button"
               className="pm-btn pm-btn-note"
               onClick={() => setOpen((v) => !v)}
               title={GLOSSARY.fa_justificacion_criterio}
-              aria-label={`Agregar justificación a ${criterion.code}`}
+              aria-label={t("Agregar justificación a {codigo}", { codigo: criterion.code })}
             >
               <Icon name="note" size={14} />
             </button>
           </>
         ) : (
           <span className="pm-readonly" title={lockedWhy}>
-            {value == null ? "Pendiente" : "Registrado"}
+            {value == null ? t("Pendiente") : t("Registrado")}
           </span>
         )}
       </div>
@@ -185,7 +194,7 @@ export default function PriorityMatrix({ cycleId, technologyId, onChange }) {
       const { data } = await api.get(`/priority/${cycleId}/${technologyId}`);
       setState(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar la matriz de priorización"));
+      toast.error(apiError(e, t("No se pudo cargar la matriz de priorización")));
     } finally {
       setLoading(false);
     }
@@ -208,22 +217,26 @@ export default function PriorityMatrix({ cycleId, technologyId, onChange }) {
       setState(data);
       if (data.complete) {
         toast.success(
-          `${criterion} registrado. %P = ${data.priority_pct}% → ${
-            TECH_STATUS_LABELS[data.classification]
-          }.`
+          t("{criterio} registrado. %P = {pct}% → {estado}.", {
+            criterio: criterion,
+            pct: data.priority_pct,
+            estado: TECH_STATUS_LABELS[data.classification],
+          })
         );
       } else {
-        toast.success(`${criterion} registrado. Faltan ${data.missing.join(", ")}.`);
+        toast.success(
+          t("{criterio} registrado. Faltan {lista}.", { criterio: criterion, lista: data.missing.join(", ") })
+        );
       }
       onChange?.(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo registrar la calificación"));
+      toast.error(apiError(e, t("No se pudo registrar la calificación")));
     } finally {
       setBusy(false);
     }
   };
 
-  if (loading) return <LoadingBlock label="Cargando matriz P1 a P6..." />;
+  if (loading) return <LoadingBlock label={t("Cargando matriz P1 a P6...")} />;
   if (!state) return null;
 
   const scoreFor = (code) => state.scores.find((s) => s.criterion === code);
@@ -233,13 +246,16 @@ export default function PriorityMatrix({ cycleId, technologyId, onChange }) {
       <div className="pm-header">
         <div>
           <h3 className="pm-title term-label">
-            Matriz oficial de priorización
-            <InfoTip text={GLOSSARY.p16} label="Qué es la matriz P1 a P6" />
+            {t("Matriz oficial de priorización")}
+            <InfoTip text={GLOSSARY.p16} label={t("Qué es la matriz P1 a P6")} />
           </h3>
           <p className="pm-formula">
-            %P = (suma de P1 a P6 / {state.total_criteria}) × 100 · Priorizada con{" "}
-            {state.threshold_points} puntos o más · Bajo vigilancia con {state.watch_points}{" "}
-            <InfoTip text={GLOSSARY.fa_franjas} label="Cómo se clasifican las franjas" />
+            {t("%P = (suma de P1 a P6 / {total}) × 100 · Priorizada con {umbral} puntos o más · Bajo vigilancia con {vigilancia}", {
+              total: state.total_criteria,
+              umbral: state.threshold_points,
+              vigilancia: state.watch_points,
+            })}{" "}
+            <InfoTip text={GLOSSARY.fa_franjas} label={t("Cómo se clasifican las franjas")} />
           </p>
         </div>
         <PriorityGauge state={state} />
@@ -248,13 +264,12 @@ export default function PriorityMatrix({ cycleId, technologyId, onChange }) {
       {state.frozen ? (
         <div className="pm-frozen">
           <Icon name="cog" size={15} />
-          Ciclo cerrado: los puntajes están congelados. Una reevaluación debe hacerse en un ciclo
-          posterior y generará un registro nuevo.
+          {t("Ciclo cerrado: los puntajes están congelados. Una reevaluación debe hacerse en un ciclo posterior y generará un registro nuevo.")}
         </div>
       ) : state.rate_blocked_reason ? (
         <div className="pm-frozen" data-testid="pm-blocked">
           <Icon name="alert" size={15} />
-          {state.rate_blocked_reason}
+          {ts(state.rate_blocked_reason)}
         </div>
       ) : null}
 

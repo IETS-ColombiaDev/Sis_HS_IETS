@@ -1,3 +1,5 @@
+import { t } from "../i18n";
+
 /**
  * Devuelve la etiqueta a mostrar para fuentes/hallazgos relacionados con el IETS,
  * o null si la categoria no corresponde a un producto o participacion del IETS.
@@ -5,10 +7,10 @@
 export function ietsTag(category = "") {
   const c = (category || "").toLowerCase();
   if (c.includes("producto directo iets")) {
-    return { label: "Producto IETS", tone: "priorizado" };
+    return { label: t("Producto IETS"), tone: "priorizado" };
   }
   if (c.includes("participacion iets") || c.includes("participación iets")) {
-    return { label: "IETS regional", tone: "editor" };
+    return { label: t("IETS regional"), tone: "editor" };
   }
   if (c.includes("iets")) {
     return { label: "IETS", tone: "priorizado" };

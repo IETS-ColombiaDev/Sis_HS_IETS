@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Label } from "./Field";
+import { t } from "../i18n";
 
 /**
  * Campo de contrasena con boton de mostrar/ocultar y aviso de mayusculas
@@ -62,9 +63,9 @@ export default function PasswordField({
         <button
           type="button"
           onClick={() => setVisible((v) => !v)}
-          aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+          aria-label={visible ? t("Ocultar contraseña") : t("Mostrar contraseña")}
           aria-pressed={visible}
-          title={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+          title={visible ? t("Ocultar contraseña") : t("Mostrar contraseña")}
           style={{
             position: "absolute",
             right: 6,
@@ -80,12 +81,12 @@ export default function PasswordField({
             cursor: "pointer",
           }}
         >
-          {visible ? "Ocultar" : "Mostrar"}
+          {visible ? t("Ocultar") : t("Mostrar")}
         </button>
       </div>
       {caps && (
         <div role="status" style={{ color: "#92400E", fontSize: 12, marginTop: 4 }}>
-          Bloq Mayús está activado.
+          {t("Bloq Mayús está activado.")}
         </div>
       )}
       {error && <div style={{ color: "#EF4444", fontSize: 12, marginTop: 4 }}>{error}</div>}

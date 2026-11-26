@@ -1,5 +1,7 @@
 import { Link, NavLink } from "react-router-dom";
 import Icon from "./Icon";
+import LanguageSwitch from "./LanguageSwitch";
+import { t } from "../i18n";
 
 /**
  * Marco institucional de las pantallas publicas.
@@ -14,17 +16,18 @@ export default function PublicShell({ kicker, title, lead, children, wide }) {
             <Icon name="radar" size={20} />
           </span>
           <span>
-            <strong>Escaneo de Horizonte</strong>
+            <strong>{t("Escaneo de Horizonte")}</strong>
             <em>IETS Colombia</em>
           </span>
         </Link>
         <nav className="public-shell-nav">
-          <NavLink to="/expedientes">Expedientes</NavLink>
-          <NavLink to="/transparencia">Transparencia</NavLink>
-          <NavLink to="/postular">Postular tecnología</NavLink>
+          <NavLink to="/expedientes">{t("Expedientes")}</NavLink>
+          <NavLink to="/transparencia">{t("Transparencia")}</NavLink>
+          <NavLink to="/postular">{t("Postular tecnología")}</NavLink>
           <NavLink to="/login" className="public-shell-access">
-            Acceso institucional
+            {t("Acceso institucional")}
           </NavLink>
+          <LanguageSwitch />
         </nav>
       </header>
 
@@ -36,8 +39,7 @@ export default function PublicShell({ kicker, title, lead, children, wide }) {
       </main>
 
       <footer className="public-shell-foot">
-        Instituto de Evaluación Tecnológica en Salud. Las fichas públicas no incluyen
-        modelaciones presupuestales ni información confidencial.
+        {t("Instituto de Evaluación Tecnológica en Salud. Las fichas públicas no incluyen modelaciones presupuestales ni información confidencial.")}
       </footer>
     </div>
   );

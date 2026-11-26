@@ -8,6 +8,8 @@ import { CYCLE_STATUS_LABELS, ROLE_LABELS } from "../constants/methodology";
 import { apiError } from "../api/client";
 import { GLOSSARY } from "../constants/glossary";
 import { NAV, TITLES, fold, sectionFor } from "../constants/navigation";
+import { t, tr, ts, intlLocale } from "../i18n";
+import LanguageSwitch from "./LanguageSwitch";
 import Icon from "./Icon";
 import Tooltip from "./Tooltip";
 import InfoTip from "./InfoTip";
@@ -55,13 +57,13 @@ function Sidebar({ open, onClose }) {
   return (
     <>
       {open && <div onClick={onClose} className="sidebar-overlay" />}
-      <aside className={`sidebar sb ${open ? "sidebar-open" : ""}`} aria-label="Menú de módulos">
+      <aside className={`sidebar sb ${open ? "sidebar-open" : ""}`} aria-label={t("Menú de módulos")}>
         <div className="sb-brand">
           <div className="sb-logo">
             <Icon name="radar" size={22} strokeWidth={2} />
           </div>
           <div>
-            <div className="sb-name">Escaneo de Horizonte</div>
+            <div className="sb-name">{t("Escaneo de Horizonte")}</div>
             <div className="sb-org">IETS Colombia</div>
           </div>
         </div>
@@ -72,8 +74,8 @@ function Sidebar({ open, onClose }) {
             type="search"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Buscar módulo…"
-            aria-label="Buscar módulo en el menú"
+            placeholder={t("Buscar módulo…")}
+            aria-label={t("Buscar módulo en el menú")}
           />
         </div>
 
@@ -99,24 +101,24 @@ function Sidebar({ open, onClose }) {
                   {badges[item.to] > 0 && (
                     <span
                       className="mr-count"
-                      title={`${badges[item.to]} fuente(s) de consulta manual (tipo E) por validar`}
-                      aria-label={`${badges[item.to]} fuentes tipo E por validar`}
+                      title={t("{n} fuente(s) de consulta manual (tipo E) por validar", { n: badges[item.to] })}
+                      aria-label={t("{n} fuentes tipo E por validar", { n: badges[item.to] })}
                       data-testid="nav-manual-review-count"
                     >
                       {badges[item.to]}
                     </span>
                   )}
                 </NavLink>
-                {item.help && <InfoTip text={item.help} position="right" label={`Qué es ${item.label}`} />}
+                {item.help && <InfoTip text={item.help} position="right" label={t("Qué es {name}", { name: item.label })} />}
               </div>
             )
           )}
-          {items.length === 0 && <div className="sb-empty">Ningún módulo coincide con «{filter}».</div>}
+          {items.length === 0 && <div className="sb-empty">{t("Ningún módulo coincide con «{filter}».", { filter })}</div>}
         </nav>
         <div className="sb-foot">
           <Icon name="compass" size={14} />
           <span>
-            ¿No encuentra algo? Pulse <kbd>Ctrl</kbd>+<kbd>K</kbd> o «¿Cómo llego a…?».
+            {tr("¿No encuentra algo? Pulse <k>Ctrl</k>+<k>K</k> o «¿Cómo llego a…?».", null, { k: (c) => <kbd>{c}</kbd> })}
           </span>
         </div>
       </aside>
@@ -129,10 +131,16 @@ function GeminiPill({ status, isAdmin }) {
   const enabled = aiEnabled(status);
   const label = aiLabel(status);
   const tip = enabled
-    ? `Inteligencia artificial activa (${label}).${status?.ai_ocr_enabled ? " OCR de sitios habilitado." : ""}${isAdmin ? " Clic para gestionar." : ""}`
+    ? [
+        t("Inteligencia artificial activa ({label}).", { label }),
+        status?.ai_ocr_enabled ? t("OCR de sitios habilitado.") : "",
+        isAdmin ? t("Clic para gestionar.") : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
     : isAdmin
-    ? "La IA no tiene token. Clic para configurar MiniMax."
-    : "La IA no está configurada. Solicite a un administrador la llave de MiniMax.";
+    ? t("La IA no tiene token. Clic para configurar MiniMax.")
+    : t("La IA no está configurada. Solicite a un administrador la llave de MiniMax.");
   return (
     <Tooltip text={tip}>
       <button
@@ -149,7 +157,7 @@ function GeminiPill({ status, isAdmin }) {
 }
 
 function cycleStatusLabel(cycle) {
-  return cycle?.status_label || CYCLE_STATUS_LABELS[cycle?.status] || cycle?.status || "";
+  return ts(cycle?.status_label) || CYCLE_STATUS_LABELS[cycle?.status] || cycle?.status || "";
 }
 
 /** Selector del ciclo operativo: lista visual con estado, fechas e historicos. */
@@ -177,10 +185,10 @@ function CycleSelector() {
 
   if (cycles.length === 0) {
     return (
-      <Tooltip text="Aún no hay ciclos operativos. La priorización requiere uno.">
+      <Tooltip text={t("Aún no hay ciclos operativos. La priorización requiere uno.")}>
         <button className="cycle-pill cycle-pill-empty" onClick={() => navigate("/ciclos")}>
           <Icon name="calendar" size={15} />
-          Crear ciclo de trabajo
+          {t("Crear ciclo de trabajo")}
         </button>
       </Tooltip>
     );
@@ -191,18 +199,18 @@ function CycleSelector() {
 
   return (
     <div className="cycle-switcher" ref={boxRef}>
-      <InfoTip text={GLOSSARY.ciclo} position="bottom" label="Qué es un ciclo de escaneo" />
+      <InfoTip text={GLOSSARY.ciclo} position="bottom" label={t("Qué es un ciclo de escaneo")} />
       <button
         type="button"
         className="cycle-pill cycle-pill-button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="listbox"
-        aria-label="Seleccionar ciclo operativo"
+        aria-label={t("Seleccionar ciclo operativo")}
       >
         <Icon name="calendar" size={15} />
         <span className="cycle-pill-main">
-          <strong>{cycle?.code || "Ciclo"}</strong>
+          <strong>{cycle?.code || t("Ciclo")}</strong>
           <em>{cycleStatusLabel(cycle)}</em>
         </span>
         <span className={`cycle-pill-chevron${open ? " is-open" : ""}`}>▾</span>
@@ -210,14 +218,14 @@ function CycleSelector() {
       {open && (
         <div className="cycle-switcher-panel" role="listbox">
           <div className="cycle-switcher-head">
-            <span>Ciclo en pantalla</span>
+            <span>{t("Ciclo en pantalla")}</span>
             <button type="button" onClick={() => { setOpen(false); navigate("/ciclos"); }}>
-              Gestionar ciclos
+              {t("Gestionar ciclos")}
             </button>
           </div>
           {active.length > 0 && (
             <div className="cycle-switcher-group">
-              <div className="cycle-switcher-label">Abiertos</div>
+              <div className="cycle-switcher-label">{t("Abiertos")}</div>
               {active.map((c) => (
                 <CycleOption
                   key={c.id}
@@ -233,7 +241,7 @@ function CycleSelector() {
           )}
           {historic.length > 0 && (
             <div className="cycle-switcher-group">
-              <div className="cycle-switcher-label">Históricos / cerrados</div>
+              <div className="cycle-switcher-label">{t("Históricos / cerrados")}</div>
               {historic.map((c) => (
                 <CycleOption
                   key={c.id}
@@ -267,11 +275,16 @@ function CycleOption({ cycle, selected, onPick }) {
         <span className={`cycle-option-status tone-${cycle.status || "en_configuracion"}`}>
           {cycleStatusLabel(cycle)}
         </span>
-        {cycle.is_historic && <span className="cycle-option-hist">Histórico</span>}
+        {cycle.is_historic && <span className="cycle-option-hist">{t("Histórico")}</span>}
       </div>
       <div className="cycle-option-dates">
-        Apertura {cycle.opened_on || "-"} · Corte {cycle.data_cutoff_on || "-"}
-        {cycle.bulletin_due_on ? ` · Boletín ${cycle.bulletin_due_on}` : ""}
+        {cycle.bulletin_due_on
+          ? t("Apertura {opened} · Corte {cutoff} · Boletín {bulletin}", {
+              opened: cycle.opened_on || "-",
+              cutoff: cycle.data_cutoff_on || "-",
+              bulletin: cycle.bulletin_due_on,
+            })
+          : t("Apertura {opened} · Corte {cutoff}", { opened: cycle.opened_on || "-", cutoff: cycle.data_cutoff_on || "-" })}
       </div>
     </button>
   );
@@ -285,7 +298,7 @@ function BackupStatusPill() {
   const fbName = status?.firebase_db_name || backup?.firebase?.collection || "hs_iets_db";
   if (fbOn) {
     return (
-      <Tooltip text={fbOk ? `Base Firestore ${fbName} publicada. Sobrevive al disco de Render.` : "El espacio Firestore de Horizonte está activo; la primera publicación ocurre al guardar."}>
+      <Tooltip text={fbOk ? t("Base Firestore {name} publicada. Sobrevive al disco de Render.", { name: fbName }) : t("El espacio Firestore de Horizonte está activo; la primera publicación ocurre al guardar.")}>
         <NavLink
           to="/configuracion?tab=copia_local"
           className="header-status"
@@ -302,16 +315,18 @@ function BackupStatusPill() {
   const saving = backup.status === "saving";
   const err = backup.status === "error";
   const has = Boolean(backup.current?.takenAt);
-  const label = restoring ? "Restaurando…" : saving ? "Guardando…" : err ? "Copia con error" : has ? "Guardado aquí" : "Sin copia local";
+  const label = restoring ? t("Restaurando…") : saving ? t("Guardando…") : err ? t("Copia con error") : has ? t("Guardado aquí") : t("Sin copia local");
   const tip = restoring
-    ? "Se está devolviendo al servidor la copia guardada en este navegador."
+    ? t("Se está devolviendo al servidor la copia guardada en este navegador.")
     : saving
-      ? "Se está actualizando la copia de la base en este navegador."
+      ? t("Se está actualizando la copia de la base en este navegador.")
       : err
-        ? backup.message || "No se pudo guardar o restaurar la copia local."
+        ? backup.message || t("No se pudo guardar o restaurar la copia local.")
         : has
-          ? `Copia del ${new Date(backup.current.takenAt).toLocaleString("es-CO")}. Si Render borra el disco, se restaura sola al ingresar.`
-          : "Aún no hay copia en este navegador. Se guardará sola tras el primer cambio.";
+          ? t("Copia del {fecha}. Si Render borra el disco, se restaura sola al ingresar.", {
+              fecha: new Date(backup.current.takenAt).toLocaleString(intlLocale()),
+            })
+          : t("Aún no hay copia en este navegador. Se guardará sola tras el primer cambio.");
   return (
     <Tooltip text={tip}>
       <NavLink
@@ -333,13 +348,13 @@ function EnvironmentBanner() {
   const { status } = useAuth();
   const env = status?.environment;
   if (!env || env === "production") return null;
-  const label = env === "testing" ? "Entorno de pruebas" : "Entorno de desarrollo";
+  const label = env === "testing" ? t("Entorno de pruebas") : t("Entorno de desarrollo");
   return (
     <div className="env-banner" role="note">
       <strong>{label}.</strong>{" "}
       {status?.dev_login_enabled
-        ? "El acceso sin contraseña está habilitado; en producción se apaga solo."
-        : "Los datos pueden no ser los oficiales."}
+        ? t("El acceso sin contraseña está habilitado; en producción se apaga solo.")
+        : t("Los datos pueden no ser los oficiales.")}
     </div>
   );
 }
@@ -362,12 +377,12 @@ function useActAs(onDone) {
       const data = await actAs(role);
       toast.success(
         data?.acting_as
-          ? `Viendo el sistema como ${data.role_label}. Sus permisos reales no cambiaron.`
-          : `Volvió a su perfil: ${data?.role_label || ROLE_LABELS.superadmin}.`
+          ? t("Viendo el sistema como {role}. Sus permisos reales no cambiaron.", { role: ts(data.role_label) })
+          : t("Volvió a su perfil: {role}.", { role: ts(data?.role_label) || ROLE_LABELS.superadmin })
       );
       onDone?.();
     } catch (err) {
-      toast.error(apiError(err, "No se pudo cambiar de perfil."));
+      toast.error(apiError(err, t("No se pudo cambiar de perfil.")));
     } finally {
       setBusy(false);
     }
@@ -380,22 +395,22 @@ function ActingBanner() {
   const { user, actingAs } = useAuth();
   const [restore, busy] = useActAs();
   if (!actingAs) return null;
-  const realLabel = user?.real_role_label || ROLE_LABELS.superadmin;
+  const realLabel = ts(user?.real_role_label) || ROLE_LABELS.superadmin;
   return (
     <div className="acting-banner" role="status" aria-live="polite">
       <Icon name="eye" size={15} />
       <span className="acting-banner-text">
-        <strong>Viendo como: {user?.role_label}.</strong>{" "}
-        <span className="acting-banner-hint">Menús, pantallas y permisos son los de ese perfil.</span>
+        <strong>{t("Viendo como: {role}.", { role: ts(user?.role_label) })}</strong>{" "}
+        <span className="acting-banner-hint">{t("Menús, pantallas y permisos son los de ese perfil.")}</span>
       </span>
       <button
         type="button"
         className="acting-banner-btn"
         onClick={() => restore("superadmin")}
         disabled={busy}
-        aria-label={`Volver a mi perfil (${realLabel})`}
+        aria-label={t("Volver a mi perfil ({role})", { role: realLabel })}
       >
-        {busy ? "Volviendo…" : `Volver a ${realLabel}`}
+        {busy ? t("Volviendo…") : t("Volver a {role}", { role: realLabel })}
       </button>
     </div>
   );
@@ -447,13 +462,13 @@ function Header({ onToggle, onOpenGuide }) {
   const title = TITLES[location.pathname] || "IETS";
   const section = sectionFor(location.pathname);
   useEffect(() => {
-    document.title = `${title} | Escaneo de Horizonte IETS`;
+    document.title = t("{title} | Escaneo de Horizonte IETS", { title });
   }, [title]);
 
   return (
     <header className="app-header hdr">
       <div className="app-header-left hdr-left">
-        <button type="button" onClick={onToggle} aria-label="Abrir menú de módulos" className="hamburger">
+        <button type="button" onClick={onToggle} aria-label={t("Abrir menú de módulos")} className="hamburger">
           <Icon name="menu" size={18} />
         </button>
         <div className="hdr-crumb">
@@ -463,19 +478,26 @@ function Header({ onToggle, onOpenGuide }) {
       </div>
 
       <div className="app-header-right hdr-right">
-        <Tooltip text="Cómo funciona el sistema, pantalla por pantalla.">
-          <button type="button" className="header-guide-btn" aria-label="Abrir guía rápida" onClick={onOpenGuide}>
+        <Tooltip text={t("Cómo funciona el sistema, pantalla por pantalla.")}>
+          <button type="button" className="header-guide-btn" aria-label={t("Abrir guía rápida")} onClick={onOpenGuide}>
             <Icon name="compass" size={16} />
-            <span className="header-guide-label">Guía</span>
+            <span className="header-guide-label">{t("Guía")}</span>
           </button>
         </Tooltip>
         <CycleSelector />
+        <LanguageSwitch />
 
         <div className="hdr-status">
-          <Tooltip text={`Sincronización en tiempo real.${updatedAt ? ` Última: ${new Date(updatedAt).toLocaleTimeString()}.` : ""}`}>
-            <div className="header-status" title="En vivo">
+          <Tooltip
+            text={
+              updatedAt
+                ? t("Sincronización en tiempo real. Última: {hora}.", { hora: new Date(updatedAt).toLocaleTimeString(intlLocale()) })
+                : t("Sincronización en tiempo real.")
+            }
+          >
+            <div className="header-status" title={t("En vivo")}>
               <span className="header-status-dot" />
-              <span className="header-status-label">En vivo</span>
+              <span className="header-status-label">{t("En vivo")}</span>
             </div>
           </Tooltip>
           <BackupStatusPill />
@@ -491,8 +513,8 @@ function Header({ onToggle, onOpenGuide }) {
             aria-expanded={menuOpen}
             aria-label={
               actingAs
-                ? `Menú de ${user?.name || "usuario"}. Viendo como ${user?.role_label}`
-                : `Menú de ${user?.name || "usuario"}`
+                ? t("Menú de {name}. Viendo como {role}", { name: user?.name || t("usuario"), role: ts(user?.role_label) })
+                : t("Menú de {name}", { name: user?.name || t("usuario") })
             }
             className={`hdr-user-btn${actingAs ? " is-acting" : ""}`}
           >
@@ -500,7 +522,7 @@ function Header({ onToggle, onOpenGuide }) {
             <div className="user-meta">
               <div className="hdr-user-name">{user?.name}</div>
               <div className="hdr-user-role">
-                {actingAs ? `Viendo como: ${user?.role_label}` : user?.role_label || user?.role}
+                {actingAs ? t("Viendo como: {role}", { role: ts(user?.role_label) }) : ts(user?.role_label) || user?.role}
               </div>
             </div>
             <span className="hdr-caret">
@@ -513,7 +535,7 @@ function Header({ onToggle, onOpenGuide }) {
               <div
                 className="hdr-menu"
                 role="menu"
-                aria-label="Menú de usuario"
+                aria-label={t("Menú de usuario")}
                 ref={menuRef}
                 onKeyDown={onMenuKeyDown}
               >
@@ -521,16 +543,17 @@ function Header({ onToggle, onOpenGuide }) {
                   <div className="hdr-user-name">{user?.name}</div>
                   <div className="hdr-menu-mail">{user?.email}</div>
                   <div className="hdr-menu-role">
-                    {user?.role_label}
-                    {user?.rateable_criteria?.length ? ` · califica ${user.rateable_criteria.join(", ")}` : ""}
+                    {user?.rateable_criteria?.length
+                      ? t("{role} · califica {criteria}", { role: ts(user?.role_label), criteria: user.rateable_criteria.join(", ") })
+                      : ts(user?.role_label)}
                   </div>
-                  {actingAs && <div className="hdr-menu-real">Su perfil real: {user?.real_role_label}</div>}
+                  {actingAs && <div className="hdr-menu-real">{t("Su perfil real: {role}", { role: ts(user?.real_role_label) })}</div>}
                 </div>
                 {canSwitch && (
                   <div className="hdr-menu-group" role="group" aria-labelledby="hdr-actas-title">
                     <div className="hdr-menu-group-title" id="hdr-actas-title">
                       <Icon name="eye" size={14} />
-                      Ver como (cambiar de perfil)
+                      {t("Ver como (cambiar de perfil)")}
                     </div>
                     {ROLE_ORDER.map((code) => {
                       const checked = (user?.role || "superadmin") === code;
@@ -548,7 +571,7 @@ function Header({ onToggle, onOpenGuide }) {
                           <span className="hdr-role-mark" aria-hidden="true">
                             {checked ? <Icon name="check" size={14} /> : null}
                           </span>
-                          {code === "superadmin" && actingAs ? `Volver a mi perfil (${label})` : label}
+                          {code === "superadmin" && actingAs ? t("Volver a mi perfil ({role})", { role: label }) : label}
                         </button>
                       );
                     })}
@@ -564,7 +587,7 @@ function Header({ onToggle, onOpenGuide }) {
                   }}
                 >
                   <Icon name="compass" size={17} />
-                  Guía rápida
+                  {t("Guía rápida")}
                 </button>
                 <button
                   type="button"
@@ -576,23 +599,23 @@ function Header({ onToggle, onOpenGuide }) {
                   }}
                 >
                   <Icon name="shield" size={17} />
-                  Cambiar contraseña
+                  {t("Cambiar contraseña")}
                 </button>
                 <button type="button" role="menuitem" className="user-menu-item is-danger" onClick={() => logout()}>
                   <Icon name="logout" size={17} />
-                  Cerrar sesión
+                  {t("Cerrar sesión")}
                 </button>
               </div>
             </>
           )}
         </div>
       </div>
-      <Modal open={pwdOpen} onClose={() => setPwdOpen(false)} title="Cambiar contraseña" width={460}>
+      <Modal open={pwdOpen} onClose={() => setPwdOpen(false)} title={t("Cambiar contraseña")} width={460}>
         <ChangePasswordForm
           onCancel={() => setPwdOpen(false)}
           onDone={() => {
             setPwdOpen(false);
-            toast.success("Contraseña actualizada. Sus otras sesiones se cerraron.");
+            toast.success(t("Contraseña actualizada. Sus otras sesiones se cerraron."));
           }}
         />
       </Modal>
@@ -626,7 +649,7 @@ export default function Layout({ children }) {
 
   return (
     <div className="app-frame">
-      <a href="#contenido" className="skip-link">Saltar al contenido</a>
+      <a href="#contenido" className="skip-link">{t("Saltar al contenido")}</a>
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="content-shell">
         <EnvironmentBanner />

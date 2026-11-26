@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { t } from "../i18n";
 
 /** Avatar con fallback a iniciales si la imagen falla (evita errores de img rotas). */
 export default function SafeAvatar({ user, size = 36 }) {
@@ -14,7 +15,7 @@ export default function SafeAvatar({ user, size = 36 }) {
     return (
       <img
         src={user.picture}
-        alt={user.name || "Usuario"}
+        alt={user.name || t("Usuario")}
         width={size}
         height={size}
         onError={() => setBroken(true)}

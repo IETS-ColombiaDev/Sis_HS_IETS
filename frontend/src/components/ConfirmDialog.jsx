@@ -1,13 +1,14 @@
 import Modal from "./Modal";
 import Button from "./Button";
+import { t } from "../i18n";
 
 export default function ConfirmDialog({
   open,
   onClose,
   onConfirm,
-  title = "Confirmar acción",
+  title = t("Confirmar acción"),
   message,
-  confirmLabel = "Confirmar",
+  confirmLabel = t("Confirmar"),
   confirmVariant = "danger",
   loading = false,
 }) {
@@ -20,7 +21,7 @@ export default function ConfirmDialog({
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={loading}>
-            Cancelar
+            {t("Cancelar")}
           </Button>
           <Button variant={confirmVariant} onClick={onConfirm} loading={loading}>
             {confirmLabel}

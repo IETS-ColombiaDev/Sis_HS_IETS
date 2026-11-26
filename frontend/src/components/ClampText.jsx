@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import { t } from "../i18n";
 
 /**
  * Texto recortado a N lineas sin perder informacion.
@@ -67,7 +68,7 @@ export default function ClampText({
             setOpen((v) => !v);
           }}
         >
-          {open ? "Ver menos" : "Ver nombre completo"}
+          {open ? t("Ver menos") : t("Ver nombre completo")}
         </button>
       )}
     </>

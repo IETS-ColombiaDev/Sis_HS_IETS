@@ -8,6 +8,7 @@ import Button from "./Button";
 import Badge from "./Badge";
 import Icon from "./Icon";
 import RecoveryPoints from "./RecoveryPoints";
+import { t, tr, ts, intlLocale } from "../i18n";
 
 function fmtSize(bytes) {
   if (!bytes) return "0 KB";
@@ -16,21 +17,21 @@ function fmtSize(bytes) {
 }
 
 function fmtDate(value) {
-  return value ? new Date(value).toLocaleString("es-CO") : "Sin fecha";
+  return value ? new Date(value).toLocaleString(intlLocale()) : t("Sin fecha");
 }
 
 const STATUS = {
-  idle: { tone: "ok", label: "Al día" },
-  saving: { tone: "warning", label: "Guardando…" },
-  restoring: { tone: "warning", label: "Restaurando…" },
-  error: { tone: "error", label: "Con error" },
+  idle: { tone: "ok", label: t("Al día") },
+  saving: { tone: "warning", label: t("Guardando…") },
+  restoring: { tone: "warning", label: t("Restaurando…") },
+  error: { tone: "error", label: t("Con error") },
 };
 
 const PUSH_REASONS = {
-  shrink_guard: "Copia bloqueada: la base del servidor es mucho menor que la guardada en Firebase. No se sobrescribió.",
-  count_guard: "Copia bloqueada: la base del servidor tiene menos datos que la guardada en Firebase. No se sobrescribió.",
-  pull_pending: "Aún no se pudo leer Firebase; la copia queda en pausa y se reintenta sola.",
-  busy: "Hay otra copia en curso. Intente de nuevo en un momento.",
+  shrink_guard: t("Copia bloqueada: la base del servidor es mucho menor que la guardada en Firebase. No se sobrescribió."),
+  count_guard: t("Copia bloqueada: la base del servidor tiene menos datos que la guardada en Firebase. No se sobrescribió."),
+  pull_pending: t("Aún no se pudo leer Firebase; la copia queda en pausa y se reintenta sola."),
+  busy: t("Hay otra copia en curso. Intente de nuevo en un momento."),
 };
 
 export default function BackupPanel() {
@@ -47,7 +48,7 @@ export default function BackupPanel() {
       await fn();
       if (okMsg) toast.success(okMsg);
     } catch (e) {
-      toast.error(e?.message || "No se pudo completar la acción");
+      toast.error(ts(e?.message) || t("No se pudo completar la acción"));
     } finally {
       setWorking(false);
     }
@@ -59,65 +60,65 @@ export default function BackupPanel() {
       const { data } = await api.post("/backup/firebase/push");
       if (!data?.ok) {
         await backup.refreshFirebase?.();
-        throw new Error(PUSH_REASONS[data?.reason] || data?.reason || "Firestore no aceptó la copia");
+        throw new Error(PUSH_REASONS[data?.reason] || ts(data?.reason) || t("Firestore no aceptó la copia"));
       }
       await backup.refreshFirebase?.();
       await refreshStatus?.();
-    }, "Base publicada en Firebase.");
+    }, t("Base publicada en Firebase."));
 
   // Una guarda bloqueo la copia y el superadministrador decide que la base del
   // servidor es la correcta. La copia guardada queda como punto de recuperacion.
   const overrideFirebase = () => {
     const typed = window.prompt(
-      "La base del servidor tiene menos datos que la copia guardada en Firebase.\n" +
-        "Si publica de todos modos, la copia guardada queda como punto de recuperación y se puede restaurar.\n\n" +
-        "Para continuar escriba PUBLICAR:"
+      t("La base del servidor tiene menos datos que la copia guardada en Firebase.") + "\n" +
+        t("Si publica de todos modos, la copia guardada queda como punto de recuperación y se puede restaurar.") + "\n\n" +
+        t("Para continuar escriba PUBLICAR:")
     );
     if (typed == null) return;
     if (typed.trim().toUpperCase() !== "PUBLICAR") {
-      toast.warning("No se publicó: debía escribir PUBLICAR.");
+      toast.warning(t("No se publicó: debía escribir PUBLICAR."));
       return;
     }
     run(async () => {
       const { data } = await api.post("/backup/firebase/push", null, { params: { override: true }, timeout: 240000 });
       await backup.refreshFirebase?.();
-      if (!data?.ok) throw new Error(PUSH_REASONS[data?.reason] || data?.reason || "Firestore no aceptó la copia");
-    }, "Base publicada. La copia anterior quedó como punto de recuperación.");
+      if (!data?.ok) throw new Error(PUSH_REASONS[data?.reason] || ts(data?.reason) || t("Firestore no aceptó la copia"));
+    }, t("Base publicada. La copia anterior quedó como punto de recuperación."));
   };
 
   const pullFirebase = () => {
     const ok = window.confirm(
-      "Se reemplazará toda la base del servidor por la copia publicada en Firebase. " +
-        "Lo registrado aquí después de esa publicación se perderá. ¿Continuar?"
+      t("Se reemplazará toda la base del servidor por la copia publicada en Firebase. Lo registrado aquí después de esa publicación se perderá. ¿Continuar?")
     );
     if (!ok) return;
     run(async () => {
       const { data } = await api.post("/backup/firebase/pull");
-      if (!data?.ok) throw new Error(data?.reason || "No se pudo leer Firestore");
+      if (!data?.ok) throw new Error(ts(data?.reason) || t("No se pudo leer Firestore"));
       if (data.restored) {
         window.location.reload();
         return;
       }
       await backup.refreshFirebase?.();
-      toast.success(data.kept_local ? "El servidor ya tenía el trabajo más reciente." : "Firebase no tiene copia todavía.");
+      toast.success(data.kept_local ? t("El servidor ya tenía el trabajo más reciente.") : t("Firebase no tiene copia todavía."));
     });
   };
 
   const firebaseCard = (
     <Card data-testid="firebase-db-panel">
-      <SectionTitle>Base en Firebase</SectionTitle>
+      <SectionTitle>{t("Base en Firebase")}</SectionTitle>
       <p style={{ color: "#475569", fontSize: 13.5, lineHeight: 1.6, marginBottom: 12 }}>
-        Este proyecto tiene su propio espacio en Firestore: colección <strong>hs_iets_db</strong>,
-        aparte del directorio RRHH. SQLite solo es el motor local; al arrancar se restaura y
-        cada cambio se publica. El disco de Render puede borrarse sin perder el trabajo. Una base
-        con menos datos que la guardada nunca la sobrescribe.
+        {tr(
+          "Este proyecto tiene su propio espacio en Firestore: colección <b>hs_iets_db</b>, aparte del directorio RRHH. SQLite solo es el motor local; al arrancar se restaura y cada cambio se publica. El disco de Render puede borrarse sin perder el trabajo. Una base con menos datos que la guardada nunca la sobrescribe.",
+          null,
+          { b: (c) => <strong>{c}</strong> }
+        )}
       </p>
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
         <Badge tone={fb?.enabled ? (fb?.synced ? "ok" : fb?.error ? "error" : "warning") : "default"}>
-          {fb?.enabled ? (fb?.synced ? "Sincronizada" : fb?.error ? "Con error" : "Pendiente") : "Sin credencial"}
+          {fb?.enabled ? (fb?.synced ? t("Sincronizada") : fb?.error ? t("Con error") : t("Pendiente")) : t("Sin credencial")}
         </Badge>
         <span style={{ fontSize: 13.5 }}>
-          Última publicación: <strong>{fmtDate(fb?.taken_at)}</strong>
+          {tr("Última publicación: <b>{date}</b>", { date: fmtDate(fb?.taken_at) }, { b: (c) => <strong>{c}</strong> })}
         </span>
         <span style={{ fontSize: 13.5, color: "#64748B" }}>
           {fb?.collection || "hs_iets_db"}
@@ -128,27 +129,30 @@ export default function BackupPanel() {
       </div>
       {fb?.error ? (
         <div role="alert" className="login-notice login-notice-error" style={{ marginBottom: 12 }}>
-          {fb.error}
+          {ts(fb.error)}
         </div>
       ) : null}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <Button onClick={pushFirebase} loading={working} disabled={working || !fb?.configured}>
-          <Icon name="save" size={16} /> Publicar ahora en Firebase
+          <Icon name="save" size={16} /> {t("Publicar ahora en Firebase")}
         </Button>
         <Button variant="outline" onClick={pullFirebase} disabled={working || !fb?.configured}>
-          <Icon name="refresh" size={16} /> Restaurar desde Firebase
+          <Icon name="refresh" size={16} /> {t("Restaurar desde Firebase")}
         </Button>
         {fb?.blocked_shrink ? (
           <Button variant="outline" onClick={overrideFirebase} disabled={working} data-testid="firebase-override">
-            Publicar de todos modos
+            {t("Publicar de todos modos")}
           </Button>
         ) : null}
       </div>
       {fb?.enabled ? <RecoveryPoints disabled={working} /> : null}
       {!fb?.configured ? (
         <p style={{ fontSize: 13, color: "#92400E", marginTop: 10 }}>
-          Defina <code>FIREBASE_SERVICE_ACCOUNT_KEY</code> en el servidor. La copia vive en la colección
-          exclusiva <code>hs_iets_db</code>, aparte de la colección de usuarios del directorio RRHH.
+          {tr(
+            "Defina <c>FIREBASE_SERVICE_ACCOUNT_KEY</c> en el servidor. La copia vive en la colección exclusiva <c>hs_iets_db</c>, aparte de la colección de usuarios del directorio RRHH.",
+            null,
+            { c: (c) => <code>{c}</code> }
+          )}
         </p>
       ) : null}
     </Card>
@@ -159,9 +163,9 @@ export default function BackupPanel() {
       <>
         {firebaseCard}
         <Card>
-          <SectionTitle>Copia en este navegador</SectionTitle>
+          <SectionTitle>{t("Copia en este navegador")}</SectionTitle>
           <p style={{ color: "#64748B", fontSize: 13.5 }}>
-            El servidor usa una base PostgreSQL persistente: no hace falta guardar copia en el navegador.
+            {t("El servidor usa una base PostgreSQL persistente: no hace falta guardar copia en el navegador.")}
           </p>
         </Card>
       </>
@@ -171,8 +175,7 @@ export default function BackupPanel() {
   const st = STATUS[backup.status] || STATUS.idle;
   const confirmRestore = (key, takenAt) => {
     const ok = window.confirm(
-      `Se reemplazará toda la base del servidor por la copia del ${fmtDate(takenAt)}. ` +
-        "Lo registrado en el servidor después de esa fecha se perderá. ¿Continuar?"
+      t("Se reemplazará toda la base del servidor por la copia del {date}. Lo registrado en el servidor después de esa fecha se perderá. ¿Continuar?", { date: fmtDate(takenAt) })
     );
     if (ok) run(() => backup.restoreFrom(key));
   };
@@ -181,19 +184,18 @@ export default function BackupPanel() {
     <>
     {firebaseCard}
     <Card data-testid="browser-backup-panel">
-      <SectionTitle>Copia de respaldo en este navegador</SectionTitle>
+      <SectionTitle>{t("Copia de respaldo en este navegador")}</SectionTitle>
       <p style={{ color: "#475569", fontSize: 13.5, lineHeight: 1.6, marginBottom: 12 }}>
-        Copia extra en este navegador. La fuente de verdad es Firebase; esto sirve si hay que
-        recuperar un momento anterior sin tocar Firestore.
+        {t("Copia extra en este navegador. La fuente de verdad es Firebase; esto sirve si hay que recuperar un momento anterior sin tocar Firestore.")}
       </p>
 
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
         <Badge tone={st.tone}>{st.label}</Badge>
         <span style={{ fontSize: 13.5 }}>
-          Última copia: <strong>{fmtDate(backup.current?.takenAt)}</strong>
+          {tr("Última copia: <b>{date}</b>", { date: fmtDate(backup.current?.takenAt) }, { b: (c) => <strong>{c}</strong> })}
         </span>
         <span style={{ fontSize: 13.5, color: "#64748B" }}>
-          {backup.current ? `${fmtSize(backup.current.size)} comprimida · ${fmtSize(backup.current.rawSize)} de base` : "Sin copia todavía"}
+          {backup.current ? t("{size} comprimida · {raw} de base", { size: fmtSize(backup.current.size), raw: fmtSize(backup.current.rawSize) }) : t("Sin copia todavía")}
         </span>
       </div>
       {backup.status === "error" && backup.message && (
@@ -203,26 +205,26 @@ export default function BackupPanel() {
       )}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Button onClick={() => run(backup.saveNow, "Copia actualizada en este navegador.")} loading={working && backup.status === "saving"} disabled={working}>
-          <Icon name="save" size={16} /> Guardar copia ahora
+        <Button onClick={() => run(backup.saveNow, t("Copia actualizada en este navegador."))} loading={working && backup.status === "saving"} disabled={working}>
+          <Icon name="save" size={16} /> {t("Guardar copia ahora")}
         </Button>
         <Button variant="secondary" onClick={() => run(backup.download)} disabled={working || !backup.current}>
-          <Icon name="doc" size={16} /> Descargar copia (.db.gz)
+          <Icon name="doc" size={16} /> {t("Descargar copia (.db.gz)")}
         </Button>
         <Button variant="outline" onClick={() => confirmRestore("current", backup.current?.takenAt)} disabled={working || !backup.current}>
-          <Icon name="refresh" size={16} /> Restaurar esta copia en el servidor
+          <Icon name="refresh" size={16} /> {t("Restaurar esta copia en el servidor")}
         </Button>
       </div>
 
       {backup.archives?.length > 0 && (
         <div style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Copias de bases anteriores</div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{t("Copias de bases anteriores")}</div>
           {backup.archives.map((a) => (
             <div key={a.key} style={{ display: "flex", gap: 12, alignItems: "center", fontSize: 13, padding: "6px 0", borderTop: "1px solid #E2E8F0" }}>
               <span>{fmtDate(a.takenAt)}</span>
               <span style={{ color: "#64748B" }}>{fmtSize(a.size)}</span>
               <Button variant="outline" onClick={() => confirmRestore(a.key, a.takenAt)} disabled={working}>
-                Restaurar
+                {t("Restaurar")}
               </Button>
             </div>
           ))}

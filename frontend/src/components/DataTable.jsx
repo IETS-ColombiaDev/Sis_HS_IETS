@@ -1,3 +1,5 @@
+import { t } from "../i18n";
+
 /**
  * Tabla reutilizable con estilo consistente del sistema IETS.
  *
@@ -5,7 +7,7 @@
  * con el rotulo de la columna al lado de cada valor (`data-label`), en lugar de
  * obligar a desplazarse en horizontal. Sin `stack` se comporta como antes.
  */
-export default function DataTable({ columns, rows, minWidth = 880, emptyMessage = "Sin registros", stack = false }) {
+export default function DataTable({ columns, rows, minWidth = 880, emptyMessage = t("Sin registros"), stack = false }) {
   return (
     <div className={`data-table-wrap${stack ? " data-table-wrap--stack" : ""}`}>
       <table className={`data-table${stack ? " data-table--stack" : ""}`} style={{ minWidth }}>

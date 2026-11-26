@@ -4,6 +4,7 @@ import api, { AI_TIMEOUT } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { aiEnabled } from "../ai/status";
 import { HOWTO, NAV, SUGGESTED, fold, matchHowto, screenLabel } from "../constants/navigation";
+import { t, tr } from "../i18n";
 import Icon from "./Icon";
 import Markdown from "./Markdown";
 import "./nav-assistant.css";
@@ -11,7 +12,7 @@ import "./nav-assistant.css";
 const STORE_KEY = "iets_hs_nav_assistant";
 // Pantallas con una caja de escritura fija abajo: el boton sube para no taparla.
 const RAISED = new Set(["/chat"]);
-const DEFAULT_SUGGESTED = ["¿Qué tengo pendiente?", "¿Cómo clasifico una señal?", "¿Cómo califico P1 a P6?"];
+const DEFAULT_SUGGESTED = [t("¿Qué tengo pendiente?"), t("¿Cómo clasifico una señal?"), t("¿Cómo califico P1 a P6?")];
 
 function loadHistory() {
   try {
@@ -25,9 +26,9 @@ function loadHistory() {
 
 /** "1. a 2. b" en una sola linea se muestra como lista numerada. */
 function asSteps(text) {
-  const t = String(text || "");
-  if (!/(^|\s)1\.\s/.test(t) || t.includes("\n")) return t;
-  return t.replace(/\s+(\d+)\.\s/g, "\n$1. ").trim();
+  const raw = String(text || "");
+  if (!/(^|\s)1\.\s/.test(raw) || raw.includes("\n")) return raw;
+  return raw.replace(/\s+(\d+)\.\s/g, "\n$1. ").trim();
 }
 
 /** Mapa compacto para la IA: solo lo que existe, con lo que el perfil puede hacer. */
@@ -37,9 +38,9 @@ function siteMap(can) {
     .join("\n");
   const tasks = HOWTO.map((h) => {
     const allowed = !h.perm || can(h.perm);
-    return `* ${h.title}${h.to ? ` [${h.to}]` : ""}${allowed ? "" : " (SU PERFIL NO TIENE PERMISO)"}: ${h.steps.join(" ")}`;
+    return `* ${h.title}${h.to ? ` [${h.to}]` : ""}${allowed ? "" : ` (${t("SU PERFIL NO TIENE PERMISO")})`}: ${h.steps.join(" ")}`;
   }).join("\n");
-  return `PANTALLAS\n${screens}\n\nTAREAS\n${tasks}\n\nCABECERA: «Guía» (guía rápida), selector de ciclo, menú del usuario (cambiar contraseña, cerrar sesión).`;
+  return `${t("PANTALLAS")}\n${screens}\n\n${t("TAREAS")}\n${tasks}\n\n${t("CABECERA: «Guía» (guía rápida), selector de ciclo, menú del usuario (cambiar contraseña, cerrar sesión).")}`;
 }
 
 /**
@@ -88,7 +89,7 @@ export default function NavAssistant({ onOpenGuide }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const screen = screenLabel(location.pathname) || "el sistema";
+  const screen = screenLabel(location.pathname) || t("el sistema");
   const suggestions = SUGGESTED[location.pathname] || DEFAULT_SUGGESTED;
 
   // Mientras escribe: pantallas que coinciden, para saltar sin preguntar.
@@ -109,8 +110,9 @@ export default function NavAssistant({ onOpenGuide }) {
       return {
         role: "assistant",
         kind: "none",
-        content:
-          "No encontré esa opción. Pruebe con otras palabras (por ejemplo «clasificar», «ciclo», «PDF») o abra la Guía para ver el recorrido completo.",
+        content: t(
+          "No encontré esa opción. Pruebe con otras palabras (por ejemplo «clasificar», «ciclo», «PDF») o abra la Guía para ver el recorrido completo."
+        ),
       };
     }
     const [best, ...rest] = found;
@@ -176,18 +178,18 @@ export default function NavAssistant({ onOpenGuide }) {
         </ol>
         {!allowed && (
           <p className="na-warn">
-            <Icon name="alert" size={13} /> Su perfil no tiene este permiso: pídaselo a un superadministrador.
+            <Icon name="alert" size={13} /> {t("Su perfil no tiene este permiso: pídaselo a un superadministrador.")}
           </p>
         )}
         <div className="na-actions">
           {h.to && (
             <button type="button" className="na-go" onClick={() => go(h.to)} data-testid={`nav-assistant-go-${h.id}`}>
-              Ir a {screenLabel(h.to)} →
+              {t("Ir a {screen} →", { screen: screenLabel(h.to) })}
             </button>
           )}
           {h.id === "guia" && onOpenGuide && (
             <button type="button" className="na-go" onClick={onOpenGuide}>
-              Abrir la guía →
+              {t("Abrir la guía →")}
             </button>
           )}
         </div>
@@ -204,30 +206,30 @@ export default function NavAssistant({ onOpenGuide }) {
           type="button"
           className={`na-fab${RAISED.has(location.pathname) ? " is-raised" : ""}`}
           onClick={() => setOpen(true)}
-          aria-label="Abrir asistente de navegación"
-          title="¿Cómo llego a…? (Ctrl+K)"
+          aria-label={t("Abrir asistente de navegación")}
+          title={t("¿Cómo llego a…? (Ctrl+K)")}
           data-testid="nav-assistant-open"
         >
           <Icon name="compass" size={20} />
-          <span className="na-fab-label">¿Cómo llego a…?</span>
+          <span className="na-fab-label">{t("¿Cómo llego a…?")}</span>
         </button>
       )}
       {open && (
-        <section className="na-panel" role="dialog" aria-label="Asistente de navegación" data-testid="nav-assistant">
+        <section className="na-panel" role="dialog" aria-label={t("Asistente de navegación")} data-testid="nav-assistant">
           <header className="na-head">
             <div className="na-avatar">
               <Icon name="compass" size={18} />
             </div>
             <div className="na-head-text">
-              <strong>Asistente de navegación</strong>
-              <span>{withAi ? "Con IA · le indica dónde está cada cosa" : "Le indica dónde está cada cosa"}</span>
+              <strong>{t("Asistente de navegación")}</strong>
+              <span>{withAi ? t("Con IA · le indica dónde está cada cosa") : t("Le indica dónde está cada cosa")}</span>
             </div>
             {messages.length > 0 && (
-              <button type="button" className="na-icon-btn" onClick={() => setMessages([])} title="Nueva conversación" aria-label="Nueva conversación">
+              <button type="button" className="na-icon-btn" onClick={() => setMessages([])} title={t("Nueva conversación")} aria-label={t("Nueva conversación")}>
                 <Icon name="refresh" size={15} />
               </button>
             )}
-            <button type="button" className="na-icon-btn" onClick={() => setOpen(false)} aria-label="Cerrar asistente">
+            <button type="button" className="na-icon-btn" onClick={() => setOpen(false)} aria-label={t("Cerrar asistente")}>
               <Icon name="x" size={16} />
             </button>
           </header>
@@ -235,8 +237,17 @@ export default function NavAssistant({ onOpenGuide }) {
           <div className="na-body" ref={listRef}>
             <div className="na-msg na-msg--bot">
               <p>
-                Hola{user?.name ? `, ${user.name.split(" ")[0]}` : ""}. Está en <strong>{screen}</strong>. Pregúnteme cómo hacer algo y le
-                muestro los pasos y el botón para ir.
+                {user?.name
+                  ? tr(
+                      "Hola, {name}. Está en <b>{screen}</b>. Pregúnteme cómo hacer algo y le muestro los pasos y el botón para ir.",
+                      { name: user.name.split(" ")[0], screen },
+                      { b: (c) => <strong>{c}</strong> }
+                    )
+                  : tr(
+                      "Hola. Está en <b>{screen}</b>. Pregúnteme cómo hacer algo y le muestro los pasos y el botón para ir.",
+                      { screen },
+                      { b: (c) => <strong>{c}</strong> }
+                    )}
               </p>
               <div className="na-chips">
                 {suggestions.map((s) => (
@@ -261,7 +272,7 @@ export default function NavAssistant({ onOpenGuide }) {
                         <div className="na-actions">
                           {m.routes.map((r) => (
                             <button key={r} type="button" className="na-go" onClick={() => go(r)}>
-                              Ir a {screenLabel(r)} →
+                              {t("Ir a {screen} →", { screen: screenLabel(r) })}
                             </button>
                           ))}
                         </div>
@@ -275,7 +286,7 @@ export default function NavAssistant({ onOpenGuide }) {
                       {onOpenGuide && (
                         <div className="na-actions">
                           <button type="button" className="na-go" onClick={onOpenGuide}>
-                            Abrir la guía →
+                            {t("Abrir la guía →")}
                           </button>
                         </div>
                       )}
@@ -283,7 +294,7 @@ export default function NavAssistant({ onOpenGuide }) {
                   )}
                   {m.also?.length > 0 && (
                     <div className="na-also">
-                      <span>También puede servirle:</span>
+                      <span>{t("También puede servirle:")}</span>
                       <div className="na-chips">{m.also.map((id) => renderHowto(id, true))}</div>
                     </div>
                   )}
@@ -301,7 +312,7 @@ export default function NavAssistant({ onOpenGuide }) {
 
           {jump.length > 0 && (
             <div className="na-jump">
-              <span>Ir directo:</span>
+              <span>{t("Ir directo:")}</span>
               {jump.map((n) => (
                 <button key={n.to} type="button" className="na-chip" onClick={() => { setText(""); go(n.to); }}>
                   <Icon name={n.icon} size={13} /> {n.label.replace(/^\d+\.\s*/, "")}
@@ -321,11 +332,11 @@ export default function NavAssistant({ onOpenGuide }) {
               ref={inputRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Ej.: ¿cómo paso señales al ciclo?"
-              aria-label="Pregunta para el asistente de navegación"
+              placeholder={t("Ej.: ¿cómo paso señales al ciclo?")}
+              aria-label={t("Pregunta para el asistente de navegación")}
               maxLength={500}
             />
-            <button type="submit" disabled={!text.trim() || busy} aria-label="Enviar pregunta">
+            <button type="submit" disabled={!text.trim() || busy} aria-label={t("Enviar pregunta")}>
               <Icon name="send" size={16} />
             </button>
           </form>

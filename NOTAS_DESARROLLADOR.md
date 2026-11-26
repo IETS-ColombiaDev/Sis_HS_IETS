@@ -982,3 +982,41 @@ actualizar la URL en la matriz) y `cda-amc.ca` responde con reto en todo el domi
 consulta manual (fuentes tipo E).
 
 **Pruebas.** `backend/tests/test_entrega_final.py` y `frontend/e2e/entrega_final.spec.js`.
+
+## Interfaz en tres idiomas: español, inglés británico e inglés americano (26-11-2026, versión 7.6.0)
+
+**Por qué.** El equipo pidió poder cambiar el idioma de la interfaz, con inglés británico y americano por separado.
+
+**Cómo funciona.**
+
+- `frontend/src/i18n/index.js`. El texto en español es la llave: `t("Guardar cambios")`. Sin entrada en el
+  diccionario se muestra el español. `tr()` admite elementos dentro del texto, `ts()` traduce la prosa que escribe
+  el servidor (coincidencia exacta y luego por patrón) y `intlLocale()` da la región para fechas y números.
+- El idioma se guarda en `localStorage` (`iets_hs_lang`) y se resuelve antes de cargar la aplicación
+  (`main.jsx` carga el diccionario y luego `bootstrap.jsx`). Cambiarlo recarga la página: por eso `t()` sirve igual
+  en un componente que en una constante de módulo. El diccionario de inglés viaja en un fragmento aparte que solo
+  se descarga si se usa.
+- `frontend/src/i18n/locales/en/`. Un diccionario por archivo fuente, escrito en inglés americano
+  (5.290 llaves). `british.js` deriva la ortografía británica; lo que cambia más que la ortografía va en el `gb`
+  de cada diccionario. Los `server.*.js` traducen los mensajes del backend, con patrones para los que llevan datos.
+- El backend sigue en español (los mensajes también se guardan en la base). Solo cambia el asistente: la cabecera
+  `X-UI-Language` hace que `ai_service.chat_answer` y `/chat/navigate` respondan en el idioma de la interfaz.
+- `components/LanguageSwitch.jsx`: selector en la cabecera, el ingreso y las pantallas públicas.
+
+**Qué no se traduce.** Contenido (fuentes, señales, notas, boletines, postulaciones), respuestas ya guardadas de la
+IA, documentos exportados (PDF, XLSX, CSV, paquete de diseminación), correos, nombres de entidades y los valores que
+se comparan o se envían al servidor.
+
+**Cómo agregar o corregir textos.** Reglas, glosario de términos y formato en `frontend/src/i18n/README.md`.
+`node scripts/i18n-check.mjs` (en `frontend/`) lista llaves sin traducción, choques entre diccionarios y textos que
+parecen español sin pasar por `t()`.
+
+**Pruebas.** `frontend/e2e/idioma.spec.js`: el selector cambia y recuerda el idioma, y las 23 pantallas abren en
+en-GB y en-US sin errores de consola. `backend/tests/test_idioma.py`: la instrucción de idioma llega al modelo.
+
+**Pendientes.**
+
+- La traducción se revisó por coherencia de términos, no por una persona nativa: conviene una lectura del equipo
+  técnico en las pantallas que más usa.
+- Documentos exportados y correos siguen en español.
+- Los nombres de clústeres y tipologías editados a mano en Configuración se muestran como se escribieron.

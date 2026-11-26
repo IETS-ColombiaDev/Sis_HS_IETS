@@ -4,15 +4,16 @@ import axios from "axios";
 import Button from "../components/Button";
 import { Select, Textarea } from "../components/Field";
 import PublicShell from "../components/PublicShell";
+import { t, tr, ts, intlLocale } from "../i18n";
 
-const VERDICT_LABEL = { aprobado: "Aprobado", observado: "Devuelto con observaciones" };
+const VERDICT_LABEL = { aprobado: t("Aprobado"), observado: t("Devuelto con observaciones") };
 
 function detailOf(err, fallback) {
   const detail = err?.response?.data?.detail;
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail)) return detail.map((d) => d.msg).join("; ");
-  if (err?.response?.status >= 500) return "El servidor no respondió. Intente de nuevo en unos minutos.";
-  if (!err?.response) return "No hay conexión con la plataforma. Revise su red e intente de nuevo.";
+  if (typeof detail === "string") return ts(detail);
+  if (Array.isArray(detail)) return detail.map((d) => ts(d.msg)).join("; ");
+  if (err?.response?.status >= 500) return t("El servidor no respondió. Intente de nuevo en unos minutos.");
+  if (!err?.response) return t("No hay conexión con la plataforma. Revise su red e intente de nuevo.");
   return fallback;
 }
 
@@ -38,7 +39,7 @@ export default function ReviewerPortal() {
       const { data } = await axios.get(`/api/public/reviews/${encoded}`);
       setState(data);
     } catch (err) {
-      setError(detailOf(err, "No se pudo abrir la invitación."));
+      setError(detailOf(err, t("No se pudo abrir la invitación.")));
       setState(null);
     } finally {
       setLoading(false);
@@ -58,9 +59,9 @@ export default function ReviewerPortal() {
     try {
       const { data } = await axios.post(`/api/public/reviews/${encoded}/coi`, coi);
       setState(data);
-      setNotice("Declaración registrada. Ya puede leer el documento.");
+      setNotice(t("Declaración registrada. Ya puede leer el documento."));
     } catch (err) {
-      setError(detailOf(err, "No se pudo registrar la declaración."));
+      setError(detailOf(err, t("No se pudo registrar la declaración.")));
     } finally {
       setSending("");
     }
@@ -74,10 +75,10 @@ export default function ReviewerPortal() {
       await axios.post(`/api/public/reviews/${encoded}/comments`, { body: comment, field_key: commentField });
       setComment("");
       setCommentField("");
-      setNotice("Observación registrada.");
+      setNotice(t("Observación registrada."));
       await load();
     } catch (err) {
-      setError(detailOf(err, "No se pudo comentar."));
+      setError(detailOf(err, t("No se pudo comentar.")));
     } finally {
       setSending("");
     }
@@ -99,9 +100,9 @@ export default function ReviewerPortal() {
       setState(data);
       setNote("");
       setConfirming(false);
-      setNotice("Revisión enviada. Gracias: la coordinación del IETS ya puede verla.");
+      setNotice(t("Revisión enviada. Gracias: la coordinación del IETS ya puede verla."));
     } catch (err) {
-      setError(detailOf(err, "No se pudo enviar la revisión."));
+      setError(detailOf(err, t("No se pudo enviar la revisión.")));
       setConfirming(false);
     } finally {
       setSending("");
@@ -113,11 +114,11 @@ export default function ReviewerPortal() {
 
   return (
     <PublicShell
-      kicker="Revisión por pares"
-      title="Expediente asignado"
-      lead="Acceso temporal al informe. No crea cuenta institucional. El enlace es personal y caduca a los 10 días."
+      kicker={t("Revisión por pares")}
+      title={t("Expediente asignado")}
+      lead={t("Acceso temporal al informe. No crea cuenta institucional. El enlace es personal y caduca a los 10 días.")}
     >
-      {loading && <p>Abriendo la invitación...</p>}
+      {loading && <p>{t("Abriendo la invitación...")}</p>}
       {error && (
         <p className="public-submit-error" role="alert">
           {error}
@@ -129,17 +130,26 @@ export default function ReviewerPortal() {
         </p>
       )}
 
-      {!loading && !state && !error && <p>El enlace está incompleto. Use el enlace exacto que recibió.</p>}
+      {!loading && !state && !error && <p>{t("El enlace está incompleto. Use el enlace exacto que recibió.")}</p>}
 
       {state?.access === "coi_required" && (
         <form onSubmit={sign}>
           <p>
-            Documento: <strong style={{ overflowWrap: "anywhere" }}>{state.title}</strong> ·{" "}
-            {state.product_level_label}
+            {tr("Documento: <b>{titulo}</b>", { titulo: <>{state.title}</> }, {
+              b: (c) => <strong style={{ overflowWrap: "anywhere" }}>{c}</strong>,
+            })}{" "}
+            ·{" "}
+            {ts(state.product_level_label)}
           </p>
           <p>
-            Hola {state.reviewer_name}. Debe declarar conflicto de interés antes de leer el informe.
-            {state.expires_at ? ` Su enlace vence el ${new Date(state.expires_at).toLocaleDateString("es-CO")}.` : ""}
+            {t("Hola {nombre}. Debe declarar conflicto de interés antes de leer el informe.", {
+              nombre: state.reviewer_name,
+            })}
+            {state.expires_at
+              ? ` ${t("Su enlace vence el {fecha}.", {
+                  fecha: new Date(state.expires_at).toLocaleDateString(intlLocale()),
+                })}`
+              : ""}
           </p>
           <label className="public-check">
             <input
@@ -148,7 +158,7 @@ export default function ReviewerPortal() {
               onChange={(e) => setCoi({ ...coi, accepted: e.target.checked })}
               data-testid="portal-coi-accept"
             />
-            Acepto la declaración de conflicto de interés y la confidencialidad del expediente.
+            {t("Acepto la declaración de conflicto de interés y la confidencialidad del expediente.")}
           </label>
           <label className="public-check">
             <input
@@ -156,11 +166,11 @@ export default function ReviewerPortal() {
               checked={coi.has_conflict}
               onChange={(e) => setCoi({ ...coi, has_conflict: e.target.checked })}
             />
-            Tengo un conflicto que debo declarar
+            {t("Tengo un conflicto que debo declarar")}
           </label>
           <Textarea
             id="portal-coi-statement"
-            label="Detalle del conflicto (si aplica)"
+            label={t("Detalle del conflicto (si aplica)")}
             rows={3}
             value={coi.statement}
             onChange={(e) => setCoi({ ...coi, statement: e.target.value })}
@@ -171,14 +181,14 @@ export default function ReviewerPortal() {
             disabled={!coi.accepted || (coi.has_conflict && !coi.statement.trim())}
             title={
               !coi.accepted
-                ? "Marque la aceptación para continuar."
+                ? t("Marque la aceptación para continuar.")
                 : coi.has_conflict && !coi.statement.trim()
-                ? "Describa el conflicto que declara."
+                ? t("Describa el conflicto que declara.")
                 : undefined
             }
             data-testid="portal-coi-sign"
           >
-            Firmar y leer el informe
+            {t("Firmar y leer el informe")}
           </Button>
         </form>
       )}
@@ -186,39 +196,39 @@ export default function ReviewerPortal() {
       {state?.access === "granted" && (
         <div>
           <p>
-            <strong style={{ overflowWrap: "anywhere" }}>{state.title}</strong> · {state.product_level_label}
-            {state.status_label ? ` · Estado: ${state.status_label}` : ""}
-            {state.confidential ? " · CONFIDENCIAL" : ""}
+            <strong style={{ overflowWrap: "anywhere" }}>{state.title}</strong> · {ts(state.product_level_label)}
+            {state.status_label ? ` · ${t("Estado: {estado}", { estado: ts(state.status_label) })}` : ""}
+            {state.confidential ? ` · ${t("CONFIDENCIAL")}` : ""}
           </p>
           {Object.entries(state.body || {}).map(([key, value]) =>
             value ? (
               <section key={key} className="eval-public-block">
-                <h3>{labels[key] || key}</h3>
+                <h3>{ts(labels[key] || key)}</h3>
                 <p style={{ whiteSpace: "pre-wrap" }}>{value}</p>
               </section>
             ) : null
           )}
 
           <form onSubmit={addComment}>
-            <h3>Observaciones</h3>
+            <h3>{t("Observaciones##revision")}</h3>
             <Select
               id="portal-comment-field"
-              label="Campo (opcional)"
+              label={t("Campo (opcional)")}
               value={commentField}
               onChange={(e) => setCommentField(e.target.value)}
             >
-              <option value="">Documento completo</option>
+              <option value="">{t("Documento completo")}</option>
               {Object.keys(state.body || {})
                 .filter((k) => state.body[k])
                 .map((k) => (
                   <option key={k} value={k}>
-                    {labels[k] || k}
+                    {ts(labels[k] || k)}
                   </option>
                 ))}
             </Select>
             <Textarea
               id="portal-comment"
-              label="Observación en línea"
+              label={t("Observación en línea")}
               rows={3}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
@@ -230,7 +240,7 @@ export default function ReviewerPortal() {
               disabled={!comment.trim()}
               data-testid="portal-comment-submit"
             >
-              Añadir observación
+              {t("Añadir observación")}
             </Button>
           </form>
 
@@ -239,7 +249,7 @@ export default function ReviewerPortal() {
               {state.comments.map((c) => (
                 <li key={c.id}>
                   <strong>{c.author}</strong>
-                  {c.field_key ? ` · ${labels[c.field_key] || c.field_key}` : ""}
+                  {c.field_key ? ` · ${ts(labels[c.field_key] || c.field_key)}` : ""}
                   <p>{c.body}</p>
                 </li>
               ))}
@@ -247,19 +257,23 @@ export default function ReviewerPortal() {
           )}
 
           <form onSubmit={submit} style={{ marginTop: 24 }}>
-            <h3>Veredicto</h3>
+            <h3>{t("Veredicto")}</h3>
             {submitted && (
               <p className="fa-notice fa-notice--ok" data-testid="portal-submitted">
-                Revisión enviada: {VERDICT_LABEL[state.assignment_status]}
-                {state.submitted_at ? ` el ${new Date(state.submitted_at).toLocaleString("es-CO")}` : ""}.
-                {state.can_submit ? " Puede actualizarla mientras el documento siga en revisión." : ""}
+                {state.submitted_at
+                  ? t("Revisión enviada: {veredicto} el {fecha}.", {
+                      veredicto: VERDICT_LABEL[state.assignment_status],
+                      fecha: new Date(state.submitted_at).toLocaleString(intlLocale()),
+                    })
+                  : t("Revisión enviada: {veredicto}.", { veredicto: VERDICT_LABEL[state.assignment_status] })}
+                {state.can_submit ? ` ${t("Puede actualizarla mientras el documento siga en revisión.")}` : ""}
               </p>
             )}
             {!state.can_submit && !submitted && (
               <p className="fa-notice fa-notice--info">
                 {state.status === "publicado"
-                  ? "El documento ya fue publicado: la revisión está cerrada."
-                  : "El documento aún no está en revisión externa. Podrá enviar su veredicto cuando la coordinación lo habilite; mientras tanto puede dejar observaciones."}
+                  ? t("El documento ya fue publicado: la revisión está cerrada.")
+                  : t("El documento aún no está en revisión externa. Podrá enviar su veredicto cuando la coordinación lo habilite; mientras tanto puede dejar observaciones.")}
               </p>
             )}
             {state.can_submit && (
@@ -274,7 +288,7 @@ export default function ReviewerPortal() {
                       setConfirming(false);
                     }}
                   />
-                  Apruebo el documento
+                  {t("Apruebo el documento")}
                 </label>
                 <label className="public-check">
                   <input
@@ -286,22 +300,24 @@ export default function ReviewerPortal() {
                       setConfirming(false);
                     }}
                   />
-                  Devuelvo con observaciones
+                  {t("Devuelvo con observaciones")}
                 </label>
                 <Textarea
                   id="portal-note"
-                  label="Nota para el comité"
+                  label={t("Nota para el comité")}
                   rows={3}
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                 />
                 {confirming && (
                   <p className="fa-notice fa-notice--warn" role="alert">
-                    Va a enviar el veredicto "{VERDICT_LABEL[verdict]}". Pulse de nuevo para confirmar.
+                    {t('Va a enviar el veredicto "{veredicto}". Pulse de nuevo para confirmar.', {
+                      veredicto: VERDICT_LABEL[verdict],
+                    })}
                   </p>
                 )}
                 <Button type="submit" loading={sending === "submit"} data-testid="portal-submit">
-                  {confirming ? "Confirmar envío" : "Enviar revisión"}
+                  {confirming ? t("Confirmar envío") : t("Enviar revisión")}
                 </Button>
               </>
             )}

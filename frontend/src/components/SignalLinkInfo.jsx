@@ -1,26 +1,27 @@
 import Icon from "./Icon";
 import "./signal-origin.css";
+import { intlLocale, t, tr, ts } from "../i18n";
 
 /** Etiquetas del tipo de enlace de una señal (RF-001). Nunca se presenta como exacto lo que no lo es. */
 export const LINK_TYPE = {
-  exacto: { label: "Enlace exacto", button: "Abrir la señal en la fuente", tone: "ok" },
-  consulta: { label: "Página de consulta, la fuente no ofrece enlace directo", button: "Abrir la página de consulta", tone: "warn" },
-  sin_enlace: { label: "Sin enlace", button: "", tone: "bad" },
+  exacto: { label: t("Enlace exacto"), button: t("Abrir la señal en la fuente"), tone: "ok" },
+  consulta: { label: t("Página de consulta, la fuente no ofrece enlace directo"), button: t("Abrir la página de consulta##enlace"), tone: "warn" },
+  sin_enlace: { label: t("Sin enlace"), button: "", tone: "bad" },
 };
 
 export const LINK_STATUS = {
-  ok: "Responde",
-  redirigido: "Redirige a otra página",
-  caido: "No responde",
-  bloqueado: "El sitio bloquea la verificación automática",
-  sin_verificar: "Sin verificar",
-  sin_respuesta: "El sitio no respondió a la verificación (se reintenta)",
+  ok: t("Responde"),
+  redirigido: t("Redirige a otra página"),
+  caido: t("No responde"),
+  bloqueado: t("El sitio bloquea la verificación automática"),
+  sin_verificar: t("Sin verificar"),
+  sin_respuesta: t("El sitio no respondió a la verificación (se reintenta)"),
 };
 
 function fmt(value) {
   if (!value) return "";
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleString("es-CO");
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleString(intlLocale());
 }
 
 /**
@@ -56,10 +57,10 @@ export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, ev
             href={locatorUrl}
             target="_blank"
             rel="noopener noreferrer"
-            title={`Abre la página y resalta «${evidence.locator_text || ""}»`}
+            title={t("Abre la página y resalta «{text}»", { text: evidence.locator_text || "" })}
             data-testid="signal-link-locate"
           >
-            <Icon name="search" size={14} /> Abrir la página y resaltar la señal
+            <Icon name="search" size={14} /> {t("Abrir la página y resaltar la señal")}
           </a>
         )}
         {url && !hideLinks && (
@@ -71,71 +72,72 @@ export default function SignalLinkInfo({ url, linkType, linkStatus, queryUrl, ev
             title={url}
             data-testid="signal-link-open"
           >
-            {!locatorUrl && <Icon name="external" size={14} />} {type?.button || "Abrir enlace"}
+            {!locatorUrl && <Icon name="external" size={14} />} {type?.button || t("Abrir enlace")}
           </a>
         )}
         {queryUrl && linkType === "exacto" && !compact && !hideLinks && (
           <a className="sl-query" href={queryUrl} target="_blank" rel="noopener noreferrer" title={queryUrl}>
-            Página consultada
+            {t("Página consultada")}
           </a>
         )}
       </div>
       {linkType === "exacto" && resolved?.method === "enlace_en_pagina" && !compact && (
         <div className="sl-muted" data-testid="signal-link-resolved">
-          Enlace exacto ubicado por el sistema en la página de la fuente.
+          {t("Enlace exacto ubicado por el sistema en la página de la fuente.")}
           {resolved.previous_url && (
             <>
-              {" "}Antes apuntaba a{" "}
-              <a href={resolved.previous_url} target="_blank" rel="noopener noreferrer" style={{ overflowWrap: "anywhere" }}>
-                la página de consulta
-              </a>
-              .
+              {" "}
+              {tr("Antes apuntaba a <a>la página de consulta</a>.", null, {
+                a: (c) => (
+                  <a href={resolved.previous_url} target="_blank" rel="noopener noreferrer" style={{ overflowWrap: "anywhere" }}>
+                    {c}
+                  </a>
+                ),
+              })}
             </>
           )}
         </div>
       )}
       {viaNews && !compact && (
         <div className="sl-muted" data-testid="signal-link-news">
-          Este enlace pasa por Google Noticias y redirige al artículo original de la fuente. Allí, busque el título de la
-          señal (Ctrl+F) para ubicarla.
+          {t("Este enlace pasa por Google Noticias y redirige al artículo original de la fuente. Allí, busque el título de la señal (Ctrl+F) para ubicarla.")}
         </div>
       )}
       {linkType === "exacto" && resolved?.method === "enlace_del_registro" && !compact && (
         <div className="sl-muted" data-testid="signal-link-registry">
-          Enlace exacto a la ficha del producto en el registro oficial.
+          {t("Enlace exacto a la ficha del producto en el registro oficial.")}
         </div>
       )}
       {linkType === "exacto" && evidence?.snippet && evidence.is_quote && !compact && (
         <div className="sl-muted" data-testid="signal-link-quote">
-          Texto de la señal en la fuente: «{evidence.snippet}». El enlace abre la página y el navegador resalta ese texto.
+          {t("Texto de la señal en la fuente: «{snippet}». El enlace abre la página y el navegador resalta ese texto.", { snippet: evidence.snippet })}
         </div>
       )}
       {showEvidence && (
         <div className="sl-evidence" data-testid="signal-evidence">
-          <div className="sl-evidence-title">Evidencia de captura</div>
-          {evidence.title && <div><strong>Título:</strong> {evidence.title}</div>}
+          <div className="sl-evidence-title">{t("Evidencia de captura")}</div>
+          {evidence.title && <div><strong>{t("Título:")}</strong> {evidence.title}</div>}
           {evidence.snippet && (
             <blockquote className="sl-snippet">
               {evidence.snippet}
-              {!evidence.is_quote && <span className="sl-muted"> (resumen; la fuente no dio cita textual)</span>}
+              {!evidence.is_quote && <span className="sl-muted">{" "}{t("(resumen; la fuente no dio cita textual)")}</span>}
             </blockquote>
           )}
-          {evidence.captured_at && <div><strong>Fecha y hora de captura:</strong> {fmt(evidence.captured_at)}</div>}
+          {evidence.captured_at && <div><strong>{t("Fecha y hora de captura:")}</strong> {fmt(evidence.captured_at)}</div>}
           {(evidence.query_url || queryUrl) && (
             <div style={{ overflowWrap: "anywhere" }}>
-              <strong>URL consultada:</strong>{" "}
+              <strong>{t("URL consultada:")}</strong>{" "}
               <a href={evidence.query_url || queryUrl} target="_blank" rel="noopener noreferrer">{evidence.query_url || queryUrl}</a>
             </div>
           )}
           {locatorUrl ? (
             <div className="sl-muted">
-              La fuente publica esta señal en una tabla o listado sin enlace propio. «Abrir la página y resaltar la señal»
-              lleva al punto exacto de la página (navegadores Chrome, Edge, Safari y Firefox recientes).
+              {t("La fuente publica esta señal en una tabla o listado sin enlace propio. «Abrir la página y resaltar la señal» lleva al punto exacto de la página (navegadores Chrome, Edge, Safari y Firefox recientes).")}
             </div>
           ) : (
             <div className="sl-muted">
-              {resolved?.method === "sin_ubicar" && resolved.reason ? `${resolved.reason} ` : ""}
-              Busque el título o el fragmento en la página consultada para ubicar la señal.
+              {resolved?.method === "sin_ubicar" && resolved.reason ? `${ts(resolved.reason)} ` : ""}
+              {t("Busque el título o el fragmento en la página consultada para ubicar la señal.")}
             </div>
           )}
         </div>
