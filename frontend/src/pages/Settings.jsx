@@ -17,6 +17,7 @@ import SourceParamsPanel from "../components/SourceParamsPanel";
 import IntelligencePanel from "../components/IntelligencePanel";
 import BackupPanel from "../components/BackupPanel";
 import HorizonRulesPanel from "../components/HorizonRulesPanel";
+import BrandingPanel from "../components/BrandingPanel";
 import { t, ts, intlLocale, fmtDateTime } from "../i18n";
 
 // Las pestañas, agrupadas por tema y en el orden en que se suelen configurar.
@@ -48,6 +49,12 @@ const TAB_GROUPS = [
     title: t("Datos y respaldo"),
     tabs: [
       { id: "copia_local", label: t("Persistencia (Firebase)"), icon: "save", about: t("Copia de la base, puntos de recuperación y restauración.") },
+    ],
+  },
+  {
+    title: t("Apariencia"),
+    tabs: [
+      { id: "identidad", label: t("Identidad institucional"), icon: "eye", about: t("Logo que se muestra en el menú, el ingreso y las pantallas públicas.") },
     ],
   },
 ];
@@ -359,31 +366,45 @@ export default function Settings() {
         />
       </div>
 
-      <nav className="settings-menu" aria-label={t("Secciones de configuración")}>
-        {TAB_GROUPS.map((g) => (
-          <div key={g.title} className="settings-group">
-            <div className="settings-group-title">{g.title}</div>
-            <div className="settings-group-tabs">
-              {g.tabs.map((item) => (
-                <Button
-                  key={item.id}
-                  variant={tab === item.id ? "primary" : "secondary"}
-                  onClick={() => setTab(item.id)}
-                  title={item.about}
-                  aria-pressed={tab === item.id}
-                >
-                  <Icon name={item.icon} size={16} /> {item.label}
-                </Button>
-              ))}
+      <div className="settings-layout">
+        <nav className="settings-menu" aria-label={t("Secciones de configuración")}>
+          {TAB_GROUPS.map((g) => (
+            <div key={g.title} className="settings-group">
+              <div className="settings-group-title">{g.title}</div>
+              <div className="settings-group-tabs">
+                {g.tabs.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`settings-nav-item${tab === item.id ? " is-active" : ""}`}
+                    onClick={() => setTab(item.id)}
+                    title={item.about}
+                    aria-pressed={tab === item.id}
+                  >
+                    <span className="settings-nav-icon" aria-hidden="true">
+                      <Icon name={item.icon} size={16} />
+                    </span>
+                    <span className="settings-nav-label">{item.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
-      </nav>
-      <p className="settings-about" data-testid="settings-about">
-        <strong>{TABS.find((item) => item.id === tab)?.label}.</strong> {TABS.find((item) => item.id === tab)?.about}
-      </p>
+          ))}
+        </nav>
+
+        <div className="settings-content">
+          <header className="settings-about" data-testid="settings-about">
+            <span className="settings-about-icon" aria-hidden="true">
+              <Icon name={TABS.find((item) => item.id === tab)?.icon || "cog"} size={18} />
+            </span>
+            <div>
+              <h2>{TABS.find((item) => item.id === tab)?.label}</h2>
+              <p>{TABS.find((item) => item.id === tab)?.about}</p>
+            </div>
+          </header>
 
       {tab === "metodologia" && <MethodologyPanel />}
+      {tab === "identidad" && <BrandingPanel toast={toast} />}
 
       {tab === "programacion" && <SchedulePanel />}
 
@@ -660,6 +681,8 @@ export default function Settings() {
           </div>
         </Card>
       )}
+        </div>
+      </div>
     </div>
   );
 }

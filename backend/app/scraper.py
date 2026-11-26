@@ -974,6 +974,41 @@ def news_feed_url(source: Source) -> str:
     return f"{GOOGLE_NEWS_RSS}?q={quote_plus(f'site:{host} {GOOGLE_NEWS_WINDOW}')}&{locale}"
 
 
+# Respaldo final: lo que los buscadores tienen indexado del dominio. Desde un
+# centro de datos (Render) Google News suele responder 503 o 429; los buscadores
+# de `web_search` van en cascada y con pausa propia, asi que uno suele contestar.
+SEARCH_INDEX_URL = "https://duckduckgo.com/"
+
+
+def search_index_url(source: Source) -> str:
+    """Direccion que identifica el respaldo por buscadores (consulta `site:dominio`)."""
+    host = (urlparse(source.url or "").hostname or "").lower().removeprefix("www.")
+    return f"{SEARCH_INDEX_URL}?q={quote_plus(f'site:{host}')}" if host else ""
+
+
+def is_search_index_url(url: str) -> bool:
+    return bool(url) and url.startswith(SEARCH_INDEX_URL + "?q=site%3A")
+
+
+def search_results_feed(results: list[dict], title: str = "") -> str:
+    """Resultados de busqueda como canal RSS: asi siguen el mismo camino que Google News."""
+    items = []
+    for row in results:
+        url = (row.get("url") or "").strip()
+        name = _clean(row.get("title") or "") or url
+        if not url:
+            continue
+        items.append(
+            "<item><title>{}</title><link>{}</link><description>{}</description></item>".format(
+                html_lib.escape(name), html_lib.escape(url), html_lib.escape(_clean(row.get("snippet") or ""))
+            )
+        )
+    if not items:
+        return ""
+    head = html_lib.escape(title or "Resultados de busqueda")
+    return f'<?xml version="1.0" encoding="utf-8"?><rss version="2.0"><channel><title>{head}</title>{"".join(items)}</channel></rss>'
+
+
 def fallback_urls(source: Source, entry_urls: list[str] | None = None) -> list[str]:
     """Rutas de respaldo: las de la matriz EH, el RSS oficial, el indice de la revista en PubMed y Google News."""
     main = _normalize_url(source.url or "")
@@ -999,6 +1034,8 @@ def access_route(source: Source, landing_url: str, entry_urls: list[str] | None 
         return "sitio"
     if is_news_feed_url(landing_url) and not is_news_feed_url(source.url or ""):
         return "google_news"
+    if is_search_index_url(landing_url):
+        return "busqueda_web"
     from . import access_routes
 
     if access_routes.is_journal_index(landing_url):
@@ -2053,8 +2090,8 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             if step["action"] not in ("descarga", "respaldo"):
                 continue
             route = "sitio" if step["action"] == "descarga" else access_route(source, step["url"], profile["entry_urls"])
-            label = {"sitio": "sitio", "ruta_matriz": "ruta de la matriz", "rss_oficial": "RSS oficial", "indice_pubmed": "índice de PubMed", "google_news": "Google News"}.get(route, route)
-            status = step["status"].replace("http_", "HTTP ").replace("sin_conexion", "sin respuesta").replace(
+            label = {"sitio": "sitio", "ruta_matriz": "ruta de la matriz", "rss_oficial": "RSS oficial", "indice_pubmed": "índice de PubMed", "google_news": "Google News", "busqueda_web": "buscadores web"}.get(route, route)
+            status = step["status"].replace("http_", "HTTP ").replace("sin_conexion", "sin respuesta").replace("sin_resultados", "sin resultados").replace(
                 "omitida_sin_respuesta_reciente", "omitido (no respondió en una corrida reciente)"
             )
             tried.append(f"{label}: {status}")
@@ -2080,6 +2117,36 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                     landing_url = alt
                     status_code, content_type, text, raw = alt_result
                     break
+            search_backup: list[dict] = []
+            if not (0 < status_code < 400):
+                # Ni el sitio ni sus canales respondieron: lo que los buscadores tienen del dominio.
+                alt = search_index_url(source)
+                if alt:
+                    scan_progress.stage("conectando", "Probando ruta de respaldo: resultados de buscadores para el dominio")
+                    t0 = time.perf_counter()
+                    try:
+                        from . import web_search
+
+                        found = web_search.search_for_source(db, source, {**profile, "web_search": True}, context=context)
+                        search_backup = list(found.get("results") or [])
+                    except Exception as exc:  # noqa: BLE001 - el respaldo nunca tumba la corrida
+                        logging.getLogger(__name__).warning("Respaldo por buscadores de %s: %s", source.title, exc)
+                    feed = search_results_feed(search_backup, source.title)
+                    steps.append(
+                        {
+                            "action": "respaldo",
+                            "url": alt,
+                            "status": "ok" if feed else "sin_resultados",
+                            "ms": int((time.perf_counter() - t0) * 1000),
+                            "detail": f"{len(search_backup)} resultado(s) del dominio",
+                        }
+                    )
+                    scan_progress.attempt(alt, "ok" if feed else "sin_resultados", f"{len(search_backup)} resultado(s) del dominio", route="busqueda_web")
+                    if feed:
+                        if status_code == 0:
+                            _mark_unreachable(source.url)
+                        landing_url = alt
+                        status_code, content_type, text, raw = 200, "application/rss+xml", feed, feed.encode("utf-8")
         if status_code == 0:
             log.status = "error"
             log.message = failure_message("No se pudo entrar a la fuente.")[:500]
@@ -2150,7 +2217,7 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
             # El respaldo de Google News trae todo lo publicado en el dominio
             # (empleos, resultados financieros): solo quedan los items pertinentes.
             # El indice de la revista en PubMed se lee igual: un canal con titulos y resumenes.
-            news_fallback = via in ("google_news", "indice_pubmed")
+            news_fallback = via in ("google_news", "indice_pubmed", "busqueda_web")
             findings_data = extract_candidates(target, text, only_relevant=news_fallback)
             # Tabla de pipeline solo si la pagina trae filas reconocibles. Con la matriz
             # por enlace un fabricante tiene paginas de innovacion, portafolio o
@@ -2163,7 +2230,11 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
                 crawl = feed_crawl(landing_url, text, only_relevant=True)
                 # El sitio bloquea al robot, pero los buscadores lo tienen indexado:
                 # los fragmentos de resultados del dominio tambien entran al corpus.
-                crawl = _add_search_snippets(db, source, profile, context, crawl)
+                if via == "busqueda_web":
+                    # La busqueda ya se hizo para entrar: no se repite.
+                    crawl["search_results"] = search_backup
+                else:
+                    crawl = _add_search_snippets(db, source, profile, context, crawl)
             elif not pipeline_table and not is_news_feed_url(landing_url):
                 crawl = _crawl_with_profile(db, source, landing_url, text, profile, context)
                 findings_data = apply_crawled_text(findings_data, crawl)
@@ -2309,9 +2380,9 @@ def scrape_source(db: Session, source: Source, triggered_by: str = "sistema") ->
         # Si el sitio no se pudo leer y las senales vienen de un respaldo, la
         # corrida queda parcial: la fuente en si no se consulto.
         fallback_note = ""
-        if via in ("google_news", "rss_oficial", "indice_pubmed", "navegador"):
+        if via in ("google_news", "rss_oficial", "indice_pubmed", "navegador", "busqueda_web"):
             fallback_note = f" Vía {ACCESS_VIA_LABELS[via]}."
-        log.status = "ok" if findings_data and via not in ("google_news", "indice_pubmed") else "parcial"
+        log.status = "ok" if findings_data and via not in ("google_news", "indice_pubmed", "busqueda_web") else "parcial"
         visited = f" {crawl.get('pages_visited', 1)} página(s) visitadas." if crawl else ""
         elapsed = int((time.perf_counter() - started) * 1000)
         relinked_note = f" {relinked} con enlace corregido a la página exacta." if relinked else ""

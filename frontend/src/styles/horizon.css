@@ -698,3 +698,143 @@ body {
     top: 72px;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Vigilancia: acciones de la cabecera y bloque de operación          */
+/* ------------------------------------------------------------------ */
+.scan-hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.scan-hero-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+@media (max-width: 640px) {
+  .scan-hero-actions,
+  .scan-hero-buttons {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+}
+
+.scan-ops {
+  overflow: hidden;
+}
+.scan-ops-head {
+  display: flex;
+  align-items: center;
+  gap: 12px 22px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+}
+.scan-ops-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+}
+.scan-sched-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0;
+  flex: 1 1 420px;
+  font-size: 13px;
+}
+.scan-sched-meta dt {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.scan-sched-meta dd {
+  margin: 0;
+  color: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.scan-sched-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.scan-ops-note {
+  margin: -4px 18px 12px;
+  font-size: 12.5px;
+  color: #64748b;
+}
+.scan-ops-fold {
+  border-top: 1px solid #e8eef6;
+}
+.scan-ops-fold > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  cursor: pointer;
+  list-style: none;
+  color: #334155;
+  font-size: 13.5px;
+  user-select: none;
+}
+.scan-ops-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.scan-ops-fold > summary:hover {
+  background: #f8fafc;
+}
+.scan-ops-fold > summary:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.scan-ops-fold-title {
+  font-weight: 600;
+  color: #0f172a;
+}
+.scan-ops-fold-meta {
+  color: #64748b;
+  font-size: 12.5px;
+}
+.scan-ops-chevron {
+  margin-left: auto;
+  display: inline-flex;
+  color: #94a3b8;
+  transition: transform 0.15s ease;
+}
+.scan-ops-fold[open] .scan-ops-chevron {
+  transform: rotate(180deg);
+}
+.scan-ops-fold-body {
+  padding: 4px 18px 16px;
+}
+.scan-ops-fold-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+.scan-sched-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}

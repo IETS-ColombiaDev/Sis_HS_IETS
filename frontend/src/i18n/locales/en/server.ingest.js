@@ -231,6 +231,8 @@ const NOTE_REASONS = [
 
 // ---------------------------------------------------------------- textos fijos
 export default {
+  "Resultados de buscadores para el dominio (el sitio no respondió)": "Search engine results for the domain (the site did not respond)",
+  "Probando ruta de respaldo: resultados de buscadores para el dominio": "Trying fallback route: search engine results for the domain",
   // --- ingest_service.py
   "Interrumpido: el proceso se detuvo durante la ejecución; se reintenta al final de la cola.":
     "Interrupted: the process stopped while running; it will be retried at the end of the queue.",

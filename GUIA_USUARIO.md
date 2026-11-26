@@ -5,7 +5,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.6.0 · actualizada el 26 de noviembre de 2026 (interfaz en español, inglés británico e inglés americano con selector de idioma; antes, 7.5.0: entrega final: rutas de acceso a las fuentes, historial de vigilancias con fecha, hora y duración, informe de acceso plegable y ficha de modelos de inteligencia; antes, 7.4.2: búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
+| **Versión del sistema** | 7.7.0 · actualizada el 26 de noviembre de 2026 (respaldo por buscadores cuando un sitio y Google Noticias rechazan la lectura, Vigilancia y Catálogo de fuentes reorganizados, Configuración con menú lateral y carga del logo institucional; antes, 7.6.0: interfaz en español, inglés británico e inglés americano con selector de idioma; antes, 7.5.0: entrega final: rutas de acceso a las fuentes, historial de vigilancias con fecha, hora y duración, informe de acceso plegable y ficha de modelos de inteligencia; antes, 7.4.2: búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
@@ -177,6 +177,16 @@ En servidores de prueba puede verse «Acceso rápido como administrador». **En 
 Use el menú de su perfil → salir. En equipos compartidos, cierre siempre la sesión.
 
 ---
+
+### Logo institucional
+
+El superadministrador lo carga en **Configuración › Apariencia › Identidad institucional**: arrastre la imagen o pulse **Cargar logo** (PNG, JPG o WebP, máximo 400 KB; mejor con fondo transparente). Se muestra en el menú lateral, en la pantalla de ingreso y en las pantallas públicas. **Quitar logo** vuelve al distintivo del sistema. El cambio queda en la bitácora de auditoría.
+
+### Cómo están agrupadas las acciones
+
+- **Vigilancia.** «Inventario» y «Ejecutar vigilancia» están juntos en la cabecera. Debajo del historial, una sola franja muestra la **vigilancia programada** (estado, intervalo, próxima y última corrida) con «Ejecutar ahora» y «Configurar». La **cola de ingesta** y la **vista previa de un enlace** están plegadas en esa misma tarjeta: pulse su título para abrirlas. La cola se abre sola cuando tiene trabajos.
+- **Catálogo de fuentes.** Tres menús: **Descargar** (Excel o CSV), **Mantenimiento** (Sondear todas, Recargar catálogo) y **Agregar fuente** (Alta rápida, Registro completo, Cargar matriz, Detectar fuentes con IA). Cada opción dice qué hace y, si está bloqueada, por qué.
+- **Configuración.** Las secciones están en un menú lateral agrupado por tema; a la derecha se ve la sección abierta con su explicación.
 
 ### Idioma de la interfaz
 

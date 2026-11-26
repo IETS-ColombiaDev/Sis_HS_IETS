@@ -6,6 +6,7 @@ import Button from "../components/Button";
 import { Input } from "../components/Field";
 import PasswordField from "../components/PasswordField";
 import LanguageSwitch from "../components/LanguageSwitch";
+import { BrandMark } from "../branding/BrandingContext";
 import Icon from "../components/Icon";
 import { t } from "../i18n";
 
@@ -121,9 +122,7 @@ export default function Login() {
         }}
       >
         <div style={{ position: "relative", zIndex: 2, maxWidth: 460 }}>
-          <div className="login-logo" aria-hidden="true">
-            <Icon name="radar" size={30} strokeWidth={2} />
-          </div>
+          <BrandMark className="login-logo" iconSize={30} />
           <h1 style={{ fontSize: 34, fontWeight: 800, lineHeight: 1.15, color: "#fff" }}>
             {t("Sistema de Escaneo de Horizonte")}
           </h1>

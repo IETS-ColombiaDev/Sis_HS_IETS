@@ -49,6 +49,7 @@ const STAGE_TONE = {
 
 const VIA_TONE = {
   google_news: "warning",
+  busqueda_web: "warning",
   rss_oficial: "warning",
   indice_pubmed: "warning",
   ruta_matriz: "info",
@@ -165,6 +166,7 @@ const ROUTE_LABEL = {
   rss_oficial: t("RSS oficial"),
   indice_pubmed: t("Índice de PubMed"),
   google_news: "Google News",
+  busqueda_web: t("Buscadores web"),
   api: "API",
 };
 

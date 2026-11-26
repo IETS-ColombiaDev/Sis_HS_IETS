@@ -48,8 +48,8 @@ export default {
   "fuente, agregar fuente, nueva fuente, sitio, url, alta rapida, catalogo, rss, editar fuente":
     "source, add source, new source, site, url, quick add, catalog, rss, edit source",
   "Abra Catálogo de fuentes.": "Open Source catalog.",
-  "«Alta rápida» registra solo con la URL; «Agregar fuente» abre el formulario completo (adaptador, nivel, flujo de escaneo).":
-    "“Quick add” registers a source with just the URL; “Add source” opens the full form (adapter, level, scanning flow).",
+  "En «Agregar fuente»: «Alta rápida» registra solo con la URL y «Registro completo» abre el formulario (adaptador, nivel, flujo de escaneo).":
+    "Under “Add source”: “Quick add” registers with just the URL and “Full registration” opens the form (adapter, level, scan workflow).",
   "Use «Vista previa» para comprobar qué lee el sistema antes de guardar.":
     "Use “Preview” to check what the system reads before saving.",
 
@@ -57,8 +57,8 @@ export default {
   "sonda, salud, fuente caida, rojo, ambar, 403, bloquea, no funciona fuente, sondear":
     "probe, source health, health probe, source down, in red, amber, 403, blocked, source not working, probing",
   "Abra Catálogo de fuentes y la pestaña «Salud de fuentes».": "Open Source catalog and the “Source health” tab.",
-  "«Sondear todas» prueba el inventario completo en segundo plano (o «Solo A/B» las principales); «Sonda» o «Repetir sonda» prueba una sola.":
-    "“Probe all” tests the full inventory in the background (or “A/B only” for the main ones); “Probe” or “Repeat probe” tests a single source.",
+  "En «Mantenimiento», «Sondear todas» prueba el inventario completo en segundo plano (o «Solo A/B» las principales); «Sonda» o «Repetir sonda» prueba una sola.":
+    "Under “Maintenance”, “Probe all” tests the full inventory in the background (or “A/B only” for the main ones); “Probe” or “Repeat probe” tests a single source.",
   "Verde = funciona (o usa una ruta de respaldo); ámbar = revise la URL; rojo = sin acceso.":
     "Green = working (or using a fallback route); amber = check the URL; red = no access.",
 

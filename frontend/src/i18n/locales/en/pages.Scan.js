@@ -1,5 +1,8 @@
 // src/pages/Scan.jsx — Vigilancia de fuentes (fase 1 · identificación).
 export default {
+  "vacía": "empty",
+  "{n} trabajo(s)": "{n} job(s)",
+  "probar una URL sin guardar nada": "try a URL without saving anything",
   // Estados de trabajos y corridas
   "Pendiente": "Pending",
   "Ejecutando": "Running",

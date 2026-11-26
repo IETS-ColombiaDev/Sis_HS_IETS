@@ -1020,3 +1020,49 @@ en-GB y en-US sin errores de consola. `backend/tests/test_idioma.py`: la instruc
   técnico en las pantallas que más usa.
 - Documentos exportados y correos siguen en español.
 - Los nombres de clústeres y tipologías editados a mano en Configuración se muestran como se escribieron.
+
+## Respaldo por buscadores, pantallas reorganizadas y logo institucional (26-11-2026, versión 7.7.0)
+
+**Por qué.** La primera vigilancia completa en producción con la 7.5.0 dejó 20 de 115 fuentes en «No pudo entrar».
+El informe de acceso (`informe_acceso_fuentes_2026-11-26.csv`) muestra la misma causa en las 20: el sitio rechaza la
+lectura directa desde Render (13 con HTTP 403, una con 400, una con 401, una con 406 y cuatro sin respuesta) y el
+respaldo de Google News respondió HTTP 503 (19) o 429 (1). Desde un equipo local Google News sí contesta: bloquea la
+dirección del centro de datos. En esa misma corrida la búsqueda web del sistema sí trajo resultados en 65 fuentes.
+
+**Qué cambió en la vigilancia.**
+
+- `scraper.py`: nueva ruta de respaldo `busqueda_web`. Si el sitio, sus canales y Google News fallan, se consultan los
+  buscadores de `web_search` (en cascada, con pausa y base de conocimiento) por el dominio de la fuente y sus
+  resultados se leen como un canal: solo quedan los ítems pertinentes y la corrida queda **parcial**, igual que con
+  Google News. Se usa aunque la fuente tenga la búsqueda web apagada en su flujo, porque es el último recurso; sí
+  respeta el interruptor general de Parámetros de fuentes.
+- Sin resultados, la fuente sigue como «No pudo entrar» y el mensaje nombra también esa ruta
+  («buscadores web: sin resultados»).
+- `scan_progress.py`: etiqueta y ruta de respaldo nuevas; el informe de acceso la muestra como
+  «Resultados de buscadores para el dominio (el sitio no respondió)».
+
+**Qué cambió en la interfaz.**
+
+- **Vigilancia** (`pages/Scan.jsx`): «Inventario» queda junto a «Ejecutar vigilancia». La vigilancia programada pasa a
+  una franja; la cola de ingesta y la vista previa de un enlace quedan plegadas en la misma tarjeta (`<details>`), la
+  cola se abre sola cuando tiene trabajos. No se quitó ninguna función.
+- **Catálogo de fuentes** (`pages/Sources.jsx`): los ocho botones de la cabecera pasan a tres menús
+  (`components/ActionMenu.jsx`): Descargar, Mantenimiento y Agregar fuente. Cada opción lleva su explicación y el
+  motivo cuando está bloqueada.
+- **Configuración** (`pages/Settings.jsx`, `components/layout.css`): menú lateral fijo agrupado por tema y cabecera
+  de sección; en pantallas angostas vuelve a filas.
+- **Logo institucional**: `app/branding.py`, `GET /api/branding` (público), `PUT` y `DELETE /api/config/branding`
+  (permiso `config:manage`, quedan en bitácora). PNG, JPG o WebP hasta 400 KB, validados por la firma del archivo
+  (un SVG se rechaza). Se guarda como data URL en `app_meta` (`brand.logo`), así viaja con la copia en Firestore.
+  En el frontend: `branding/BrandingContext.jsx` (`BrandMark`) y `components/BrandingPanel.jsx`.
+
+**Pruebas.** `tests/test_scan_progress_and_feeds.py` (respaldo por buscadores, con y sin resultados),
+`tests/test_branding.py`, `e2e/identidad.spec.js`; se ajustaron `crud_scan`, `crud_sources`, `modulo0_pendientes` y
+`menu_ordenado` a los controles reagrupados.
+
+**Pendientes.**
+
+- Confirmar en producción cuántas de las 20 fuentes entran por la ruta nueva: depende de que los buscadores respondan
+  desde Render y de que tengan indexado el dominio. Las que sigan sin entrar necesitan el cliente compatible con
+  navegador (decisión del IETS, Configuración › Parámetros de fuentes) o revisión de la URL en la matriz.
+- Las señales que llegan por buscadores son titulares y fragmentos: conviene abrir el enlace antes de clasificarlas.

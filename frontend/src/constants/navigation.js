@@ -98,7 +98,7 @@ export const HOWTO = [
     keys: t("fuente, agregar fuente, nueva fuente, sitio, url, alta rapida, catalogo, rss, editar fuente").split(", "),
     steps: [
       t("Abra Catálogo de fuentes."),
-      t("«Alta rápida» registra solo con la URL; «Agregar fuente» abre el formulario completo (adaptador, nivel, flujo de escaneo)."),
+      t("En «Agregar fuente»: «Alta rápida» registra solo con la URL y «Registro completo» abre el formulario (adaptador, nivel, flujo de escaneo)."),
       t("Use «Vista previa» para comprobar qué lee el sistema antes de guardar."),
     ],
   },
@@ -110,7 +110,7 @@ export const HOWTO = [
     keys: t("sonda, salud, fuente caida, rojo, ambar, 403, bloquea, no funciona fuente, sondear").split(", "),
     steps: [
       t("Abra Catálogo de fuentes y la pestaña «Salud de fuentes»."),
-      t("«Sondear todas» prueba el inventario completo en segundo plano (o «Solo A/B» las principales); «Sonda» o «Repetir sonda» prueba una sola."),
+      t("En «Mantenimiento», «Sondear todas» prueba el inventario completo en segundo plano (o «Solo A/B» las principales); «Sonda» o «Repetir sonda» prueba una sola."),
       t("Verde = funciona (o usa una ruta de respaldo); ámbar = revise la URL; rojo = sin acceso."),
     ],
   },

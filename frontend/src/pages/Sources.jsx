@@ -10,6 +10,7 @@ import { PERM } from "../constants/methodology";
 import PhaseGuide, { ModuleStatsRow } from "../components/PhaseGuide";
 import { Card } from "../components/Card";
 import Button from "../components/Button";
+import ActionMenu from "../components/ActionMenu";
 import HintButton from "../components/HintButton";
 import Badge from "../components/Badge";
 import Icon from "../components/Icon";
@@ -715,50 +716,101 @@ export default function Sources() {
         purpose={t("Inventario RF01 / D-06: fuentes verificadas clasificadas por contrato de datos. Las de nivel A y B sostienen el pipeline; el resto lo enriquece.")}
         actions={
           <div className="fb-toolbar">
-            <HintButton
-              variant="secondary"
-              hint={t("Descarga el catálogo en Excel (.xlsx): hoja de fuentes con filtros e hipervínculos, fuentes de consulta manual (tipo E) y su estado, resumen por nivel, tipo y salud, y las fuentes retiradas.")}
-              onClick={() => exportFile("xlsx")}
-              loading={exporting === "xlsx"}
-              data-testid="sources-export-xlsx"
-            >
-              <Icon name="doc" size={16} /> {t("Descargar Excel")}
-            </HintButton>
-            <HintButton variant="ghost" hint={t("El mismo listado en CSV (separado por punto y coma), para otros programas")} onClick={() => exportFile("csv")} loading={exporting === "csv"}>
-              CSV
-            </HintButton>
-            <HintButton
-              variant="outline"
-              hint={t("Prueba todas las fuentes activas del inventario (no solo A y B) en segundo plano, de a varias a la vez. Deja el estado verde, ámbar o rojo de cada una y su informe en Excel.")}
-              disabledHint={bulk?.running ? t("Ya hay un sondeo en curso") : noScan}
-              disabled={!canScan || bulk?.running}
-              onClick={probeEverything}
+            <ActionMenu
+              label={t("Descargar")}
+              icon="doc"
+              testId="sources-download-menu"
+              loading={Boolean(exporting)}
+              items={[
+                {
+                  key: "xlsx",
+                  label: t("Descargar Excel"),
+                  icon: "doc",
+                  description: t("Catálogo en .xlsx: fuentes con filtros e hipervínculos, fuentes tipo E, resumen y retiradas."),
+                  onSelect: () => exportFile("xlsx"),
+                  testId: "sources-export-xlsx",
+                },
+                {
+                  key: "csv",
+                  label: "CSV",
+                  icon: "list",
+                  description: t("El mismo listado en CSV (separado por punto y coma), para otros programas"),
+                  onSelect: () => exportFile("csv"),
+                },
+              ]}
+            />
+            <ActionMenu
+              label={t("Mantenimiento")}
+              icon="pulse"
+              testId="sources-maintenance-menu"
               loading={probingAll}
-              data-testid="sources-probe-all"
-            >
-              <Icon name="pulse" size={16} /> {t("Sondear todas")}
-            </HintButton>
-            <HintButton variant="outline" hint={GLOSSARY.fb_recargar_catalogo} disabledHint={noWrite} disabled={!canWrite} onClick={() => setConfirmImport(true)}>
-              <Icon name="layers" size={16} /> {t("Recargar catálogo")}
-            </HintButton>
-            <HintButton
-              variant="outline"
-              hint={t("Sube el Excel de la matriz de fuentes (MATRIZ_FUENTES_ESCANEO_EH, .xlsx) o una hoja de Google Sheets: valida, muestra la vista previa de diferencias y conflictos, y no guarda nada hasta que usted confirme. Genera un reporte descargable y queda en bitácora.")}
-              disabledHint={noWrite}
-              disabled={!canWrite}
-              onClick={() => setMatrixOpen(true)}
-            >
-              <Icon name="doc" size={16} /> {t("Cargar matriz")}
-            </HintButton>
-            <HintButton variant="outline" hint={DISCOVER_HINT} disabledHint={noWrite} disabled={!canWrite} onClick={openDiscover}>
-              <Icon name="spark" size={16} /> {t("Detectar fuentes con IA")}
-            </HintButton>
-            <HintButton variant="secondary" hint={GLOSSARY.fb_alta_rapida} disabledHint={noWrite} disabled={!canWrite} onClick={() => { setQuick(QUICK_EMPTY); setPreview(null); setQuickOpen(true); }}>
-              <Icon name="plus" size={16} /> {t("Alta rápida")}
-            </HintButton>
-            <HintButton hint={t("Registrar una fuente con adaptador, nivel, frecuencia y configuración")} disabledHint={noWrite} disabled={!canWrite} onClick={() => openAdvanced()}>
-              <Icon name="plus" size={16} /> {t("Agregar fuente")}
-            </HintButton>
+              items={[
+                {
+                  key: "probe",
+                  label: t("Sondear todas"),
+                  icon: "pulse",
+                  description: t("Prueba todas las fuentes activas en segundo plano y deja su estado verde, ámbar o rojo y un informe en Excel."),
+                  disabled: !canScan || bulk?.running,
+                  disabledHint: bulk?.running ? t("Ya hay un sondeo en curso") : noScan,
+                  onSelect: probeEverything,
+                  testId: "sources-probe-all",
+                },
+                {
+                  key: "reload",
+                  label: t("Recargar catálogo"),
+                  icon: "layers",
+                  description: GLOSSARY.fb_recargar_catalogo,
+                  disabled: !canWrite,
+                  disabledHint: noWrite,
+                  onSelect: () => setConfirmImport(true),
+                },
+              ]}
+            />
+            <ActionMenu
+              label={t("Agregar fuente")}
+              icon="plus"
+              variant="primary"
+              align="right"
+              testId="sources-add-menu"
+              items={[
+                {
+                  key: "quick",
+                  label: t("Alta rápida"),
+                  icon: "plus",
+                  description: GLOSSARY.fb_alta_rapida,
+                  disabled: !canWrite,
+                  disabledHint: noWrite,
+                  onSelect: () => { setQuick(QUICK_EMPTY); setPreview(null); setQuickOpen(true); },
+                },
+                {
+                  key: "full",
+                  label: t("Registro completo"),
+                  icon: "cog",
+                  description: t("Registrar una fuente con adaptador, nivel, frecuencia y configuración"),
+                  disabled: !canWrite,
+                  disabledHint: noWrite,
+                  onSelect: () => openAdvanced(),
+                },
+                {
+                  key: "matrix",
+                  label: t("Cargar matriz"),
+                  icon: "doc",
+                  description: t("Sube el Excel de la matriz de fuentes o una hoja de Google Sheets: muestra las diferencias y no guarda nada hasta que usted confirme."),
+                  disabled: !canWrite,
+                  disabledHint: noWrite,
+                  onSelect: () => setMatrixOpen(true),
+                },
+                {
+                  key: "discover",
+                  label: t("Detectar fuentes con IA"),
+                  icon: "spark",
+                  description: DISCOVER_HINT,
+                  disabled: !canWrite,
+                  disabledHint: noWrite,
+                  onSelect: openDiscover,
+                },
+              ]}
+            />
           </div>
         }
       />

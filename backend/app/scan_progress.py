@@ -57,6 +57,7 @@ ACCESS_VIA_LABELS = {
     "ruta_matriz": "URL de entrada de la matriz EH",
     "rss_oficial": "RSS oficial del sitio (la portada no respondió)",
     "google_news": "RSS de Google News (el sitio no respondió)",
+    "busqueda_web": "Resultados de buscadores para el dominio (el sitio no respondió)",
     "api": "API del adaptador",
     "pdf": "Documento PDF",
 }
@@ -291,7 +292,7 @@ OUTCOME_LABELS = {
     "en_curso": "En curso",
     "sin_ejecutar": "Sin ejecutar",
 }
-BACKUP_ROUTES = ("google_news", "rss_oficial", "indice_pubmed")
+BACKUP_ROUTES = ("google_news", "rss_oficial", "indice_pubmed", "busqueda_web")
 
 
 def access_outcome(entry: dict | None, job_status: str = "") -> str:
