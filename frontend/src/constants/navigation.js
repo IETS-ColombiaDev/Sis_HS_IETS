@@ -5,29 +5,31 @@ import { GLOSSARY } from "./glossary";
  * navegacion leen de aqui. Una pantalla nueva se agrega una sola vez.
  */
 export const NAV = [
-  { section: "Operación diaria" },
+  { section: "Inicio" },
   { to: "/", label: "Bandeja de trabajo", icon: "home", end: true, help: GLOSSARY.bandeja_trabajo },
   { to: "/ciclos", label: "Ciclos de escaneo", icon: "calendar", help: GLOSSARY.ciclo },
+  { to: "/notas", label: "Notas del equipo", icon: "note", help: "Notas internas del equipo, vinculadas a señales, fuentes o informes. No son el informe público." },
+  // Las cuatro fases, en el orden de la metodologia. `sub` marca las pantallas
+  // que pertenecen a la fase de arriba, en el orden en que se usan.
   { section: "Metodología IETS" },
   { to: "/vigilancia", label: "1. Vigilancia", icon: "radar", help: GLOSSARY.vigilancia },
-  { to: "/fuentes", label: "Catálogo de fuentes", icon: "globe", help: GLOSSARY.catalogo_fuentes },
-  { to: "/bandeja-entrada", label: "Bandeja de entrada", icon: "inbox", help: GLOSSARY.bandeja_entrada },
-  { to: "/postulaciones", label: "Postulaciones", icon: "note", help: GLOSSARY.postulacion },
-  { to: "/filtrado", label: "Filtrado y depuración", icon: "filter", help: GLOSSARY.filtrado },
+  { to: "/fuentes", label: "Catálogo de fuentes", icon: "globe", sub: true, help: GLOSSARY.catalogo_fuentes },
+  { to: "/senales", label: "Señales capturadas", icon: "list", sub: true, help: GLOSSARY.senal },
+  { to: "/bandeja-entrada", label: "Bandeja de entrada", icon: "inbox", sub: true, help: GLOSSARY.bandeja_entrada },
+  { to: "/postulaciones", label: "Postulaciones", icon: "note", sub: true, help: GLOSSARY.postulacion },
+  { to: "/filtrado", label: "Filtrado y depuración", icon: "filter", sub: true, help: GLOSSARY.filtrado },
   { to: "/priorizacion", label: "2. Priorización", icon: "layers", help: GLOSSARY.priorizacion },
   { to: "/evaluacion", label: "3. Evaluación", icon: "doc", help: GLOSSARY.evaluacion },
   { to: "/diseminacion", label: "4. Diseminación", icon: "bulb", help: GLOSSARY.diseminacion },
-  { to: "/boletines", label: "Boletines del ciclo", icon: "book", help: GLOSSARY.boletin },
-  { to: "/notas", label: "Notas del equipo", icon: "note", help: "Notas internas del equipo, vinculadas a señales, fuentes o informes. No son el informe público." },
-  { section: "Análisis y alertas" },
+  { to: "/boletines", label: "Boletines del ciclo", icon: "book", sub: true, help: GLOSSARY.boletin },
+  { section: "Análisis y seguimiento" },
   { to: "/dashboards", label: "Tablero estratégico", icon: "chart", help: GLOSSARY.tablero },
   { to: "/alertas", label: "Alertas tempranas", icon: "pulse", help: GLOSSARY.alertas },
-  { to: "/senales", label: "Señales capturadas", icon: "list", help: GLOSSARY.senal },
   { to: "/chat", label: "Asistente IA", icon: "chat", help: GLOSSARY.minimax },
   { section: "Administración", permission: "config:manage" },
-  { to: "/auditoria", label: "Bitácora de auditoría", icon: "shield", permission: "audit:read", help: GLOSSARY.bitacora },
-  { to: "/configuracion", label: "Configuración", icon: "cog", permission: "config:manage", help: "Parámetros de la metodología, el modelo de IA y las llaves de las fuentes automáticas." },
+  { to: "/configuracion", label: "Configuración", icon: "cog", permission: "config:manage", help: "Metodología, fuentes y vigilancia, inteligencia artificial y respaldo de datos." },
   { to: "/usuarios", label: "Usuarios y perfiles", icon: "users", permission: "user:manage", help: GLOSSARY.rbac },
+  { to: "/auditoria", label: "Bitácora de auditoría", icon: "shield", permission: "audit:read", help: GLOSSARY.bitacora },
 ];
 
 // Titulo de cada ruta (cabecera y pestaña del navegador).
