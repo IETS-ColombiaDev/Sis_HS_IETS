@@ -64,6 +64,14 @@ def run_scan(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Las fuentes elegidas están retiradas del inventario vigente; no hay nada que encolar.",
         )
+    from .. import scheduler_service
+
+    scheduler_service.record_manual_scan(
+        db,
+        jobs,
+        triggered_by=user.email,
+        scope=scheduler_service.SCOPE_SELECTION if payload.source_ids else scheduler_service.SCOPE_ALL,
+    )
     kick()
     by_id = {s.id: s for s in sources}
     logs = [_job_as_log(j, by_id.get(j.source_id)) for j in jobs]
@@ -95,7 +103,14 @@ def run_scan_source(
             status_code=status.HTTP_409_CONFLICT,
             detail="No se pudo encolar la fuente.",
         )
+    from .. import scheduler_service
+
+    scheduler_service.record_manual_scan(db, jobs, triggered_by=user.email, scope=scheduler_service.SCOPE_SELECTION)
     job = run_job(db, jobs[0].id)
+    try:
+        scheduler_service.finalize_scan_runs(db)
+    except Exception:  # noqa: BLE001 - el historial se cierra en la siguiente consulta
+        db.rollback()
     return _job_as_log(job, source)
 
 

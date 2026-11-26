@@ -138,7 +138,8 @@ def test_an_empty_google_news_fallback_creates_no_signal(db, monkeypatch):
 def test_access_route_names_where_the_content_came_from():
     src = Source(title="BMJ", url="https://www.bmj.com/")
     assert scraper.access_route(src, "https://www.bmj.com") == "sitio"
-    assert scraper.access_route(src, "https://www.bmj.com/rss/recent.xml") == "rss_oficial"
+    jama = Source(title="JAMA", url="https://jamanetwork.com/")
+    assert scraper.access_route(jama, "https://jamanetwork.com/rss/site_3/67.xml") == "rss_oficial"
     assert scraper.access_route(src, scraper.news_feed_url(src)) == "google_news"
     assert scraper.access_route(src, "https://www.bmj.com/research", ["https://www.bmj.com/research"]) == "ruta_matriz"
 

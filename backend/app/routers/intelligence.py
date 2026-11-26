@@ -32,6 +32,8 @@ def _status(db: Session) -> dict:
         "knowledge": intelligence.stats(db),
         "calibration": intelligence.load_calibration(db),
         "acceptance": intelligence.acceptance(db),
+        "model_card": intelligence.model_card(db),
+        "trace": intelligence.suggestion_trace(db),
     }
 
 

@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     ai_ocr_enabled: bool = False
     ai_web_enabled: bool = True
 
+    # Vigilancia: si un sitio publico rechaza al cliente HTTP normal (403, 406 o
+    # sin respuesta), se repite la descarga con un cliente compatible con
+    # navegador (curl_cffi). Respeta robots.txt. false = solo el cliente normal.
+    browser_fetch_enabled: bool = True
+
     # Verificacion INVIMA (RF11): si el indice local no tiene la tecnologia, se
     # consulta en vivo datos.gov.co. false = solo el indice local (pruebas aisladas).
     invima_live_lookup: bool = True

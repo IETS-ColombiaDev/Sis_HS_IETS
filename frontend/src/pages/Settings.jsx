@@ -62,6 +62,11 @@ export default function Settings() {
     setTabState(id);
     setSearchParams(id === "metodologia" ? {} : { tab: id }, { replace: true });
   };
+  // Un enlace interno (?tab=...) abre su pestaña aunque la pantalla ya esté montada.
+  const urlTab = searchParams.get("tab");
+  useEffect(() => {
+    if (urlTab && TABS.some((t) => t.id === urlTab)) setTabState(urlTab);
+  }, [urlTab]);
   const [cfg, setCfg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState("");

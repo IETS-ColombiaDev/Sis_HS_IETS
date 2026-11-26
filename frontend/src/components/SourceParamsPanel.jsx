@@ -34,6 +34,11 @@ const SWITCHES = [
   { key: "prefer_documents", title: "Priorizar documentos", text: "PDF, informes y publicaciones se leen primero." },
   { key: "knowledge_enabled", title: "Usar la base de conocimiento de búsqueda", text: "Visita las páginas ya encontradas sin consultar buscadores. Si son recientes, no se busca en vivo." },
   { key: "sitemap_fallback", title: "Respaldo por mapa del sitio", text: "Si los buscadores bloquean o no traen nada, lee el mapa del sitio de la propia fuente. No requiere llave." },
+  {
+    key: "browser_fetch",
+    title: "Acceso con cliente compatible con navegador",
+    text: "Si un sitio público rechaza al rastreador (HTTP 403 o 406, o no responde), repite la descarga como lo haría un navegador. Respeta robots.txt y no resuelve captchas ni inicia sesión. Enciéndalo solo si las condiciones de uso de las fuentes lo permiten: es decisión del IETS.",
+  },
 ];
 
 const splitList = (t) => String(t || "").split(/[\n,;]/).map((x) => x.trim()).filter(Boolean);

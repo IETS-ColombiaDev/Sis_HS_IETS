@@ -89,6 +89,19 @@ def probe_source(db: Session, source: Source, *, persist: bool = True) -> dict:
         detail["http_status"] = resp.status_code
         notes: list = []
         if resp.status_code != expect_status and connector == "html":
+            # El escaner repite la descarga con el cliente compatible con navegador.
+            from . import access_routes
+
+            if access_routes.configure_from_db(db):
+                alt_status = access_routes.browser_get(url, 25.0)[0]
+                if alt_status == expect_status:
+                    detail["message"] = (
+                        f"La portada rechaza al cliente básico (HTTP {resp.status_code}); el escaneo entra "
+                        "con el cliente compatible con navegador."
+                    )
+                    detail["http_status"] = alt_status
+                    _store(db, source, "verde", detail, persist)
+                    return detail
             # Igual que el escaner: si la portada bloquea, vale la ruta de respaldo.
             alt = _working_fallback(source, headers, expect_status, notes)
             if alt:

@@ -93,6 +93,9 @@ DEFAULT_SEARCH: dict = {
     "knowledge_enabled": True,
     # Respaldo sin buscadores: leer el mapa del sitio de la propia fuente.
     "sitemap_fallback": True,
+    # Acceso con cliente compatible con navegador cuando el sitio rechaza al cliente
+    # normal (403/406). Apagado de fabrica: lo enciende el IETS en Parametros de fuentes.
+    "browser_fetch": False,
     "knowledge_fresh_days": 30,
     "time_budget_s": 45,
 }
@@ -395,7 +398,7 @@ def _clean_terms_by_category(value) -> list[dict]:
 
 def save_search(db: Session, payload: dict) -> dict:
     current = _read_json(db, SEARCH_KEY)
-    for key in ("enabled", "ai_queries", "same_domain_only", "prefer_documents", "knowledge_enabled", "sitemap_fallback"):
+    for key in ("enabled", "ai_queries", "same_domain_only", "prefer_documents", "knowledge_enabled", "sitemap_fallback", "browser_fetch"):
         if key in payload and payload[key] is not None:
             current[key] = bool(payload[key])
     for key, (lo, hi) in SEARCH_LIMITS.items():

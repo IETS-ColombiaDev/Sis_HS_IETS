@@ -101,13 +101,36 @@ def _aware(value: datetime | None) -> datetime | None:
 # --------------------------------------------------------------------------- #
 #  Consulta
 # --------------------------------------------------------------------------- #
-def last_run(db: Session, task: str) -> ScheduledRun | None:
-    return (
+# Alcance de una corrida de vigilancia (detail["scope"]). Solo `vencidas` es la
+# tarea programada: las otras dos las lanza una persona desde la pantalla y no
+# mueven el reloj de la programacion.
+SCOPE_DUE = "vencidas"
+SCOPE_ALL = "todas"
+SCOPE_SELECTION = "seleccion"
+SCOPE_LABELS = {
+    SCOPE_DUE: "Fuentes con frecuencia vencida",
+    SCOPE_ALL: "Todas las fuentes activas",
+    SCOPE_SELECTION: "Fuentes seleccionadas",
+}
+
+
+def _scope(run: ScheduledRun) -> str:
+    return (run.detail or {}).get("scope") or SCOPE_DUE
+
+
+def last_run(db: Session, task: str, *, any_scope: bool = False) -> ScheduledRun | None:
+    """Ultima corrida de la tarea. Sin `any_scope`, solo las de la tarea programada."""
+    rows = (
         db.query(ScheduledRun)
         .filter(ScheduledRun.task == task)
         .order_by(ScheduledRun.started_at.desc(), ScheduledRun.id.desc())
-        .first()
+        .limit(1 if any_scope else 60)
+        .all()
     )
+    for run in rows:
+        if any_scope or _scope(run) == SCOPE_DUE:
+            return run
+    return None
 
 
 def next_due(db: Session, task: str, cfg: dict | None = None) -> datetime | None:
@@ -203,7 +226,7 @@ def run_scan(db: Session, *, origin: str = "programado", triggered_by: str = "pr
         return run
 
     job_ids = [j.id for j in jobs]
-    run.detail = {"job_ids": job_ids, "source_ids": [j.source_id for j in jobs]}
+    run.detail = {"job_ids": job_ids, "source_ids": [j.source_id for j in jobs], "scope": SCOPE_DUE}
     if not job_ids:
         run.status = "sin_trabajo"
         run.finished_at = _now()
@@ -303,11 +326,17 @@ def finalize_scan_runs(db: Session) -> int:
             run.status = "parcial"
         else:
             run.status = "ok"
-        run.finished_at = _now()
+        # La corrida termina cuando termina su ultima fuente, no cuando el worker lo nota.
+        ends = [_aware(j.finished_at) for j in jobs if j.finished_at]
+        run.finished_at = max(ends) if ends else _now()
+        summary = _scan_summary(db, jobs)
+        no_access = summary["outcomes"].get("no_entro", 0)
+        run.detail = {**(run.detail or {}), "summary": summary}
         run.message = (
             f"{len(jobs)} fuente(s) procesadas: {run.items_new} señal(es) nuevas de "
             f"{run.items_found} detectadas"
             + (f"; {errors} con error" if errors else "")
+            + (f"; no se pudo entrar a {no_access}" if no_access else "")
             + "."
         )
         db.commit()
@@ -319,13 +348,156 @@ def finalize_scan_runs(db: Session) -> int:
                 kind=ALERT_KIND_SCAN,
                 title=f"{run.items_new} señal(es) nuevas en la bandeja de entrada",
                 body=(
-                    f"La vigilancia programada proceso {len(jobs)} fuente(s) y dejó {run.items_new} "
+                    f"La vigilancia {'manual' if run.origin == 'manual' else 'programada'} procesó "
+                    f"{len(jobs)} fuente(s) y dejó {run.items_new} "
                     "señal(es) nuevas por clasificar en la Bandeja de entrada."
                 ),
             )
     if closed:
         bump_state_version(db)
     return closed
+
+
+def record_manual_scan(db: Session, jobs: list, *, triggered_by: str, scope: str) -> ScheduledRun | None:
+    """Deja en el historial una vigilancia lanzada a mano desde la pantalla.
+
+    Si ya hay una corrida manual abierta, las fuentes nuevas se suman a ella: para
+    quien mira la pantalla es la misma vigilancia. Nunca lanza: el historial no
+    puede impedir que la vigilancia corra.
+    """
+    try:
+        job_ids = [j.id for j in jobs if j.id]
+        if not job_ids:
+            return None
+        source_ids = [j.source_id for j in jobs if j.id]
+        open_run = (
+            db.query(ScheduledRun)
+            .filter(ScheduledRun.task == TASK_SCAN, ScheduledRun.status == "en_curso", ScheduledRun.origin == "manual")
+            .order_by(ScheduledRun.id.desc())
+            .first()
+        )
+        if open_run is not None and _scope(open_run) != SCOPE_DUE:
+            detail = dict(open_run.detail or {})
+            detail["job_ids"] = list(dict.fromkeys([*(detail.get("job_ids") or []), *job_ids]))
+            detail["source_ids"] = list(dict.fromkeys([*(detail.get("source_ids") or []), *source_ids]))
+            if scope == SCOPE_ALL:
+                detail["scope"] = SCOPE_ALL
+            open_run.detail = detail
+            open_run.message = f"{len(detail['job_ids'])} fuente(s) encoladas; el worker las procesa en segundo plano."
+            _commit(db, open_run)
+            return open_run
+        run = ScheduledRun(
+            task=TASK_SCAN,
+            origin="manual",
+            triggered_by=triggered_by,
+            status="en_curso",
+            detail={"job_ids": job_ids, "source_ids": source_ids, "scope": scope},
+            message=f"{len(job_ids)} fuente(s) encoladas; el worker las procesa en segundo plano.",
+        )
+        _commit(db, run)
+        return run
+    except Exception:  # noqa: BLE001
+        log.exception("No se pudo registrar la vigilancia en el historial")
+        db.rollback()
+        return None
+
+
+def _scan_summary(db: Session, jobs: list) -> dict:
+    """Totales de una corrida: fuentes por estado y por desenlace de acceso."""
+    from . import scan_progress
+
+    counts = {status: 0 for status in ("ok", "parcial", "error", "cancelado")}
+    for job in jobs:
+        if job.status in counts:
+            counts[job.status] += 1
+    report = scan_progress.load_report(db)
+    outcomes = {key: 0 for key in scan_progress.OUTCOME_LABELS if key not in ("en_curso", "sin_ejecutar")}
+    failed: list[dict] = []
+    for job in jobs:
+        entry = report.get(str(job.source_id))
+        if entry and entry.get("job_id") != job.id:
+            entry = None  # el informe ya guarda una corrida posterior de esa fuente
+        if entry is None:
+            # Sin detalle guardado, el estado del job dice lo esencial.
+            if job.status in ("error", "cancelado"):
+                outcome = "no_entro"
+            else:
+                outcome = "entro_directo" if (job.items_found or 0) else "entro_sin_senales"
+        else:
+            outcome = scan_progress.access_outcome(entry)
+        if outcome in outcomes:
+            outcomes[outcome] += 1
+        if outcome in ("no_entro", "fallo_despues") and len(failed) < 60:
+            failed.append({"source_id": job.source_id, "outcome": outcome, "message": (job.message or "")[:240]})
+    return {"sources_total": len(jobs), "counts": counts, "outcomes": outcomes, "failed": failed}
+
+
+def scan_history(db: Session, *, limit: int = 30) -> dict:
+    """Historial de vigilancias: inicio, fin, duracion y resumen de cada corrida."""
+    try:
+        finalize_scan_runs(db)
+    except Exception:  # noqa: BLE001 - consultar el historial no depende de cerrar corridas
+        log.exception("Cierre de corridas al consultar el historial")
+        db.rollback()
+    rows = (
+        db.query(ScheduledRun)
+        .filter(ScheduledRun.task == TASK_SCAN, ScheduledRun.status != "sin_trabajo")
+        .order_by(ScheduledRun.started_at.desc(), ScheduledRun.id.desc())
+        .limit(limit)
+        .all()
+    )
+    failed_ids: set[int] = set()
+    runs = []
+    for run in rows:
+        detail = dict(run.detail or {})
+        job_ids = detail.get("job_ids") or []
+        summary = detail.get("summary")
+        pending = 0
+        if run.status == "en_curso" or not summary:
+            jobs = db.query(IngestJob).filter(IngestJob.id.in_(job_ids)).all() if job_ids else []
+            pending = sum(1 for j in jobs if j.status not in FINISHED_JOB_STATUSES)
+            summary = _scan_summary(db, [j for j in jobs if j.status in FINISHED_JOB_STATUSES])
+            summary["sources_total"] = len(job_ids)
+            found = sum(j.items_found or 0 for j in jobs)
+            new = sum(j.items_new or 0 for j in jobs)
+        else:
+            found, new = run.items_found or 0, run.items_new or 0
+        started = _aware(run.started_at)
+        finished = _aware(run.finished_at)
+        end = finished or _now()
+        failed = [dict(item) for item in summary.get("failed") or []]
+        failed_ids.update(item["source_id"] for item in failed if item.get("source_id"))
+        scope = detail.get("scope") or SCOPE_DUE
+        runs.append(
+            {
+                "id": run.id,
+                "status": run.status,
+                "origin": run.origin,
+                "scope": scope,
+                "scope_label": SCOPE_LABELS.get(scope, scope),
+                "triggered_by": run.triggered_by,
+                "started_at": started,
+                "finished_at": finished,
+                "duration_seconds": max(0, int((end - started).total_seconds())) if started else None,
+                "sources_total": summary.get("sources_total", len(job_ids)),
+                "sources_pending": pending,
+                "counts": summary.get("counts", {}),
+                "outcomes": summary.get("outcomes", {}),
+                "failed": failed,
+                "items_found": found,
+                "items_new": new,
+                "message": run.message or "",
+            }
+        )
+    if failed_ids:
+        from .models import Source
+
+        titles = dict(db.query(Source.id, Source.title).filter(Source.id.in_(list(failed_ids))).all())
+        for row in runs:
+            for item in row["failed"]:
+                item["title"] = titles.get(item["source_id"]) or f"Fuente {item['source_id']}"
+    last = next((r for r in runs if r["status"] != "en_curso"), None)
+    return {"runs": runs, "last_finished": last, "scope_labels": SCOPE_LABELS}
 
 
 def run_task(db: Session, task: str, *, origin: str, triggered_by: str) -> ScheduledRun:

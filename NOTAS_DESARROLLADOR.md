@@ -943,3 +943,42 @@ Arranca sola un minuto después de terminar la vigilancia y trabaja por tandas d
 - Verificar en Render, donde la CPU es mucho menor: la vigilancia con IA tardará bastante más de 19 minutos.
 - Si en producción hay un prompt de captura propio guardado, el reforzado no aplica hasta pulsar (Restaurar) en Prompts de vigilancia.
 - Revisar con el equipo técnico las 25 fuentes que no dan señales ni con IA.
+
+## Entrega final: acceso a las fuentes, historial de vigilancias y ficha de modelos (26-11-2026, versión 7.5.0)
+
+**Por qué.** La última vigilancia en producción informó «No pudo entrar» en 24 fuentes. Medido desde un equipo local
+con el rastreador de la 7.4.2, 29 de las 115 fuentes con ingesta activa rechazan la descarga directa: 22 con HTTP 403,
+una con 401, una con 404, una con 406 y cuatro sin respuesta. Casi todas son sitios públicos con filtro anti-robot.
+
+**Qué cambió.**
+
+- `app/access_routes.py` (nuevo). Dos rutas más de acceso:
+  - *Cliente compatible con navegador* (`curl_cffi`). Repite la descarga con el saludo TLS y HTTP/2 de un navegador.
+    En la medición local entraron 23 de 35 páginas que el cliente normal no leía (bloqueadas o devueltas como cascarón).
+    **Viene apagado**: se enciende en Configuración › Parámetros de fuentes («Acceso con cliente compatible con
+    navegador») y el servidor puede prohibirlo con `BROWSER_FETCH_ENABLED=false`. Respeta `robots.txt`, no resuelve
+    captchas ni inicia sesión. Encenderlo es decisión del IETS: algunos sitios prohíben el acceso automático en sus
+    condiciones de uso.
+  - *Índice oficial de la revista en PubMed* (E-utilities de NCBI) para NEJM, The Lancet, BMJ, JAMA y Cochrane, cuyos
+    sitios responden con un reto que ningún cliente HTTP supera. Arma un canal con título, resumen y enlace.
+- `scraper._fetch_url` escala a la ruta de navegador cuando la respuesta es un bloqueo o un cascarón;
+  `fallback_urls` agrega el índice de PubMed antes de Google News. Se retiró el canal RSS de BMJ, que ya responde 404.
+- `ingest_service._run_job`: la sonda en ámbar o rojo ya no suspende una fuente web. En el historial local había 480
+  errores «Sonda rojo: HTTP 403… Ingesta no arrancada»: la fuente quedaba sin leer y sin probar ninguna ruta.
+- Historial de vigilancias: `scheduler_service.record_manual_scan`, `finalize_scan_runs` (ahora guarda el resumen) y
+  `scan_history`; `GET /api/ingest/runs`. Las corridas manuales usan la tabla `scheduled_runs` con `detail.scope`
+  (`todas` o `seleccion`) y no mueven el reloj de la tarea programada (`last_run` las ignora salvo `any_scope=True`).
+  Sin migración: no hay columnas nuevas.
+- Pantalla Vigilancia: «Última realizada» bajo el botón, tarjeta «Historial de vigilancias» e «Informe de acceso por
+  fuente» plegable («Ver informe en tiempo real» durante la corrida).
+- Configuración › Inteligencia: ficha «Modelos, aprendizaje y trazabilidad» (`intelligence.model_card` y
+  `suggestion_trace`, componente `ModelCard.jsx`).
+- Bandeja de trabajo: bloque «Última vigilancia». Tablero estratégico: «Fuentes sin acceso» en el diagnóstico y
+  «Recuperar el acceso a fuentes» en lo prescriptivo.
+
+**Lo que no se resuelve con código.** Con todas las rutas, quedan fuentes que solo se pueden leer por respaldo o a mano:
+`cdsco.gov.in` y `ctri.nic.in` no responden desde fuera de India, `bd.com/es-es/our-products` ya no existe (404: hay que
+actualizar la URL en la matriz) y `cda-amc.ca` responde con reto en todo el dominio. Para ellas rige Google News o la
+consulta manual (fuentes tipo E).
+
+**Pruebas.** `backend/tests/test_entrega_final.py` y `frontend/e2e/entrega_final.spec.js`.
