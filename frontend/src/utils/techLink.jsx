@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import Button from "../components/Button";
 import Icon from "../components/Icon";
+import { t, ts } from "../i18n";
 
 /**
  * Enlace directo a una tecnologia: `?tecnologia=<id>`.
@@ -15,10 +16,10 @@ import Icon from "../components/Icon";
 export const TECH_PARAM = "tecnologia";
 
 export const PAGE_LABEL = {
-  bandeja: "Bandeja de entrada",
-  filtrado: "Filtrado y depuración",
-  priorizacion: "Priorización",
-  evaluacion: "Evaluación",
+  bandeja: t("Bandeja de entrada"),
+  filtrado: t("Filtrado y depuración"),
+  priorizacion: t("Priorización"),
+  evaluacion: t("Evaluación"),
 };
 
 export const PAGE_PATH = {
@@ -103,14 +104,14 @@ export function buildTechNotice(res, { id, page, cycle, setCycleId, navigate }) 
   if (!res || res.kind === "ok") return null;
   const name = res.loc?.name ? `"${res.loc.name.slice(0, 90)}${res.loc.name.length > 90 ? "..." : ""}"` : `#${id}`;
   const goTo = (target, techId = id) => ({
-    label: `Ir a ${PAGE_LABEL[target]}`,
+    label: t("Ir a {page}", { page: PAGE_LABEL[target] }),
     testId: `tech-link-go-${target}`,
     onClick: () => navigate(`${PAGE_PATH[target]}?${TECH_PARAM}=${techId}`),
   });
   const merged = res.loc?.merged_into_id
     ? [
         {
-          label: `Ver la tecnología que la absorbió (#${res.loc.merged_into_id})`,
+          label: t("Ver la tecnología que la absorbió (#{id})", { id: res.loc.merged_into_id }),
           testId: "tech-link-merged",
           onClick: () => navigate(`${PAGE_PATH.filtrado}?${TECH_PARAM}=${res.loc.merged_into_id}`),
         },
@@ -120,23 +121,28 @@ export function buildTechNotice(res, { id, page, cycle, setCycleId, navigate }) 
     case "missing":
       return {
         tone: "warn",
-        message: `La tecnología #${id} no existe o fue eliminada. Revise el enlace.`,
+        message: t("La tecnología #{id} no existe o fue eliminada. Revise el enlace.", { id }),
         actions: [],
       };
     case "staging":
       if (page === "bandeja") return null;
       return {
         tone: "info",
-        message: `La tecnología ${name} todavía está en la bandeja de entrada: no pertenece a ningún ciclo.`,
+        message: t("La tecnología {name} todavía está en la bandeja de entrada: no pertenece a ningún ciclo.", { name }),
         actions: [goTo("bandeja"), ...merged],
       };
     case "other-cycle":
       return {
         tone: "info",
-        message: `La tecnología ${name} no pertenece a ${cycle?.code || "el ciclo en pantalla"}: está en ${res.entry.cycle_code} (${res.entry.status_label}).`,
+        message: t("La tecnología {name} no pertenece a {cycle}: está en {other} ({status}).", {
+          name,
+          cycle: cycle?.code || t("el ciclo en pantalla"),
+          other: res.entry.cycle_code,
+          status: ts(res.entry.status_label),
+        }),
         actions: [
           {
-            label: `Cambiar a ${res.entry.cycle_code}`,
+            label: t("Cambiar a {cycle}", { cycle: res.entry.cycle_code }),
             testId: "tech-link-switch-cycle",
             onClick: () => setCycleId(res.entry.cycle_id),
           },
@@ -145,13 +151,18 @@ export function buildTechNotice(res, { id, page, cycle, setCycleId, navigate }) 
       };
     case "wrong-page": {
       const why = res.loc?.merged_into_id
-        ? ` Fue fusionada con la #${res.loc.merged_into_id}.`
+        ? ` ${t("Fue fusionada con la #{id}.", { id: res.loc.merged_into_id })}`
         : res.entry.exclusion_reason
-        ? ` Causa: ${res.entry.exclusion_reason}.`
+        ? ` ${t("Causa: {reason}.", { reason: ts(res.entry.exclusion_reason) })}`
         : "";
       return {
         tone: "info",
-        message: `La tecnología ${name} está en estado "${res.entry.status_label}" en ${res.entry.cycle_code}; se gestiona en ${PAGE_LABEL[res.page]}.${why}`,
+        message: `${t('La tecnología {name} está en estado "{status}" en {cycle}; se gestiona en {page}.', {
+          name,
+          status: ts(res.entry.status_label),
+          cycle: res.entry.cycle_code,
+          page: PAGE_LABEL[res.page],
+        })}${why}`,
         actions: res.page === page ? merged : [goTo(res.page), ...merged],
       };
     }
@@ -182,7 +193,7 @@ export function TechLinkNotice({ notice, onClose }) {
         )}
       </div>
       {onClose && (
-        <button type="button" className="clamp-text-toggle" onClick={onClose} aria-label="Cerrar aviso">
+        <button type="button" className="clamp-text-toggle" onClick={onClose} aria-label={t("Cerrar aviso")}>
           <Icon name="x" size={14} />
         </button>
       )}

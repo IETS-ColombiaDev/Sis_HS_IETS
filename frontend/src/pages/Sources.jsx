@@ -33,6 +33,7 @@ import SourceMatrixEditor, {
   matrixPayload,
   optionLabel,
 } from "../components/SourceMatrixEditor";
+import { t, tr, ts, intlLocale } from "../i18n";
 
 const BLOCKS = [
   "Registros de ensayos clinicos",
@@ -42,24 +43,45 @@ const BLOCKS = [
   "Fabricantes de I+D",
   "Revistas y portales de noticias",
 ];
-const FLOW_SHORT = { crawl: "Recorrido", ocr: "OCR", ai: "IA", web_search: "Búsqueda web" };
+const FLOW_SHORT = { crawl: t("Recorrido"), ocr: "OCR", ai: t("IA"), web_search: t("Búsqueda web") };
 // El bloque se guarda tal cual en la base (catalogo D-06 sembrado); solo la etiqueta visible lleva tilde.
-const BLOCK_LABELS = { "Registros de ensayos clinicos": "Registros de ensayos clínicos" };
+const BLOCK_LABELS = {
+  "Registros de ensayos clinicos": t("Registros de ensayos clínicos"),
+  "Agencias regulatorias": t("Agencias regulatorias"),
+  "Agencias de HTA y redes de EH": t("Agencias de HTA y redes de EH"),
+  "Literatura y organismos internacionales": t("Literatura y organismos internacionales"),
+  "Fabricantes de I+D": t("Fabricantes de I+D"),
+  "Revistas y portales de noticias": t("Revistas y portales de noticias"),
+  "Sin bloque": t("Sin bloque"),
+};
 const blockLabel = (c) => BLOCK_LABELS[c] || c;
 
 const LEVELS = [
-  { value: "A", label: "A · API estable" },
-  { value: "B", label: "B · Feed o descarga oficial" },
-  { value: "C", label: "C · Página estructurada" },
-  { value: "D", label: "D · Página que confirma" },
-  { value: "E", label: "E · Curaduría humana" },
+  { value: "A", label: t("A · API estable") },
+  { value: "B", label: t("B · Feed o descarga oficial") },
+  { value: "C", label: t("C · Página estructurada") },
+  { value: "D", label: t("D · Página que confirma") },
+  { value: "E", label: t("E · Curaduría humana") },
 ];
 const FREQUENCIES = ["diaria", "semanal", "quincenal", "mensual", "trimestral", "semestral", "anual"];
-const HEALTH_LABELS = { verde: "Verde", ambar: "Ámbar", rojo: "Rojo", sin_sonda: "Sin sonda" };
+// Los valores se guardan en español; solo la etiqueta visible cambia con el idioma.
+const FREQUENCY_LABELS = {
+  diaria: t("diaria"),
+  semanal: t("semanal"),
+  quincenal: t("quincenal"),
+  mensual: t("mensual"),
+  trimestral: t("trimestral"),
+  semestral: t("semestral"),
+  anual: t("anual"),
+};
+const frequencyLabel = (f) => FREQUENCY_LABELS[f] || f;
+const VERIFICATION_LABELS = { verificada: t("verificada"), observacion: t("observacion"), declarada: t("declarada") };
+const MATCH_LABELS = { dominio: t("dominio"), nombre: t("nombre") };
+const HEALTH_LABELS = { verde: t("Verde"), ambar: t("Ámbar"), rojo: t("Rojo"), sin_sonda: t("Sin sonda") };
 const TABS = [
-  { id: "catalogo", label: "Catálogo" },
-  { id: "salud", label: "Salud de fuentes", hint: GLOSSARY.fb_salud },
-  { id: "cobertura", label: "Cobertura", hint: GLOSSARY.fb_cobertura },
+  { id: "catalogo", label: t("Catálogo") },
+  { id: "salud", label: t("Salud de fuentes"), hint: GLOSSARY.fb_salud },
+  { id: "cobertura", label: t("Cobertura"), hint: GLOSSARY.fb_cobertura },
 ];
 
 const EMPTY = {
@@ -78,8 +100,9 @@ const EMPTY = {
 };
 const QUICK_EMPTY = { title: "", url: "", category: "Agencias de HTA y redes de EH" };
 const DISCOVER_EMPTY = { tech_types: [], focus: "", region: "" };
-const DISCOVER_HINT =
-  "La IA busca en la web fuentes de escaneo de horizonte (agencias regulatorias y de ETS, registros de ensayos, pipelines, redes como EuroScan o i-HTS, portales de noticias) que aún no estén en el catálogo. Descarta por dominio las que ya existen y verifica que respondan. No crea nada hasta que usted dé de alta cada propuesta.";
+const DISCOVER_HINT = t(
+  "La IA busca en la web fuentes de escaneo de horizonte (agencias regulatorias y de ETS, registros de ensayos, pipelines, redes como EuroScan o i-HTS, portales de noticias) que aún no estén en el catálogo. Descarta por dominio las que ya existen y verifica que respondan. No crea nada hasta que usted dé de alta cada propuesta."
+);
 
 function healthTone(status) {
   if (status === "verde") return "verde";
@@ -90,14 +113,14 @@ function healthTone(status) {
 
 /** Motivo por el que no se puede eliminar, o cadena vacia si se puede. */
 function deleteBlocker(s) {
-  if (s.catalog_code && !s.retired) return "Es parte del catálogo verificado D-06: deshabilite su ingesta en lugar de eliminarla.";
-  if ((s.findings_count || 0) > 0) return `Tiene ${s.findings_count} señal(es) capturadas, que no se descartan. Deshabilite su ingesta.`;
+  if (s.catalog_code && !s.retired) return t("Es parte del catálogo verificado D-06: deshabilite su ingesta en lugar de eliminarla.");
+  if ((s.findings_count || 0) > 0) return t("Tiene {n} señal(es) capturadas, que no se descartan. Deshabilite su ingesta.", { n: s.findings_count });
   return "";
 }
 
 function ingestBlocker(s) {
   if (s.retired || s.catalog_active === false) return GLOSSARY.fb_retirada;
-  if (!s.scrape_enabled) return "La ingesta de esta fuente está apagada. Habilítela para poder consultarla.";
+  if (!s.scrape_enabled) return t("La ingesta de esta fuente está apagada. Habilítela para poder consultarla.");
   return "";
 }
 
@@ -108,9 +131,9 @@ export default function Sources() {
   const navigate = useNavigate();
   const canWrite = can(PERM.SOURCE_WRITE);
   const canScan = can(PERM.SCAN_RUN);
-  const roleLabel = user?.role_label || user?.role || "actual";
-  const noWrite = `Su perfil (${roleLabel}) solo puede consultar el catálogo: no tiene el permiso source:write.`;
-  const noScan = `Su perfil (${roleLabel}) no puede ejecutar la vigilancia (permiso scan:run).`;
+  const roleLabel = ts(user?.role_label) || user?.role || t("actual");
+  const noWrite = t("Su perfil ({rol}) solo puede consultar el catálogo: no tiene el permiso source:write.", { rol: roleLabel });
+  const noScan = t("Su perfil ({rol}) no puede ejecutar la vigilancia (permiso scan:run).", { rol: roleLabel });
 
   const [tab, setTab] = useState("catalogo");
   const [sources, setSources] = useState([]);
@@ -176,7 +199,7 @@ export default function Sources() {
       setCoverage(c.data);
       setConnectors(k.data);
     } catch (e) {
-      if (firstLoad.current) toast.error(apiError(e, "No se pudieron cargar las fuentes"));
+      if (firstLoad.current) toast.error(apiError(e, t("No se pudieron cargar las fuentes")));
     } finally {
       firstLoad.current = false;
       setLoading(false);
@@ -270,10 +293,10 @@ export default function Sources() {
     try {
       const { data } = await api.post(`/sources/${s.id}/web-search`, null, { timeout: SCAN_TIMEOUT });
       setWebSearch(data);
-      if ((data.results || []).length) toast.success(`Búsqueda web: ${data.results.length} resultado(s) en ${data.domain}`);
-      else toast.warning("Búsqueda web sin resultados en el dominio");
+      if ((data.results || []).length) toast.success(t("Búsqueda web: {n} resultado(s) en {dominio}", { n: data.results.length, dominio: data.domain }));
+      else toast.warning(t("Búsqueda web sin resultados en el dominio"));
     } catch (e) {
-      toast.error(apiError(e, "No se pudo probar la búsqueda web"));
+      toast.error(apiError(e, t("No se pudo probar la búsqueda web")));
     } finally {
       setSearchingWeb(false);
     }
@@ -282,16 +305,16 @@ export default function Sources() {
   const save = async () => {
     setFormError("");
     if (!form.title.trim()) {
-      setFormError("El nombre de la fuente es obligatorio.");
+      setFormError(t("El nombre de la fuente es obligatorio."));
       return;
     }
     const requiresUrl = connectorByCode[form.connector]?.requires_url ?? true;
     if (requiresUrl && !form.url.trim()) {
-      setFormError("Este adaptador necesita una URL.");
+      setFormError(t("Este adaptador necesita una URL."));
       return;
     }
     if (form.url.trim() && !/^https?:\/\//i.test(form.url.trim())) {
-      setFormError("La URL debe iniciar con http:// o https://");
+      setFormError(t("La URL debe iniciar con http:// o https://"));
       return;
     }
     let connectorConfig = {};
@@ -299,7 +322,7 @@ export default function Sources() {
       connectorConfig = JSON.parse(form.connectorConfigText || "{}");
       if (!connectorConfig || typeof connectorConfig !== "object" || Array.isArray(connectorConfig)) throw new Error();
     } catch {
-      setFormError("La configuración del conector debe ser un objeto JSON válido, por ejemplo {}.");
+      setFormError(t("La configuración del conector debe ser un objeto JSON válido, por ejemplo {}."));
       return;
     }
     const matrix = matrixPayload(form);
@@ -325,11 +348,11 @@ export default function Sources() {
       };
       if (editing) await api.put(`/sources/${editing.id}`, payload);
       else await api.post("/sources", payload);
-      toast.success(editing ? "Fuente actualizada" : "Fuente creada");
+      toast.success(editing ? t("Fuente actualizada") : t("Fuente creada"));
       setModalOpen(false);
       load();
     } catch (e) {
-      setFormError(apiError(e, "No se pudo guardar la fuente"));
+      setFormError(apiError(e, t("No se pudo guardar la fuente")));
     } finally {
       setSaving(false);
     }
@@ -337,19 +360,19 @@ export default function Sources() {
 
   const saveQuick = async () => {
     if (!quick.title.trim() || !quick.url.trim()) {
-      toast.warning("Escriba el nombre y la URL de la fuente");
+      toast.warning(t("Escriba el nombre y la URL de la fuente"));
       return;
     }
     setSaving(true);
     try {
       await api.post("/sources/quick", { ...quick, title: quick.title.trim(), url: quick.url.trim() });
-      toast.success("Fuente registrada con ingesta activa");
+      toast.success(t("Fuente registrada con ingesta activa"));
       setQuickOpen(false);
       setQuick(QUICK_EMPTY);
       setPreview(null);
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo registrar la fuente"));
+      toast.error(apiError(e, t("No se pudo registrar la fuente")));
     } finally {
       setSaving(false);
     }
@@ -357,7 +380,7 @@ export default function Sources() {
 
   const runPreview = async () => {
     if (!/^https?:\/\//i.test(quick.url.trim())) {
-      toast.warning("Escriba una URL que inicie con http:// o https://");
+      toast.warning(t("Escriba una URL que inicie con http:// o https://"));
       return;
     }
     setPreviewing(true);
@@ -367,7 +390,7 @@ export default function Sources() {
       setPreview(data);
       if (!quick.title.trim() && data.title) setQuick((q) => ({ ...q, title: data.title.slice(0, 200) }));
     } catch (e) {
-      toast.error(apiError(e, "No se pudo previsualizar el enlace"));
+      toast.error(apiError(e, t("No se pudo previsualizar el enlace")));
     } finally {
       setPreviewing(false);
     }
@@ -377,11 +400,11 @@ export default function Sources() {
     setScanningId(s.id);
     try {
       const { data } = await api.post(`/scan/source/${s.id}`, null, { timeout: SCAN_TIMEOUT });
-      if (data.status === "error") toast.error(`Ingesta con error: ${data.message || "sin detalle"}`);
-      else toast.success(`Ingesta: ${data.items_new} nuevas de ${data.items_found}`);
+      if (data.status === "error") toast.error(t("Ingesta con error: {detalle}", { detalle: ts(data.message) || t("sin detalle") }));
+      else toast.success(t("Ingesta: {nuevas} nuevas de {encontradas}", { nuevas: data.items_new, encontradas: data.items_found }));
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo ingerir la fuente"));
+      toast.error(apiError(e, t("No se pudo ingerir la fuente")));
     } finally {
       setScanningId(null);
     }
@@ -391,12 +414,12 @@ export default function Sources() {
     setProbingId(s.id);
     try {
       const { data } = await api.post(`/ingest/sources/${s.id}/probe`);
-      const msg = `Sonda ${HEALTH_LABELS[data.status] || data.status}: ${data.message || "sin detalle"}`;
+      const msg = t("Sonda {estado}: {detalle}", { estado: HEALTH_LABELS[data.status] || data.status, detalle: ts(data.message) || t("sin detalle") });
       if (data.status === "verde") toast.success(msg);
       else toast.warning(msg);
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo ejecutar la sonda"));
+      toast.error(apiError(e, t("No se pudo ejecutar la sonda")));
     } finally {
       setProbingId(null);
     }
@@ -406,10 +429,10 @@ export default function Sources() {
     setTogglingId(s.id);
     try {
       await api.put(`/sources/${s.id}`, { scrape_enabled: !s.scrape_enabled });
-      toast.success(s.scrape_enabled ? "Ingesta deshabilitada" : "Ingesta habilitada");
+      toast.success(s.scrape_enabled ? t("Ingesta deshabilitada") : t("Ingesta habilitada"));
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cambiar la ingesta"));
+      toast.error(apiError(e, t("No se pudo cambiar la ingesta")));
     } finally {
       setTogglingId(null);
     }
@@ -419,12 +442,12 @@ export default function Sources() {
     setDeleting(true);
     try {
       await api.delete(`/sources/${confirmDelete.id}`);
-      toast.success("Fuente eliminada");
+      toast.success(t("Fuente eliminada"));
       setConfirmDelete(null);
       setDetailSource(null);
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo eliminar la fuente"));
+      toast.error(apiError(e, t("No se pudo eliminar la fuente")));
     } finally {
       setDeleting(false);
     }
@@ -434,11 +457,11 @@ export default function Sources() {
     setImporting(true);
     try {
       const { data } = await api.post("/ingest/sources/import");
-      toast.success(`Catálogo ${data.version}: ${data.updated} actualizadas, ${data.created} nuevas, ${data.retired} retiradas`);
+      toast.success(t("Catálogo {version}: {updated} actualizadas, {created} nuevas, {retired} retiradas", { version: data.version, updated: data.updated, created: data.created, retired: data.retired }));
       setConfirmImport(false);
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo importar el catálogo"));
+      toast.error(apiError(e, t("No se pudo importar el catálogo")));
     } finally {
       setImporting(false);
     }
@@ -453,11 +476,11 @@ export default function Sources() {
       setBulk(data);
       toast.info(
         scope === "ab"
-          ? "Sondeando las fuentes de nivel A y B en segundo plano."
-          : `Sondeando ${data.total} fuente(s) en segundo plano. Puede seguir trabajando; el avance se ve en «Salud de fuentes».`
+          ? t("Sondeando las fuentes de nivel A y B en segundo plano.")
+          : t("Sondeando {n} fuente(s) en segundo plano. Puede seguir trabajando; el avance se ve en «Salud de fuentes».", { n: data.total })
       );
     } catch (e) {
-      toast.error(apiError(e, "No se pudo iniciar el sondeo"));
+      toast.error(apiError(e, t("No se pudo iniciar el sondeo")));
     } finally {
       setProbingAll(false);
     }
@@ -480,7 +503,7 @@ export default function Sources() {
           if (prev?.running && !data.running) {
             load();
             const c = data.counts || {};
-            toast.success(`Sondeo terminado: ${c.verde || 0} verdes, ${c.ambar || 0} ámbar y ${c.rojo || 0} rojas.`);
+            toast.success(t("Sondeo terminado: {verdes} verdes, {ambar} ámbar y {rojas} rojas.", { verdes: c.verde || 0, ambar: c.ambar || 0, rojas: c.rojo || 0 }));
           }
           return data;
         });
@@ -500,11 +523,11 @@ export default function Sources() {
   const acceptTerms = async (s) => {
     try {
       await api.post(`/ingest/sources/${s.id}/accept-terms`);
-      toast.success("Términos aceptados y fechados");
+      toast.success(t("Términos aceptados y fechados"));
       setDetailSource(null);
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron registrar los términos"));
+      toast.error(apiError(e, t("No se pudieron registrar los términos")));
     }
   };
 
@@ -518,9 +541,9 @@ export default function Sources() {
     }[kind];
     try {
       await downloadFromApi(api, target[0], target[1]);
-      toast.success(kind === "probes" ? "Informe de sondas descargado" : "Catálogo descargado");
+      toast.success(kind === "probes" ? t("Informe de sondas descargado") : t("Catálogo descargado"));
     } catch (e) {
-      toast.error(apiError(e, "No se pudo exportar"));
+      toast.error(apiError(e, t("No se pudo exportar")));
     } finally {
       setExporting("");
     }
@@ -534,7 +557,7 @@ export default function Sources() {
   const toggleDiscoverTech = (code) => {
     setDiscoverForm((f) => ({
       ...f,
-      tech_types: f.tech_types.includes(code) ? f.tech_types.filter((t) => t !== code) : [...f.tech_types, code],
+      tech_types: f.tech_types.includes(code) ? f.tech_types.filter((x) => x !== code) : [...f.tech_types, code],
     }));
   };
 
@@ -552,10 +575,10 @@ export default function Sources() {
       setDiscovery(data);
       setSelected(Object.fromEntries((data.candidates || []).map((c) => [c.url, true])));
       const n = (data.candidates || []).length;
-      if (n) toast.success(`${n} fuente(s) candidata(s) que no están en el catálogo`);
-      else toast.warning("No se encontraron fuentes nuevas con ese enfoque");
+      if (n) toast.success(t("{n} fuente(s) candidata(s) que no están en el catálogo", { n }));
+      else toast.warning(t("No se encontraron fuentes nuevas con ese enfoque"));
     } catch (e) {
-      setDiscoverError(apiError(e, "No se pudo completar la detección de fuentes"));
+      setDiscoverError(apiError(e, t("No se pudo completar la detección de fuentes")));
     } finally {
       setDiscovering(false);
     }
@@ -567,13 +590,13 @@ export default function Sources() {
     try {
       const { data } = await api.post("/sources/discover/accept", { ...c, enable_ingest: enableIngest });
       setAccepted((prev) => ({ ...prev, [c.url]: { title: data.title, existing: false } }));
-      if (!quiet) toast.success(`"${data.title}" dada de alta, pendiente de verificación`);
+      if (!quiet) toast.success(t('"{titulo}" dada de alta, pendiente de verificación', { titulo: data.title }));
       return true;
     } catch (e) {
       if (e?.response?.status === 409) {
-        setAccepted((prev) => ({ ...prev, [c.url]: { title: apiError(e, "Ya existe en el catálogo"), existing: true } }));
+        setAccepted((prev) => ({ ...prev, [c.url]: { title: apiError(e, t("Ya existe en el catálogo")), existing: true } }));
       }
-      if (!quiet) toast.error(apiError(e, "No se pudo dar de alta la fuente"));
+      if (!quiet) toast.error(apiError(e, t("No se pudo dar de alta la fuente")));
       return false;
     } finally {
       setAcceptingUrl("");
@@ -586,8 +609,8 @@ export default function Sources() {
     for (const c of pending) {
       if (await acceptCandidate(c, { quiet: true })) ok += 1;
     }
-    if (ok) toast.success(`${ok} fuente(s) dada(s) de alta, pendientes de verificación`);
-    if (ok < pending.length) toast.warning(`${pending.length - ok} no se registraron (ya existían o hubo un error)`);
+    if (ok) toast.success(t("{n} fuente(s) dada(s) de alta, pendientes de verificación", { n: ok }));
+    if (ok < pending.length) toast.warning(t("{n} no se registraron (ya existían o hubo un error)", { n: pending.length - ok }));
     load();
   };
 
@@ -597,12 +620,12 @@ export default function Sources() {
     const deleteWhy = !canWrite ? noWrite : deleteBlocker(s);
     return (
       <div className="fb-toolbar" style={{ justifyContent: compact ? "flex-end" : "flex-start", gap: 4 }}>
-        <HintButton size="sm" variant="ghost" hint="Ver la ficha completa de la fuente y sus notas" onClick={() => setDetailSource(s)}>
-          Ficha
+        <HintButton size="sm" variant="ghost" hint={t("Ver la ficha completa de la fuente y sus notas")} onClick={() => setDetailSource(s)}>
+          {t("Ficha")}
         </HintButton>
         {canScan && (
           <HintButton size="sm" variant="ghost" hint={GLOSSARY.fb_sonda} loading={probingId === s.id} onClick={() => probeOne(s)}>
-            <Icon name="pulse" size={14} /> Sonda
+            <Icon name="pulse" size={14} /> {t("Sonda")}
           </HintButton>
         )}
         {canScan && (
@@ -615,23 +638,23 @@ export default function Sources() {
             loading={scanningId === s.id}
             onClick={() => scanOne(s)}
           >
-            <Icon name="radar" size={14} /> Ingerir
+            <Icon name="radar" size={14} /> {t("Ingerir")}
           </HintButton>
         )}
         {canWrite && (
           <>
-            <HintButton size="sm" variant="ghost" hint="Editar los datos y el adaptador de la fuente" onClick={() => openAdvanced(s)}>
-              <Icon name="edit" size={14} /> Editar
+            <HintButton size="sm" variant="ghost" hint={t("Editar los datos y el adaptador de la fuente")} onClick={() => openAdvanced(s)}>
+              <Icon name="edit" size={14} /> {t("Editar")}
             </HintButton>
             {!s.retired && (
               <HintButton
                 size="sm"
                 variant="ghost"
-                hint={s.scrape_enabled ? "Apagar la ingesta: deja de consultarse, sin borrar nada" : "Encender la ingesta de esta fuente"}
+                hint={s.scrape_enabled ? t("Apagar la ingesta: deja de consultarse, sin borrar nada") : t("Encender la ingesta de esta fuente")}
                 loading={togglingId === s.id}
                 onClick={() => toggleIngest(s)}
               >
-                {s.scrape_enabled ? "Deshabilitar" : "Habilitar"}
+                {s.scrape_enabled ? t("Deshabilitar") : t("Habilitar")}
               </HintButton>
             )}
             <HintButton
@@ -642,7 +665,7 @@ export default function Sources() {
               disabledHint={deleteWhy}
               disabled={Boolean(deleteWhy)}
               onClick={() => setConfirmDelete(s)}
-              aria-label={`Eliminar ${s.title}`}
+              aria-label={t("Eliminar {nombre}", { nombre: s.title })}
             >
               <Icon name="trash" size={14} />
             </HintButton>
@@ -653,33 +676,33 @@ export default function Sources() {
   };
 
   const tableColumns = [
-    { key: "code", width: 100, label: "Código", render: (s) => <span className="catalog-code">{s.catalog_code || "-"}</span> },
+    { key: "code", width: 100, label: t("Código"), render: (s) => <span className="catalog-code">{s.catalog_code || "-"}</span> },
     {
       key: "title",
-      label: "Fuente",
+      label: t("Fuente"),
       render: (s) => (
         <button type="button" className="linkish" onClick={() => setDetailSource(s)}>
           {s.title}
         </button>
       ),
     },
-    { key: "level", width: 80, label: "Acceso", tip: <InfoTip text={GLOSSARY.fb_nivel} label="Qué es el nivel de acceso" />, render: (s) => <Badge tone={s.access_level}>{s.access_level || "-"}</Badge> },
-    { key: "tier", width: 100, label: "Nivel de fuente", tip: <InfoTip text={GLOSSARY.fb_nivel_fuente} label="Qué es el nivel de fuente" />, render: (s) => optionLabel(options, "source_level", s.source_level || "por_definir") },
-    { key: "tech", width: 110, label: "Tecnologías", render: (s) => (s.tech_types || []).join(", ") || "-" },
-    { key: "connector", width: 120, label: "Adaptador", tip: <InfoTip text={GLOSSARY.fb_adaptador} label="Qué es el adaptador" />, render: (s) => s.connector || "html" },
-    { key: "health", width: 100, label: "Salud", tip: <InfoTip text={GLOSSARY.fb_salud} label="Qué es la salud" />, render: (s) => <Badge tone={healthTone(s.health_status)}>{HEALTH_LABELS[s.health_status || "sin_sonda"] || s.health_status}</Badge> },
+    { key: "level", width: 80, label: t("Acceso"), tip: <InfoTip text={GLOSSARY.fb_nivel} label={t("Qué es el nivel de acceso")} />, render: (s) => <Badge tone={s.access_level}>{s.access_level || "-"}</Badge> },
+    { key: "tier", width: 100, label: t("Nivel de fuente"), tip: <InfoTip text={GLOSSARY.fb_nivel_fuente} label={t("Qué es el nivel de fuente")} />, render: (s) => optionLabel(options, "source_level", s.source_level || "por_definir") },
+    { key: "tech", width: 110, label: t("Tecnologías"), render: (s) => (s.tech_types || []).join(", ") || "-" },
+    { key: "connector", width: 120, label: t("Adaptador"), tip: <InfoTip text={GLOSSARY.fb_adaptador} label={t("Qué es el adaptador")} />, render: (s) => s.connector || "html" },
+    { key: "health", width: 100, label: t("Salud"), tip: <InfoTip text={GLOSSARY.fb_salud} label={t("Qué es la salud")} />, render: (s) => <Badge tone={healthTone(s.health_status)}>{HEALTH_LABELS[s.health_status || "sin_sonda"] || s.health_status}</Badge> },
     {
       key: "watch",
       width: 90,
-      label: "Ingesta",
-      tip: <InfoTip text={GLOSSARY.fb_ingesta} label="Qué es la ingesta" />,
-      render: (s) => (s.retired ? <Badge tone="viewer">Retirada</Badge> : s.scrape_enabled ? <Badge tone="ok">Activa</Badge> : <Badge tone="viewer">Apagada</Badge>),
+      label: t("Ingesta"),
+      tip: <InfoTip text={GLOSSARY.fb_ingesta} label={t("Qué es la ingesta")} />,
+      render: (s) => (s.retired ? <Badge tone="viewer">{t("Retirada")}</Badge> : s.scrape_enabled ? <Badge tone="ok">{t("Activa")}</Badge> : <Badge tone="viewer">{t("Apagada")}</Badge>),
     },
-    { key: "signals", width: 80, label: "Señales", align: "right", render: (s) => s.findings_count || 0 },
-    { key: "actions", width: 330, align: "right", label: "Acciones", render: (s) => <SourceActions s={s} compact /> },
+    { key: "signals", width: 80, label: t("Señales"), align: "right", render: (s) => s.findings_count || 0 },
+    { key: "actions", width: 330, align: "right", label: t("Acciones"), render: (s) => <SourceActions s={s} compact /> },
   ];
 
-  if (loading) return <LoadingBlock label="Cargando catálogo verificado de fuentes..." />;
+  if (loading) return <LoadingBlock label={t("Cargando catálogo verificado de fuentes...")} />;
 
   const currentConnector = connectorByCode[form.connector];
 
@@ -687,54 +710,54 @@ export default function Sources() {
     <div>
       <ModuleHeader
         step="identificacion"
-        title="Catálogo de fuentes proactivas"
+        title={t("Catálogo de fuentes proactivas")}
         titleHint={GLOSSARY.catalogo_fuentes}
-        purpose="Inventario RF01 / D-06: fuentes verificadas clasificadas por contrato de datos. Las de nivel A y B sostienen el pipeline; el resto lo enriquece."
+        purpose={t("Inventario RF01 / D-06: fuentes verificadas clasificadas por contrato de datos. Las de nivel A y B sostienen el pipeline; el resto lo enriquece.")}
         actions={
           <div className="fb-toolbar">
             <HintButton
               variant="secondary"
-              hint="Descarga el catálogo en Excel (.xlsx): hoja de fuentes con filtros e hipervínculos, fuentes de consulta manual (tipo E) y su estado, resumen por nivel, tipo y salud, y las fuentes retiradas."
+              hint={t("Descarga el catálogo en Excel (.xlsx): hoja de fuentes con filtros e hipervínculos, fuentes de consulta manual (tipo E) y su estado, resumen por nivel, tipo y salud, y las fuentes retiradas.")}
               onClick={() => exportFile("xlsx")}
               loading={exporting === "xlsx"}
               data-testid="sources-export-xlsx"
             >
-              <Icon name="doc" size={16} /> Descargar Excel
+              <Icon name="doc" size={16} /> {t("Descargar Excel")}
             </HintButton>
-            <HintButton variant="ghost" hint="El mismo listado en CSV (separado por punto y coma), para otros programas" onClick={() => exportFile("csv")} loading={exporting === "csv"}>
+            <HintButton variant="ghost" hint={t("El mismo listado en CSV (separado por punto y coma), para otros programas")} onClick={() => exportFile("csv")} loading={exporting === "csv"}>
               CSV
             </HintButton>
             <HintButton
               variant="outline"
-              hint="Prueba todas las fuentes activas del inventario (no solo A y B) en segundo plano, de a varias a la vez. Deja el estado verde, ámbar o rojo de cada una y su informe en Excel."
-              disabledHint={bulk?.running ? "Ya hay un sondeo en curso" : noScan}
+              hint={t("Prueba todas las fuentes activas del inventario (no solo A y B) en segundo plano, de a varias a la vez. Deja el estado verde, ámbar o rojo de cada una y su informe en Excel.")}
+              disabledHint={bulk?.running ? t("Ya hay un sondeo en curso") : noScan}
               disabled={!canScan || bulk?.running}
               onClick={probeEverything}
               loading={probingAll}
               data-testid="sources-probe-all"
             >
-              <Icon name="pulse" size={16} /> Sondear todas
+              <Icon name="pulse" size={16} /> {t("Sondear todas")}
             </HintButton>
             <HintButton variant="outline" hint={GLOSSARY.fb_recargar_catalogo} disabledHint={noWrite} disabled={!canWrite} onClick={() => setConfirmImport(true)}>
-              <Icon name="layers" size={16} /> Recargar catálogo
+              <Icon name="layers" size={16} /> {t("Recargar catálogo")}
             </HintButton>
             <HintButton
               variant="outline"
-              hint="Sube el Excel de la matriz de fuentes (MATRIZ_FUENTES_ESCANEO_EH, .xlsx) o una hoja de Google Sheets: valida, muestra la vista previa de diferencias y conflictos, y no guarda nada hasta que usted confirme. Genera un reporte descargable y queda en bitácora."
+              hint={t("Sube el Excel de la matriz de fuentes (MATRIZ_FUENTES_ESCANEO_EH, .xlsx) o una hoja de Google Sheets: valida, muestra la vista previa de diferencias y conflictos, y no guarda nada hasta que usted confirme. Genera un reporte descargable y queda en bitácora.")}
               disabledHint={noWrite}
               disabled={!canWrite}
               onClick={() => setMatrixOpen(true)}
             >
-              <Icon name="doc" size={16} /> Cargar matriz
+              <Icon name="doc" size={16} /> {t("Cargar matriz")}
             </HintButton>
             <HintButton variant="outline" hint={DISCOVER_HINT} disabledHint={noWrite} disabled={!canWrite} onClick={openDiscover}>
-              <Icon name="spark" size={16} /> Detectar fuentes con IA
+              <Icon name="spark" size={16} /> {t("Detectar fuentes con IA")}
             </HintButton>
             <HintButton variant="secondary" hint={GLOSSARY.fb_alta_rapida} disabledHint={noWrite} disabled={!canWrite} onClick={() => { setQuick(QUICK_EMPTY); setPreview(null); setQuickOpen(true); }}>
-              <Icon name="plus" size={16} /> Alta rápida
+              <Icon name="plus" size={16} /> {t("Alta rápida")}
             </HintButton>
-            <HintButton hint="Registrar una fuente con adaptador, nivel, frecuencia y configuración" disabledHint={noWrite} disabled={!canWrite} onClick={() => openAdvanced()}>
-              <Icon name="plus" size={16} /> Agregar fuente
+            <HintButton hint={t("Registrar una fuente con adaptador, nivel, frecuencia y configuración")} disabledHint={noWrite} disabled={!canWrite} onClick={() => openAdvanced()}>
+              <Icon name="plus" size={16} /> {t("Agregar fuente")}
             </HintButton>
           </div>
         }
@@ -743,46 +766,46 @@ export default function Sources() {
       {!canWrite && (
         <div className="fb-readonly-note" data-testid="sources-readonly">
           <Icon name="info" size={16} />
-          <span>Modo consulta: {noWrite} Puede ver fichas, salud y cobertura, y descargar el CSV.</span>
+          <span>{t("Modo consulta: {motivo} Puede ver fichas, salud y cobertura, y descargar el CSV.", { motivo: noWrite })}</span>
         </div>
       )}
 
       <PhaseGuide
-        phase="Módulo 0 · Identificación"
+        phase={t("Módulo 0 · Identificación")}
         hint={GLOSSARY.catalogo_fuentes}
         tasks={[
-          "Las fuentes de nivel A y B gobiernan el pre-llenado de P1, P5 y P6.",
-          "Una sonda ámbar o roja suspende la ingesta de esa fuente; el silencio no se confunde con 'no hay tecnologías'.",
-          "Las fuentes de nivel D confirman; nunca sobreescriben un campo que ya trajo una A o B.",
+          t("Las fuentes de nivel A y B gobiernan el pre-llenado de P1, P5 y P6."),
+          t("Una sonda ámbar o roja suspende la ingesta de esa fuente; el silencio no se confunde con 'no hay tecnologías'."),
+          t("Las fuentes de nivel D confirman; nunca sobreescriben un campo que ya trajo una A o B."),
         ]}
-        nextLabel="Ejecutar vigilancia"
+        nextLabel={t("Ejecutar vigilancia")}
         onNext={() => navigate("/vigilancia")}
       />
 
       <ModuleStatsRow
         items={[
-          { label: "Fuentes del catálogo", value: stats.total, sub: `${retired.length} retiradas del inventario anterior`, hint: "Fuentes vigentes del inventario (no cuenta las retiradas del catálogo anterior)." },
-          { label: "Contrato A/B", value: stats.governors, sub: "Sostienen el pipeline", hint: GLOSSARY.fb_nivel },
-          { label: "Ingesta activa", value: stats.vigiladas, hint: GLOSSARY.fb_ingesta },
-          { label: "Fuentes de contraste", value: stats.contrast, sub: "Control de cobertura", hint: GLOSSARY.fb_contraste },
-          { label: "Fuentes primarias", value: stats.primarias, hint: GLOSSARY.fb_nivel_fuente },
+          { label: t("Fuentes del catálogo"), value: stats.total, sub: t("{n} retiradas del inventario anterior", { n: retired.length }), hint: t("Fuentes vigentes del inventario (no cuenta las retiradas del catálogo anterior).") },
+          { label: t("Contrato A/B"), value: stats.governors, sub: t("Sostienen el pipeline"), hint: GLOSSARY.fb_nivel },
+          { label: t("Ingesta activa"), value: stats.vigiladas, hint: GLOSSARY.fb_ingesta },
+          { label: t("Fuentes de contraste"), value: stats.contrast, sub: t("Control de cobertura"), hint: GLOSSARY.fb_contraste },
+          { label: t("Fuentes primarias"), value: stats.primarias, hint: GLOSSARY.fb_nivel_fuente },
           {
-            label: "URL original de la matriz",
+            label: t("URL original de la matriz"),
             value: stats.urlMatriz,
-            sub: stats.urlDistinta ? `${stats.urlDistinta} con otra URL (ver etiqueta)` : "Todas usan la URL del Excel",
-            hint: "Fuentes cuya URL principal es la que reporta la matriz EH (Excel). Las demás llevan una etiqueta que dice por qué usan otra: API oficial, página específica o URL de la matriz que no responde.",
+            sub: stats.urlDistinta ? t("{n} con otra URL (ver etiqueta)", { n: stats.urlDistinta }) : t("Todas usan la URL del Excel"),
+            hint: t("Fuentes cuya URL principal es la que reporta la matriz EH (Excel). Las demás llevan una etiqueta que dice por qué usan otra: API oficial, página específica o URL de la matriz que no responde."),
           },
-          { label: "Con búsqueda web", value: stats.buscables, sub: meta.web_search?.enabled === false ? "Apagada en Parámetros de fuentes" : "IA + motores en el dominio", hint: GLOSSARY.fb_flujo_busqueda },
+          { label: t("Con búsqueda web"), value: stats.buscables, sub: meta.web_search?.enabled === false ? t("Apagada en Parámetros de fuentes") : t("IA + motores en el dominio"), hint: GLOSSARY.fb_flujo_busqueda },
         ]}
       />
 
       <div className="catalog-tabs">
-        {TABS.map((t) => (
-          <span key={t.id} className="term-label">
-            <button type="button" className={`view-toggle${tab === t.id ? " active" : ""}`} onClick={() => setTab(t.id)}>
-              {t.label}
+        {TABS.map((item) => (
+          <span key={item.id} className="term-label">
+            <button type="button" className={`view-toggle${tab === item.id ? " active" : ""}`} onClick={() => setTab(item.id)}>
+              {item.label}
             </button>
-            {t.hint && <InfoTip text={t.hint} label={`Qué es ${t.label}`} />}
+            {item.hint && <InfoTip text={item.hint} label={t("Qué es {termino}", { termino: item.label })} />}
           </span>
         ))}
       </div>
@@ -792,52 +815,52 @@ export default function Sources() {
           <Card style={{ marginBottom: 16 }} padding={16}>
             <div className="fb-toolbar">
               <input
-                placeholder="Buscar por código, nombre, alias o URL..."
+                placeholder={t("Buscar por código, nombre, alias o URL...")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="filter-input"
-                aria-label="Buscar fuente"
+                aria-label={t("Buscar fuente")}
                 style={{ flex: 1, minWidth: 200 }}
               />
-              <select value={blockFilter} onChange={(e) => setBlockFilter(e.target.value)} className="filter-select" aria-label="Filtrar por bloque">
-                <option value="">Todos los bloques</option>
+              <select value={blockFilter} onChange={(e) => setBlockFilter(e.target.value)} className="filter-select" aria-label={t("Filtrar por bloque")}>
+                <option value="">{t("Todos los bloques")}</option>
                 {BLOCKS.map((c) => (
                   <option key={c} value={c}>{blockLabel(c)}</option>
                 ))}
               </select>
-              <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} className="filter-select" aria-label="Filtrar por nivel de acceso">
-                <option value="">Todo nivel de acceso</option>
+              <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} className="filter-select" aria-label={t("Filtrar por nivel de acceso")}>
+                <option value="">{t("Todo nivel de acceso")}</option>
                 {LEVELS.map((l) => (
-                  <option key={l.value} value={l.value}>Acceso {l.value}</option>
+                  <option key={l.value} value={l.value}>{t("Acceso {nivel}", { nivel: l.value })}</option>
                 ))}
               </select>
-              <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)} className="filter-select" aria-label="Filtrar por nivel de fuente">
-                <option value="">Primaria, secundaria...</option>
+              <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)} className="filter-select" aria-label={t("Filtrar por nivel de fuente")}>
+                <option value="">{t("Primaria, secundaria...")}</option>
                 {(options.source_level || []).map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value}>{ts(o.label)}</option>
                 ))}
               </select>
-              <select value={techFilter} onChange={(e) => setTechFilter(e.target.value)} className="filter-select" aria-label="Filtrar por tipo de tecnología">
-                <option value="">Toda tecnología</option>
+              <select value={techFilter} onChange={(e) => setTechFilter(e.target.value)} className="filter-select" aria-label={t("Filtrar por tipo de tecnología")}>
+                <option value="">{t("Toda tecnología")}</option>
                 {(options.tech_type || []).map((o) => (
-                  <option key={o.value} value={o.value}>{o.value} · {o.label}</option>
+                  <option key={o.value} value={o.value}>{o.value} · {ts(o.label)}</option>
                 ))}
               </select>
-              <select value={healthFilter} onChange={(e) => setHealthFilter(e.target.value)} className="filter-select" aria-label="Filtrar por salud">
-                <option value="">Cualquier salud</option>
+              <select value={healthFilter} onChange={(e) => setHealthFilter(e.target.value)} className="filter-select" aria-label={t("Filtrar por salud")}>
+                <option value="">{t("Cualquier salud")}</option>
                 {Object.entries(HEALTH_LABELS).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
               <label className="catalog-check">
                 <input type="checkbox" checked={showRetired} onChange={(e) => setShowRetired(e.target.checked)} />
-                <TermLabel tip={GLOSSARY.fb_retirada}>Incluir retiradas</TermLabel>
+                <TermLabel tip={GLOSSARY.fb_retirada}>{t("Incluir retiradas")}</TermLabel>
               </label>
               <div style={{ display: "flex", gap: 4, background: "#F1F5F9", padding: 4, borderRadius: 8 }}>
-                <button type="button" onClick={() => setViewMode("registry")} className={`view-toggle${viewMode === "registry" ? " active" : ""}`}>Tarjetas</button>
-                <button type="button" onClick={() => setViewMode("table")} className={`view-toggle${viewMode === "table" ? " active" : ""}`}>Tabla</button>
+                <button type="button" onClick={() => setViewMode("registry")} className={`view-toggle${viewMode === "registry" ? " active" : ""}`}>{t("Tarjetas")}</button>
+                <button type="button" onClick={() => setViewMode("table")} className={`view-toggle${viewMode === "table" ? " active" : ""}`}>{t("Tabla")}</button>
               </div>
-              <span style={{ fontSize: 13, color: "#64748B" }} data-testid="sources-count">{filtered.length} fuentes</span>
+              <span style={{ fontSize: 13, color: "#64748B" }} data-testid="sources-count">{t("{n} fuentes", { n: filtered.length })}</span>
             </div>
           </Card>
 
@@ -845,16 +868,16 @@ export default function Sources() {
             <Card>
               <EmptyState
                 icon="🌐"
-                title="Sin fuentes que coincidan"
+                title={t("Sin fuentes que coincidan")}
                 message={
                   sources.length === 0
-                    ? "El inventario está vacío. Recargue el catálogo verificado D-06 o registre una fuente."
-                    : "Ajuste la búsqueda o los filtros, o marque 'Incluir retiradas'."
+                    ? t("El inventario está vacío. Recargue el catálogo verificado D-06 o registre una fuente.")
+                    : t("Ajuste la búsqueda o los filtros, o marque 'Incluir retiradas'.")
                 }
                 action={
                   anyFilter ? (
                     <Button variant="secondary" onClick={clearFilters}>
-                      Limpiar filtros
+                      {t("Limpiar filtros")}
                     </Button>
                   ) : null
                 }
@@ -872,13 +895,13 @@ export default function Sources() {
                     {items.map((s) => (
                       <Card key={s.id} padding={16} className={`registry-card catalog-card catalog-card--${s.access_level || "D"}`}>
                         <div className="registry-card-top" data-testid={`source-card-${s.id}`}>
-                          <span className="catalog-code">{s.catalog_code || "sin código"}</span>
-                          <span title={GLOSSARY.fb_nivel}><Badge tone={s.access_level}>Acceso {s.access_level || "-"}</Badge></span>
+                          <span className="catalog-code">{s.catalog_code || t("sin código")}</span>
+                          <span title={GLOSSARY.fb_nivel}><Badge tone={s.access_level}>{t("Acceso {nivel}", { nivel: s.access_level || "-" })}</Badge></span>
                           <MatrixBadges source={s} options={options} />
                           <span title={GLOSSARY.fb_salud}><Badge tone={healthTone(s.health_status)}>{HEALTH_LABELS[s.health_status || "sin_sonda"] || s.health_status}</Badge></span>
-                          {s.is_contrast && <span title={GLOSSARY.fb_contraste}><Badge tone="info">Contraste</Badge></span>}
-                          {s.retired && <span title={GLOSSARY.fb_retirada}><Badge tone="viewer">Retirada</Badge></span>}
-                          {!s.retired && !s.scrape_enabled && <span title={GLOSSARY.fb_ingesta}><Badge tone="viewer">Ingesta apagada</Badge></span>}
+                          {s.is_contrast && <span title={GLOSSARY.fb_contraste}><Badge tone="info">{t("Contraste")}</Badge></span>}
+                          {s.retired && <span title={GLOSSARY.fb_retirada}><Badge tone="viewer">{t("Retirada")}</Badge></span>}
+                          {!s.retired && !s.scrape_enabled && <span title={GLOSSARY.fb_ingesta}><Badge tone="viewer">{t("Ingesta apagada")}</Badge></span>}
                         </div>
                         <h4>{s.title}</h4>
                         {s.url && (
@@ -887,14 +910,14 @@ export default function Sources() {
                           </a>
                         )}
                         <UrlOriginTag source={s} />
-                        <p>{s.description?.slice(0, 140) || "Sin descripción."}</p>
+                        <p>{s.description?.slice(0, 140) || t("Sin descripción.")}</p>
                         <div className="registry-card-stats">
                           <span title={GLOSSARY.fb_adaptador}>{s.connector}</span>
-                          <span title={GLOSSARY.fb_frecuencia}>{s.sync_frequency || "-"}</span>
+                          <span title={GLOSSARY.fb_frecuencia}>{frequencyLabel(s.sync_frequency) || "-"}</span>
                           <span>{s.country || s.language}</span>
-                          <span>{s.findings_count || 0} señales</span>
+                          <span>{t("{n} señales", { n: s.findings_count || 0 })}</span>
                           {(s.tech_types || []).length > 0 && <span title={GLOSSARY.fb_tipos_tecnologia}>{s.tech_types.join(" · ")}</span>}
-                          {s.requires_api_key && <span title="Funciona sin llave, pero con un cupo bajo. Configúrela en Configuración > Llaves de fuentes.">requiere llave</span>}
+                          {s.requires_api_key && <span title={t("Funciona sin llave, pero con un cupo bajo. Configúrela en Configuración > Llaves de fuentes.")}>{t("requiere llave")}</span>}
                         </div>
                         {s.scrape_enabled && !s.retired && (
                           <div className="source-flow-chips" title={GLOSSARY.fb_flujo_fuente}>
@@ -927,11 +950,11 @@ export default function Sources() {
               {bulk?.running ? (
                 <>
                   <strong>
-                    Sondeando {bulk.done} de {bulk.total}…
+                    {t("Sondeando {n} de {total}…", { n: bulk.done, total: bulk.total })}
                   </strong>{" "}
                   <span style={{ color: "#64748b" }}>
-                    {bulk.counts?.verde || 0} verdes · {bulk.counts?.ambar || 0} ámbar · {bulk.counts?.rojo || 0} rojas
-                    {bulk.current?.length ? ` · ahora: ${bulk.current.slice(0, 2).join(", ")}` : ""}
+                    {t("{verdes} verdes · {ambar} ámbar · {rojas} rojas", { verdes: bulk.counts?.verde || 0, ambar: bulk.counts?.ambar || 0, rojas: bulk.counts?.rojo || 0 })}
+                    {bulk.current?.length ? " · " + t("ahora: {lista}", { lista: bulk.current.slice(0, 2).join(", ") }) : ""}
                   </span>
                   <div className="probe-progress" aria-hidden="true">
                     <div style={{ width: `${bulk.total ? Math.round((100 * bulk.done) / bulk.total) : 0}%` }} />
@@ -939,11 +962,12 @@ export default function Sources() {
                 </>
               ) : bulk?.finished_at ? (
                 <span style={{ color: "#64748b" }}>
-                  Último sondeo en lote: {new Date(bulk.finished_at).toLocaleString("es-CO")} ({bulk.total} fuentes
-                  {bulk.by ? `, por ${bulk.by}` : ""}).
+                  {bulk.by
+                    ? t("Último sondeo en lote: {fecha} ({total} fuentes, por {quien}).", { fecha: new Date(bulk.finished_at).toLocaleString(intlLocale()), total: bulk.total, quien: bulk.by })
+                    : t("Último sondeo en lote: {fecha} ({total} fuentes).", { fecha: new Date(bulk.finished_at).toLocaleString(intlLocale()), total: bulk.total })}
                 </span>
               ) : (
-                <span style={{ color: "#64748b" }}>Use «Sondear todas» para probar el inventario completo.</span>
+                <span style={{ color: "#64748b" }}>{t("Use «Sondear todas» para probar el inventario completo.")}</span>
               )}
             </div>
             <div className="fb-toolbar">
@@ -951,21 +975,21 @@ export default function Sources() {
                 size="sm"
                 variant="outline"
                 hint={GLOSSARY.fb_sondear_ab}
-                disabledHint={bulk?.running ? "Ya hay un sondeo en curso" : noScan}
+                disabledHint={bulk?.running ? t("Ya hay un sondeo en curso") : noScan}
                 disabled={!canScan || bulk?.running}
                 onClick={probeGovernors}
               >
-                Solo A/B
+                {t("Solo A/B")}
               </HintButton>
               <HintButton
                 size="sm"
                 variant="secondary"
-                hint="Informe en Excel de todas las fuentes: estado de la sonda, detalle y acción sugerida (rojas y ámbar primero)."
+                hint={t("Informe en Excel de todas las fuentes: estado de la sonda, detalle y acción sugerida (rojas y ámbar primero).")}
                 onClick={() => exportFile("probes")}
                 loading={exporting === "probes"}
                 data-testid="probe-report-xlsx"
               >
-                <Icon name="doc" size={14} /> Informe de sondas (Excel)
+                <Icon name="doc" size={14} /> {t("Informe de sondas (Excel)")}
               </HintButton>
             </div>
           </div>
@@ -977,15 +1001,15 @@ export default function Sources() {
               </div>
             ))}
           </div>
-          <p className="catalog-legend">{GLOSSARY.fb_salud} El silencio de una fuente A no significa «no hay tecnologías nuevas».</p>
+          <p className="catalog-legend">{GLOSSARY.fb_salud} {t("El silencio de una fuente A no significa «no hay tecnologías nuevas».")}</p>
           <DataTable
             stack
             columns={[
-              { key: "code", width: 100, label: "Código", render: (s) => s.catalog_code || "-" },
-              { key: "title", label: "Fuente", render: (s) => s.title },
-              { key: "level", width: 80, label: "Acceso", tip: <InfoTip text={GLOSSARY.fb_nivel} />, render: (s) => <Badge tone={s.access_level}>{s.access_level}</Badge> },
-              { key: "status", width: 100, label: "Estado", render: (s) => <Badge tone={healthTone(s.health_status)}>{HEALTH_LABELS[s.health_status || "sin_sonda"] || s.health_status}</Badge> },
-              { key: "msg", label: "Detalle", render: (s) => s.message || "-" },
+              { key: "code", width: 100, label: t("Código"), render: (s) => s.catalog_code || "-" },
+              { key: "title", label: t("Fuente"), render: (s) => s.title },
+              { key: "level", width: 80, label: t("Acceso"), tip: <InfoTip text={GLOSSARY.fb_nivel} />, render: (s) => <Badge tone={s.access_level}>{s.access_level}</Badge> },
+              { key: "status", width: 100, label: t("Estado"), render: (s) => <Badge tone={healthTone(s.health_status)}>{HEALTH_LABELS[s.health_status || "sin_sonda"] || s.health_status}</Badge> },
+              { key: "msg", label: t("Detalle"), render: (s) => ts(s.message) || "-" },
               {
                 key: "act",
                 width: 110,
@@ -996,47 +1020,47 @@ export default function Sources() {
                       const src = sources.find((x) => x.id === s.id);
                       if (src) probeOne(src);
                     }}>
-                      Repetir sonda
+                      {t("Repetir sonda")}
                     </HintButton>
                   ) : null,
               },
             ]}
             rows={(health?.items || []).map((s) => ({ key: s.id, data: s }))}
             minWidth={860}
-            emptyMessage="Aún no hay sondas registradas. Use «Sondear todas» para la primera."
+            emptyMessage={t("Aún no hay sondas registradas. Use «Sondear todas» para la primera.")}
           />
         </Card>
       )}
 
       {tab === "cobertura" && (
         <Card>
-          <h3 style={{ marginTop: 0 }}>Huecos frente a fuentes de contraste</h3>
+          <h3 style={{ marginTop: 0 }}>{t("Huecos frente a fuentes de contraste")}</h3>
           <p className="catalog-legend">
-            Tecnologías que aparecen en PCORI, CDA-AMC, NIHRIO, ACE, ScanMedicine o INAHTA y no están en
-            {coverage?.cycle_code ? ` ${coverage.cycle_code}` : " el ciclo activo"}.
-            Si el contraste las tiene y el IETS no, hay que justificar el hueco.
+            {coverage?.cycle_code
+              ? t("Tecnologías que aparecen en PCORI, CDA-AMC, NIHRIO, ACE, ScanMedicine o INAHTA y no están en {ciclo}. Si el contraste las tiene y el IETS no, hay que justificar el hueco.", { ciclo: coverage.cycle_code })
+              : t("Tecnologías que aparecen en PCORI, CDA-AMC, NIHRIO, ACE, ScanMedicine o INAHTA y no están en el ciclo activo. Si el contraste las tiene y el IETS no, hay que justificar el hueco.")}
           </p>
           <ModuleStatsRow
             items={[
-              { label: "Ciclo", value: coverage?.cycle_code || "-", sub: `${coverage?.cycle_size || 0} tecnologías`, hint: "Ciclo contra el que se mide la cobertura (el activo)." },
-              { label: "Captadas en contraste", value: coverage?.contrast_captured || 0, hint: GLOSSARY.fb_contraste },
-              { label: "Huecos", value: coverage?.gap_count || 0, color: coverage?.gap_count ? "#F59E0B" : undefined, hint: GLOSSARY.fb_cobertura },
+              { label: t("Ciclo"), value: coverage?.cycle_code || "-", sub: t("{n} tecnologías", { n: coverage?.cycle_size || 0 }), hint: t("Ciclo contra el que se mide la cobertura (el activo).") },
+              { label: t("Captadas en contraste"), value: coverage?.contrast_captured || 0, hint: GLOSSARY.fb_contraste },
+              { label: t("Huecos"), value: coverage?.gap_count || 0, color: coverage?.gap_count ? "#F59E0B" : undefined, hint: GLOSSARY.fb_cobertura },
             ]}
           />
           {(coverage?.gaps || []).length === 0 ? (
             <EmptyState
               icon="✓"
-              title="Sin huecos detectados"
-              message="Aún no hay señales de contraste, o todas ya están en el ciclo. Ejecute la vigilancia de PCORI, CDA-AMC o ScanMedicine."
+              title={t("Sin huecos detectados")}
+              message={t("Aún no hay señales de contraste, o todas ya están en el ciclo. Ejecute la vigilancia de PCORI, CDA-AMC o ScanMedicine.")}
             />
           ) : (
             <DataTable
               stack
               columns={[
-                { key: "name", label: "Tecnología", render: (g) => <strong>{g.commercial_name || g.inn_name}</strong> },
-                { key: "src", label: "Fuente", render: (g) => `${g.catalog_code} · ${g.source_title}` },
+                { key: "name", label: t("Tecnología"), render: (g) => <strong>{g.commercial_name || g.inn_name}</strong> },
+                { key: "src", label: t("Fuente"), render: (g) => `${g.catalog_code} · ${g.source_title}` },
                 { key: "nct", label: "NCT", render: (g) => (g.nct_ids || []).join(", ") || "-" },
-                { key: "ind", label: "Indicación", render: (g) => g.indication || "-" },
+                { key: "ind", label: t("Indicación"), render: (g) => g.indication || "-" },
               ]}
               rows={(coverage?.gaps || []).map((g) => ({ key: g.technology_id, data: g }))}
               minWidth={820}
@@ -1057,11 +1081,11 @@ export default function Sources() {
       <Modal
         open={discoverOpen}
         onClose={() => !discovering && setDiscoverOpen(false)}
-        title="Detectar fuentes con IA"
+        title={t("Detectar fuentes con IA")}
         width={860}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setDiscoverOpen(false)} disabled={discovering}>Cerrar</Button>
+            <Button variant="secondary" onClick={() => setDiscoverOpen(false)} disabled={discovering}>{t("Cerrar")}</Button>
             {(discovery?.candidates || []).length > 0 && (
               <Button
                 variant="outline"
@@ -1069,23 +1093,23 @@ export default function Sources() {
                 loading={Boolean(acceptingUrl)}
                 disabled={discovering || !(discovery.candidates || []).some((c) => selected[c.url] && !accepted[c.url])}
               >
-                Dar de alta las seleccionadas
+                {t("Dar de alta las seleccionadas")}
               </Button>
             )}
             <Button onClick={runDiscover} loading={discovering}>
-              <Icon name="spark" size={15} /> {discovery ? "Detectar de nuevo" : "Detectar"}
+              <Icon name="spark" size={15} /> {discovery ? t("Detectar de nuevo") : t("Detectar")}
             </Button>
           </>
         }
       >
         <p style={{ fontSize: 13, color: "#64748B", marginTop: 0 }}>{DISCOVER_HINT}</p>
         <fieldset style={{ border: 0, padding: 0, margin: "0 0 12px" }}>
-          <legend style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Tipos de tecnología (opcional)</legend>
+          <legend style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{t("Tipos de tecnología (opcional)")}</legend>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
             {(options.tech_type || []).map((o) => (
-              <label key={o.value} className="catalog-check" title={o.description || o.label}>
+              <label key={o.value} className="catalog-check" title={ts(o.description || o.label)}>
                 <input type="checkbox" checked={discoverForm.tech_types.includes(o.value)} onChange={() => toggleDiscoverTech(o.value)} disabled={discovering} />
-                {o.value} · {o.label}
+                {o.value} · {ts(o.label)}
               </label>
             ))}
           </div>
@@ -1093,8 +1117,8 @@ export default function Sources() {
         <div className="fb-grid-2">
           <Input
             id="discover-focus"
-            label="Tema o enfoque (opcional)"
-            placeholder="Ej.: terapias génicas, oncología de precisión"
+            label={t("Tema o enfoque (opcional)")}
+            placeholder={t("Ej.: terapias génicas, oncología de precisión")}
             maxLength={200}
             value={discoverForm.focus}
             disabled={discovering}
@@ -1102,8 +1126,8 @@ export default function Sources() {
           />
           <Input
             id="discover-region"
-            label="País o región (opcional)"
-            placeholder="Ej.: Latinoamérica, Brasil, Europa"
+            label={t("País o región (opcional)")}
+            placeholder={t("Ej.: Latinoamérica, Brasil, Europa")}
             maxLength={120}
             value={discoverForm.region}
             disabled={discovering}
@@ -1112,13 +1136,13 @@ export default function Sources() {
         </div>
         <label className="catalog-check" style={{ marginBottom: 8 }}>
           <input type="checkbox" checked={enableIngest} onChange={(e) => setEnableIngest(e.target.checked)} />
-          Activar la ingesta al dar de alta (si no, queda apagada hasta verificarla)
+          {t("Activar la ingesta al dar de alta (si no, queda apagada hasta verificarla)")}
         </label>
 
         {discoverError && <p className="public-submit-error" role="alert">{discoverError}</p>}
         {discovering && (
           <p role="status" aria-live="polite" style={{ fontSize: 13, color: "#475569" }}>
-            Buscando en la web y comparando con el catálogo. Puede tardar uno o dos minutos...
+            {t("Buscando en la web y comparando con el catálogo. Puede tardar uno o dos minutos...")}
           </p>
         )}
 
@@ -1126,17 +1150,19 @@ export default function Sources() {
           <div aria-live="polite">
             {discovery.message && (
               <p role="status" style={{ fontSize: 12.5, color: "#92400E", background: "#FFFBEB", padding: "8px 10px", borderRadius: 8 }}>
-                {discovery.message}
+                {ts(discovery.message)}
               </p>
             )}
             <p style={{ fontSize: 12.5, color: "#64748B" }}>
-              {discovery.queries?.length || 0} consulta(s) {discovery.query_origin === "ia" ? "redactadas por la IA" : "por reglas"}
-              {" · "}{discovery.ai_calls} llamada(s) a la IA (máx. {discovery.limits?.max_ai_calls})
-              {" · "}{(discovery.already_in_catalog || []).length} ya en el catálogo
-              {" · "}{(discovery.discarded || []).length} descartada(s) por no responder
+              {discovery.query_origin === "ia"
+                ? t("{n} consulta(s) redactadas por la IA", { n: discovery.queries?.length || 0 })
+                : t("{n} consulta(s) por reglas", { n: discovery.queries?.length || 0 })}
+              {" · "}{t("{n} llamada(s) a la IA (máx. {max})", { n: discovery.ai_calls, max: discovery.limits?.max_ai_calls })}
+              {" · "}{t("{n} ya en el catálogo", { n: (discovery.already_in_catalog || []).length })}
+              {" · "}{t("{n} descartada(s) por no responder", { n: (discovery.discarded || []).length })}
             </p>
             {(discovery.candidates || []).length === 0 ? (
-              <EmptyState icon="🔎" title="Sin fuentes nuevas" message="Pruebe con otro tema, otra región u otros tipos de tecnología." />
+              <EmptyState icon="🔎" title={t("Sin fuentes nuevas")} message={t("Pruebe con otro tema, otra región u otros tipos de tecnología.")} />
             ) : (
               <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 10 }}>
                 {discovery.candidates.map((c) => {
@@ -1146,7 +1172,7 @@ export default function Sources() {
                       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                         <input
                           type="checkbox"
-                          aria-label={`Seleccionar ${c.name}`}
+                          aria-label={t("Seleccionar {nombre}", { nombre: c.name })}
                           checked={Boolean(selected[c.url]) && !done}
                           disabled={Boolean(done)}
                           onChange={(e) => setSelected((prev) => ({ ...prev, [c.url]: e.target.checked }))}
@@ -1155,23 +1181,23 @@ export default function Sources() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                             <strong>{c.name}</strong>
-                            <Badge tone={c.access_level}>Acceso {c.access_level}</Badge>
+                            <Badge tone={c.access_level}>{t("Acceso {nivel}", { nivel: c.access_level })}</Badge>
                             <Badge tone="info">{optionLabel(options, "source_level", c.source_level)}</Badge>
-                            {c.origin === "ia" && <span title="Propuesta por el conocimiento de la IA, no por un resultado de búsqueda"><Badge tone="warning">Conocimiento IA</Badge></span>}
-                            {c.reachable?.status >= 400 && <span title={c.reachable.detail}><Badge tone="ambar">Acceso restringido</Badge></span>}
+                            {c.origin === "ia" && <span title={t("Propuesta por el conocimiento de la IA, no por un resultado de búsqueda")}><Badge tone="warning">{t("Conocimiento IA")}</Badge></span>}
+                            {c.reachable?.status >= 400 && <span title={ts(c.reachable.detail)}><Badge tone="ambar">{t("Acceso restringido")}</Badge></span>}
                           </div>
                           <a href={c.url} target="_blank" rel="noreferrer" className="registry-url">{c.url.replace(/^https?:\/\//, "").slice(0, 80)}</a>
-                          <p style={{ margin: "4px 0", fontSize: 13 }}>{c.justification || "Sin justificación."}</p>
+                          <p style={{ margin: "4px 0", fontSize: 13 }}>{c.justification || t("Sin justificación.")}</p>
                           <p style={{ margin: 0, fontSize: 12, color: "#64748B" }}>
-                            {blockLabel(c.category)} · {c.country || "País sin determinar"} · {(c.tech_types || []).join(", ") || "-"}
+                            {blockLabel(c.category)} · {c.country || t("País sin determinar")} · {(c.tech_types || []).join(", ") || "-"}
                           </p>
                         </div>
                         <div style={{ flex: "0 0 auto" }}>
                           {done ? (
-                            <Badge tone={done.existing ? "viewer" : "ok"}>{done.existing ? "Ya existe" : "Dada de alta"}</Badge>
+                            <Badge tone={done.existing ? "viewer" : "ok"}>{done.existing ? t("Ya existe") : t("Dada de alta")}</Badge>
                           ) : (
                             <Button size="sm" variant="outline" loading={acceptingUrl === c.url} disabled={Boolean(acceptingUrl)} onClick={() => acceptCandidate(c).then((ok) => ok && load())}>
-                              Dar de alta
+                              {t("Dar de alta")}
                             </Button>
                           )}
                         </div>
@@ -1184,20 +1210,20 @@ export default function Sources() {
             )}
             {(discovery.already_in_catalog || []).length > 0 && (
               <details style={{ marginTop: 12 }}>
-                <summary style={{ cursor: "pointer", fontSize: 13 }}>Encontradas que ya están en el catálogo ({discovery.already_in_catalog.length})</summary>
+                <summary style={{ cursor: "pointer", fontSize: 13 }}>{t("Encontradas que ya están en el catálogo ({n})", { n: discovery.already_in_catalog.length })}</summary>
                 <ul style={{ fontSize: 12.5, color: "#475569" }}>
                   {discovery.already_in_catalog.map((e) => (
-                    <li key={e.url}>{e.url.replace(/^https?:\/\//, "").slice(0, 70)} → {e.source_title || "catálogo D-06"} (coincide por {e.match})</li>
+                    <li key={e.url}>{e.url.replace(/^https?:\/\//, "").slice(0, 70)} → {e.source_title || t("catálogo D-06")} {t("(coincide por {criterio})", { criterio: MATCH_LABELS[e.match] || ts(e.match) })}</li>
                   ))}
                 </ul>
               </details>
             )}
             {(discovery.discarded || []).length > 0 && (
               <details style={{ marginTop: 8 }}>
-                <summary style={{ cursor: "pointer", fontSize: 13 }}>Descartadas porque no respondieron ({discovery.discarded.length})</summary>
+                <summary style={{ cursor: "pointer", fontSize: 13 }}>{t("Descartadas porque no respondieron ({n})", { n: discovery.discarded.length })}</summary>
                 <ul style={{ fontSize: 12.5, color: "#475569" }}>
                   {discovery.discarded.map((d) => (
-                    <li key={d.url}>{d.name} · {d.url.replace(/^https?:\/\//, "").slice(0, 70)} · {d.detail}</li>
+                    <li key={d.url}>{d.name} · {d.url.replace(/^https?:\/\//, "").slice(0, 70)} · {ts(d.detail)}</li>
                   ))}
                 </ul>
               </details>
@@ -1210,26 +1236,26 @@ export default function Sources() {
       <Modal
         open={quickOpen}
         onClose={() => setQuickOpen(false)}
-        title="Alta rápida de fuente"
+        title={t("Alta rápida de fuente")}
         width={620}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setQuickOpen(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={saveQuick} loading={saving}>Registrar fuente</Button>
+            <Button variant="secondary" onClick={() => setQuickOpen(false)} disabled={saving}>{t("Cancelar")}</Button>
+            <Button onClick={saveQuick} loading={saving}>{t("Registrar fuente")}</Button>
           </>
         }
       >
         <p style={{ fontSize: 13, color: "#64748B", marginTop: 0 }}>{GLOSSARY.fb_alta_rapida}</p>
-        <Input id="quick-title" label="Nombre" required value={quick.title} onChange={(e) => setQuick({ ...quick, title: e.target.value })} />
+        <Input id="quick-title" label={t("Nombre")} required value={quick.title} onChange={(e) => setQuick({ ...quick, title: e.target.value })} />
         <div className="fb-inline-row">
           <Input id="quick-url" label="URL" required hint={GLOSSARY.fb_url} placeholder="https://..." value={quick.url} onChange={(e) => setQuick({ ...quick, url: e.target.value })} />
           <div style={{ flex: "0 0 auto", marginBottom: 14 }}>
             <HintButton variant="outline" hint={GLOSSARY.fb_vista_previa} disabledHint={noScan} disabled={!canScan} loading={previewing} onClick={runPreview}>
-              <Icon name="eye" size={15} /> Vista previa
+              <Icon name="eye" size={15} /> {t("Vista previa")}
             </HintButton>
           </div>
         </div>
-        <Select id="quick-block" label="Bloque" value={quick.category} onChange={(e) => setQuick({ ...quick, category: e.target.value })}>
+        <Select id="quick-block" label={t("Bloque")} value={quick.category} onChange={(e) => setQuick({ ...quick, category: e.target.value })}>
           {BLOCKS.map((c) => <option key={c} value={c}>{blockLabel(c)}</option>)}
         </Select>
         {preview && <LinkPreview data={preview} />}
@@ -1239,48 +1265,47 @@ export default function Sources() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editing ? "Editar fuente" : "Agregar fuente"}
+        title={editing ? t("Editar fuente") : t("Agregar fuente")}
         width={820}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={save} loading={saving}>{editing ? "Guardar cambios" : "Crear fuente"}</Button>
+            <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={saving}>{t("Cancelar")}</Button>
+            <Button onClick={save} loading={saving}>{editing ? t("Guardar cambios") : t("Crear fuente")}</Button>
           </>
         }
       >
         {formError && <p className="public-submit-error" role="alert">{formError}</p>}
         {editing?.catalog_code && (
           <p style={{ fontSize: 12.5, color: "#92400E", background: "#FFFBEB", padding: "8px 10px", borderRadius: 8, marginTop: 0 }}>
-            Fuente del catálogo D-06 ({editing.catalog_code}). Recargar el catálogo restituye sus datos oficiales; la
-            nivel de fuente, la ruta de acceso y el flujo que edite aquí se conservan.
+            {t("Fuente del catálogo D-06 ({codigo}). Recargar el catálogo restituye sus datos oficiales; la nivel de fuente, la ruta de acceso y el flujo que edite aquí se conservan.", { codigo: editing.catalog_code })}
           </p>
         )}
-        <Input id="source-title" label="Nombre" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        <Input id="source-title" label={t("Nombre")} required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
         <Input id="source-url" label="URL" hint={GLOSSARY.fb_url} required={currentConnector?.requires_url ?? true} value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
         <div className="fb-grid-2">
-          <Select id="source-block" label="Bloque" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+          <Select id="source-block" label={t("Bloque")} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
             {[...new Set([...BLOCKS, form.category].filter(Boolean))].map((c) => <option key={c} value={c}>{blockLabel(c)}</option>)}
           </Select>
-          <Select id="source-access" label="Nivel de acceso (contrato de datos)" hint={GLOSSARY.fb_nivel} value={form.access_level} onChange={(e) => setForm({ ...form, access_level: e.target.value })}>
+          <Select id="source-access" label={t("Nivel de acceso (contrato de datos)")} hint={GLOSSARY.fb_nivel} value={form.access_level} onChange={(e) => setForm({ ...form, access_level: e.target.value })}>
             {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
           </Select>
-          <Select id="source-connector" label="Adaptador" hint={GLOSSARY.fb_adaptador} value={form.connector} onChange={(e) => setForm({ ...form, connector: e.target.value })}>
-            {connectors.map((c) => <option key={c.code} value={c.code}>{c.label} ({c.code})</option>)}
+          <Select id="source-connector" label={t("Adaptador")} hint={GLOSSARY.fb_adaptador} value={form.connector} onChange={(e) => setForm({ ...form, connector: e.target.value })}>
+            {connectors.map((c) => <option key={c.code} value={c.code}>{ts(c.label)} ({c.code})</option>)}
             {!connectorByCode[form.connector] && <option value={form.connector}>{form.connector}</option>}
           </Select>
-          <Select id="source-frequency" label="Frecuencia" hint={GLOSSARY.fb_frecuencia} value={form.sync_frequency} onChange={(e) => setForm({ ...form, sync_frequency: e.target.value })}>
-            {[...new Set([...FREQUENCIES, form.sync_frequency].filter(Boolean))].map((f) => <option key={f} value={f}>{f}</option>)}
+          <Select id="source-frequency" label={t("Frecuencia")} hint={GLOSSARY.fb_frecuencia} value={form.sync_frequency} onChange={(e) => setForm({ ...form, sync_frequency: e.target.value })}>
+            {[...new Set([...FREQUENCIES, form.sync_frequency].filter(Boolean))].map((f) => <option key={f} value={f}>{frequencyLabel(f)}</option>)}
           </Select>
         </div>
-        {currentConnector?.description && <p style={{ fontSize: 12.5, color: "#64748B", marginTop: -6 }}>{currentConnector.description}</p>}
+        {currentConnector?.description && <p style={{ fontSize: 12.5, color: "#64748B", marginTop: -6 }}>{ts(currentConnector.description)}</p>}
         <div className="fb-grid-2">
-          <Input id="source-country" label="País o ámbito" value={form.country || ""} onChange={(e) => setForm({ ...form, country: e.target.value })} />
-          <Input id="source-language" label="Idioma" value={form.language || ""} onChange={(e) => setForm({ ...form, language: e.target.value })} />
+          <Input id="source-country" label={t("País o ámbito")} value={form.country || ""} onChange={(e) => setForm({ ...form, country: e.target.value })} />
+          <Input id="source-language" label={t("Idioma")} value={form.language || ""} onChange={(e) => setForm({ ...form, language: e.target.value })} />
         </div>
-        <Textarea id="source-description" label="Descripción" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />
+        <Textarea id="source-description" label={t("Descripción")} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />
         <Textarea
           id="source-config"
-          label="Configuración del conector (JSON)"
+          label={t("Configuración del conector (JSON)")}
           hint={GLOSSARY.fb_config_conector}
           className="fb-json"
           value={form.connectorConfigText}
@@ -1290,62 +1315,62 @@ export default function Sources() {
         />
         <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, marginTop: 6 }}>
           <input type="checkbox" checked={form.scrape_enabled} onChange={(e) => setForm({ ...form, scrape_enabled: e.target.checked })} style={{ width: 18, height: 18 }} />
-          <TermLabel tip={GLOSSARY.fb_ingesta}>Ingesta activa (vigilancia masiva y programada)</TermLabel>
+          <TermLabel tip={GLOSSARY.fb_ingesta}>{t("Ingesta activa (vigilancia masiva y programada)")}</TermLabel>
         </label>
         <SourceMatrixEditor form={form} setForm={setForm} options={options} webSearchOn={meta.web_search?.enabled !== false} />
         {editing && canScan && (
           <div style={{ marginTop: 4 }}>
             <HintButton variant="outline" size="sm" hint={GLOSSARY.fb_probar_busqueda} loading={searchingWeb} onClick={() => testWebSearch(editing)}>
-              <Icon name="radar" size={14} /> Probar búsqueda web
+              <Icon name="radar" size={14} /> {t("Probar búsqueda web")}
             </HintButton>
             <WebSearchResult data={webSearch} />
           </div>
         )}
       </Modal>
 
-      <Modal open={!!detailSource} onClose={() => setDetailSource(null)} title={detailSource?.title || "Fuente"} width={720}>
+      <Modal open={!!detailSource} onClose={() => setDetailSource(null)} title={detailSource?.title || t("Fuente")} width={720}>
         {detailSource && (
           <div className="source-fiche">
             <div className="registry-card-top" style={{ marginBottom: 12 }}>
-              <span className="catalog-code">{detailSource.catalog_code || "sin código"}</span>
-              <Badge tone={detailSource.access_level}>Acceso {detailSource.access_level || "-"}</Badge>
+              <span className="catalog-code">{detailSource.catalog_code || t("sin código")}</span>
+              <Badge tone={detailSource.access_level}>{t("Acceso {nivel}", { nivel: detailSource.access_level || "-" })}</Badge>
               <MatrixBadges source={detailSource} options={options} />
               <Badge tone={healthTone(detailSource.health_status)}>{HEALTH_LABELS[detailSource.health_status || "sin_sonda"] || detailSource.health_status}</Badge>
-              {detailSource.verification_status && <Badge tone={detailSource.verification_status}>{detailSource.verification_status}</Badge>}
+              {detailSource.verification_status && <Badge tone={detailSource.verification_status}>{VERIFICATION_LABELS[detailSource.verification_status] || ts(detailSource.verification_status)}</Badge>}
             </div>
             <p>{detailSource.description}</p>
             <dl className="fiche-grid">
-              <div><dt><TermLabel tip={GLOSSARY.fb_adaptador}>Adaptador</TermLabel></dt><dd>{detailSource.connector}</dd></div>
-              <div><dt><TermLabel tip={GLOSSARY.fb_frecuencia}>Frecuencia</TermLabel></dt><dd>{detailSource.sync_frequency || "-"}</dd></div>
-              <div><dt>País</dt><dd>{detailSource.country || "-"}</dd></div>
-              <div><dt>Señales capturadas</dt><dd>{detailSource.findings_count || 0}</dd></div>
-              <div><dt>Última consulta</dt><dd>{detailSource.last_scraped_at ? new Date(detailSource.last_scraped_at).toLocaleString() : "Nunca"}</dd></div>
-              <div><dt>Campos que aporta</dt><dd>{(detailSource.provides_fields || []).join(", ") || "-"}</dd></div>
-              <div><dt>Alias</dt><dd>{(detailSource.aliases || []).join(", ") || "-"}</dd></div>
-              <div><dt>Términos</dt><dd>{detailSource.terms_accepted_at ? `Aceptados ${new Date(detailSource.terms_accepted_at).toLocaleDateString()}` : (detailSource.terms_url || "No aplican")}</dd></div>
-              {detailSource.last_error && <div><dt>Último error</dt><dd>{detailSource.last_error.slice(0, 300)}</dd></div>}
-              <div><dt><TermLabel tip={GLOSSARY.fb_nivel_fuente}>Nivel de fuente</TermLabel></dt><dd>{optionLabel(options, "source_level", detailSource.source_level || "por_definir")}</dd></div>
-              <div><dt><TermLabel tip={GLOSSARY.fb_tipos_tecnologia}>Tipos de tecnología</TermLabel></dt><dd>{(detailSource.tech_types || []).map((t) => optionLabel(options, "tech_type", t)).join(", ") || "-"}</dd></div>
-              <div><dt>Origen en la matriz</dt><dd>{[detailSource.matrix_ref, detailSource.matrix_origin].filter(Boolean).join(" · ") || "-"}</dd></div>
+              <div><dt><TermLabel tip={GLOSSARY.fb_adaptador}>{t("Adaptador")}</TermLabel></dt><dd>{detailSource.connector}</dd></div>
+              <div><dt><TermLabel tip={GLOSSARY.fb_frecuencia}>{t("Frecuencia")}</TermLabel></dt><dd>{frequencyLabel(detailSource.sync_frequency) || "-"}</dd></div>
+              <div><dt>{t("País")}</dt><dd>{detailSource.country || "-"}</dd></div>
+              <div><dt>{t("Señales capturadas")}</dt><dd>{detailSource.findings_count || 0}</dd></div>
+              <div><dt>{t("Última consulta")}</dt><dd>{detailSource.last_scraped_at ? new Date(detailSource.last_scraped_at).toLocaleString(intlLocale()) : t("Nunca")}</dd></div>
+              <div><dt>{t("Campos que aporta")}</dt><dd>{(detailSource.provides_fields || []).join(", ") || "-"}</dd></div>
+              <div><dt>{t("Alias")}</dt><dd>{(detailSource.aliases || []).join(", ") || "-"}</dd></div>
+              <div><dt>{t("Términos")}</dt><dd>{detailSource.terms_accepted_at ? t("Aceptados {fecha}", { fecha: new Date(detailSource.terms_accepted_at).toLocaleDateString(intlLocale()) }) : (detailSource.terms_url || t("No aplican"))}</dd></div>
+              {detailSource.last_error && <div><dt>{t("Último error")}</dt><dd>{ts(detailSource.last_error).slice(0, 300)}</dd></div>}
+              <div><dt><TermLabel tip={GLOSSARY.fb_nivel_fuente}>{t("Nivel de fuente")}</TermLabel></dt><dd>{optionLabel(options, "source_level", detailSource.source_level || "por_definir")}</dd></div>
+              <div><dt><TermLabel tip={GLOSSARY.fb_tipos_tecnologia}>{t("Tipos de tecnología")}</TermLabel></dt><dd>{(detailSource.tech_types || []).map((code) => optionLabel(options, "tech_type", code)).join(", ") || "-"}</dd></div>
+              <div><dt>{t("Origen en la matriz")}</dt><dd>{[detailSource.matrix_ref, detailSource.matrix_origin].filter(Boolean).join(" · ") || "-"}</dd></div>
               <div>
-                <dt><TermLabel tip={GLOSSARY.fb_flujo_fuente}>Flujo</TermLabel></dt>
+                <dt><TermLabel tip={GLOSSARY.fb_flujo_fuente}>{t("Flujo")}</TermLabel></dt>
                 <dd>
                   {Object.entries(FLOW_SHORT)
                     .filter(([k]) => detailSource.scan_profile?.[k] !== false)
                     .map(([, label]) => label)
-                    .join(" · ") || "Todo apagado"}
-                  {detailSource.scan_profile?.max_pages ? ` · ${detailSource.scan_profile.max_pages} páginas` : ""}
+                    .join(" · ") || t("Todo apagado")}
+                  {detailSource.scan_profile?.max_pages ? " · " + t("{n} páginas", { n: detailSource.scan_profile.max_pages }) : ""}
                 </dd>
               </div>
-              {detailSource.material_type && <div><dt>Tipo de material</dt><dd>{detailSource.material_type}</dd></div>}
+              {detailSource.material_type && <div><dt>{t("Tipo de material")}</dt><dd>{detailSource.material_type}</dd></div>}
             </dl>
             {(detailSource.access_path || detailSource.consult_info || (detailSource.entry_urls || []).length > 0) && (
               <div className="source-matrix-fiche">
-                {detailSource.access_path && <p><strong>Ruta de acceso:</strong> {detailSource.access_path}</p>}
-                {detailSource.consult_info && <p><strong>Qué consultar:</strong> {detailSource.consult_info}</p>}
+                {detailSource.access_path && <p><strong>{t("Ruta de acceso:")}</strong> {detailSource.access_path}</p>}
+                {detailSource.consult_info && <p><strong>{t("Qué consultar:")}</strong> {detailSource.consult_info}</p>}
                 {(detailSource.entry_urls || []).length > 0 && (
                   <div>
-                    <strong>URLs de entrada:</strong>
+                    <strong>{t("URLs de entrada:")}</strong>
                     <ul>
                       {detailSource.entry_urls.map((u) => (
                         <li key={u}><a href={u} target="_blank" rel="noreferrer">{u.replace(/^https?:\/\//, "").slice(0, 90)}</a></li>
@@ -1354,20 +1379,20 @@ export default function Sources() {
                   </div>
                 )}
                 {(detailSource.reference_urls || []).length > 0 && (
-                  <p><strong>Referencias:</strong> {detailSource.reference_urls.map((u) => <a key={u} href={u} target="_blank" rel="noreferrer" style={{ marginRight: 8 }}>{u.replace(/^https?:\/\//, "").slice(0, 60)}</a>)}</p>
+                  <p><strong>{t("Referencias:")}</strong> {detailSource.reference_urls.map((u) => <a key={u} href={u} target="_blank" rel="noreferrer" style={{ marginRight: 8 }}>{u.replace(/^https?:\/\//, "").slice(0, 60)}</a>)}</p>
                 )}
-                {detailSource.observations && <p><strong>Observaciones:</strong> {detailSource.observations}</p>}
-                {detailSource.usage_restrictions && <p><strong>Restricciones:</strong> {detailSource.usage_restrictions}</p>}
+                {detailSource.observations && <p><strong>{t("Observaciones:")}</strong> {detailSource.observations}</p>}
+                {detailSource.usage_restrictions && <p><strong>{t("Restricciones:")}</strong> {detailSource.usage_restrictions}</p>}
               </div>
             )}
             {detailSource.catalog_note && <p className="catalog-note">{detailSource.catalog_note}</p>}
             <div className="url-origin-detail">
-              <strong>URL principal:</strong>{" "}
+              <strong>{t("URL principal:")}</strong>{" "}
               {detailSource.url ? <a href={detailSource.url} target="_blank" rel="noreferrer">{detailSource.url}</a> : "-"}
               <UrlOriginTag source={detailSource} detailed />
               {detailSource.matrix_url && detailSource.url_origin !== "matriz" && (
                 <p style={{ margin: "4px 0 0" }}>
-                  <strong>URL original de la matriz:</strong>{" "}
+                  <strong>{t("URL original de la matriz:")}</strong>{" "}
                   <a href={detailSource.matrix_url} target="_blank" rel="noreferrer">{detailSource.matrix_url}</a>
                 </p>
               )}
@@ -1375,12 +1400,12 @@ export default function Sources() {
             <div className="fb-toolbar" style={{ marginBottom: 8 }}>
               {detailSource.url && (
                 <a href={detailSource.url} target="_blank" rel="noreferrer">
-                  <Button variant="secondary" size="sm"><Icon name="external" size={14} /> Abrir fuente</Button>
+                  <Button variant="secondary" size="sm"><Icon name="external" size={14} /> {t("Abrir fuente")}</Button>
                 </a>
               )}
               {canWrite && detailSource.terms_url && !detailSource.terms_accepted_at && (
-                <HintButton size="sm" hint="Deja fechado que el IETS aceptó los términos de uso de esta fuente" onClick={() => acceptTerms(detailSource)}>
-                  Registrar aceptación de términos
+                <HintButton size="sm" hint={t("Deja fechado que el IETS aceptó los términos de uso de esta fuente")} onClick={() => acceptTerms(detailSource)}>
+                  {t("Registrar aceptación de términos")}
                 </HintButton>
               )}
             </div>
@@ -1395,18 +1420,18 @@ export default function Sources() {
         onClose={() => setConfirmDelete(null)}
         onConfirm={doDelete}
         loading={deleting}
-        title="Eliminar fuente"
-        message={`Se eliminará "${confirmDelete?.title}" del inventario. No tiene señales capturadas. Esta acción no se puede deshacer.`}
-        confirmLabel="Eliminar"
+        title={t("Eliminar fuente")}
+        message={t('Se eliminará "{nombre}" del inventario. No tiene señales capturadas. Esta acción no se puede deshacer.', { nombre: confirmDelete?.title })}
+        confirmLabel={t("Eliminar")}
       />
       <ConfirmDialog
         open={confirmImport}
         onClose={() => setConfirmImport(false)}
         onConfirm={importCatalog}
         loading={importing}
-        title="Recargar catálogo D-06"
-        message="Se actualizarán las fuentes oficiales con los datos del catálogo verificado y se retirarán las que ya no estén en el. Las señales nunca se borran. Los datos oficiales (URL, adaptador, nivel de acceso) se restituyen; la priorización, la ruta de acceso y el flujo editados en el panel se conservan."
-        confirmLabel="Recargar"
+        title={t("Recargar catálogo D-06")}
+        message={t("Se actualizarán las fuentes oficiales con los datos del catálogo verificado y se retirarán las que ya no estén en el. Las señales nunca se borran. Los datos oficiales (URL, adaptador, nivel de acceso) se restituyen; la priorización, la ruta de acceso y el flujo editados en el panel se conservan.")}
+        confirmLabel={t("Recargar")}
         confirmVariant="primary"
       />
     </div>

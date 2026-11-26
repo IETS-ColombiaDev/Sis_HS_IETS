@@ -1,6 +1,7 @@
 import { useId } from "react";
 import InfoTip from "./InfoTip";
 import Icon from "./Icon";
+import { t } from "../i18n";
 
 /**
  * Campos de formulario. Estilos en styles/ui.css.
@@ -22,7 +23,7 @@ export function Label({ children, htmlFor, required, hint }) {
           </span>
         )}
       </span>
-      <InfoTip text={hint} label={`Qué es ${typeof children === "string" ? children : "este campo"}`} />
+      <InfoTip text={hint} label={t("Qué es {term}", { term: typeof children === "string" ? children : t("este campo") })} />
     </label>
   );
 }

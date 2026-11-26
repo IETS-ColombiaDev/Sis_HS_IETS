@@ -1,5 +1,6 @@
 import { Component } from "react";
 import Button from "./Button";
+import { t } from "../i18n";
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -24,9 +25,9 @@ export default class ErrorBoundary extends Component {
     if (this.state.error) {
       return (
         <div className="error-boundary" role="alert">
-          <strong>{this.props.title || "Esta vista se detuvo"}</strong>
-          <p>{this.props.hint || "El resto del sistema sigue disponible. Puede reintentar sin recargar todo el sitio."}</p>
-          <Button size="sm" onClick={this.reset}>Reintentar</Button>
+          <strong>{this.props.title || t("Esta vista se detuvo")}</strong>
+          <p>{this.props.hint || t("El resto del sistema sigue disponible. Puede reintentar sin recargar todo el sitio.")}</p>
+          <Button size="sm" onClick={this.reset}>{t("Reintentar")}</Button>
         </div>
       );
     }

@@ -1,3 +1,5 @@
+import { t, ts } from "../i18n";
+
 export const TYPE_COLOR = {
   cycle: "#4F46E5",
   cluster: "#0F766E",
@@ -10,14 +12,14 @@ export const TYPE_COLOR = {
 };
 
 export const TYPE_LABEL = {
-  cycle: "Ciclo",
-  cluster: "Clúster",
-  funnel: "Embudo",
-  technology: "Tecnología",
+  cycle: t("Ciclo"),
+  cluster: t("Clúster"),
+  funnel: t("Embudo"),
+  technology: t("Tecnología"),
   ttm: "Time-to-market",
-  evidence: "Evidencia",
-  budget: "Presupuesto",
-  comparators: "Comparadores",
+  evidence: t("Evidencia"),
+  budget: t("Presupuesto"),
+  comparators: t("Comparadores"),
 };
 
 const COLS = { cycle: 0, cluster: 1, funnel: 1, technology: 2, ttm: 3, evidence: 3, budget: 3, comparators: 3 };
@@ -164,7 +166,8 @@ export function filterNodes(nodes, query, type) {
   return (nodes || []).filter((n) => {
     if (type && n.type !== type) return false;
     if (!q) return true;
-    const hay = `${n.label || ""} ${n.subtitle || ""} ${TYPE_LABEL[n.type] || ""}`.toLowerCase();
+    // El texto mostrado puede estar traducido: se busca en el original y en el que se ve.
+    const hay = `${n.label || ""} ${n.subtitle || ""} ${ts(n.label) || ""} ${ts(n.subtitle) || ""} ${TYPE_LABEL[n.type] || ""}`.toLowerCase();
     return hay.includes(q);
   });
 }

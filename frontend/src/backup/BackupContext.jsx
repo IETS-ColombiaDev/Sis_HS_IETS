@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useRealtime } from "../realtime/RealtimeContext";
 import { useToast } from "../components/Toast";
 import { listArchives, loadByKey, loadCurrent, readMeta, saveCurrent } from "./browserStore";
+import { t, intlLocale } from "../i18n";
 
 /**
  * Copia extra de la base en IndexedDB del administrador.
@@ -129,7 +130,7 @@ export function BackupProvider({ children }) {
             return;
           } catch (e) {
             if (e?.response?.status !== 409) {
-              setState((s) => ({ ...s, status: "error", message: apiError(e, "No se pudo restaurar la copia") }));
+              setState((s) => ({ ...s, status: "error", message: apiError(e, t("No se pudo restaurar la copia")) }));
               return;
             }
           }
@@ -158,7 +159,7 @@ export function BackupProvider({ children }) {
       await exportNow(info);
       await refreshLocal({ status: "idle", message: "" });
     } catch (e) {
-      setState((s) => ({ ...s, status: "error", message: apiError(e, "No se pudo guardar la copia local") }));
+      setState((s) => ({ ...s, status: "error", message: apiError(e, t("No se pudo guardar la copia local")) }));
     } finally {
       busy.current = false;
     }
@@ -169,7 +170,7 @@ export function BackupProvider({ children }) {
     if (restoredAt && user) {
       sessionStorage.removeItem(RESTORED_FLAG);
       toastRef.current.success(
-        `El servidor se reinició sin datos y se restauraron desde este navegador (copia del ${new Date(restoredAt).toLocaleString("es-CO")}).`
+        t("El servidor se reinició sin datos y se restauraron desde este navegador (copia del {date}).", { date: new Date(restoredAt).toLocaleString(intlLocale()) })
       );
     }
   }, [user]);
@@ -197,15 +198,15 @@ export function BackupProvider({ children }) {
       return undefined;
     }
     if (firebaseOn.current) return undefined;
-    const t = setTimeout(() => sync(), CHANGE_DEBOUNCE_MS);
-    return () => clearTimeout(t);
+    const debounce = setTimeout(() => sync(), CHANGE_DEBOUNCE_MS);
+    return () => clearTimeout(debounce);
   }, [enabled, version, sync]);
 
   const saveNow = useCallback(() => sync({ manual: true }), [sync]);
 
   const download = useCallback(async () => {
     const snap = await loadCurrent();
-    if (!snap?.blob) throw new Error("Aún no hay copia guardada en este navegador.");
+    if (!snap?.blob) throw new Error(t("Aún no hay copia guardada en este navegador."));
     const url = URL.createObjectURL(snap.blob);
     const a = document.createElement("a");
     const stamp = (snap.takenAt || new Date().toISOString()).slice(0, 19).replace(/[:T]/g, "-");
@@ -217,12 +218,12 @@ export function BackupProvider({ children }) {
 
   const restoreFrom = useCallback(async (key = "current") => {
     const snap = await loadByKey(key);
-    if (!snap?.blob) throw new Error("No hay copia para restaurar.");
+    if (!snap?.blob) throw new Error(t("No hay copia para restaurar."));
     setState((s) => ({ ...s, status: "restoring", message: "" }));
     try {
       return await restoreBlob(snap.blob, { force: true });
     } catch (e) {
-      setState((s) => ({ ...s, status: "error", message: apiError(e, "No se pudo restaurar la copia") }));
+      setState((s) => ({ ...s, status: "error", message: apiError(e, t("No se pudo restaurar la copia")) }));
       throw e;
     }
   }, [restoreBlob]);

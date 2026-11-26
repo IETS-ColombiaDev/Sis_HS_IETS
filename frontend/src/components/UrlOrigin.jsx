@@ -1,5 +1,6 @@
 import Badge from "./Badge";
 import Icon from "./Icon";
+import { t, ts } from "../i18n";
 
 /**
  * Etiqueta de procedencia de la URL principal de una fuente frente a la matriz
@@ -24,19 +25,19 @@ export function UrlOriginTag({ source, detailed = false }) {
   const same = source.url_origin === "matriz";
   return (
     <div className="url-origin-wrap">
-      <span className="url-origin" title={source.url_note || ""}>
+      <span className="url-origin" title={ts(source.url_note) || ""}>
         <Badge tone={TONE[source.url_origin] || "viewer"}>
-          <Icon name={same ? "check" : "info"} size={12} /> {source.url_origin_label}
+          <Icon name={same ? "check" : "info"} size={12} /> {ts(source.url_origin_label)}
         </Badge>
       </span>
       {!same && (detailed || source.matrix_url) && (
         <div className="url-origin-note">
-          {source.url_note}
+          {ts(source.url_note)}
           {source.matrix_url && !detailed && (
             <>
               {" "}
               <a href={source.matrix_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
-                Abrir la URL de la matriz
+                {t("Abrir la URL de la matriz")}
               </a>
             </>
           )}

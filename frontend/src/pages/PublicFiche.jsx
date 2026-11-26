@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import axios from "axios";
 import PublicShell from "../components/PublicShell";
 import Button from "../components/Button";
+import { t, ts } from "../i18n";
 
 export default function PublicFiche() {
   const { id } = useParams();
@@ -17,7 +18,7 @@ export default function PublicFiche() {
       .then((r) => setData(r.data))
       .catch((err) => {
         const detail = err?.response?.data?.detail;
-        setError(typeof detail === "string" ? detail : "Esta ficha no está disponible en la consulta pública.");
+        setError(typeof detail === "string" ? ts(detail) : t("Esta ficha no está disponible en la consulta pública."));
       });
   }, [id]);
 
@@ -26,11 +27,11 @@ export default function PublicFiche() {
 
   return (
     <PublicShell
-      kicker="Ficha pública"
-      title={data?.title || (error ? "Expediente no disponible" : "Cargando…")}
+      kicker={t("Ficha pública")}
+      title={data?.title || (error ? t("Expediente no disponible") : t("Cargando…"))}
       lead={
         data
-          ? [data.inn_name, data.cluster, data.ttm_band_label].filter(Boolean).join(" · ")
+          ? [data.inn_name, ts(data.cluster), ts(data.ttm_band_label)].filter(Boolean).join(" · ")
           : undefined
       }
     >
@@ -41,10 +42,10 @@ export default function PublicFiche() {
           <header className="iets-dossier-mast">
             <div className="iets-dossier-brand">IETS</div>
             <div>
-              <p className="iets-dossier-kicker">Consulta pública · Escaneo de horizonte</p>
+              <p className="iets-dossier-kicker">{t("Consulta pública · Escaneo de horizonte")}</p>
               <h2>{data.title}</h2>
               <p className="iets-dossier-sub">
-                {[data.commercial_name, data.inn_name && `DCI ${data.inn_name}`, data.manufacturer]
+                {[data.commercial_name, data.inn_name && t("DCI {name}", { name: data.inn_name }), data.manufacturer]
                   .filter(Boolean)
                   .join(" · ")}
               </p>
@@ -53,16 +54,16 @@ export default function PublicFiche() {
 
           <div className="public-fiche-meta">
             <div>
-              <b>Clúster</b>
-              <span>{data.cluster || "-"}</span>
+              <b>{t("Clúster")}</b>
+              <span>{ts(data.cluster) || "-"}</span>
             </div>
             <div>
-              <b>Horizonte</b>
-              <span>{data.ttm_band_label || "-"}</span>
+              <b>{t("Horizonte")}</b>
+              <span>{ts(data.ttm_band_label) || "-"}</span>
             </div>
             <div>
-              <b>Producto</b>
-              <span>{data.product_level || "Ficha"}</span>
+              <b>{t("Producto")}</b>
+              <span>{ts(data.product_level) || t("Ficha")}</span>
             </div>
           </div>
 
@@ -70,7 +71,7 @@ export default function PublicFiche() {
             <article key={key} className="iets-dossier-block">
               <h4>
                 <span className="iets-dossier-num-inline">0{index + 1}</span>
-                {labels[key] || key}
+                {ts(labels[key]) || key}
               </h4>
               {String(value)
                 .split("\n")
@@ -82,9 +83,9 @@ export default function PublicFiche() {
           ))}
 
           <section className="iets-dossier-block">
-            <h4>Ensayos clínicos asociados</h4>
+            <h4>{t("Ensayos clínicos asociados")}</h4>
             {(data.nct_ids || []).length === 0 ? (
-              <p>Sin identificadores NCT registrados.</p>
+              <p>{t("Sin identificadores NCT registrados.")}</p>
             ) : (
               <ul>
                 {data.nct_ids.map((n) => (
@@ -103,15 +104,15 @@ export default function PublicFiche() {
               variant="secondary"
               onClick={() => window.open(`/api/public/technologies/${id}/export?format=pdf`, "_blank", "noopener")}
             >
-              Descargar ficha técnica
+              {t("Descargar ficha técnica")}
             </Button>
             <Button
               variant="outline"
               onClick={() => window.open(`/api/public/technologies/${id}/export`, "_blank", "noopener")}
             >
-              Ver versión web
+              {t("Ver versión web")}
             </Button>
-            <Link to="/expedientes">Volver al buscador</Link>
+            <Link to="/expedientes">{t("Volver al buscador")}</Link>
           </div>
         </article>
       )}

@@ -30,6 +30,7 @@ import Alerts from "./pages/Alerts";
 import Submissions from "./pages/Submissions";
 import { CycleProvider } from "./cycle/CycleContext";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { t } from "./i18n";
 
 /**
  * Marco de las pantallas internas. Se monta una sola vez: al cambiar de modulo
@@ -44,8 +45,8 @@ function ProtectedShell() {
     <Layout>
       <ErrorBoundary
         key={location.pathname}
-        title="Esta pantalla se detuvo"
-        hint="El menú sigue disponible. Reintente o cambie de módulo."
+        title={t("Esta pantalla se detuvo")}
+        hint={t("El menú sigue disponible. Reintente o cambie de módulo.")}
       >
         <Outlet />
       </ErrorBoundary>
@@ -70,7 +71,7 @@ export default function App() {
   if (loading) {
     return (
       <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <LoadingBlock label="Iniciando el sistema..." />
+        <LoadingBlock label={t("Iniciando el sistema...")} />
       </div>
     );
   }

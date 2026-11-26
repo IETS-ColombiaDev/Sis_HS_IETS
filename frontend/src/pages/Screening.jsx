@@ -29,6 +29,7 @@ import {
   resolveTechLink,
   useTechDeepLink,
 } from "../utils/techLink";
+import { t, tr, ts, intlLocale } from "../i18n";
 
 /**
  * Fase 3 del plan: depuracion del acervo del ciclo.
@@ -39,9 +40,9 @@ import {
  */
 
 const TABS = [
-  { key: "duplicados", label: "Duplicados", icon: "layers", hint: GLOSSARY.desduplicacion },
-  { key: "novedad", label: "Novedad y registro sanitario", icon: "shield", hint: GLOSSARY.novedad },
-  { key: "listado", label: "Listado único", icon: "list", hint: GLOSSARY.listado_unico },
+  { key: "duplicados", label: t("Duplicados"), icon: "layers", hint: GLOSSARY.desduplicacion },
+  { key: "novedad", label: t("Novedad y registro sanitario"), icon: "shield", hint: GLOSSARY.novedad },
+  { key: "listado", label: t("Listado único"), icon: "list", hint: GLOSSARY.listado_unico },
 ];
 
 function pct(value) {
@@ -50,12 +51,12 @@ function pct(value) {
 
 function techLabel(tech) {
   if (!tech) return "-";
-  return tech.inn_name || tech.commercial_name || `Tecnología #${tech.id}`;
+  return tech.inn_name || tech.commercial_name || t("Tecnología #{id}", { id: tech.id });
 }
 
 /** Ficha de un registro dentro de una propuesta de fusion. */
 function MergeCandidate({ tech, selected, onSelect, disabled }) {
-  if (!tech) return <div className="merge-card">Registro no disponible</div>;
+  if (!tech) return <div className="merge-card">{t("Registro no disponible")}</div>;
   return (
     <div className={`merge-card${selected ? " is-selected" : ""}`}>
       <div className="merge-card-head">
@@ -65,7 +66,7 @@ function MergeCandidate({ tech, selected, onSelect, disabled }) {
       <dl className="merge-fields">
         {tech.commercial_name && tech.commercial_name !== techLabel(tech) && (
           <>
-            <dt>Comercial</dt>
+            <dt>{t("Comercial")}</dt>
             <dd>
               <ClampText text={tech.commercial_name} lines={2} expandable />
             </dd>
@@ -73,7 +74,7 @@ function MergeCandidate({ tech, selected, onSelect, disabled }) {
         )}
         {tech.manufacturer && (
           <>
-            <dt>Fabricante</dt>
+            <dt>{t("Fabricante")}</dt>
             <dd>{tech.manufacturer}</dd>
           </>
         )}
@@ -85,24 +86,24 @@ function MergeCandidate({ tech, selected, onSelect, disabled }) {
         )}
         {tech.nct_ids?.length > 0 && (
           <>
-            <dt>Ensayos</dt>
+            <dt>{t("Ensayos")}</dt>
             <dd>{tech.nct_ids.join(", ")}</dd>
           </>
         )}
         {tech.cluster_name && (
           <>
-            <dt>Clúster</dt>
+            <dt>{t("Clúster")}</dt>
             <dd>{tech.cluster_name}</dd>
           </>
         )}
         {tech.source_name && (
           <>
-            <dt>Fuente</dt>
+            <dt>{t("Fuente")}</dt>
             <dd>{tech.source_name}</dd>
           </>
         )}
-        <dt>Estado</dt>
-        <dd>{tech.status}</dd>
+        <dt>{t("Estado")}</dt>
+        <dd>{ts(tech.status)}</dd>
       </dl>
       <Button
         variant={selected ? "primary" : "secondary"}
@@ -111,7 +112,7 @@ function MergeCandidate({ tech, selected, onSelect, disabled }) {
         onClick={onSelect}
         style={{ width: "100%" }}
       >
-        {selected ? "Se conserva este" : "Conservar este"}
+        {selected ? t("Se conserva este") : t("Conservar este")}
       </Button>
     </div>
   );
@@ -125,9 +126,11 @@ function MatchEvidence({ proposal }) {
     <div className="merge-evidence">
       {proposal.decisive ? (
         <p className="merge-evidence-decisive">
-          Ambos registros comparten el ensayo clínico{" "}
-          <strong>{(proposal.detail?.nct || []).join(", ")}</strong>. No es un parecido
-          de nombres: es el mismo desarrollo.
+          {tr(
+            "Ambos registros comparten el ensayo clínico <b>{nct}</b>. No es un parecido de nombres: es el mismo desarrollo.",
+            { nct: <>{(proposal.detail?.nct || []).join(", ")}</> },
+            { b: (c) => <strong>{c}</strong> }
+          )}
         </p>
       ) : (
         <>
@@ -135,23 +138,23 @@ function MatchEvidence({ proposal }) {
             <div className="merge-metrics">
               <span className="term-label">
                 Levenshtein <strong>{name.levenshtein}</strong>
-                <InfoTip text={GLOSSARY.fa_levenshtein} label="Qué es Levenshtein" />
+                <InfoTip text={GLOSSARY.fa_levenshtein} label={t("Qué es Levenshtein")} />
               </span>
               <span className="term-label">
                 Jaro-Winkler <strong>{name.jaro_winkler}</strong>
-                <InfoTip text={GLOSSARY.fa_jaro} label="Qué es Jaro-Winkler" />
+                <InfoTip text={GLOSSARY.fa_jaro} label={t("Qué es Jaro-Winkler")} />
               </span>
               <span className="term-label">
                 Token sorting <strong>{name.token_sort}</strong>
-                <InfoTip text={GLOSSARY.fa_token_sort} label="Qué es token sorting" />
+                <InfoTip text={GLOSSARY.fa_token_sort} label={t("Qué es token sorting")} />
               </span>
             </div>
           )}
           {manufacturer && (
             <div className="merge-metrics">
               <span className="term-label">
-                Fabricante <strong>{manufacturer.token_set}</strong>
-                <InfoTip text={GLOSSARY.fa_fabricante_sim} label="Cómo pesa el fabricante" />
+                {t("Fabricante")} <strong>{manufacturer.token_set}</strong>
+                <InfoTip text={GLOSSARY.fa_fabricante_sim} label={t("Cómo pesa el fabricante")} />
               </span>
             </div>
           )}
@@ -160,7 +163,7 @@ function MatchEvidence({ proposal }) {
       <div className="merge-signals">
         {(proposal.matched_on || []).map((tag) => (
           <Badge key={tag} tone={tag === "fabricante_discrepante" ? "warning" : "info"}>
-            {tag.replace(/_/g, " ")}
+            {ts(tag.replace(/_/g, " "))}
           </Badge>
         ))}
       </div>
@@ -194,7 +197,7 @@ function DuplicatesTab({ canWrite, onChanged }) {
         return next;
       });
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar las propuestas de fusión"));
+      toast.error(apiError(e, t("No se pudieron cargar las propuestas de fusión")));
     } finally {
       setLoading(false);
     }
@@ -212,13 +215,16 @@ function DuplicatesTab({ canWrite, onChanged }) {
         params: cycleId ? { cycle_id: cycleId } : {},
       });
       toast.success(
-        `Barrido con umbral ${data.threshold}%: ${data.detected} pares detectados, ` +
-          `${data.created} propuestas nuevas.`
+        t("Barrido con umbral {threshold}%: {detected} pares detectados, {created} propuestas nuevas.", {
+          threshold: data.threshold,
+          detected: data.detected,
+          created: data.created,
+        })
       );
       await load();
       onChanged?.();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo ejecutar el barrido"));
+      toast.error(apiError(e, t("No se pudo ejecutar el barrido")));
     } finally {
       setScanning(false);
     }
@@ -232,24 +238,24 @@ function DuplicatesTab({ canWrite, onChanged }) {
           keep_technology_id: choice[proposal.id],
           note: notes[proposal.id] || "",
         });
-        toast.success("Registros fusionados. El absorbido queda trazado, no borrado.");
+        toast.success(t("Registros fusionados. El absorbido queda trazado, no borrado."));
       } else {
         await api.post(`/screening/merges/${proposal.id}/discard`, {
           note: notes[proposal.id] || "",
         });
-        toast.success("Propuesta descartada. El motor no volverá a proponerla.");
+        toast.success(t("Propuesta descartada. El motor no volverá a proponerla."));
       }
       setConfirming(null);
       await load();
       onChanged?.();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo resolver la propuesta"));
+      toast.error(apiError(e, t("No se pudo resolver la propuesta")));
     } finally {
       setBusyId(null);
     }
   };
 
-  if (loading) return <LoadingBlock label="Cargando propuestas de fusión..." />;
+  if (loading) return <LoadingBlock label={t("Cargando propuestas de fusión...")} />;
 
   const keptTech = (p) =>
     choice[p.id] === p.technology_a_id ? p.technology_a : p.technology_b;
@@ -259,8 +265,8 @@ function DuplicatesTab({ canWrite, onChanged }) {
   return (
     <>
       <Card
-        title="Detección de duplicados"
-        hint="El hash exacto solo atrapa la misma página traída dos veces. La misma tecnología llega con nombres distintos según la fuente, y ese es el duplicado que contamina el Listado Único."
+        title={t("Detección de duplicados")}
+        hint={t("El hash exacto solo atrapa la misma página traída dos veces. La misma tecnología llega con nombres distintos según la fuente, y ese es el duplicado que contamina el Listado Único.")}
         padding={18}
         style={{ marginBottom: 18 }}
         actions={
@@ -269,26 +275,25 @@ function DuplicatesTab({ canWrite, onChanged }) {
               onClick={scan}
               loading={scanning}
               disabled={!cycleId || isClosed}
-              disabledHint={!cycleId ? "Seleccione un ciclo para barrer su acervo." : "El ciclo está cerrado: su acervo ya no cambia."}
-              hint={`${GLOSSARY.fa_barrido} Barre ${cycle?.code || "el ciclo en pantalla"}.`}
+              disabledHint={!cycleId ? t("Seleccione un ciclo para barrer su acervo.") : t("El ciclo está cerrado: su acervo ya no cambia.")}
+              hint={t("{hint} Barre {ciclo}.", { hint: GLOSSARY.fa_barrido, ciclo: cycle?.code || t("el ciclo en pantalla") })}
               data-testid="dedup-scan"
             >
-              <Icon name="refresh" size={16} /> Ejecutar barrido
+              <Icon name="refresh" size={16} /> {t("Ejecutar barrido")}
             </HintButton>
           )
         }
       >
         <p className="muted-note">
-          El sistema propone; una persona confirma. Ninguna fusión es automática y todas
-          quedan en la bitácora con su autor.
+          {t("El sistema propone; una persona confirma. Ninguna fusión es automática y todas quedan en la bitácora con su autor.")}
         </p>
       </Card>
 
       {proposals.length === 0 ? (
         <EmptyState
           icon="✅"
-          title="Sin duplicados pendientes"
-          message="No hay pares por revisar. Ejecute el barrido después de asignar nuevas señales al ciclo."
+          title={t("Sin duplicados pendientes")}
+          message={t("No hay pares por revisar. Ejecute el barrido después de asignar nuevas señales al ciclo.")}
         />
       ) : (
         proposals.map((proposal) => (
@@ -296,10 +301,10 @@ function DuplicatesTab({ canWrite, onChanged }) {
             <div className="merge-head" data-testid={`merge-${proposal.id}`}>
               <div>
                 <Badge tone={proposal.decisive ? "priorizada" : "asignada_a_ciclo"}>
-                  {proposal.decisive ? "Mismo ensayo clínico" : `Similitud ${pct(proposal.score)}`}
+                  {proposal.decisive ? t("Mismo ensayo clínico") : t("Similitud {pct}", { pct: pct(proposal.score) })}
                 </Badge>
               </div>
-              <span className="muted-note">Propuesta #{proposal.id}</span>
+              <span className="muted-note">{t("Propuesta #{id}", { id: proposal.id })}</span>
             </div>
 
             <MatchEvidence proposal={proposal} />
@@ -326,8 +331,8 @@ function DuplicatesTab({ canWrite, onChanged }) {
             {canWrite && (
               <>
                 <Input
-                  aria-label={`Nota de la decisión de la propuesta ${proposal.id}`}
-                  placeholder="Nota de la decisión (opcional)"
+                  aria-label={t("Nota de la decisión de la propuesta {id}", { id: proposal.id })}
+                  placeholder={t("Nota de la decisión (opcional)")}
                   value={notes[proposal.id] || ""}
                   onChange={(e) => setNotes((p) => ({ ...p, [proposal.id]: e.target.value }))}
                   style={{ marginBottom: 10 }}
@@ -338,7 +343,7 @@ function DuplicatesTab({ canWrite, onChanged }) {
                     loading={busyId === proposal.id}
                     hint={GLOSSARY.fa_confirmar_fusion}
                   >
-                    Fusionar y conservar #{choice[proposal.id]}
+                    {t("Fusionar y conservar #{id}", { id: choice[proposal.id] })}
                   </HintButton>
                   <HintButton
                     variant="secondary"
@@ -346,7 +351,7 @@ function DuplicatesTab({ canWrite, onChanged }) {
                     disabled={busyId === proposal.id}
                     hint={GLOSSARY.fa_descartar_fusion}
                   >
-                    Son distintas
+                    {t("Son distintas")}
                   </HintButton>
                 </div>
               </>
@@ -360,12 +365,16 @@ function DuplicatesTab({ canWrite, onChanged }) {
         onClose={() => setConfirming(null)}
         onConfirm={() => resolve(confirming, "confirm")}
         loading={Boolean(confirming) && busyId === confirming?.id}
-        title="Confirmar fusión"
-        confirmLabel="Fusionar"
+        title={t("Confirmar fusión")}
+        confirmLabel={t("Fusionar")}
         confirmVariant="primary"
         message={
           confirming
-            ? `Se conserva #${keptTech(confirming)?.id} (${techLabel(keptTech(confirming)).slice(0, 90)}) y absorbe a #${droppedTech(confirming)?.id}, que sale del Listado Único con causa "duplicada". La fusión no se deshace.`
+            ? t('Se conserva #{kept} ({name}) y absorbe a #{dropped}, que sale del Listado Único con causa "duplicada". La fusión no se deshace.', {
+                kept: keptTech(confirming)?.id,
+                name: techLabel(keptTech(confirming)).slice(0, 90),
+                dropped: droppedTech(confirming)?.id,
+              })
             : ""
         }
       />
@@ -388,7 +397,7 @@ function InvimaPanel({ canSync, onChanged }) {
       setStatus(s.data);
       setSyncs(h.data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo consultar el índice del INVIMA"));
+      toast.error(apiError(e, t("No se pudo consultar el índice del INVIMA")));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -402,16 +411,19 @@ function InvimaPanel({ canSync, onChanged }) {
     try {
       const { data } = await api.post("/invima/sync");
       if (data.status === "error") {
-        toast.error(data.message);
+        toast.error(ts(data.message));
       } else {
         toast.success(
-          `Índice actualizado: ${data.rows_ingested} nuevos, ${data.rows_updated} actualizados.`
+          t("Índice actualizado: {nuevos} nuevos, {actualizados} actualizados.", {
+            nuevos: data.rows_ingested,
+            actualizados: data.rows_updated,
+          })
         );
       }
       await load();
       onChanged?.();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo sincronizar"));
+      toast.error(apiError(e, t("No se pudo sincronizar")));
     } finally {
       setBusy("");
     }
@@ -425,53 +437,53 @@ function InvimaPanel({ canSync, onChanged }) {
     form.append("file", file);
     try {
       const { data } = await api.post("/invima/sync/file", form);
-      if (data.status === "error") toast.error(data.message);
-      else toast.success(`${data.rows_ingested} registros cargados desde el archivo.`);
+      if (data.status === "error") toast.error(ts(data.message));
+      else toast.success(t("{n} registros cargados desde el archivo.", { n: data.rows_ingested }));
       await load();
       onChanged?.();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar el archivo"));
+      toast.error(apiError(e, t("No se pudo cargar el archivo")));
     } finally {
       setBusy("");
       event.target.value = "";
     }
   };
 
-  if (!status) return <LoadingBlock label="Consultando el índice..." />;
+  if (!status) return <LoadingBlock label={t("Consultando el índice...")} />;
 
   return (
     <Card
-      title="Índice local de registros sanitarios"
-      hint="La verificación responde contra una copia local y no contra el servicio en línea: es la única forma de sostener el tiempo de respuesta y de seguir filtrando si la fuente no está disponible."
+      title={t("Índice local de registros sanitarios")}
+      hint={t("La verificación responde contra una copia local y no contra el servicio en línea: es la única forma de sostener el tiempo de respuesta y de seguir filtrando si la fuente no está disponible.")}
       padding={18}
       style={{ marginBottom: 18 }}
     >
       {status.warning && (
         <div className={`invima-alert${status.total_records === 0 ? " is-empty" : ""}`}>
           <Icon name="alert" />
-          <span>{status.warning}</span>
+          <span>{ts(status.warning)}</span>
         </div>
       )}
 
       <ModuleStatsRow
         items={[
           {
-            label: "Registros",
-            value: status.total_records.toLocaleString("es-CO"),
-            hint: "Registros sanitarios en la copia local del índice del INVIMA.",
+            label: t("Registros"),
+            value: status.total_records.toLocaleString(intlLocale()),
+            hint: t("Registros sanitarios en la copia local del índice del INVIMA."),
           },
           {
-            label: "Antigüedad",
-            value: status.age_days === null ? "-" : `${status.age_days} d`,
-            sub: `Máximo ${status.stale_after_days} d`,
+            label: t("Antigüedad"),
+            value: status.age_days === null ? "-" : t("{n} d", { n: status.age_days }),
+            sub: t("Máximo {n} d", { n: status.stale_after_days }),
             color: status.stale ? "#EF4444" : "#059669",
-            hint: "Días desde la última sincronización. Un índice viejo da falsos 'sin registro' en silencio.",
+            hint: t("Días desde la última sincronización. Un índice viejo da falsos 'sin registro' en silencio."),
           },
           {
-            label: "Última sincronización",
+            label: t("Última sincronización"),
             value: status.last_source || "-",
-            sub: status.last_status || "sin ejecutar",
-            hint: "Origen y resultado de la última carga: datos.gov.co (Socrata) o archivo plano.",
+            sub: ts(status.last_status) || t("sin ejecutar"),
+            hint: t("Origen y resultado de la última carga: datos.gov.co (Socrata) o archivo plano."),
           },
         ]}
       />
@@ -481,9 +493,9 @@ function InvimaPanel({ canSync, onChanged }) {
           <HintButton
             onClick={syncOnline}
             loading={busy === "online"}
-            hint="Descarga los conjuntos abiertos de datos.gov.co. Puede tardar varios minutos."
+            hint={t("Descarga los conjuntos abiertos de datos.gov.co. Puede tardar varios minutos.")}
           >
-            <Icon name="refresh" size={16} /> Sincronizar desde datos.gov.co
+            <Icon name="refresh" size={16} /> {t("Sincronizar desde datos.gov.co")}
           </HintButton>
           <label className="invima-upload">
             <input
@@ -492,15 +504,14 @@ function InvimaPanel({ canSync, onChanged }) {
               onChange={uploadFile}
               disabled={busy === "file"}
             />
-            <span>{busy === "file" ? "Cargando..." : "Cargar archivo plano (CSV)"}</span>
+            <span>{busy === "file" ? t("Cargando...") : t("Cargar archivo plano (CSV)")}</span>
           </label>
         </div>
       ) : (
-        <p className="muted-note">Solo los perfiles con permiso de sincronización actualizan el índice.</p>
+        <p className="muted-note">{t("Solo los perfiles con permiso de sincronización actualizan el índice.")}</p>
       )}
       <p className="muted-note">
-        La carga de archivo plano es la ruta de contingencia prevista mientras no se
-        acuerde con el INVIMA el acceso estructurado al dato.
+        {t("La carga de archivo plano es la ruta de contingencia prevista mientras no se acuerde con el INVIMA el acceso estructurado al dato.")}
       </p>
 
       {syncs.length > 0 && (
@@ -508,27 +519,27 @@ function InvimaPanel({ canSync, onChanged }) {
           <table className="invima-syncs">
             <thead>
               <tr>
-                <th>Fecha</th>
-                <th>Origen</th>
-                <th>Estado</th>
+                <th>{t("Fecha")}</th>
+                <th>{t("Origen")}</th>
+                <th>{t("Estado")}</th>
                 <th>
-                  <TermLabel tip="Filas nuevas / filas actualizadas en la carga.">Filas</TermLabel>
+                  <TermLabel tip={t("Filas nuevas / filas actualizadas en la carga.")}>{t("Filas")}</TermLabel>
                 </th>
-                <th>Detalle</th>
+                <th>{t("Detalle")}</th>
               </tr>
             </thead>
             <tbody>
               {syncs.map((s) => (
                 <tr key={s.id}>
-                  <td>{new Date(s.started_at).toLocaleString("es-CO")}</td>
+                  <td>{new Date(s.started_at).toLocaleString(intlLocale())}</td>
                   <td>{s.source}</td>
                   <td>
-                    <Badge tone={s.status === "ok" ? "priorizada" : "warning"}>{s.status}</Badge>
+                    <Badge tone={s.status === "ok" ? "priorizada" : "warning"}>{ts(s.status)}</Badge>
                   </td>
                   <td>
                     {s.rows_ingested} / {s.rows_updated}
                   </td>
-                  <td className="invima-message">{s.message}</td>
+                  <td className="invima-message">{ts(s.message)}</td>
                 </tr>
               ))}
             </tbody>
@@ -568,10 +579,10 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
       setQueue(data);
       setTotal(Number(headers?.["x-total-count"] ?? data.length));
       setActiveId((current) =>
-        current && data.some((t) => t.id === current) ? current : data[0]?.id || null
+        current && data.some((item) => item.id === current) ? current : data[0]?.id || null
       );
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar la cola de filtrado"));
+      toast.error(apiError(e, t("No se pudo cargar la cola de filtrado")));
     } finally {
       setLoading(false);
     }
@@ -585,7 +596,7 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
   // Enlace directo: abre la tecnologia pedida en la cola de novedad.
   useEffect(() => {
     if (!focusId || loading || focusedRef.current === focusId) return;
-    if (!queue.some((t) => t.id === focusId)) return;
+    if (!queue.some((item) => item.id === focusId)) return;
     focusedRef.current = focusId;
     setSearch("");
     setActiveId(focusId);
@@ -614,7 +625,7 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
         sala_ref: data.sala_especializada_ref || "",
       });
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar la verificación de novedad"));
+      toast.error(apiError(e, t("No se pudo cargar la verificación de novedad")));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleId, activeId]);
@@ -626,8 +637,8 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return queue;
-    return queue.filter((t) =>
-      `${t.inn_name} ${t.commercial_name} ${t.cluster_name}`.toLowerCase().includes(q)
+    return queue.filter((item) =>
+      `${item.inn_name} ${item.commercial_name} ${item.cluster_name}`.toLowerCase().includes(q)
     );
   }, [queue, search]);
 
@@ -648,12 +659,12 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
       setDetail(data);
       toast.success(
         data.has_valid_registry
-          ? "El INVIMA reporta registro sanitario vigente para esta tecnología."
-          : "Sin registro sanitario vigente en el índice local."
+          ? t("El INVIMA reporta registro sanitario vigente para esta tecnología.")
+          : t("Sin registro sanitario vigente en el índice local.")
       );
       onChanged?.();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cruzar con el INVIMA"));
+      toast.error(apiError(e, t("No se pudo cruzar con el INVIMA")));
     } finally {
       setBusy("");
     }
@@ -671,12 +682,12 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
       setDetail(data);
       toast.success(
         data.can_qualify
-          ? "Criterio de novedad registrado. Ya puede marcarla apta para priorización."
-          : `Criterio registrado. ${data.blocking_reason}`
+          ? t("Criterio de novedad registrado. Ya puede marcarla apta para priorización.")
+          : t("Criterio registrado. {motivo}", { motivo: ts(data.blocking_reason) })
       );
       onChanged?.();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo guardar el criterio de novedad"));
+      toast.error(apiError(e, t("No se pudo guardar el criterio de novedad")));
     } finally {
       setBusy("");
     }
@@ -686,11 +697,11 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
     setBusy("qualify");
     try {
       await api.post(`/technologies/${activeId}/cycles/${cycleId}/qualify`);
-      toast.success("Tecnología apta para priorización. Pasó a la cola P1 a P6.");
+      toast.success(t("Tecnología apta para priorización. Pasó a la cola P1 a P6."));
       await load();
       onChanged?.();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo calificar como apta"));
+      toast.error(apiError(e, t("No se pudo calificar como apta")));
     } finally {
       setBusy("");
     }
@@ -700,34 +711,34 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
     setBusy("exclude");
     try {
       await api.post(`/technologies/${activeId}/cycles/${cycleId}/exclude`, exclusion);
-      toast.success("Tecnología excluida con causa registrada.");
+      toast.success(t("Tecnología excluida con causa registrada."));
       setExcluding(false);
       await load();
       onChanged?.();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo excluir"));
+      toast.error(apiError(e, t("No se pudo excluir")));
     } finally {
       setBusy("");
     }
   };
 
-  if (loading) return <LoadingBlock label="Cargando cola de filtrado..." />;
+  if (loading) return <LoadingBlock label={t("Cargando cola de filtrado...")} />;
   if (!cycleId)
     return (
       <EmptyState
         icon="🗓️"
-        title="Sin ciclo activo"
-        message="El filtrado ocurre dentro de un ciclo. Seleccione uno en la cabecera o abra uno nuevo."
+        title={t("Sin ciclo activo")}
+        message={t("El filtrado ocurre dentro de un ciclo. Seleccione uno en la cabecera o abra uno nuevo.")}
       />
     );
 
   let qualifyBlock = "";
-  if (dirty) qualifyBlock = "Guarde primero el criterio de novedad que modificó.";
-  else if (detail && !detail.can_qualify) qualifyBlock = detail.blocking_reason;
+  if (dirty) qualifyBlock = t("Guarde primero el criterio de novedad que modificó.");
+  else if (detail && !detail.can_qualify) qualifyBlock = ts(detail.blocking_reason);
 
   let saveBlock = "";
-  if (!form.option_code) saveBlock = "Seleccione la vía de novedad que aplica.";
-  else if (justificationShort) saveBlock = "La justificación debe tener al menos 20 caracteres.";
+  if (!form.option_code) saveBlock = t("Seleccione la vía de novedad que aplica.");
+  else if (justificationShort) saveBlock = t("La justificación debe tener al menos 20 caracteres.");
 
   return (
     <>
@@ -736,18 +747,18 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
       {queue.length === 0 ? (
         <EmptyState
           icon="✅"
-          title="Nada pendiente de filtrar"
-          message="No hay tecnologías en estado 'asignada al ciclo' esperando verificación de novedad. Asigne señales desde la bandeja de entrada o revise el Listado Único."
+          title={t("Nada pendiente de filtrar")}
+          message={t("No hay tecnologías en estado 'asignada al ciclo' esperando verificación de novedad. Asigne señales desde la bandeja de entrada o revise el Listado Único.")}
         />
       ) : (
         <div className="prio-layout">
           <Card padding={0} style={{ overflow: "hidden" }}>
-            <div className="prio-list-head">Por filtrar · {total} tecnología(s)</div>
+            <div className="prio-list-head">{t("Por filtrar · {total} tecnología(s)", { total })}</div>
             <div className="fa-toolbar">
               <input
                 type="search"
-                aria-label="Buscar en la cola de filtrado"
-                placeholder="Buscar por nombre o clúster..."
+                aria-label={t("Buscar en la cola de filtrado")}
+                placeholder={t("Buscar por nombre o clúster...")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -771,14 +782,14 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
                     lines={3}
                   />
                   <div className="prio-item-meta">
-                    {tech.cluster_name || "Sin clúster"} ·{" "}
-                    {TECH_STATUS_LABELS[tech.cycle_status || tech.status] || tech.status}
+                    {tech.cluster_name || t("Sin clúster")} ·{" "}
+                    {TECH_STATUS_LABELS[tech.cycle_status || tech.status] || ts(tech.status)}
                   </div>
                 </button>
               ))}
               {visible.length === 0 && (
                 <p className="muted-note" style={{ padding: 16 }}>
-                  Ninguna tecnología coincide con la búsqueda.
+                  {t("Ninguna tecnología coincide con la búsqueda.")}
                 </p>
               )}
             </div>
@@ -786,7 +797,7 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
 
           <div className="prio-detail">
             {!detail ? (
-              <LoadingBlock label="Cargando..." />
+              <LoadingBlock label={t("Cargando...")} />
             ) : (
               <Card padding={18}>
                 <ClampText
@@ -798,26 +809,25 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
                   style={{ margin: "0 0 4px", fontSize: 17 }}
                 />
                 <p className="muted-note" style={{ marginTop: 6 }}>
-                  Una tecnología con registro sanitario vigente en Colombia no avanza a
-                  priorización sin justificar por qué sigue siendo novedosa.
+                  {t("Una tecnología con registro sanitario vigente en Colombia no avanza a priorización sin justificar por qué sigue siendo novedosa.")}
                 </p>
 
                 <div className="novelty-invima">
                   <div>
                     <span className="novelty-invima-label term-label">
-                      Registro sanitario
-                      <InfoTip text={GLOSSARY.invima} label="Qué es el registro sanitario" />
+                      {t("Registro sanitario")}
+                      <InfoTip text={GLOSSARY.invima} label={t("Qué es el registro sanitario")} />
                     </span>
                     {detail.invima_checked_at ? (
                       <Badge tone={detail.has_valid_registry ? "warning" : "priorizada"}>
-                        {detail.has_valid_registry ? "Vigente en Colombia" : "Sin registro vigente"}
+                        {detail.has_valid_registry ? t("Vigente en Colombia") : t("Sin registro vigente")}
                       </Badge>
                     ) : (
-                      <Badge tone="info">Sin verificar</Badge>
+                      <Badge tone="info">{t("Sin verificar")}</Badge>
                     )}
                     {detail.invima_checked_at && (
                       <span className="muted-note" style={{ marginLeft: 8 }}>
-                        Cruzado {new Date(detail.invima_checked_at).toLocaleString("es-CO")}
+                        {t("Cruzado {fecha}", { fecha: new Date(detail.invima_checked_at).toLocaleString(intlLocale()) })}
                       </span>
                     )}
                   </div>
@@ -830,7 +840,7 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
                       hint={GLOSSARY.fa_cruce_invima}
                       data-testid="novelty-invima-check"
                     >
-                      Cruzar con el INVIMA
+                      {t("Cruzar con el INVIMA")}
                     </HintButton>
                   )}
                 </div>
@@ -840,12 +850,12 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
                     <table className="novelty-matches">
                       <thead>
                         <tr>
-                          <th>Producto</th>
-                          <th>Titular</th>
-                          <th>Estado</th>
+                          <th>{t("Producto")}</th>
+                          <th>{t("Titular")}</th>
+                          <th>{t("Estado")}</th>
                           <th>
-                            <TermLabel tip="Parecido entre el nombre de la tecnología y el producto registrado. Sobre el umbral invima.match_threshold se considera hallado.">
-                              Similitud
+                            <TermLabel tip={t("Parecido entre el nombre de la tecnología y el producto registrado. Sobre el umbral invima.match_threshold se considera hallado.")}>
+                              {t("Similitud")}
                             </TermLabel>
                           </th>
                         </tr>
@@ -866,16 +876,16 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
 
                 <Select
                   id="novelty-option"
-                  label="Vía de novedad"
+                  label={t("Vía de novedad")}
                   hint={GLOSSARY.fa_via_novedad}
                   value={form.option_code}
                   disabled={!canWrite || isClosed}
                   onChange={(e) => setForm((f) => ({ ...f, option_code: e.target.value }))}
                 >
-                  <option value="">Seleccione la vía que aplica...</option>
+                  <option value="">{t("Seleccione la vía que aplica...")}</option>
                   {options.map((o) => (
                     <option key={o.code} value={o.code}>
-                      {o.label}
+                      {ts(o.label)}
                     </option>
                   ))}
                 </Select>
@@ -883,15 +893,15 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
                 {needsJustification && (
                   <Textarea
                     id="novelty-justification"
-                    label="Justificación explícita"
+                    label={t("Justificación explícita")}
                     hint={GLOSSARY.fa_justificacion_novedad}
                     required
                     rows={3}
-                    placeholder="Explique por qué la tecnología sigue siendo novedosa pese al registro existente."
+                    placeholder={t("Explique por qué la tecnología sigue siendo novedosa pese al registro existente.")}
                     value={form.justification}
                     error={
                       justificationShort && form.justification
-                        ? `Faltan ${20 - form.justification.trim().length} caracteres.`
+                        ? t("Faltan {n} caracteres.", { n: 20 - form.justification.trim().length })
                         : undefined
                     }
                     disabled={!canWrite || isClosed}
@@ -902,13 +912,13 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
                 <details className="eval-versions" style={{ marginBottom: 12 }}>
                   <summary>
                     <span className="term-label">
-                      Concepto de la Sala Especializada del INVIMA (opcional)
-                      <InfoTip text={GLOSSARY.fa_sala_especializada} label="Qué es la Sala Especializada" />
+                      {t("Concepto de la Sala Especializada del INVIMA (opcional)")}
+                      <InfoTip text={GLOSSARY.fa_sala_especializada} label={t("Qué es la Sala Especializada")} />
                     </span>
                   </summary>
                   <Textarea
                     id="novelty-sala-concept"
-                    label="Resumen del concepto"
+                    label={t("Resumen del concepto")}
                     rows={2}
                     value={form.sala_concept}
                     disabled={!canWrite || isClosed}
@@ -916,8 +926,8 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
                   />
                   <Input
                     id="novelty-sala-ref"
-                    label="Referencia del acta"
-                    placeholder="Acta No. 12 de 2026 o enlace al PDF"
+                    label={t("Referencia del acta")}
+                    placeholder={t("Acta No. 12 de 2026 o enlace al PDF")}
                     value={form.sala_ref}
                     disabled={!canWrite || isClosed}
                     onChange={(e) => setForm((f) => ({ ...f, sala_ref: e.target.value }))}
@@ -927,7 +937,7 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
                 {detail.blocking_reason && !dirty && (
                   <div className="novelty-block">
                     <Icon name="alert" />
-                    <span>{detail.blocking_reason}</span>
+                    <span>{ts(detail.blocking_reason)}</span>
                   </div>
                 )}
 
@@ -940,7 +950,7 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
                       disabledHint={saveBlock}
                       data-testid="novelty-save"
                     >
-                      Guardar criterio
+                      {t("Guardar criterio")}
                     </HintButton>
                     <HintButton
                       variant="success"
@@ -951,7 +961,7 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
                       hint={GLOSSARY.fa_marcar_apta}
                       data-testid="novelty-qualify"
                     >
-                      Marcar apta para priorización
+                      {t("Marcar apta para priorización")}
                     </HintButton>
                     <HintButton
                       variant="secondary"
@@ -963,13 +973,13 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
                       style={{ color: "#B91C1C" }}
                       data-testid="novelty-exclude"
                     >
-                      Excluir con causa
+                      {t("Excluir con causa")}
                     </HintButton>
                   </div>
                 )}
                 {isClosed && (
                   <div className="fa-notice fa-notice--ok" style={{ marginTop: 12 }}>
-                    Ciclo cerrado: la verificación queda congelada como evidencia.
+                    {t("Ciclo cerrado: la verificación queda congelada como evidencia.")}
                   </div>
                 )}
               </Card>
@@ -981,46 +991,49 @@ function NoveltyTab({ canWrite, canSync, onChanged, exclusionReasons, focusId, o
       <Modal
         open={excluding}
         onClose={() => setExcluding(false)}
-        title="Excluir del ciclo"
+        title={t("Excluir del ciclo")}
         footer={
           <>
             <Button variant="secondary" onClick={() => setExcluding(false)}>
-              Cancelar
+              {t("Cancelar")}
             </Button>
             <HintButton
               variant="danger"
               onClick={exclude}
               loading={busy === "exclude"}
               disabled={!exclusion.reason_code}
-              disabledHint="Seleccione el motivo tipificado: es obligatorio."
+              disabledHint={t("Seleccione el motivo tipificado: es obligatorio.")}
               data-testid="novelty-exclude-confirm"
             >
-              Excluir
+              {t("Excluir")}
             </HintButton>
           </>
         }
       >
         <p style={{ fontSize: 14, color: "#475569", marginBottom: 14 }}>
-          <strong>{detail?.technology_name?.slice(0, 140)}</strong> saldrá del ciclo. La causa es
-          obligatoria y no editable una vez registrada; queda con fecha y evaluador en la bitácora.
+          {tr(
+            "<b>{name}</b> saldrá del ciclo. La causa es obligatoria y no editable una vez registrada; queda con fecha y evaluador en la bitácora.",
+            { name: <>{detail?.technology_name?.slice(0, 140)}</> },
+            { b: (c) => <strong>{c}</strong> }
+          )}
         </p>
         <Select
           id="novelty-exclusion-reason"
-          label="Motivo tipificado"
+          label={t("Motivo tipificado")}
           required
           value={exclusion.reason_code}
           onChange={(e) => setExclusion({ ...exclusion, reason_code: e.target.value })}
         >
-          <option value="">Seleccione un motivo...</option>
+          <option value="">{t("Seleccione un motivo...")}</option>
           {Object.entries(exclusionReasons || {}).map(([code, label]) => (
             <option key={code} value={code}>
-              {label}
+              {ts(label)}
             </option>
           ))}
         </Select>
         <Textarea
           id="novelty-exclusion-note"
-          label="Observación"
+          label={t("Observación")}
           rows={3}
           value={exclusion.note}
           onChange={(e) => setExclusion({ ...exclusion, note: e.target.value })}
@@ -1046,9 +1059,9 @@ function UniqueListTab({ focusId }) {
         `/screening/unique-list/${cycleId}/export`,
         `listado_unico_${(data.cycle_code || cycleId).toString().replace(/[^A-Za-z0-9_.-]+/g, "_")}.csv`
       );
-      toast.success("Listado Único exportado en CSV.");
+      toast.success(t("Listado Único exportado en CSV."));
     } catch (e) {
-      toast.error(apiError(e, "No se pudo exportar el Listado Único"));
+      toast.error(apiError(e, t("No se pudo exportar el Listado Único")));
     } finally {
       setExporting(false);
     }
@@ -1062,7 +1075,7 @@ function UniqueListTab({ focusId }) {
     api
       .get(`/screening/unique-list/${cycleId}`)
       .then(({ data: d }) => setData(d))
-      .catch((e) => toast.error(apiError(e, "No se pudo generar el Listado Único")))
+      .catch((e) => toast.error(apiError(e, t("No se pudo generar el Listado Único"))))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleId, version]);
@@ -1071,21 +1084,21 @@ function UniqueListTab({ focusId }) {
     if (focusId && data) focusElement(`unique-row-${focusId}`);
   }, [focusId, data]);
 
-  if (loading) return <LoadingBlock label="Consolidando el Listado Único..." />;
+  if (loading) return <LoadingBlock label={t("Consolidando el Listado Único...")} />;
   if (!cycleId || !data)
     return (
       <EmptyState
         icon="🗓️"
-        title="Sin ciclo activo"
-        message="El Listado Único es la salida consolidada de un ciclo."
+        title={t("Sin ciclo activo")}
+        message={t("El Listado Único es la salida consolidada de un ciclo.")}
       />
     );
 
   return (
     <>
       <Card
-        title={`Listado Único por clúster · ${data.cycle_code}`}
-        hint="Salida consolidada del filtrado: el acervo depurado del ciclo, sin duplicados ni exclusiones."
+        title={t("Listado Único por clúster · {code}", { code: data.cycle_code })}
+        hint={t("Salida consolidada del filtrado: el acervo depurado del ciclo, sin duplicados ni exclusiones.")}
         padding={18}
         style={{ marginBottom: 18 }}
         actions={
@@ -1094,25 +1107,25 @@ function UniqueListTab({ focusId }) {
             onClick={exportCsv}
             loading={exporting}
             disabled={data.total === 0}
-            disabledHint="El listado está vacío: no hay nada que exportar todavía."
+            disabledHint={t("El listado está vacío: no hay nada que exportar todavía.")}
             hint={GLOSSARY.fa_listado_csv}
             data-testid="unique-export"
           >
-            <Icon name="save" size={16} /> Exportar CSV
+            <Icon name="save" size={16} /> {t("Exportar CSV")}
           </HintButton>
         }
       >
         <ModuleStatsRow
           items={[
-            { label: "En el listado", value: data.total, color: "#059669", hint: GLOSSARY.listado_unico },
-            { label: "Excluidas", value: data.excluded_count, color: "#94A3B8", hint: GLOSSARY.fa_excluidas },
+            { label: t("En el listado"), value: data.total, color: "#059669", hint: GLOSSARY.listado_unico },
+            { label: t("Excluidas"), value: data.excluded_count, color: "#94A3B8", hint: GLOSSARY.fa_excluidas },
             {
-              label: "Fusionadas",
+              label: t("Fusionadas"),
               value: data.merged_count,
               color: "#2563EB",
-              hint: "Registros absorbidos por fusiones confirmadas (en todo el sistema). No aparecen en el listado.",
+              hint: t("Registros absorbidos por fusiones confirmadas (en todo el sistema). No aparecen en el listado."),
             },
-            { label: "Clústeres", value: data.clusters.length, hint: GLOSSARY.cluster },
+            { label: t("Clústeres"), value: data.clusters.length, hint: GLOSSARY.cluster },
           ]}
         />
       </Card>
@@ -1120,8 +1133,8 @@ function UniqueListTab({ focusId }) {
       {data.clusters.length === 0 ? (
         <EmptyState
           icon="📋"
-          title="Listado vacío"
-          message="Ninguna tecnología del ciclo ha superado el filtrado todavía. Marque aptas en la pestaña de novedad."
+          title={t("Listado vacío")}
+          message={t("Ninguna tecnología del ciclo ha superado el filtrado todavía. Marque aptas en la pestaña de novedad.")}
         />
       ) : (
         data.clusters.map((group) => (
@@ -1135,13 +1148,13 @@ function UniqueListTab({ focusId }) {
               <table className="unique-list">
                 <thead>
                   <tr>
-                    <th>DCI / comercial</th>
-                    <th>Fabricante</th>
-                    <th>Tipología</th>
+                    <th>{t("DCI / comercial")}</th>
+                    <th>{t("Fabricante")}</th>
+                    <th>{t("Tipología")}</th>
                     <th>
-                      <TermLabel tip="Código ATC: clasificación anatómica, terapéutica y química de la OMS para medicamentos.">ATC</TermLabel>
+                      <TermLabel tip={t("Código ATC: clasificación anatómica, terapéutica y química de la OMS para medicamentos.")}>ATC</TermLabel>
                     </th>
-                    <th>Estado</th>
+                    <th>{t("Estado")}</th>
                     <th>
                       <TermLabel tip={GLOSSARY.pct_p}>%P</TermLabel>
                     </th>
@@ -1159,7 +1172,7 @@ function UniqueListTab({ focusId }) {
                       <td>{item.manufacturer || "-"}</td>
                       <td>{item.tech_type_name || "-"}</td>
                       <td>{item.atc_code || "-"}</td>
-                      <td>{TECH_STATUS_LABELS[item.status] || item.status}</td>
+                      <td>{TECH_STATUS_LABELS[item.status] || ts(item.status)}</td>
                       <td>{item.priority_pct === null ? "-" : pct(item.priority_pct)}</td>
                     </tr>
                   ))}
@@ -1208,7 +1221,7 @@ export default function Screening() {
   const toast = useToast();
   useEffect(() => {
     if (invalidParam) {
-      setLinkNotice({ tone: "warn", message: "El enlace de tecnología no es válido.", actions: [] });
+      setLinkNotice({ tone: "warn", message: t("El enlace de tecnología no es válido."), actions: [] });
       return;
     }
     if (!techId || !cycleId) return;
@@ -1234,17 +1247,31 @@ export default function Screening() {
             const merged = loc.merged_into_id
               ? [
                   {
-                    label: `Ver la tecnología que la absorbió (#${loc.merged_into_id})`,
+                    label: t("Ver la tecnología que la absorbió (#{id})", { id: loc.merged_into_id }),
                     testId: "tech-link-merged",
                     onClick: () => navigate(`/filtrado?tecnologia=${loc.merged_into_id}`),
                   },
                 ]
               : [];
+            const noticeVars = {
+              name: loc.name.slice(0, 90),
+              cycle: entry.cycle_code,
+              reason: ts(entry.exclusion_reason),
+              id: loc.merged_into_id,
+            };
+            let excludedMessage;
+            if (entry.exclusion_reason) {
+              excludedMessage = loc.merged_into_id
+                ? t('La tecnología "{name}" fue excluida de {cycle} (causa: {reason}) al fusionarse con la #{id}. No aparece en el Listado Único.', noticeVars)
+                : t('La tecnología "{name}" fue excluida de {cycle} (causa: {reason}). No aparece en el Listado Único.', noticeVars);
+            } else {
+              excludedMessage = loc.merged_into_id
+                ? t('La tecnología "{name}" fue excluida de {cycle} al fusionarse con la #{id}. No aparece en el Listado Único.', noticeVars)
+                : t('La tecnología "{name}" fue excluida de {cycle}. No aparece en el Listado Único.', noticeVars);
+            }
             setLinkNotice({
               tone: "info",
-              message: `La tecnología "${loc.name.slice(0, 90)}" fue excluida de ${entry.cycle_code}${
-                entry.exclusion_reason ? ` (causa: ${entry.exclusion_reason})` : ""
-              }${loc.merged_into_id ? ` al fusionarse con la #${loc.merged_into_id}` : ""}. No aparece en el Listado Único.`,
+              message: excludedMessage,
               actions: merged,
             });
           } else {
@@ -1253,7 +1280,7 @@ export default function Screening() {
         }
         setFocusId(techId);
       } catch (e) {
-        toast.error(apiError(e, "No se pudo abrir la tecnología del enlace"));
+        toast.error(apiError(e, t("No se pudo abrir la tecnología del enlace")));
       }
     })();
     return () => {
@@ -1265,15 +1292,15 @@ export default function Screening() {
   const statItems = useMemo(() => {
     if (!stats) return [];
     return [
-      { label: "Fusiones por revisar", value: stats.pending_merges, color: "#D97706", hint: GLOSSARY.fa_fusiones_revisar },
-      { label: "Fusiones confirmadas", value: stats.confirmed_merges, color: "#2563EB", hint: GLOSSARY.fa_fusiones_confirmadas },
-      { label: "Por filtrar", value: stats.assigned, color: "#3B82F6", hint: GLOSSARY.fa_por_filtrar },
-      { label: "Aptas", value: stats.qualified, color: "#059669", hint: GLOSSARY.fa_aptas },
-      { label: "Excluidas", value: stats.excluded, color: "#94A3B8", hint: GLOSSARY.fa_excluidas },
+      { label: t("Fusiones por revisar"), value: stats.pending_merges, color: "#D97706", hint: GLOSSARY.fa_fusiones_revisar },
+      { label: t("Fusiones confirmadas"), value: stats.confirmed_merges, color: "#2563EB", hint: GLOSSARY.fa_fusiones_confirmadas },
+      { label: t("Por filtrar"), value: stats.assigned, color: "#3B82F6", hint: GLOSSARY.fa_por_filtrar },
+      { label: t("Aptas"), value: stats.qualified, color: "#059669", hint: GLOSSARY.fa_aptas },
+      { label: t("Excluidas"), value: stats.excluded, color: "#94A3B8", hint: GLOSSARY.fa_excluidas },
       {
-        label: "Novedad verificada",
+        label: t("Novedad verificada"),
         value: stats.novelty_assessed,
-        sub: `${stats.invima_checked} cruzadas con INVIMA`,
+        sub: t("{n} cruzadas con INVIMA", { n: stats.invima_checked }),
         hint: GLOSSARY.fa_novedad_verificada,
       },
     ];
@@ -1282,21 +1309,25 @@ export default function Screening() {
   return (
     <div>
       <PageHeader
-        title="Filtrado y depuración"
+        title={t("Filtrado y depuración")}
         titleHint={GLOSSARY.filtrado}
-        subtitle={`Módulo 2 de la especificación${cycle ? ` en ${cycle.code}` : ""}: desduplicación difusa, criterio de novedad con verificación regulatoria y Listado Único por clúster.`}
+        subtitle={
+          cycle
+            ? t("Módulo 2 de la especificación en {code}: desduplicación difusa, criterio de novedad con verificación regulatoria y Listado Único por clúster.", { code: cycle.code })
+            : t("Módulo 2 de la especificación: desduplicación difusa, criterio de novedad con verificación regulatoria y Listado Único por clúster.")
+        }
       />
 
       <PhaseGuide
-        phase="Módulo 2"
+        phase={t("Módulo 2")}
         hint={GLOSSARY.filtrado}
         tasks={[
-          "Ejecutar el barrido difuso y resolver los pares propuestos: fusionar o declarar que son distintas.",
-          "Cruzar cada tecnología con el índice del INVIMA y registrar por qué vía es novedosa.",
-          "Marcar como apta lo que supera el filtro; excluir con causa tipificada lo que no.",
-          "Consolidar y exportar el Listado Único por clúster.",
+          t("Ejecutar el barrido difuso y resolver los pares propuestos: fusionar o declarar que son distintas."),
+          t("Cruzar cada tecnología con el índice del INVIMA y registrar por qué vía es novedosa."),
+          t("Marcar como apta lo que supera el filtro; excluir con causa tipificada lo que no."),
+          t("Consolidar y exportar el Listado Único por clúster."),
         ]}
-        nextLabel="Priorización P1 a P6"
+        nextLabel={t("Priorización P1 a P6")}
         onNext={() => navigate("/priorizacion")}
       />
 
@@ -1305,17 +1336,17 @@ export default function Screening() {
       <TechLinkNotice notice={linkNotice} onClose={() => setLinkNotice(null)} />
 
       <div className="screening-tabs" role="tablist">
-        {TABS.map((t) => (
+        {TABS.map((item) => (
           <button
-            key={t.key}
+            key={item.key}
             type="button"
             role="tab"
-            aria-selected={tab === t.key}
-            title={t.hint}
-            className={`screening-tab${tab === t.key ? " is-active" : ""}`}
-            onClick={() => setTab(t.key)}
+            aria-selected={tab === item.key}
+            title={item.hint}
+            className={`screening-tab${tab === item.key ? " is-active" : ""}`}
+            onClick={() => setTab(item.key)}
           >
-            <Icon name={t.icon} /> {t.label}
+            <Icon name={item.icon} /> {item.label}
           </button>
         ))}
       </div>

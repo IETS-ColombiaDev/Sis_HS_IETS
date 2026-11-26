@@ -1,4 +1,5 @@
 /** Formatos de tiempo de la vigilancia (duraciones y hora de fin). */
+import { intlLocale } from "../i18n";
 
 export function formatDuration(seconds) {
   if (seconds == null || Number.isNaN(seconds)) return "-";
@@ -16,9 +17,9 @@ export function formatClock(iso) {
   if (!iso) return "-";
   const d = new Date(iso);
   const now = new Date();
-  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const time = d.toLocaleTimeString(intlLocale(), { hour: "2-digit", minute: "2-digit" });
   if (d.toDateString() === now.toDateString()) return time;
-  return `${d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })} ${time}`;
+  return `${d.toLocaleDateString(intlLocale(), { weekday: "short", day: "numeric", month: "short" })} ${time}`;
 }
 
 /** Rango "35-52 min" a partir de los extremos de la estimación. */
@@ -39,7 +40,7 @@ export function formatDateTime(iso) {
   if (!iso) return "-";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleString("es-CO", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+  return d.toLocaleString(intlLocale(), { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 /** Duración exacta de una corrida: "45 s", "12 min 30 s", "1 h 05 min". */

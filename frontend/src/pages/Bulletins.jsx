@@ -18,20 +18,21 @@ import { LoadingBlock } from "../components/Spinner";
 import ModuleHeader from "../components/ModuleHeader";
 import { PERM } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
+import { t, intlLocale } from "../i18n";
 
 const BULLETIN_STATUS = {
-  borrador: "Borrador",
-  pendiente_aprobacion: "Pendiente de aprobación",
-  publicado: "Publicado",
+  borrador: t("Borrador"),
+  pendiente_aprobacion: t("Pendiente de aprobación"),
+  publicado: t("Publicado"),
 };
 
 function BulletinKpis({ body }) {
   const funnel = body?.funnel || {};
   const items = [
-    { label: "Asignadas", value: funnel.captured ?? funnel.assigned ?? 0, hint: GLOSSARY.capturadas },
-    { label: "Filtradas", value: funnel.filtered ?? 0, hint: GLOSSARY.filtradas },
-    { label: "Priorizadas", value: funnel.prioritized ?? body?.prioritized ?? 0, hint: GLOSSARY.priorizadas },
-    { label: "Publicadas", value: funnel.published ?? body?.published ?? 0, hint: GLOSSARY.publicadas },
+    { label: t("Asignadas"), value: funnel.captured ?? funnel.assigned ?? 0, hint: GLOSSARY.capturadas },
+    { label: t("Filtradas"), value: funnel.filtered ?? 0, hint: GLOSSARY.filtradas },
+    { label: t("Priorizadas"), value: funnel.prioritized ?? body?.prioritized ?? 0, hint: GLOSSARY.priorizadas },
+    { label: t("Publicadas"), value: funnel.published ?? body?.published ?? 0, hint: GLOSSARY.publicadas },
   ];
   return (
     <div className="bulletin-kpis">
@@ -40,7 +41,7 @@ function BulletinKpis({ body }) {
           <b>{item.value}</b>
           <span className="term-label">
             {item.label}
-            <InfoTip text={item.hint} label={`Qué cuenta ${item.label}`} />
+            <InfoTip text={item.hint} label={t("Qué cuenta {label}", { label: item.label })} />
           </span>
         </div>
       ))}
@@ -72,14 +73,14 @@ export default function Bulletins() {
       setMailReady(Boolean(data.email));
       setRecipients((prev) => prev || (data.recipients || []).join(", "));
     } catch (e) {
-      setSendError(apiError(e, "No se pudo leer la lista de destinatarios"));
+      setSendError(apiError(e, t("No se pudo leer la lista de destinatarios")));
     }
   };
 
   const send = async () => {
     const list = recipients.split(/[,;\s]+/).map((r) => r.trim()).filter(Boolean);
     if (list.length === 0) {
-      setSendError("Escriba al menos un correo.");
+      setSendError(t("Escriba al menos un correo."));
       return;
     }
     setSendError("");
@@ -88,14 +89,14 @@ export default function Bulletins() {
       const { data } = await api.post(`/bulletins/${sending.id}/distribute`, { recipients: list }, { timeout: 180000 });
       const failed = data.failed || [];
       if (failed.length > 0) {
-        toast.warning(`Enviado a ${data.sent.length}; no se pudo entregar a ${failed.map((f) => f.email).join(", ")}.`);
+        toast.warning(t("Enviado a {n}; no se pudo entregar a {failed}.", { n: data.sent.length, failed: failed.map((f) => f.email).join(", ") }));
       } else {
-        toast.success(`Boletín enviado a ${data.sent.length} destinatario(s).`);
+        toast.success(t("Boletín enviado a {n} destinatario(s).", { n: data.sent.length }));
       }
       setSending(null);
       load();
     } catch (e) {
-      setSendError(apiError(e, "No se pudo enviar el boletín"));
+      setSendError(apiError(e, t("No se pudo enviar el boletín")));
     } finally {
       setBusy("");
     }
@@ -107,7 +108,7 @@ export default function Bulletins() {
       const { data } = await api.get("/bulletins", { params: cycleId ? { cycle_id: cycleId } : {} });
       setItems(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar los boletines"));
+      toast.error(apiError(e, t("No se pudieron cargar los boletines")));
     } finally {
       setLoading(false);
     }
@@ -121,10 +122,10 @@ export default function Bulletins() {
     setBusy("compile");
     try {
       await api.post(`/bulletins/compile/${cycleId}`);
-      toast.success("Boletín compilado con las cifras actuales. Queda pendiente de aprobación.");
+      toast.success(t("Boletín compilado con las cifras actuales. Queda pendiente de aprobación."));
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo compilar"));
+      toast.error(apiError(e, t("No se pudo compilar")));
     } finally {
       setBusy("");
     }
@@ -134,11 +135,11 @@ export default function Bulletins() {
     setBusy(`${publish ? "pub" : "apr"}-${id}`);
     try {
       await api.post(`/bulletins/${id}/approve`, { publish });
-      toast.success(publish ? "Boletín publicado." : "Boletín aprobado. Ya se puede publicar.");
+      toast.success(publish ? t("Boletín publicado.") : t("Boletín aprobado. Ya se puede publicar."));
       setPublishing(null);
       load();
     } catch (e) {
-      toast.error(apiError(e, "La decisión fue rechazada"));
+      toast.error(apiError(e, t("La decisión fue rechazada")));
     } finally {
       setBusy("");
     }
@@ -148,9 +149,9 @@ export default function Bulletins() {
     try {
       const { data } = await api.get(`/bulletins/${b.id}/export`, { responseType: "blob" });
       const win = window.open(URL.createObjectURL(data), "_blank", "noopener");
-      if (!win) toast.info("Si no se abrió una pestaña nueva, permita las ventanas emergentes para este sitio.");
+      if (!win) toast.info(t("Si no se abrió una pestaña nueva, permita las ventanas emergentes para este sitio."));
     } catch (e) {
-      toast.error(apiError(e, "No se pudo abrir el boletín"));
+      toast.error(apiError(e, t("No se pudo abrir el boletín")));
     }
   };
 
@@ -158,7 +159,7 @@ export default function Bulletins() {
     try {
       await downloadFromApi(api, `/bulletins/${b.id}/export?format=pdf`, `boletin-${b.id}.pdf`);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo generar el PDF del boletín"));
+      toast.error(apiError(e, t("No se pudo generar el PDF del boletín")));
     }
   };
 
@@ -168,12 +169,12 @@ export default function Bulletins() {
     <div>
       <ModuleHeader
         step="diseminacion"
-        title="Boletines del ciclo"
+        title={t("Boletines del ciclo")}
         titleHint={GLOSSARY.boletin}
         purpose={
           cycle
-            ? `Fase 4 · ${cycle.code}. Resumen ejecutivo epidemiológico y financiero para publicar después de la aprobación del líder.`
-            : "Fase 4 · Resumen ejecutivo para publicar después de la aprobación."
+            ? t("Fase 4 · {code}. Resumen ejecutivo epidemiológico y financiero para publicar después de la aprobación del líder.", { code: cycle.code })
+            : t("Fase 4 · Resumen ejecutivo para publicar después de la aprobación.")
         }
         actions={
           canWrite && cycleId ? (
@@ -181,39 +182,39 @@ export default function Bulletins() {
               onClick={compile}
               loading={busy === "compile"}
               disabled={isHistoric}
-              disabledHint="El ciclo histórico no produce boletines."
+              disabledHint={t("El ciclo histórico no produce boletines.")}
               hint={
                 hasOpenDraft
-                  ? `${GLOSSARY.fa_compilar_boletin} Actualiza el borrador pendiente.`
+                  ? `${GLOSSARY.fa_compilar_boletin} ${t("Actualiza el borrador pendiente.")}`
                   : GLOSSARY.fa_compilar_boletin
               }
               data-testid="bulletin-compile"
             >
-              {hasOpenDraft ? "Recompilar desde el ciclo" : "Compilar desde el ciclo"}
+              {hasOpenDraft ? t("Recompilar desde el ciclo") : t("Compilar desde el ciclo")}
             </HintButton>
           ) : null
         }
       />
       {loading ? (
-        <LoadingBlock label="Cargando boletines..." />
+        <LoadingBlock label={t("Cargando boletines...")} />
       ) : !cycleId ? (
         <Card>
           <EmptyState
             icon="🗓️"
-            title="Seleccione un ciclo"
-            message="Cada boletín resume un ciclo. Elija uno en la cabecera."
-            action={<Button onClick={() => navigate("/ciclos")}>Ir a ciclos</Button>}
+            title={t("Seleccione un ciclo")}
+            message={t("Cada boletín resume un ciclo. Elija uno en la cabecera.")}
+            action={<Button onClick={() => navigate("/ciclos")}>{t("Ir a ciclos")}</Button>}
           />
         </Card>
       ) : items.length === 0 ? (
         <Card>
           <EmptyState
             icon="📰"
-            title="Sin boletines"
+            title={t("Sin boletines")}
             message={
               canWrite
-                ? "Se compila automáticamente al cerrar el ciclo, o pulse Compilar desde el ciclo."
-                : "Se compila automáticamente al cerrar el ciclo. Un evaluador técnico o el superadministrador lo aprueba y publica."
+                ? t("Se compila automáticamente al cerrar el ciclo, o pulse Compilar desde el ciclo.")
+                : t("Se compila automáticamente al cerrar el ciclo. Un evaluador técnico o el superadministrador lo aprueba y publica.")
             }
           />
         </Card>
@@ -222,13 +223,14 @@ export default function Bulletins() {
           <Card key={b.id} style={{ marginBottom: 16 }}>
             <div className="bulletin-card-head" data-testid={`bulletin-${b.id}`}>
               <div style={{ minWidth: 0 }}>
-                <p className="iets-dossier-kicker">Boletín epidemiológico y financiero</p>
+                <p className="iets-dossier-kicker">{t("Boletín epidemiológico y financiero")}</p>
                 <h3 style={{ overflowWrap: "anywhere" }}>{b.title}</h3>
                 <p className="bulletin-card-meta">
-                  Compilado {b.body?.compiled_on || "-"}
-                  {b.compiled_by ? ` por ${b.compiled_by}` : ""}
-                  {b.approved_by ? ` · Aprobado por ${b.approved_by}` : ""}
-                  {b.published_at ? ` · Publicado ${new Date(b.published_at).toLocaleDateString("es-CO")}` : ""}
+                  {b.compiled_by
+                    ? t("Compilado {date} por {name}", { date: b.body?.compiled_on || "-", name: b.compiled_by })
+                    : t("Compilado {date}", { date: b.body?.compiled_on || "-" })}
+                  {b.approved_by ? " · " + t("Aprobado por {name}", { name: b.approved_by }) : ""}
+                  {b.published_at ? " · " + t("Publicado {date}", { date: new Date(b.published_at).toLocaleDateString(intlLocale()) }) : ""}
                 </p>
               </div>
               <Badge tone={b.status === "publicado" ? "ok" : "warning"}>
@@ -250,8 +252,11 @@ export default function Bulletins() {
               <p className="bulletin-card-meta" data-testid={`bulletin-sent-${b.id}`}>
                 {(() => {
                   const last = b.body.distribution[b.body.distribution.length - 1];
-                  const when = last.at ? new Date(last.at).toLocaleString("es-CO") : "";
-                  return `Último envío: ${when}, a ${(last.sent || []).length} destinatario(s)${last.by ? `, por ${last.by}` : ""}.`;
+                  const when = last.at ? new Date(last.at).toLocaleString(intlLocale()) : "";
+                  const n = (last.sent || []).length;
+                  return last.by
+                    ? t("Último envío: {when}, a {n} destinatario(s), por {by}.", { when, n, by: last.by })
+                    : t("Último envío: {when}, a {n} destinatario(s).", { when, n });
                 })()}
               </p>
             )}
@@ -263,48 +268,48 @@ export default function Bulletins() {
                     onClick={() => approve(b.id, false)}
                     loading={busy === `apr-${b.id}`}
                     disabled={Boolean(b.approved_by)}
-                    disabledHint={`Ya aprobado por ${b.approved_by}. Si recompila, la aprobación se anula.`}
+                    disabledHint={t("Ya aprobado por {name}. Si recompila, la aprobación se anula.", { name: b.approved_by })}
                     hint={GLOSSARY.fa_aprobar_boletin}
                     data-testid={`bulletin-approve-${b.id}`}
                   >
-                    Aprobar
+                    {t("Aprobar")}
                   </HintButton>
                   <HintButton
                     variant="success"
                     onClick={() => setPublishing(b)}
                     disabled={!b.approved_by}
-                    disabledHint="Requiere la aprobación del líder antes de publicarse (RF19)."
+                    disabledHint={t("Requiere la aprobación del líder antes de publicarse (RF19).")}
                     hint={GLOSSARY.fa_publicar_boletin}
                     data-testid={`bulletin-publish-${b.id}`}
                   >
-                    Publicar
+                    {t("Publicar")}
                   </HintButton>
                 </>
               )}
               {canWrite && b.status === "publicado" && (
                 <HintButton
                   onClick={() => openSend(b)}
-                  hint="Envía el boletín publicado, con su PDF adjunto, a los correos de la alta dirección."
+                  hint={t("Envía el boletín publicado, con su PDF adjunto, a los correos de la alta dirección.")}
                   data-testid={`bulletin-send-${b.id}`}
                 >
-                  Enviar a la alta dirección
+                  {t("Enviar a la alta dirección")}
                 </HintButton>
               )}
               <HintButton
                 variant="outline"
                 onClick={() => exportHtml(b)}
-                hint="Abre la versión ejecutiva en una pestaña nueva."
+                hint={t("Abre la versión ejecutiva en una pestaña nueva.")}
                 data-testid={`bulletin-export-${b.id}`}
               >
-                Ver HTML ejecutivo
+                {t("Ver HTML ejecutivo")}
               </HintButton>
               <HintButton
                 variant="outline"
                 onClick={() => exportPdf(b)}
-                hint="Descarga el boletín en PDF (A4) listo para distribuir."
+                hint={t("Descarga el boletín en PDF (A4) listo para distribuir.")}
                 data-testid={`bulletin-pdf-${b.id}`}
               >
-                Descargar PDF
+                {t("Descargar PDF")}
               </HintButton>
             </div>
           </Card>
@@ -314,28 +319,27 @@ export default function Bulletins() {
       <Modal
         open={Boolean(sending)}
         onClose={() => setSending(null)}
-        title="Enviar el boletín a la alta dirección"
+        title={t("Enviar el boletín a la alta dirección")}
         width={560}
         footer={
           <div className="fb-toolbar" style={{ justifyContent: "flex-end" }}>
-            <Button variant="outline" onClick={() => setSending(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setSending(null)}>{t("Cancelar")}</Button>
             <Button onClick={send} loading={Boolean(sending) && busy === `send-${sending?.id}`} disabled={!mailReady}>
-              Enviar boletín
+              {t("Enviar boletín")}
             </Button>
           </div>
         }
       >
         <p style={{ fontSize: 13.5, color: "#475569", lineHeight: 1.6, marginBottom: 12 }}>
-          Se enviará «{sending?.title || ""}» con el PDF adjunto. La lista se recuerda para el siguiente boletín
-          y cada envío queda registrado.
+          {t("Se enviará «{title}» con el PDF adjunto. La lista se recuerda para el siguiente boletín y cada envío queda registrado.", { title: sending?.title || "" })}
         </p>
         {!mailReady && (
           <div role="alert" className="login-notice login-notice-error" style={{ marginBottom: 12 }}>
-            El correo institucional no está configurado en el servidor. Descargue el PDF y envíelo por su correo.
+            {t("El correo institucional no está configurado en el servidor. Descargue el PDF y envíelo por su correo.")}
           </div>
         )}
         <label htmlFor="bulletin-recipients" style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-          Destinatarios (separados por coma)
+          {t("Destinatarios (separados por coma)")}
         </label>
         <textarea
           id="bulletin-recipients"
@@ -356,10 +360,10 @@ export default function Bulletins() {
         onClose={() => setPublishing(null)}
         onConfirm={() => approve(publishing.id, true)}
         loading={Boolean(publishing) && busy === `pub-${publishing?.id}`}
-        title="Publicar boletín"
+        title={t("Publicar boletín")}
         confirmVariant="success"
-        confirmLabel="Publicar"
-        message={`Se publicará "${publishing?.title || ""}" con las cifras aprobadas. La publicación no se deshace.`}
+        confirmLabel={t("Publicar")}
+        message={t('Se publicará "{title}" con las cifras aprobadas. La publicación no se deshace.', { title: publishing?.title || "" })}
       />
     </div>
   );

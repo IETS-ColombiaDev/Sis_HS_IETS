@@ -1,0 +1,22 @@
+// src/components/FindingDetailModal.jsx
+export default {
+  "emergente": "emerging",
+  "transicional": "transitional",
+  "inminente": "imminent",
+  "medicamento": "medicine",
+  "dispositivo": "device",
+  "digital": "digital",
+  "nuevo": "new",
+  "revisado": "reviewed",
+  "priorizado": "prioritized",
+  "descartado": "discarded",
+  "Ficha de señal tecnológica": "Technology signal fact sheet",
+  "Capturada": "Captured",
+  "{n} recomendación(es)": "{n} recommendation(s)",
+  "Enlace original": "Original link",
+  "Enriquecer con IA": "Enrich with AI",
+  "Su perfil no redacta informes (permiso report:write).": "Your profile cannot write reports (report:write permission).",
+  "Generar informe": "Generate report",
+  "Corregir título, resumen y clasificación de la señal": "Correct the signal's title, summary and classification",
+  "Estado de triage": "Triage status",
+};

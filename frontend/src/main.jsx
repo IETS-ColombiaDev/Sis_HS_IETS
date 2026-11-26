@@ -1,33 +1,5 @@
-// Estilos base primero: los de cada componente se cargan despues y los afinan.
-import "./styles/globals.css";
-import "./styles/shell.css";
-import "./styles/ui.css";
-import React from "react";
-import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import App from "./App";
-import { AuthProvider } from "./auth/AuthContext";
-import { RealtimeProvider } from "./realtime/RealtimeContext";
-import { ToastProvider } from "./components/Toast";
-import { BackupProvider } from "./backup/BackupContext";
-import { ScanProvider } from "./scan/ScanContext";
-// Al final: afina los estilos base y los de cada componente.
-import "./styles/horizon.css";
+// El idioma se resuelve antes de cargar la aplicación: así los textos de las
+// constantes de módulo (menú, glosario, columnas) ya salen traducidos.
+import { initI18n } from "./i18n";
 
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <ToastProvider>
-        <AuthProvider>
-          <RealtimeProvider>
-            <BackupProvider>
-              <ScanProvider>
-                <App />
-              </ScanProvider>
-            </BackupProvider>
-          </RealtimeProvider>
-        </AuthProvider>
-      </ToastProvider>
-    </BrowserRouter>
-  </React.StrictMode>
-);
+initI18n().finally(() => import("./bootstrap.jsx"));

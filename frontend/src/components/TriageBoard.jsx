@@ -4,6 +4,7 @@ import Icon from "./Icon";
 import Tooltip from "./Tooltip";
 import ClampText from "./ClampText";
 import { useScreeningThreshold } from "../scan/useScreeningThreshold";
+import { t, ts } from "../i18n";
 
 /**
  * Puntaje de cribado de la senal capturada. Ordena la cola de trabajo; no es el
@@ -16,9 +17,9 @@ export function ScreeningScore({ score, compact = false }) {
   const tone = high ? "priorizado" : n >= 50 ? "revisado" : "viewer";
   return (
     <Tooltip
-      text={`Puntaje de cribado: ${n}. Ordena la cola de señales sin calificar (destaque desde ${threshold}, ajustable en Configuración). No es el índice %P de la matriz oficial.`}
+      text={t("Puntaje de cribado: {n}. Ordena la cola de señales sin calificar (destaque desde {threshold}, ajustable en Configuración). No es el índice %P de la matriz oficial.", { n, threshold })}
     >
-      <Badge tone={tone}>{compact ? `Cribado ${n}` : `Cribado ${n}/100`}</Badge>
+      <Badge tone={tone}>{compact ? t("Cribado {n}", { n }) : t("Cribado {n}/100", { n })}</Badge>
     </Tooltip>
   );
 }
@@ -28,10 +29,10 @@ export function ScreeningScore({ score, compact = false }) {
  */
 export default function TriageBoard({ findings, isEditor, onOpen, onStatus, onGenerate, counts }) {
   const columns = [
-    { key: "nuevo", label: "Nuevas señales", tone: "nuevo" },
-    { key: "revisado", label: "En revisión", tone: "revisado" },
-    { key: "priorizado", label: "A seguir", tone: "priorizado" },
-    { key: "descartado", label: "Descartadas", tone: "descartado" },
+    { key: "nuevo", label: t("Nuevas señales"), tone: "nuevo" },
+    { key: "revisado", label: t("En revisión"), tone: "revisado" },
+    { key: "priorizado", label: t("A seguir"), tone: "priorizado" },
+    { key: "descartado", label: t("Descartadas"), tone: "descartado" },
   ];
 
   return (
@@ -42,11 +43,11 @@ export default function TriageBoard({ findings, isEditor, onOpen, onStatus, onGe
           <div key={col.key} className="triage-column">
             <div className="triage-column-head">
               <Badge tone={col.tone}>{col.label}</Badge>
-              <span className="triage-count" title={counts ? `${items.length} cargadas de ${counts[col.key] ?? items.length}` : undefined}>{counts?.[col.key] ?? items.length}</span>
+              <span className="triage-count" title={counts ? t("{n} cargadas de {total}", { n: items.length, total: counts[col.key] ?? items.length }) : undefined}>{counts?.[col.key] ?? items.length}</span>
             </div>
             <div className="triage-column-body">
               {items.length === 0 ? (
-                <p className="triage-empty">Sin items</p>
+                <p className="triage-empty">{t("Sin items")}</p>
               ) : (
                 items.map((f) => (
                   <div
@@ -59,36 +60,36 @@ export default function TriageBoard({ findings, isEditor, onOpen, onStatus, onGe
                   >
                     <div className="triage-card-top">
                       <ScreeningScore score={f.screening_score} compact />
-                      {f.horizon && <Badge>{f.horizon}</Badge>}
+                      {f.horizon && <Badge tone={f.horizon}>{ts(f.horizon)}</Badge>}
                     </div>
                     <ClampText className="triage-card-title" text={f.title} lines={3} />
                     <div className="triage-card-meta">
-                      <Badge>{f.technology_type || "otro"}</Badge>
+                      <Badge tone={f.technology_type || "otro"}>{f.technology_type ? ts(f.technology_type) : t("otro")}</Badge>
                       <span title={f.source_title}>{f.source_title}</span>
                     </div>
                     {isEditor && (
                       <div className="triage-card-actions" onClick={(e) => e.stopPropagation()}>
                         {col.key === "nuevo" && (
-                          <Tooltip text="Marcar como revisada: alguien del equipo ya la leyó.">
+                          <Tooltip text={t("Marcar como revisada: alguien del equipo ya la leyó.")}>
                             <Button size="sm" variant="outline" onClick={() => onStatus(f, "revisado")}>
-                              Revisar
+                              {t("Revisar")}
                             </Button>
                           </Tooltip>
                         )}
                         {col.key === "revisado" && (
                           <>
-                            <Tooltip text="Marcarla como señal a seguir. No es la priorización oficial P1-P6: esa se hace en el ciclo.">
-                              <Button size="sm" onClick={() => onStatus(f, "priorizado")}>Seguir</Button>
+                            <Tooltip text={t("Marcarla como señal a seguir. No es la priorización oficial P1-P6: esa se hace en el ciclo.")}>
+                              <Button size="sm" onClick={() => onStatus(f, "priorizado")}>{t("Seguir")}</Button>
                             </Tooltip>
-                            <Tooltip text="Marcarla como ruido o no pertinente. No se borra.">
-                              <Button size="sm" variant="ghost" onClick={() => onStatus(f, "descartado")}>Descartar</Button>
+                            <Tooltip text={t("Marcarla como ruido o no pertinente. No se borra.")}>
+                              <Button size="sm" variant="ghost" onClick={() => onStatus(f, "descartado")}>{t("Descartar")}</Button>
                             </Tooltip>
                           </>
                         )}
                         {col.key === "priorizado" && (
-                          <Tooltip text="Generar una recomendación de adopción para Colombia (con IA, o preliminar si no hay IA).">
+                          <Tooltip text={t("Generar una recomendación de adopción para Colombia (con IA, o preliminar si no hay IA).")}>
                             <Button size="sm" variant="outline" onClick={() => onGenerate(f)}>
-                              <Icon name="pulse" size={13} /> Informe
+                              <Icon name="pulse" size={13} /> {t("Informe")}
                             </Button>
                           </Tooltip>
                         )}

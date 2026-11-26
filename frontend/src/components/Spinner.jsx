@@ -1,3 +1,5 @@
+import { t } from "../i18n";
+
 export function Spinner({ size = 22, color = "#2563EB" }) {
   return (
     <span
@@ -14,7 +16,7 @@ export function Spinner({ size = 22, color = "#2563EB" }) {
   );
 }
 
-export function LoadingBlock({ label = "Cargando..." }) {
+export function LoadingBlock({ label = t("Cargando...") }) {
   return (
     <div className="loading-block" role="status" aria-live="polite">
       <Spinner size={30} />

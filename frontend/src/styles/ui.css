@@ -922,3 +922,52 @@ main textarea:not(.field-control):focus-visible {
 form > .fb-public-note:first-child {
   margin: 14px 0 6px;
 }
+
+/* Selector de idioma (cabecera, ingreso y pantallas públicas) */
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 6px 0 8px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #fff;
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.lang-switch-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+.lang-switch select {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 4px 2px;
+  cursor: pointer;
+  max-width: 132px;
+}
+.lang-switch select:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.lang-switch--dark {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.lang-switch--dark select option {
+  color: #0f172a;
+}
+@media (max-width: 720px) {
+  .lang-switch-icon {
+    display: none;
+  }
+  .lang-switch select {
+    max-width: 96px;
+  }
+}

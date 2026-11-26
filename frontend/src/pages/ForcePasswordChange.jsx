@@ -1,6 +1,7 @@
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
 import ChangePasswordForm from "../components/ChangePasswordForm";
+import { t } from "../i18n";
 
 /** Primer ingreso con contrasena temporal: se cambia antes de operar. */
 export default function ForcePasswordChange() {
@@ -20,14 +21,20 @@ export default function ForcePasswordChange() {
         }}
       >
         <div style={{ fontSize: 34 }} aria-hidden="true">🔐</div>
-        <h1 style={{ fontSize: 22, fontWeight: 700, marginTop: 8 }}>Cree su contraseña personal</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, marginTop: 8 }}>{t("Cree su contraseña personal")}</h1>
         <p style={{ color: "#64748B", fontSize: 14, marginTop: 6, marginBottom: 20, lineHeight: 1.6 }}>
-          Hola{account?.name ? `, ${account.name}` : ""}. Ingreso con una contraseña temporal asignada por el
-          administrador. Por seguridad, reemplácela ahora: nadie más, ni siquiera el administrador, conocerá la nueva.
+          {account?.name
+            ? t(
+                "Hola, {name}. Ingreso con una contraseña temporal asignada por el administrador. Por seguridad, reemplácela ahora: nadie más, ni siquiera el administrador, conocerá la nueva.",
+                { name: account.name }
+              )
+            : t(
+                "Hola. Ingreso con una contraseña temporal asignada por el administrador. Por seguridad, reemplácela ahora: nadie más, ni siquiera el administrador, conocerá la nueva."
+              )}
         </p>
         <ChangePasswordForm
           forced
-          onDone={() => toast.success("Contraseña actualizada. Bienvenido al sistema.")}
+          onDone={() => toast.success(t("Contraseña actualizada. Bienvenido al sistema."))}
           onCancel={() => logout()}
         />
       </main>

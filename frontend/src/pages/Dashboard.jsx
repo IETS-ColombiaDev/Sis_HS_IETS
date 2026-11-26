@@ -19,29 +19,37 @@ import { GLOSSARY } from "../constants/glossary";
 import InfoTip from "../components/InfoTip";
 import TechSearch from "../components/TechSearch";
 import { formatDateTime, formatSpan } from "../scan/format";
+import { t, tr, ts, intlLocale } from "../i18n";
 import "./dashboards.css";
 
 // Que mide cada indicador y como se calcula (criterio operativo: sin
 // documentacion externa).
 const KPI_HELP = {
-  bandeja:
-    "Qué mide: señales capturadas que aún no se asignan a ningún ciclo. Cómo se calcula: tecnologías en estado 'capturada / no asignada'.",
-  cribado: `Qué mide: señales de la cola de cribado con puntaje alto. Cómo se calcula: señales con puntaje de cribado igual o mayor al umbral de Configuración › Cribado (0 a 100). Es una ayuda para ordenar, no el %P oficial.`,
-  calificar:
-    "Qué mide: su trabajo pendiente en la matriz oficial. Cómo se calcula: tecnologías del ciclo activo aptas para priorización y no congeladas a las que les falta al menos uno de los criterios que su perfil califica.",
-  priorizadas:
-    "Qué mide: tecnologías del ciclo activo que superaron el umbral de puntos y esperan pasar a evaluación. Cómo se calcula: estado 'priorizada'. El tablero estratégico suma además las que ya están en evaluación o publicadas.",
-  vigilancia:
-    "Qué mide: tecnologías del ciclo activo que quedaron en observación (3 puntos). Cómo se calcula: estado 'bajo vigilancia'; se proponen para el ciclo siguiente al cerrar.",
-  sin_pct:
-    "Tecnologías del ciclo activo, aptas para calificar y no congeladas, cuyo %P aún no se calcula porque falta al menos un criterio de P1 a P6.",
-  pendientes:
-    "Lo que su perfil tiene por hacer hoy. Cada tarjeta dice qué cuenta, cómo se calcula (icono de ayuda) y lleva directo a la pantalla donde se resuelve.",
-  cola:
-    "Señales sin procesar ordenadas por puntaje de cribado. Se omiten las que ya tienen desenlace (publicadas, excluidas, no priorizadas) o se fusionaron. Cada una lleva a la acción que le corresponde según su estado.",
+  bandeja: t(
+    "Qué mide: señales capturadas que aún no se asignan a ningún ciclo. Cómo se calcula: tecnologías en estado 'capturada / no asignada'."
+  ),
+  cribado: t(`Qué mide: señales de la cola de cribado con puntaje alto. Cómo se calcula: señales con puntaje de cribado igual o mayor al umbral de Configuración › Cribado (0 a 100). Es una ayuda para ordenar, no el %P oficial.`),
+  calificar: t(
+    "Qué mide: su trabajo pendiente en la matriz oficial. Cómo se calcula: tecnologías del ciclo activo aptas para priorización y no congeladas a las que les falta al menos uno de los criterios que su perfil califica."
+  ),
+  priorizadas: t(
+    "Qué mide: tecnologías del ciclo activo que superaron el umbral de puntos y esperan pasar a evaluación. Cómo se calcula: estado 'priorizada'. El tablero estratégico suma además las que ya están en evaluación o publicadas."
+  ),
+  vigilancia: t(
+    "Qué mide: tecnologías del ciclo activo que quedaron en observación (3 puntos). Cómo se calcula: estado 'bajo vigilancia'; se proponen para el ciclo siguiente al cerrar."
+  ),
+  sin_pct: t(
+    "Tecnologías del ciclo activo, aptas para calificar y no congeladas, cuyo %P aún no se calcula porque falta al menos un criterio de P1 a P6."
+  ),
+  pendientes: t(
+    "Lo que su perfil tiene por hacer hoy. Cada tarjeta dice qué cuenta, cómo se calcula (icono de ayuda) y lleva directo a la pantalla donde se resuelve."
+  ),
+  cola: t(
+    "Señales sin procesar ordenadas por puntaje de cribado. Se omiten las que ya tienen desenlace (publicadas, excluidas, no priorizadas) o se fusionaron. Cada una lleva a la acción que le corresponde según su estado."
+  ),
 };
 
-const SEVERITY_LABEL = { accion: "Por hacer", aviso: "Atención", info: "Para leer", ok: "Al día" };
+const SEVERITY_LABEL = { accion: t("Por hacer"), aviso: t("Atención"), info: t("Para leer"), ok: t("Al día") };
 
 function isIdle(item) {
   return item.severity === "ok" || (item.severity === "accion" && item.count === 0);
@@ -50,25 +58,26 @@ function isIdle(item) {
 function WorkCard({ item }) {
   // "Al dia": nada por hacer. Un aviso (p. ej. indice INVIMA vacio) nunca lo es.
   const empty = isIdle(item);
+  const label = ts(item.label);
   return (
     <article
       className="dc-work-card"
       data-severity={item.severity}
       data-empty={empty ? "true" : "false"}
       data-testid={`work-${item.key}`}
-      aria-label={`${item.label}: ${item.count}`}
+      aria-label={`${label}: ${item.count}`}
     >
       <div className="dc-work-head">
         <span className="dc-work-count" data-testid={`work-${item.key}-count`}>
           {item.count}
         </span>
         <Badge tone={empty ? "ok" : item.severity === "aviso" ? "warning" : item.severity === "info" ? "info" : "default"}>
-          {empty ? "Al día" : SEVERITY_LABEL[item.severity] || item.severity}
+          {empty ? t("Al día") : SEVERITY_LABEL[item.severity] || item.severity}
         </Badge>
       </div>
       <div className="dc-work-label">
-        <ClampText text={item.label} lines={2} as="span" />
-        <InfoTip text={item.help} label={`Cómo se calcula: ${item.label}`} />
+        <ClampText text={label} lines={2} as="span" />
+        <InfoTip text={ts(item.help)} label={t("Cómo se calcula: {label}", { label })} />
       </div>
       {item.samples?.length > 0 && (
         <ul className="dc-work-samples">
@@ -77,15 +86,15 @@ function WorkCard({ item }) {
               <Link to={s.to} title={s.name}>
                 <ClampText text={s.name} lines={1} as="span" />
               </Link>
-              {s.detail && <small>{s.detail}</small>}
+              {s.detail && <small>{ts(s.detail)}</small>}
             </li>
           ))}
-          {item.count > 3 && <li className="dc-muted" style={{ fontSize: 12 }}>y {item.count - 3} más</li>}
+          {item.count > 3 && <li className="dc-muted" style={{ fontSize: 12 }}>{t("y {n} más", { n: item.count - 3 })}</li>}
         </ul>
       )}
       <div className="dc-work-action">
         <Link to={item.to} data-testid={`work-${item.key}-go`}>
-          {item.action_label} <span aria-hidden="true">→</span>
+          {ts(item.action_label)} <span aria-hidden="true">→</span>
         </Link>
       </div>
     </article>
@@ -93,10 +102,10 @@ function WorkCard({ item }) {
 }
 
 const RUN_STATE = {
-  en_curso: { label: "En curso", tone: "info" },
-  ok: { label: "Completa", tone: "success" },
-  parcial: { label: "Con novedades", tone: "warning" },
-  error: { label: "Con error", tone: "danger" },
+  en_curso: { label: t("En curso"), tone: "info" },
+  ok: { label: t("Completa"), tone: "success" },
+  parcial: { label: t("Con novedades"), tone: "warning" },
+  error: { label: t("Con error"), tone: "danger" },
 };
 
 /** Última vigilancia del historial: cuándo corrió, cuánto tardó y qué dejó. */
@@ -107,27 +116,29 @@ function LastVigilance({ run }) {
   return (
     <div className="dc-last-run" data-testid="bandeja-last-run">
       <div className="dc-last-run-head">
-        <strong>Última vigilancia</strong>
+        <strong>{t("Última vigilancia")}</strong>
         <Badge tone={state.tone}>{state.label}</Badge>
       </div>
       <div className="dc-last-run-when">
-        {formatDateTime(run.finished_at || run.started_at)} · {run.status === "en_curso" ? "lleva" : "duró"} {formatSpan(run.duration_seconds)}
+        {run.status === "en_curso"
+          ? t("{when} · lleva {span}", { when: formatDateTime(run.finished_at || run.started_at), span: formatSpan(run.duration_seconds) })
+          : t("{when} · duró {span}", { when: formatDateTime(run.finished_at || run.started_at), span: formatSpan(run.duration_seconds) })}
       </div>
       <dl className="dc-last-run-facts">
         <div>
-          <dt>Fuentes</dt>
+          <dt>{t("Fuentes")}</dt>
           <dd>{run.sources_total}</dd>
         </div>
         <div>
-          <dt>Entraron</dt>
+          <dt>{t("Entraron")}</dt>
           <dd>{entered}</dd>
         </div>
         <div>
-          <dt>Sin acceso</dt>
+          <dt>{t("Sin acceso")}</dt>
           <dd className={o.no_entro ? "dc-warn" : ""}>{o.no_entro || 0}</dd>
         </div>
         <div>
-          <dt>Señales nuevas</dt>
+          <dt>{t("Señales nuevas")}</dt>
           <dd className={run.items_new ? "dc-ok" : ""}>+{run.items_new}</dd>
         </div>
       </dl>
@@ -175,14 +186,14 @@ export default function Dashboard() {
       }
       if (silent) return;
       if (a.status === "rejected" && b.status === "rejected") {
-        toast.error(apiError(a.reason, "No se pudo cargar la bandeja de trabajo"));
+        toast.error(apiError(a.reason, t("No se pudo cargar la bandeja de trabajo")));
       } else if (a.status === "rejected") {
-        toast.error(apiError(a.reason, "No se pudieron cargar los indicadores"));
+        toast.error(apiError(a.reason, t("No se pudieron cargar los indicadores")));
       } else if (b.status === "rejected") {
-        toast.error(apiError(b.reason, "No se pudieron cargar los pendientes del perfil"));
+        toast.error(apiError(b.reason, t("No se pudieron cargar los pendientes del perfil")));
       }
     } catch (e) {
-      if (!silent) toast.error(apiError(e, "No se pudo cargar la bandeja de trabajo"));
+      if (!silent) toast.error(apiError(e, t("No se pudo cargar la bandeja de trabajo")));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -201,14 +212,14 @@ export default function Dashboard() {
     load({ silent: true });
   }, [load, version]);
 
-  if (loading) return <LoadingBlock label="Cargando bandeja de trabajo..." />;
+  if (loading) return <LoadingBlock label={t("Cargando bandeja de trabajo...")} />;
   if (!wb) {
     return (
       <EmptyState
         icon="⚠️"
-        title="No se pudo cargar la bandeja"
-        message="Revise su conexión e intente de nuevo."
-        action={<Button onClick={load}>Reintentar</Button>}
+        title={t("No se pudo cargar la bandeja")}
+        message={t("Revise su conexión e intente de nuevo.")}
+        action={<Button onClick={load}>{t("Reintentar")}</Button>}
       />
     );
   }
@@ -227,16 +238,16 @@ export default function Dashboard() {
     <div>
       <div className="page-header bandeja-header">
         <div className="page-header-text">
-          <span className="page-eyebrow">Inicio</span>
+          <span className="page-eyebrow">{t("Inicio##página")}</span>
           <h1 className="page-title term-label">
-            Bandeja de trabajo
-            <InfoTip text={GLOSSARY.bandeja_trabajo} label="Qué es la bandeja de trabajo" />
+            {t("Bandeja de trabajo")}
+            <InfoTip text={GLOSSARY.bandeja_trabajo} label={t("Qué es la bandeja de trabajo")} />
           </h1>
           <p className="page-subtitle dc-hello">
-            {firstName ? `Hola, ${firstName}. ` : ""}Perfil <strong>{work.role_label}</strong>
+            {firstName ? `${t("Hola, {name}.", { name: firstName })} ` : ""}{tr("Perfil {role}", { role: <strong>{ts(work.role_label)}</strong> })}
             {work.active_cycle_code ? (
               <>
-                {" "}· Ciclo en curso <strong>{work.active_cycle_code}</strong> ({work.active_cycle_status_label})
+                {" "}· {tr("Ciclo en curso {code} ({status})", { code: <strong>{work.active_cycle_code}</strong>, status: ts(work.active_cycle_status_label) })}
               </>
             ) : null}
           </p>
@@ -244,7 +255,7 @@ export default function Dashboard() {
         {isEditor && (
           <div className="page-actions">
             <Button onClick={() => navigate("/vigilancia")}>
-              <Icon name="radar" size={17} /> Ejecutar vigilancia
+              <Icon name="radar" size={17} /> {t("Ejecutar vigilancia")}
             </Button>
           </div>
         )}
@@ -256,11 +267,14 @@ export default function Dashboard() {
         <Card style={{ marginBottom: 20, background: "#FEF3C7", borderColor: "#FDE68A" }} padding={16}>
           <div className="cycle-banner">
             <div style={{ fontSize: 14, color: "#92400E" }}>
-              <strong>No hay ciclo operativo abierto.</strong> La priorización oficial P1 a P6 y el filtrado de novedad
-              requieren un ciclo activo.
+              {tr(
+                "<b>No hay ciclo operativo abierto.</b> La priorización oficial P1 a P6 y el filtrado de novedad requieren un ciclo activo.",
+                null,
+                { b: (c) => <strong>{c}</strong> }
+              )}
             </div>
             <Button size="sm" onClick={() => navigate("/ciclos")}>
-              {isEditor ? "Crear ciclo" : "Ver ciclos"}
+              {isEditor ? t("Crear ciclo") : t("Ver ciclos")}
             </Button>
           </div>
         </Card>
@@ -269,14 +283,14 @@ export default function Dashboard() {
       <section aria-labelledby="dc-my-work">
         <div className="dc-work-summary">
           <h2 id="dc-my-work">
-            Mis pendientes
-            <InfoTip text={KPI_HELP.pendientes} label="Qué son mis pendientes" />
+            {t("Mis pendientes")}
+            <InfoTip text={KPI_HELP.pendientes} label={t("Qué son mis pendientes")} />
           </h2>
           <span className="dc-muted" data-testid="work-summary">
             {pendingCount > 0
-              ? `${pendingCount} tarea(s) por hacer para su perfil`
-              : "Está al día: no tiene tareas pendientes para su perfil"}
-            {warnings > 0 ? ` · ${warnings} aviso(s) que requieren atención` : ""}
+              ? t("{n} tarea(s) por hacer para su perfil", { n: pendingCount })
+              : t("Está al día: no tiene tareas pendientes para su perfil")}
+            {warnings > 0 ? " · " + t("{n} aviso(s) que requieren atención", { n: warnings }) : ""}
           </span>
         </div>
         {items.length ? (
@@ -287,39 +301,39 @@ export default function Dashboard() {
           </div>
         ) : (
           <Card style={{ marginBottom: 24 }}>
-            <EmptyState icon="✅" title="Sin pendientes" message="Su perfil no tiene tareas asignadas en el sistema. Puede consultar el tablero estratégico o los boletines." />
+            <EmptyState icon="✅" title={t("Sin pendientes")} message={t("Su perfil no tiene tareas asignadas en el sistema. Puede consultar el tablero estratégico o los boletines.")} />
           </Card>
         )}
       </section>
 
       <div className="dc-kpis" data-testid="bandeja-kpis">
         {isEditor && (
-          <KPICard label="En bandeja de entrada" hint={KPI_HELP.bandeja} value={wb.staging_unassigned} icon={<Icon name="inbox" />} accent="#2563EB" sub="Sin asignar a ciclo" />
+          <KPICard label={t("En bandeja de entrada")} hint={KPI_HELP.bandeja} value={wb.staging_unassigned} icon={<Icon name="inbox" />} accent="#2563EB" sub={t("Sin asignar a ciclo")} />
         )}
         {isEditor && (
-          <KPICard label="Cribado alto" hint={KPI_HELP.cribado} value={wb.high_priority} icon={<Icon name="pulse" />} accent="#EF4444" sub={`Puntaje de ${screeningThreshold} o más`} />
+          <KPICard label={t("Cribado alto")} hint={KPI_HELP.cribado} value={wb.high_priority} icon={<Icon name="pulse" />} accent="#EF4444" sub={t("Puntaje de {n} o más", { n: screeningThreshold })} />
         )}
         {hasCriteria && (
-          <KPICard label="Me toca calificar" hint={KPI_HELP.calificar} value={wb.cycle_pending_for_me} icon={<Icon name="layers" />} accent="#3B82F6" sub={`Criterios ${work.my_criteria.join(", ")}`} />
+          <KPICard label={t("Me toca calificar")} hint={KPI_HELP.calificar} value={wb.cycle_pending_for_me} icon={<Icon name="layers" />} accent="#3B82F6" sub={t("Criterios {list}", { list: work.my_criteria.join(", ") })} />
         )}
-        <KPICard label="Priorizadas por evaluar" hint={KPI_HELP.priorizadas} value={wb.cycle_prioritized} icon={<Icon name="check" />} accent="#10B981" sub={work.active_cycle_code || "Sin ciclo activo"} />
-        <KPICard label="Bajo vigilancia" hint={KPI_HELP.vigilancia} value={wb.cycle_watchlist} icon={<Icon name="clock" />} accent="#F59E0B" sub={work.active_cycle_code || "Sin ciclo activo"} />
+        <KPICard label={t("Priorizadas por evaluar")} hint={KPI_HELP.priorizadas} value={wb.cycle_prioritized} icon={<Icon name="check" />} accent="#10B981" sub={work.active_cycle_code || t("Sin ciclo activo")} />
+        <KPICard label={t("Bajo vigilancia")} hint={KPI_HELP.vigilancia} value={wb.cycle_watchlist} icon={<Icon name="clock" />} accent="#F59E0B" sub={work.active_cycle_code || t("Sin ciclo activo")} />
       </div>
 
       {work.active_cycle_id && (
         <Card style={{ marginBottom: 24 }} padding={16}>
           <div className="cycle-banner">
             <div>
-              <span className="cycle-banner-label">Ciclo en curso</span>
+              <span className="cycle-banner-label">{t("Ciclo en curso")}</span>
               <strong>{work.active_cycle_code}</strong>
-              <Badge tone={work.active_cycle_status}>{work.active_cycle_status_label}</Badge>
+              <Badge tone={work.active_cycle_status}>{ts(work.active_cycle_status_label)}</Badge>
             </div>
             <div className="cycle-banner-meta term-label">
-              {wb.cycle_pending_rating} tecnología(s) sin %P completo
-              <InfoTip text={KPI_HELP.sin_pct} label="Qué es sin %P completo" />
+              {t("{n} tecnología(s) sin %P completo", { n: wb.cycle_pending_rating })}
+              <InfoTip text={KPI_HELP.sin_pct} label={t("Qué es sin %P completo")} />
             </div>
             <Button size="sm" variant="outline" onClick={() => navigate("/ciclos")}>
-              Gestionar ciclos
+              {t("Gestionar ciclos")}
             </Button>
           </div>
         </Card>
@@ -341,7 +355,7 @@ export default function Dashboard() {
               <span>{phase.short}</span>
             </button>
             <span style={{ position: "absolute", top: 12, right: 12 }}>
-              <InfoTip text={phase.help || phase.hint} label={`Qué es ${phase.label}`} />
+              <InfoTip text={phase.help || phase.hint} label={t("Qué es {label}", { label: phase.label })} />
             </span>
           </div>
         ))}
@@ -354,11 +368,11 @@ export default function Dashboard() {
               hint={KPI_HELP.cola}
               right={
                 <Button size="sm" variant="ghost" onClick={() => navigate("/senales")}>
-                  Ver todas ({work.queue_total})
+                  {t("Ver todas ({n})", { n: work.queue_total })}
                 </Button>
               }
             >
-              Cola de trabajo
+              {t("Cola de trabajo")}
             </SectionTitle>
             {work.queue.length ? (
               <ol className="dc-queue" data-testid="work-queue">
@@ -367,14 +381,14 @@ export default function Dashboard() {
                     <div style={{ minWidth: 0 }}>
                       <div className="dc-queue-meta">
                         <ScreeningScore score={f.screening_score} compact />
-                        <Badge tone={f.status}>{f.status === "nuevo" ? "Nueva" : f.status === "revisado" ? "Revisada" : f.status}</Badge>
-                        {f.horizon && <Badge>{f.horizon}</Badge>}
+                        <Badge tone={f.status}>{f.status === "nuevo" ? t("Nueva") : f.status === "revisado" ? t("Revisada") : f.status}</Badge>
+                        {f.horizon && <Badge tone={f.horizon}>{ts(f.horizon)}</Badge>}
                         {f.source_title && <span className="dc-clamp-1" style={{ maxWidth: 220 }} title={f.source_title}>{f.source_title}</span>}
                       </div>
                       <ClampText text={f.title} lines={2} className="dc-queue-title" testId="queue-title" />
                     </div>
-                    <Link className="dc-queue-go" to={f.to} title={`${f.action_label}: ${f.title}`} aria-label={`${f.action_label}: ${f.title}`}>
-                      {f.action_label} <span aria-hidden="true">→</span>
+                    <Link className="dc-queue-go" to={f.to} title={`${ts(f.action_label)}: ${f.title}`} aria-label={`${ts(f.action_label)}: ${f.title}`}>
+                      {ts(f.action_label)} <span aria-hidden="true">→</span>
                     </Link>
                   </li>
                 ))}
@@ -382,11 +396,11 @@ export default function Dashboard() {
             ) : (
               <EmptyState
                 icon="✅"
-                title="Cola vacía"
-                message="No hay señales pendientes. Ejecute la vigilancia de fuentes para detectar tecnologías emergentes."
+                title={t("Cola vacía")}
+                message={t("No hay señales pendientes. Ejecute la vigilancia de fuentes para detectar tecnologías emergentes.")}
                 action={
                   <Button onClick={() => navigate("/vigilancia")}>
-                    <Icon name="radar" size={16} /> Fase 1 · Vigilancia
+                    <Icon name="radar" size={16} /> {t("Fase 1 · Vigilancia")}
                   </Button>
                 }
               />
@@ -395,39 +409,39 @@ export default function Dashboard() {
         )}
 
         <Card>
-          <SectionTitle>Estado de vigilancia</SectionTitle>
+          <SectionTitle>{t("Estado de vigilancia")}</SectionTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div className="stat-row">
-              <span>Fuentes vigiladas</span>
+              <span>{t("Fuentes vigiladas")}</span>
               <strong>{wb.sources_enabled}</strong>
             </div>
             <div className="stat-row">
-              <span>Señales últimos 7 días</span>
+              <span>{t("Señales últimos 7 días")}</span>
               <strong>{wb.findings_last_7d}</strong>
             </div>
             {lastRun && <LastVigilance run={lastRun} />}
             {lastRun ? null : wb.last_scan ? (
               <div style={{ marginTop: 8, padding: 12, background: "#F8FAFC", borderRadius: 10, fontSize: 13 }}>
                 <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
-                  <Badge tone={wb.last_scan.status}>{wb.last_scan.status}</Badge>
-                  <span style={{ color: "#94A3B8" }}>{new Date(wb.last_scan.started_at).toLocaleString("es-CO")}</span>
+                  <Badge tone={wb.last_scan.status}>{ts(wb.last_scan.status)}</Badge>
+                  <span style={{ color: "#94A3B8" }}>{new Date(wb.last_scan.started_at).toLocaleString(intlLocale())}</span>
                 </div>
-                <ClampText text={wb.last_scan.message} lines={3} />
+                <ClampText text={ts(wb.last_scan.message)} lines={3} />
                 <div style={{ marginTop: 8, color: "#64748B" }}>
-                  {wb.last_scan.items_new} nuevas · {wb.last_scan.items_found} detectadas
+                  {t("{nuevas} nuevas · {detectadas} detectadas", { nuevas: wb.last_scan.items_new, detectadas: wb.last_scan.items_found })}
                 </div>
               </div>
             ) : (
-              <EmptyState icon="🛰️" message="Aún no hay escaneos registrados." />
+              <EmptyState icon="🛰️" message={t("Aún no hay escaneos registrados.")} />
             )}
             {isEditor && (
               <Button variant="secondary" onClick={() => navigate("/vigilancia")} style={{ marginTop: 4 }}>
-                Ir a vigilancia de fuentes
+                {t("Ir a vigilancia de fuentes")}
               </Button>
             )}
             {!isEditor && (
               <p className="dc-muted" style={{ margin: 0 }}>
-                La vigilancia la ejecuta el equipo técnico; aquí ve su estado.
+                {t("La vigilancia la ejecuta el equipo técnico; aquí ve su estado.")}
               </p>
             )}
           </div>

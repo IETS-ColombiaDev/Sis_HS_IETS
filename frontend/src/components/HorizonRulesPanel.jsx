@@ -6,20 +6,21 @@ import Button from "./Button";
 import { Select, Textarea } from "./Field";
 import { LoadingBlock } from "./Spinner";
 import { PERM } from "../constants/methodology";
+import { t } from "../i18n";
 
-const NOTICE = "Los cambios aplican a las señales que se capturen desde ahora; las ya capturadas no se reclasifican";
+const NOTICE = t("Los cambios aplican a las señales que se capturen desde ahora; las ya capturadas no se reclasifican");
 
 const LEVELS = [
-  { id: "inminente", label: "Inminente", help: "Se evalúa primero: si alguna palabra coincide, la señal queda como inminente." },
-  { id: "transicional", label: "Transicional", help: "Se evalúa si no coincidió ninguna palabra de inminente." },
-  { id: "emergente", label: "Emergente", help: "Se evalúa al final, si no coincidieron las anteriores." },
+  { id: "inminente", label: t("Inminente"), help: t("Se evalúa primero: si alguna palabra coincide, la señal queda como inminente.") },
+  { id: "transicional", label: t("Transicional"), help: t("Se evalúa si no coincidió ninguna palabra de inminente.") },
+  { id: "emergente", label: t("Emergente"), help: t("Se evalúa al final, si no coincidieron las anteriores.") },
 ];
 
 const toText = (terms) => (terms || []).join("\n");
 const toTerms = (text) =>
   text
     .split("\n")
-    .map((t) => t.trim().replace(/\s+/g, " "))
+    .map((term) => term.trim().replace(/\s+/g, " "))
     .filter(Boolean);
 
 function toDraft(rules) {
@@ -47,7 +48,7 @@ export default function HorizonRulesPanel({ toast }) {
       setData(res);
       setDraft(toDraft(res));
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron cargar las reglas de horizonte"));
+      toast.error(apiError(e, t("No se pudieron cargar las reglas de horizonte")));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -57,7 +58,7 @@ export default function HorizonRulesPanel({ toast }) {
   }, [load]);
 
   if (!can(PERM.CONFIG_MANAGE)) return null;
-  if (!draft) return <LoadingBlock label="Cargando reglas de horizonte..." />;
+  if (!draft) return <LoadingBlock label={t("Cargando reglas de horizonte...")} />;
 
   const payload = {
     inminente: toTerms(draft.inminente),
@@ -75,7 +76,7 @@ export default function HorizonRulesPanel({ toast }) {
   const save = async () => {
     const empty = LEVELS.find((l) => payload[l.id].length === 0);
     if (empty) {
-      toast.error(`La lista de "${empty.label}" no puede quedar vacía.`);
+      toast.error(t('La lista de "{label}" no puede quedar vacía.', { label: empty.label }));
       return;
     }
     setSaving(true);
@@ -83,9 +84,9 @@ export default function HorizonRulesPanel({ toast }) {
       const { data: res } = await api.put("/config/horizon-rules", payload);
       setData(res);
       setDraft(toDraft(res));
-      toast.success("Reglas de horizonte guardadas");
+      toast.success(t("Reglas de horizonte guardadas"));
     } catch (e) {
-      toast.error(apiError(e, "No se pudieron guardar las reglas de horizonte"));
+      toast.error(apiError(e, t("No se pudieron guardar las reglas de horizonte")));
     } finally {
       setSaving(false);
     }
@@ -93,11 +94,9 @@ export default function HorizonRulesPanel({ toast }) {
 
   return (
     <Card data-testid="horizon-rules-panel">
-      <SectionTitle>Reglas de horizonte</SectionTitle>
+      <SectionTitle>{t("Reglas de horizonte")}</SectionTitle>
       <p style={{ fontSize: 13, color: "#64748B", marginTop: -6 }}>
-        Clasifican por horizonte las señales extraídas de páginas web. Escriba una palabra o frase simple por
-        línea (no expresiones regulares): se compara la palabra completa, sin distinguir mayúsculas ni tildes.
-        No aplica a los conectores de bases de datos ni a la clasificación hecha por la IA.
+        {t("Clasifican por horizonte las señales extraídas de páginas web. Escriba una palabra o frase simple por línea (no expresiones regulares): se compara la palabra completa, sin distinguir mayúsculas ni tildes. No aplica a los conectores de bases de datos ni a la clasificación hecha por la IA.")}
       </p>
       <div
         role="note"
@@ -117,7 +116,7 @@ export default function HorizonRulesPanel({ toast }) {
         <Textarea
           key={l.id}
           id={`horizon-${l.id}`}
-          label={`${l.label} (${toTerms(draft[l.id]).length} términos)`}
+          label={t("{label} ({n} términos)", { label: l.label, n: toTerms(draft[l.id]).length })}
           help={l.help}
           rows={6}
           value={draft[l.id]}
@@ -126,25 +125,25 @@ export default function HorizonRulesPanel({ toast }) {
       ))}
       <Select
         id="horizon-default"
-        label="Horizonte por defecto (si ninguna palabra coincide)"
+        label={t("Horizonte por defecto (si ninguna palabra coincide)")}
         value={draft.default}
         onChange={(e) => setDraft({ ...draft, default: e.target.value })}
       >
-        <option value="">Sin determinar</option>
-        <option value="emergente">Emergente</option>
-        <option value="transicional">Transicional</option>
-        <option value="inminente">Inminente</option>
+        <option value="">{t("Sin determinar")}</option>
+        <option value="emergente">{t("Emergente")}</option>
+        <option value="transicional">{t("Transicional")}</option>
+        <option value="inminente">{t("Inminente")}</option>
       </Select>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <Button onClick={save} disabled={saving || !dirty}>
-          {saving ? "Guardando..." : "Guardar reglas"}
+          {saving ? t("Guardando...") : t("Guardar reglas")}
         </Button>
         <Button variant="secondary" onClick={() => setDraft(toDraft(data.defaults))} disabled={saving}>
-          Restaurar valores iniciales
+          {t("Restaurar valores iniciales")}
         </Button>
         {dirty && (
           <Button variant="secondary" onClick={() => setDraft(toDraft(data))} disabled={saving}>
-            Descartar cambios
+            {t("Descartar cambios")}
           </Button>
         )}
       </div>

@@ -20,6 +20,36 @@ SYSTEM_ANALYST = (
     "estructurada y accionable para el contexto del sistema de salud colombiano."
 )
 
+# Idioma de la interfaz (cabecera X-UI-Language). El sistema escribe en español;
+# solo las respuestas conversacionales siguen el idioma que eligió la persona.
+_LANGUAGE_RULES = {
+    "en-GB": (
+        "IMPORTANT: the user interface is set to British English. Write your whole answer in "
+        "British English (UK spelling and usage: prioritise, programme, centre, paediatric), "
+        "even though the context and these instructions are in Spanish. Keep proper names, "
+        "source titles and quoted text in their original language."
+    ),
+    "en-US": (
+        "IMPORTANT: the user interface is set to American English. Write your whole answer in "
+        "American English (US spelling and usage: prioritize, program, center, pediatric), "
+        "even though the context and these instructions are in Spanish. Keep proper names, "
+        "source titles and quoted text in their original language."
+    ),
+}
+
+
+def language_rule(language: str | None) -> str:
+    """Instruccion de idioma para el modelo; cadena vacia en español o si el codigo no se reconoce."""
+    return _LANGUAGE_RULES.get((language or "").strip(), "")
+
+
+def _localized(system: str, language: str | None) -> str:
+    rule = language_rule(language)
+    if not rule:
+        return system
+    return system.replace("Respondes en espanol", "Respondes en ingles") + " " + rule
+
+
 _lock = threading.Lock()
 _runtime_provider: str = (settings.ai_provider or "auto").strip().lower() or "auto"
 _runtime_ocr: bool = bool(settings.ai_ocr_enabled)
@@ -194,7 +224,7 @@ Se concreto y evita afirmaciones no sustentadas. Termina con una linea: "IMPACTO
     return text, model
 
 
-def chat_answer(question: str, context: str, history: list[dict]) -> tuple[str, str]:
+def chat_answer(question: str, context: str, history: list[dict], language: str | None = None) -> tuple[str, str]:
     hist_txt = ""
     for h in history[-6:]:
         role = "Usuario" if h.get("role") == "user" else "Asistente"
@@ -210,10 +240,11 @@ Historial reciente de la conversacion:
 
 Pregunta del usuario: {question}
 
-Responde en espanol, basandote principalmente en el contexto proporcionado. Si el contexto no
+Responde en {'ingles' if language_rule(language) else 'espanol'}, basandote principalmente en el contexto proporcionado. Si el contexto no
 alcanza, indicalo y ofrece orientacion general de ETS/escaneo de horizonte. Cita las fuentes por
-su titulo cuando corresponda. Se claro y conciso."""
-    text, model = generate(prompt, system=SYSTEM_ANALYST, temperature=0.5)
+su titulo cuando corresponda. Se claro y conciso.
+{language_rule(language)}"""
+    text, model = generate(prompt, system=_localized(SYSTEM_ANALYST, language), temperature=0.5)
     if not text or text.startswith("[Error"):
         text = _fallback_chat(question, context)
         model = model or "fallback (sin IA)"

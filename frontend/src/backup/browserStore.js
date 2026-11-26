@@ -4,6 +4,8 @@
  * "current" es la copia vigente. Si el servidor cambia de epoch (Render borro
  * el disco) la copia anterior pasa a archive:<epoch> y no se pisa.
  */
+import { t } from "../i18n";
+
 const DB_NAME = "iets_hs_backup";
 const STORE = "snapshots";
 const CURRENT = "current";
@@ -13,7 +15,7 @@ const META_KEY = "iets_hs_backup_meta";
 function openDb() {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === "undefined") {
-      reject(new Error("Este navegador no permite guardar la copia local (IndexedDB)."));
+      reject(new Error(t("Este navegador no permite guardar la copia local (IndexedDB).")));
       return;
     }
     const req = indexedDB.open(DB_NAME, 1);
@@ -37,7 +39,7 @@ function complete(tx) {
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error || new Error("IndexedDB abortó la transacción"));
+    tx.onabort = () => reject(tx.error || new Error(t("IndexedDB abortó la transacción")));
   });
 }
 

@@ -13,8 +13,9 @@ import { Input } from "./Field";
 import { LoadingBlock } from "./Spinner";
 import { PERM } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
+import { t, tr, ts, intlLocale } from "../i18n";
 
-const RUN_LABELS = { en_curso: "En curso", ok: "Ok", parcial: "Parcial", error: "Error", sin_trabajo: "Sin trabajo" };
+const RUN_LABELS = { en_curso: t("En curso"), ok: t("Ok"), parcial: t("Parcial"), error: t("Error"), sin_trabajo: t("Sin trabajo") };
 const RUN_TONE = { ok: "success", parcial: "warning", error: "danger", sin_trabajo: "viewer", en_curso: "info" };
 const TASK_META = {
   vigilancia: {
@@ -28,19 +29,19 @@ const TASK_META = {
     enabledKey: "dedup_enabled",
     hoursKey: "dedup_interval_hours",
     hint: GLOSSARY.fb_barrido_duplicados,
-    hoursHint: "Cada cuántas horas se compara el ciclo activo en busca de duplicados. Una vez al día suele bastar.",
+    hoursHint: t("Cada cuántas horas se compara el ciclo activo en busca de duplicados. Una vez al día suele bastar."),
     permission: PERM.SCREENING_WRITE,
   },
 };
 
 function when(iso) {
-  return iso ? new Date(iso).toLocaleString() : "-";
+  return iso ? new Date(iso).toLocaleString(intlLocale()) : "-";
 }
 
 /** Proxima ejecucion; si ya vencio, corre en la siguiente vuelta del worker. */
 function nextRun(iso) {
   if (!iso) return "-";
-  return new Date(iso).getTime() <= Date.now() ? "En la próxima vuelta del worker" : when(iso);
+  return new Date(iso).getTime() <= Date.now() ? t("En la próxima vuelta del worker") : when(iso);
 }
 
 /**
@@ -72,7 +73,7 @@ export default function SchedulePanel() {
         dedup_interval_hours: String(s.data.dedup_interval_hours),
       });
     } catch (e) {
-      if (firstLoad.current) toast.error(apiError(e, "No se pudo cargar la programación"));
+      if (firstLoad.current) toast.error(apiError(e, t("No se pudo cargar la programación")));
     } finally {
       firstLoad.current = false;
     }
@@ -94,7 +95,7 @@ export default function SchedulePanel() {
     for (const key of ["scan_interval_hours", "dedup_interval_hours"]) {
       const n = Number(draft[key]);
       if (!Number.isInteger(n) || n < 1 || n > 720) {
-        toast.error("Cada intervalo debe ser un número entero de horas entre 1 y 720.");
+        toast.error(t("Cada intervalo debe ser un número entero de horas entre 1 y 720."));
         return;
       }
     }
@@ -106,10 +107,10 @@ export default function SchedulePanel() {
         dedup_enabled: draft.dedup_enabled,
         dedup_interval_hours: Number(draft.dedup_interval_hours),
       });
-      toast.success("Programación guardada. El worker la aplica en su próxima vuelta.");
+      toast.success(t("Programación guardada. El worker la aplica en su próxima vuelta."));
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo guardar la programación"));
+      toast.error(apiError(e, t("No se pudo guardar la programación")));
     } finally {
       setSaving(false);
     }
@@ -119,34 +120,33 @@ export default function SchedulePanel() {
     setRunningTask(task);
     try {
       const { data: run } = await api.post(`/config/schedule/${task}/run`);
-      if (run.status === "error") toast.error(run.message);
-      else toast.success(run.message || "Tarea ejecutada");
+      if (run.status === "error") toast.error(ts(run.message));
+      else toast.success(ts(run.message) || t("Tarea ejecutada"));
       load();
     } catch (e) {
-      toast.error(apiError(e, "No se pudo ejecutar la tarea"));
+      toast.error(apiError(e, t("No se pudo ejecutar la tarea")));
     } finally {
       setRunningTask("");
     }
   };
 
-  if (!data) return <LoadingBlock label="Cargando tareas programadas..." />;
+  if (!data) return <LoadingBlock label={t("Cargando tareas programadas...")} />;
 
   return (
     <div style={{ display: "grid", gap: 16 }} data-testid="schedule-panel">
       {!data.worker_enabled && (
         <div className="fb-public-note">
-          El worker está deshabilitado en este servidor (INGEST_WORKER_ENABLED=false): las tareas no correrán solas. Puede ejecutarlas a mano con
-          "Ejecutar ahora".
+          {t('El worker está deshabilitado en este servidor (INGEST_WORKER_ENABLED=false): las tareas no correrán solas. Puede ejecutarlas a mano con "Ejecutar ahora".')}
         </div>
       )}
       <div className="fb-schedule-grid">
-        {data.tasks.map((t) => {
-          const meta = TASK_META[t.task];
+        {data.tasks.map((item) => {
+          const meta = TASK_META[item.task];
           const canRun = can(meta.permission);
           return (
-            <Card key={t.task} padding={18} className="fb-schedule-card">
+            <Card key={item.task} padding={18} className="fb-schedule-card">
               <h4>
-                {t.label} <InfoTip text={meta.hint} label={`Qué es ${t.label}`} />
+                {ts(item.label)} <InfoTip text={meta.hint} label={t("Qué es {tarea}", { tarea: ts(item.label) })} />
               </h4>
               <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, marginTop: 10 }}>
                 <input
@@ -154,13 +154,13 @@ export default function SchedulePanel() {
                   checked={Boolean(draft[meta.enabledKey])}
                   disabled={!editable}
                   onChange={(e) => setDraft({ ...draft, [meta.enabledKey]: e.target.checked })}
-                  aria-label={`Activar ${t.label}`}
+                  aria-label={t("Activar {tarea}", { tarea: ts(item.label) })}
                 />
-                Activa
+                {t("Activa")}
               </label>
               <Input
-                id={`hours-${t.task}`}
-                label="Intervalo (horas)"
+                id={`hours-${item.task}`}
+                label={t("Intervalo (horas)")}
                 hint={meta.hoursHint}
                 type="number"
                 min={1}
@@ -171,30 +171,30 @@ export default function SchedulePanel() {
                 style={{ maxWidth: 160 }}
               />
               <dl className="fb-schedule-meta">
-                <dt>Próxima</dt>
-                <dd>{t.enabled ? nextRun(t.next_run_at) : "Apagada"}</dd>
-                <dt>Última</dt>
+                <dt>{t("Próxima")}</dt>
+                <dd>{item.enabled ? nextRun(item.next_run_at) : t("Apagada")}</dd>
+                <dt>{t("Última")}</dt>
                 <dd>
-                  {t.last_run ? (
+                  {item.last_run ? (
                     <>
-                      <Badge tone={RUN_TONE[t.last_run.status]}>{RUN_LABELS[t.last_run.status] || t.last_run.status}</Badge> {when(t.last_run.started_at)}
+                      <Badge tone={RUN_TONE[item.last_run.status]}>{RUN_LABELS[item.last_run.status] || item.last_run.status}</Badge> {when(item.last_run.started_at)}
                     </>
                   ) : (
-                    "Aún no ha corrido"
+                    t("Aún no ha corrido")
                   )}
                 </dd>
               </dl>
-              {t.last_run?.message && <p style={{ fontSize: 12.5, color: "#64748B", marginTop: 0 }}>{t.last_run.message}</p>}
+              {item.last_run?.message && <p style={{ fontSize: 12.5, color: "#64748B", marginTop: 0 }}>{ts(item.last_run.message)}</p>}
               <HintButton
                 size="sm"
                 variant="outline"
-                loading={runningTask === t.task}
+                loading={runningTask === item.task}
                 disabled={!canRun}
-                hint="Ejecutarla ahora, fuera de su horario. Queda registrada como manual."
-                disabledHint={`Su perfil no tiene el permiso ${meta.permission} para ejecutar esta tarea.`}
-                onClick={() => runNow(t.task)}
+                hint={t("Ejecutarla ahora, fuera de su horario. Queda registrada como manual.")}
+                disabledHint={t("Su perfil no tiene el permiso {permiso} para ejecutar esta tarea.", { permiso: meta.permission })}
+                onClick={() => runNow(item.task)}
               >
-                Ejecutar ahora
+                {t("Ejecutar ahora")}
               </HintButton>
             </Card>
           );
@@ -205,40 +205,43 @@ export default function SchedulePanel() {
           onClick={save}
           loading={saving}
           disabled={!editable || !dirty}
-          hint="Guardar interruptores e intervalos"
-          disabledHint={!editable ? "Solo el superadministrador cambia la programación (permiso config:manage)." : "No hay cambios por guardar."}
+          hint={t("Guardar interruptores e intervalos")}
+          disabledHint={!editable ? t("Solo el superadministrador cambia la programación (permiso config:manage).") : t("No hay cambios por guardar.")}
         >
-          Guardar programación
+          {t("Guardar programación")}
         </HintButton>
         <span style={{ fontSize: 12.5, color: "#64748B" }}>
-          <TermLabel tip={GLOSSARY.fb_worker}>Worker</TermLabel>: {data.worker_running ? "en marcha" : data.worker_enabled ? "detenido" : "deshabilitado"} · revisa cada{" "}
-          {data.worker_interval_seconds} s
+          {tr(
+            "<w>Worker</w>: {estado} · revisa cada {n} s",
+            { estado: data.worker_running ? t("en marcha") : data.worker_enabled ? t("detenido") : t("deshabilitado"), n: data.worker_interval_seconds },
+            { w: (c) => <TermLabel tip={GLOSSARY.fb_worker}>{c}</TermLabel> }
+          )}
         </span>
       </div>
 
       <Card padding={0}>
         <div style={{ padding: "18px 18px 0" }}>
-          <SectionTitle hint={GLOSSARY.fb_registro_ejecucion} right={<Button size="sm" variant="ghost" onClick={load}>Actualizar</Button>}>
-            Registro de ejecución
+          <SectionTitle hint={GLOSSARY.fb_registro_ejecucion} right={<Button size="sm" variant="ghost" onClick={load}>{t("Actualizar")}</Button>}>
+            {t("Registro de ejecución")}
           </SectionTitle>
         </div>
         <DataTable
           stack
           minWidth={820}
-          emptyMessage="Aún no hay ejecuciones registradas."
+          emptyMessage={t("Aún no hay ejecuciones registradas.")}
           columns={[
-            { key: "task", width: 170, label: "Tarea", render: (r) => r.label },
-            { key: "status", width: 110, label: "Resultado", render: (r) => <Badge tone={RUN_TONE[r.status]}>{RUN_LABELS[r.status] || r.status}</Badge> },
-            { key: "origin", width: 120, label: "Origen", render: (r) => (r.origin === "manual" ? `Manual · ${r.triggered_by}` : "Programada") },
-            { key: "started", width: 170, label: "Inicio", render: (r) => when(r.started_at) },
+            { key: "task", width: 170, label: t("Tarea"), render: (r) => ts(r.label) },
+            { key: "status", width: 110, label: t("Resultado"), render: (r) => <Badge tone={RUN_TONE[r.status]}>{RUN_LABELS[r.status] || r.status}</Badge> },
+            { key: "origin", width: 120, label: t("Origen"), render: (r) => (r.origin === "manual" ? `${t("Manual")} · ${r.triggered_by}` : t("Programada")) },
+            { key: "started", width: 170, label: t("Inicio##hora"), render: (r) => when(r.started_at) },
             {
               key: "items",
               width: 130,
-              label: "Nuevas / detectadas",
-              tip: <InfoTip text="Vigilancia: señales nuevas / registros leídos. Duplicados: propuestas nuevas / pares sobre el umbral." />,
-              render: (r) => `${r.items_new} / ${r.items_found}${r.jobs_pending ? ` (${r.jobs_pending} en cola)` : ""}`,
+              label: t("Nuevas / detectadas"),
+              tip: <InfoTip text={t("Vigilancia: señales nuevas / registros leídos. Duplicados: propuestas nuevas / pares sobre el umbral.")} />,
+              render: (r) => `${r.items_new} / ${r.items_found}${r.jobs_pending ? ` ${t("({n} en cola)", { n: r.jobs_pending })}` : ""}`,
             },
-            { key: "msg", label: "Detalle", render: (r) => <span style={{ fontSize: 12.5 }}>{r.message}</span> },
+            { key: "msg", label: t("Detalle"), render: (r) => <span style={{ fontSize: 12.5 }}>{ts(r.message)}</span> },
           ]}
           rows={runs.map((r) => ({ key: r.id, data: r }))}
         />

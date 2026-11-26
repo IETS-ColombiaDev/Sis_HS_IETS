@@ -3,6 +3,7 @@ import api from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
 import { formatDuration } from "./format";
+import { t } from "../i18n";
 
 /**
  * Estado de la vigilancia para TODA la aplicación, no solo para su pantalla.
@@ -15,7 +16,8 @@ import { formatDuration } from "./format";
 const ScanContext = createContext({ progress: null, refresh: () => Promise.resolve(null), lastFetch: null });
 
 // Prefijo de avance en el título de la pestaña; el resto del título lo pone cada pantalla.
-const TITLE_PREFIX = /^\(\d+\/\d+[^)]*\) Vigilancia · /;
+const TITLE_WORD = t("Vigilancia");
+const TITLE_PREFIX = new RegExp(`^\\(\\d+/\\d+[^)]*\\) ${TITLE_WORD} · `);
 const stripPrefix = (title) => (title || "").replace(TITLE_PREFIX, "");
 
 const ACTIVE_MS = 4000;
@@ -90,14 +92,14 @@ export function ScanProvider({ children }) {
       wasActive.current = true;
       const eta = progress.eta?.eta_seconds != null ? ` · ~${formatDuration(progress.eta.eta_seconds)}` : "";
       const pct = Math.floor(progress.percent_display ?? 0);
-      document.title = `(${finished}/${progress.total} · ${pct}%${eta}) Vigilancia · ${stripPrefix(document.title)}`;
+      document.title = `(${finished}/${progress.total} · ${pct}%${eta}) ${TITLE_WORD} · ${stripPrefix(document.title)}`;
       return;
     }
     document.title = stripPrefix(document.title);
     if (wasActive.current) {
       wasActive.current = false;
       const ok = (c.ok || 0) + (c.parcial || 0);
-      const msg = `Vigilancia terminada: ${ok} fuente(s) procesadas${c.error ? `, ${c.error} con error` : ""}${c.cancelado ? `, ${c.cancelado} cancelada(s)` : ""}.`;
+      const msg = `${t("Vigilancia terminada: {n} fuente(s) procesadas", { n: ok })}${c.error ? `, ${t("{n} con error", { n: c.error })}` : ""}${c.cancelado ? `, ${t("{n} cancelada(s)", { n: c.cancelado })}` : ""}.`;
       if (c.error) toast.warning(msg);
       else toast.success(msg);
     }

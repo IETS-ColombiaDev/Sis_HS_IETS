@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "./Icon";
+import { t } from "../i18n";
 
 /**
  * Nota de ayuda contextual para explicar que hace cada modulo.
@@ -47,7 +48,7 @@ export default function HelpNote({ id, children, tone = "info", dismissible = tr
       {dismissible && (
         <button
           onClick={dismiss}
-          title="Ocultar ayuda"
+          title={t("Ocultar ayuda")}
           style={{ border: "none", background: "transparent", cursor: "pointer", color: tones.fg, flexShrink: 0, opacity: 0.7 }}
         >
           <Icon name="x" size={16} />

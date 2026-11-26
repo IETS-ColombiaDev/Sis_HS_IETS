@@ -10,31 +10,32 @@ import EmptyState from "../components/EmptyState";
 import { LoadingBlock } from "../components/Spinner";
 import Modal from "../components/Modal";
 import InfoTip from "../components/InfoTip";
+import { t, intlLocale } from "../i18n";
 
 // Debe cubrir `audit.AUDITED_MODELS` mas los eventos de negocio. Una entidad
 // ausente aqui se registra igual, pero no se puede filtrar desde la pantalla.
 const ENTITY_LABELS = {
-  users: "Usuarios",
-  sources: "Fuentes",
-  findings: "Señales capturadas",
-  technologies: "Tecnologías",
-  cycles: "Ciclos",
-  cycle_technologies: "Tecnología en ciclo",
-  priority_scores: "Calificaciones P1-P6",
-  priority_criteria: "Criterios de priorización",
-  clusters: "Clústeres de salud",
-  tech_types: "Tipologías tecnológicas",
-  methodology_params: "Parámetros metodológicos",
-  recommendations: "Recomendaciones",
-  auth: "Autenticación",
-  notes: "Notas",
-  submissions: "Postulaciones",
-  ingest_jobs: "Trabajos de ingesta",
-  scheduled_runs: "Tareas programadas",
-  merge_proposals: "Propuestas de fusión",
-  novelty_assessments: "Verificaciones de novedad",
-  evaluation_docs: "Informes de evaluación",
-  bulletins: "Boletines",
+  users: t("Usuarios"),
+  sources: t("Fuentes"),
+  findings: t("Señales capturadas"),
+  technologies: t("Tecnologías"),
+  cycles: t("Ciclos"),
+  cycle_technologies: t("Tecnología en ciclo"),
+  priority_scores: t("Calificaciones P1-P6"),
+  priority_criteria: t("Criterios de priorización"),
+  clusters: t("Clústeres de salud"),
+  tech_types: t("Tipologías tecnológicas"),
+  methodology_params: t("Parámetros metodológicos"),
+  recommendations: t("Recomendaciones"),
+  auth: t("Autenticación"),
+  notes: t("Notas"),
+  submissions: t("Postulaciones"),
+  ingest_jobs: t("Trabajos de ingesta"),
+  scheduled_runs: t("Tareas programadas"),
+  merge_proposals: t("Propuestas de fusión"),
+  novelty_assessments: t("Verificaciones de novedad"),
+  evaluation_docs: t("Informes de evaluación"),
+  bulletins: t("Boletines"),
 };
 
 const ACTION_TONE = {
@@ -96,7 +97,7 @@ export default function Audit() {
       const { data } = await api.get("/audit", { params });
       setPage(data);
     } catch (e) {
-      toast.error(apiError(e, "No se pudo cargar la bitácora"));
+      toast.error(apiError(e, t("No se pudo cargar la bitácora")));
     } finally {
       setLoading(false);
     }
@@ -134,7 +135,7 @@ export default function Audit() {
       const { data } = await api.get(`/audit/entity/${encodeURIComponent(entry.entity_type)}/${encodeURIComponent(entry.entity_id)}`);
       setTrail({ entry, items: data });
     } catch (e) {
-      toast.error(apiError(e, "No se pudo reconstruir la vida de la entidad"));
+      toast.error(apiError(e, t("No se pudo reconstruir la vida de la entidad")));
       setTrail(null);
     }
   };
@@ -150,23 +151,23 @@ export default function Audit() {
   return (
     <div>
       <PageHeader
-        title="Bitácora de auditoría"
+        title={t("Bitácora de auditoría")}
         titleHint={GLOSSARY.bitacora}
-        subtitle="Registro inmutable y de solo inserción. Cada cambio guarda usuario, IP, fecha UTC y los valores antes y después. El motor de base de datos rechaza cualquier intento de modificarla o borrarla."
+        subtitle={t("Registro inmutable y de solo inserción. Cada cambio guarda usuario, IP, fecha UTC y los valores antes y después. El motor de base de datos rechaza cualquier intento de modificarla o borrarla.")}
       />
 
       <Card style={{ marginBottom: 18 }} padding={16}>
         <div className="audit-filters" style={{ flexWrap: "wrap" }}>
           <Select
             id="audit-entity"
-            label="Entidad"
-            aria-label="Filtrar por entidad"
+            label={t("Entidad")}
+            aria-label={t("Filtrar por entidad")}
             hint={GLOSSARY.fb_audit_entidad}
             value={filters.entity_type}
             onChange={(e) => setFilter("entity_type", e.target.value)}
             style={{ marginBottom: 0 }}
           >
-            <option value="">Todas las entidades</option>
+            <option value="">{t("Todas las entidades")}</option>
             {entityOptions.map((code) => (
               <option key={code} value={code}>
                 {ENTITY_LABELS[code] || code}
@@ -175,23 +176,23 @@ export default function Audit() {
           </Select>
           <Input
             id="audit-entity-id"
-            label="Id"
-            aria-label="Identificador de la entidad"
-            placeholder="Id de la entidad (ej. 42)"
+            label={t("Id")}
+            aria-label={t("Identificador de la entidad")}
+            placeholder={t("Id de la entidad (ej. 42)")}
             value={filters.entity_id}
             onChange={(e) => setFilter("entity_id", e.target.value.trim())}
             style={{ marginBottom: 0 }}
           />
           <Select
             id="audit-action"
-            label="Acción"
+            label={t("Acción")}
             hint={GLOSSARY.fb_audit_accion}
-            aria-label="Filtrar por acción"
+            aria-label={t("Filtrar por acción")}
             value={filters.action}
             onChange={(e) => setFilter("action", e.target.value)}
             style={{ marginBottom: 0 }}
           >
-            <option value="">Todas las acciones</option>
+            <option value="">{t("Todas las acciones")}</option>
             {actions.map((a) => (
               <option key={a} value={a}>
                 {a}
@@ -200,31 +201,31 @@ export default function Audit() {
           </Select>
           <Input
             id="audit-email"
-            label="Usuario"
-            aria-label="Filtrar por correo"
-            placeholder="Filtrar por correo del usuario..."
+            label={t("Usuario")}
+            aria-label={t("Filtrar por correo")}
+            placeholder={t("Filtrar por correo del usuario...")}
             value={emailDraft}
             onChange={(e) => setEmailDraft(e.target.value)}
             style={{ marginBottom: 0 }}
           />
-          <Input id="audit-since" label="Desde" aria-label="Desde" type="date" value={filters.since} onChange={(e) => setFilter("since", e.target.value)} style={{ marginBottom: 0 }} />
-          <Input id="audit-until" label="Hasta" aria-label="Hasta" type="date" value={filters.until} onChange={(e) => setFilter("until", e.target.value)} style={{ marginBottom: 0 }} />
+          <Input id="audit-since" label={t("Desde")} aria-label={t("Desde")} type="date" value={filters.since} onChange={(e) => setFilter("since", e.target.value)} style={{ marginBottom: 0 }} />
+          <Input id="audit-until" label={t("Hasta")} aria-label={t("Hasta")} type="date" value={filters.until} onChange={(e) => setFilter("until", e.target.value)} style={{ marginBottom: 0 }} />
           {hasFilters && (
             <Button variant="ghost" size="sm" onClick={() => { setFilters(EMPTY_FILTERS); setEmailDraft(""); setOffset(0); }}>
-              Limpiar filtros
+              {t("Limpiar filtros")}
             </Button>
           )}
         </div>
       </Card>
 
       {loading ? (
-        <LoadingBlock label="Cargando bitácora..." />
+        <LoadingBlock label={t("Cargando bitácora...")} />
       ) : page.items.length === 0 ? (
         <Card>
           <EmptyState
             icon="🗒️"
-            title="Sin registros"
-            message="No hay eventos que coincidan con los filtros aplicados."
+            title={t("Sin registros")}
+            message={t("No hay eventos que coincidan con los filtros aplicados.")}
           />
         </Card>
       ) : (
@@ -234,10 +235,10 @@ export default function Audit() {
             <table className="audit-table" style={{ minWidth: 760 }}>
               <thead>
                 <tr>
-                  <th>Fecha</th>
-                  <th>Usuario</th>
-                  <th>Entidad <InfoTip text={GLOSSARY.fb_audit_entidad} /></th>
-                  <th>Acción <InfoTip text={GLOSSARY.fb_audit_accion} /></th>
+                  <th>{t("Fecha")}</th>
+                  <th>{t("Usuario")}</th>
+                  <th>{t("Entidad")} <InfoTip text={GLOSSARY.fb_audit_entidad} /></th>
+                  <th>{t("Acción")} <InfoTip text={GLOSSARY.fb_audit_accion} /></th>
                   <th>IP <InfoTip text={GLOSSARY.fb_audit_ip} /></th>
                   <th></th>
                 </tr>
@@ -247,10 +248,10 @@ export default function Audit() {
                   <Fragment key={entry.id}>
                     <tr>
                       <td className="audit-date">
-                        {new Date(entry.occurred_at).toLocaleString()}
+                        {new Date(entry.occurred_at).toLocaleString(intlLocale())}
                       </td>
                       <td>
-                        <div className="audit-user">{entry.user_email || "sistema"}</div>
+                        <div className="audit-user">{entry.user_email || t("sistema")}</div>
                         {entry.user_role && (
                           <div className="audit-role">{entry.user_role.replace("_", " ")}</div>
                         )}
@@ -269,10 +270,10 @@ export default function Audit() {
                           size="sm"
                           onClick={() => setExpanded(expanded === entry.id ? null : entry.id)}
                         >
-                          {expanded === entry.id ? "Ocultar" : "Ver cambios"}
+                          {expanded === entry.id ? t("Ocultar") : t("Ver cambios")}
                         </Button>
                         <Button variant="ghost" size="sm" title={GLOSSARY.fb_audit_vida} onClick={() => openTrail(entry)}>
-                          Vida
+                          {t("Vida")}
                         </Button>
                       </td>
                     </tr>
@@ -280,13 +281,13 @@ export default function Audit() {
                       <tr>
                         <td colSpan={6} className="audit-detail">
                           <div className="audit-detail-head">
-                            <span>{entry.request_path || "Sin ruta"}</span>
-                            <span>Petición {entry.request_id || "-"}</span>
+                            <span>{entry.request_path || t("Sin ruta")}</span>
+                            <span>{t("Petición {id}", { id: entry.request_id || "-" })}</span>
                           </div>
                           <div className="audit-diff-legend">
-                            <span>Campo</span>
-                            <span>Antes</span>
-                            <span>Después</span>
+                            <span>{t("Campo")}</span>
+                            <span>{t("Antes")}</span>
+                            <span>{t("Después")}</span>
                           </div>
                           <ValueDiff oldValue={entry.old_value} newValue={entry.new_value} />
                         </td>
@@ -301,7 +302,11 @@ export default function Audit() {
 
           <div className="audit-pager">
             <span>
-              {offset + 1} a {Math.min(offset + PAGE_SIZE, page.total)} de {page.total} registros
+              {t("{desde} a {hasta} de {total} registros", {
+                desde: offset + 1,
+                hasta: Math.min(offset + PAGE_SIZE, page.total),
+                total: page.total,
+              })}
             </span>
             <div style={{ display: "flex", gap: 8 }}>
               <Button
@@ -310,7 +315,7 @@ export default function Audit() {
                 disabled={offset === 0}
                 onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
               >
-                Anteriores
+                {t("Anteriores")}
               </Button>
               <Button
                 variant="secondary"
@@ -318,7 +323,7 @@ export default function Audit() {
                 disabled={offset + PAGE_SIZE >= page.total}
                 onClick={() => setOffset(offset + PAGE_SIZE)}
               >
-                Siguientes
+                {t("Siguientes")}
               </Button>
             </div>
           </div>
@@ -327,18 +332,25 @@ export default function Audit() {
       <Modal
         open={!!trail}
         onClose={() => setTrail(null)}
-        title={trail ? `Vida de ${ENTITY_LABELS[trail.entry.entity_type] || trail.entry.entity_type} #${trail.entry.entity_id}` : ""}
+        title={
+          trail
+            ? t("Vida de {entidad} #{id}", {
+                entidad: ENTITY_LABELS[trail.entry.entity_type] || trail.entry.entity_type,
+                id: trail.entry.entity_id,
+              })
+            : ""
+        }
         width={720}
       >
-        {trail && !trail.items && <LoadingBlock label="Reconstruyendo la historia..." />}
+        {trail && !trail.items && <LoadingBlock label={t("Reconstruyendo la historia...")} />}
         {trail?.items && (
           <>
-            <p style={{ fontSize: 13, color: "#64748B", marginTop: 0 }}>{GLOSSARY.fb_audit_vida} {trail.items.length} evento(s).</p>
+            <p style={{ fontSize: 13, color: "#64748B", marginTop: 0 }}>{GLOSSARY.fb_audit_vida} {t("{n} evento(s).", { n: trail.items.length })}</p>
             <ol className="fb-trail" data-testid="audit-trail">
               {trail.items.map((ev) => (
                 <li key={ev.id}>
                   <div>
-                    <strong>{ev.action}</strong> · {new Date(ev.occurred_at).toLocaleString()} · {ev.user_email || "proceso interno"}
+                    <strong>{ev.action}</strong> · {new Date(ev.occurred_at).toLocaleString(intlLocale())} · {ev.user_email || t("proceso interno")}
                   </div>
                   <ValueDiff oldValue={ev.old_value} newValue={ev.new_value} />
                 </li>

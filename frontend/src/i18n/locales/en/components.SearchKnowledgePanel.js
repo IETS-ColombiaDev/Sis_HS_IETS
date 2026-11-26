@@ -1,0 +1,37 @@
+// src/components/SearchKnowledgePanel.jsx — base de conocimiento de búsqueda.
+export default {
+  "nunca": "never",
+  "Mapa del sitio": "Sitemap",
+  "Base##conocimiento": "Knowledge base",
+  "No se pudo leer la base de conocimiento de búsqueda": "The search knowledge base could not be read",
+  "No se pudo descargar el paquete": "The package could not be downloaded",
+  "Paquete cargado: {added} página(s) nuevas y {updated} ya conocidas. No se borró nada.":
+    "Package uploaded: {added} new page(s) and {updated} already known. Nothing was deleted.",
+  "El archivo no es un paquete JSON válido.": "The file is not a valid JSON package.",
+  "No se pudo cargar el paquete": "The package could not be uploaded",
+  "Descargar paquete": "Download package",
+  "Cargar paquete": "Upload package",
+  "Base de conocimiento de búsqueda": "Search knowledge base",
+  "Páginas de cada fuente que ya se encontraron y que la vigilancia visita sin consultar buscadores. Sirve a todas las corridas y a todos los ciclos, y se respalda con la base del sistema. Una página que no aporta señales en {visitas} visitas deja de visitarse y se vuelve a probar a los {dias} días.":
+    "Pages from each source that have already been found and that the surveillance visits without querying search engines. It serves all runs and all cycles, and is backed up with the system database. A page that yields no signals in {visitas} visits stops being visited and is tried again after {dias} days.",
+  "{n} página(s)": "{n} page(s)",
+  "{n} sitio(s)": "{n} site(s)",
+  "{n} han aportado señales": "{n} have yielded signals",
+  "{n} sin señal (en pausa)": "{n} with no signal (paused)",
+  "{n} de {total} fuentes activas con páginas conocidas": "{n} of {total} active sources with known pages",
+  "Última actualización: {fecha}": "Last updated: {fecha}",
+  "Consultar la base": "Query the knowledge base",
+  "Por ejemplo: terapia génica, pipeline, nice.org.uk": "For example: gene therapy, pipeline, nice.org.uk",
+  "Buscar": "Search",
+  "Ninguna página coincide con esa consulta.": "No page matches that query.",
+  "La base está vacía. Se llena con el paquete del sistema, con una vigilancia o cargando un paquete.":
+    "The knowledge base is empty. It is filled from the system package, by a surveillance run or by uploading a package.",
+  "Página": "Page",
+  "Sitio": "Site",
+  "Origen": "Origin",
+  "Visitas": "Visits",
+  "Señales": "Signals",
+  "Estado": "Status",
+  "Activa": "Active",
+  "Sin señal": "No signal",
+};
