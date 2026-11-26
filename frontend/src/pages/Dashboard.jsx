@@ -178,13 +178,14 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="bandeja-header">
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }} className="term-label">
+      <div className="page-header bandeja-header">
+        <div className="page-header-text">
+          <span className="page-eyebrow">Inicio</span>
+          <h1 className="page-title term-label">
             Bandeja de trabajo
             <InfoTip text={GLOSSARY.bandeja_trabajo} label="Qué es la bandeja de trabajo" />
           </h1>
-          <p className="dc-hello">
+          <p className="page-subtitle dc-hello">
             {firstName ? `Hola, ${firstName}. ` : ""}Perfil <strong>{work.role_label}</strong>
             {work.active_cycle_code ? (
               <>
@@ -194,9 +195,11 @@ export default function Dashboard() {
           </p>
         </div>
         {isEditor && (
-          <Button onClick={() => navigate("/vigilancia")}>
-            <Icon name="radar" size={17} /> Ejecutar vigilancia
-          </Button>
+          <div className="page-actions">
+            <Button onClick={() => navigate("/vigilancia")}>
+              <Icon name="radar" size={17} /> Ejecutar vigilancia
+            </Button>
+          </div>
         )}
       </div>
 
@@ -244,7 +247,7 @@ export default function Dashboard() {
 
       <div className="dc-kpis" data-testid="bandeja-kpis">
         {isEditor && (
-          <KPICard label="En bandeja de entrada" hint={KPI_HELP.bandeja} value={wb.staging_unassigned} icon={<Icon name="inbox" />} accent="#6366F1" sub="Sin asignar a ciclo" />
+          <KPICard label="En bandeja de entrada" hint={KPI_HELP.bandeja} value={wb.staging_unassigned} icon={<Icon name="inbox" />} accent="#2563EB" sub="Sin asignar a ciclo" />
         )}
         {isEditor && (
           <KPICard label="Cribado alto" hint={KPI_HELP.cribado} value={wb.high_priority} icon={<Icon name="pulse" />} accent="#EF4444" sub={`Puntaje de ${screeningThreshold} o más`} />

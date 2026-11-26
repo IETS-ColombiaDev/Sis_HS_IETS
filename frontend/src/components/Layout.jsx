@@ -84,7 +84,7 @@ function Sidebar({ open, onClose }) {
                 {item.section}
               </div>
             ) : (
-              <div key={item.to} className="nav-row">
+              <div key={item.to} className={`nav-row${item.sub ? " is-sub" : ""}`}>
                 <NavLink
                   to={item.to}
                   end={item.end}
@@ -94,7 +94,7 @@ function Sidebar({ open, onClose }) {
                   }}
                   className={({ isActive }) => `sb-link${isActive ? " is-active" : ""}`}
                 >
-                  <Icon name={item.icon} size={18} strokeWidth={1.9} />
+                  <Icon name={item.icon} size={item.sub ? 16 : 18} strokeWidth={1.9} />
                   <span className="sb-label">{item.label}</span>
                   {badges[item.to] > 0 && (
                     <span

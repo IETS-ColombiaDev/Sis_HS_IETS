@@ -1109,7 +1109,7 @@ function UniqueListTab({ focusId }) {
             {
               label: "Fusionadas",
               value: data.merged_count,
-              color: "#6366F1",
+              color: "#2563EB",
               hint: "Registros absorbidos por fusiones confirmadas (en todo el sistema). No aparecen en el listado.",
             },
             { label: "Clústeres", value: data.clusters.length, hint: GLOSSARY.cluster },
@@ -1266,7 +1266,7 @@ export default function Screening() {
     if (!stats) return [];
     return [
       { label: "Fusiones por revisar", value: stats.pending_merges, color: "#D97706", hint: GLOSSARY.fa_fusiones_revisar },
-      { label: "Fusiones confirmadas", value: stats.confirmed_merges, color: "#6366F1", hint: GLOSSARY.fa_fusiones_confirmadas },
+      { label: "Fusiones confirmadas", value: stats.confirmed_merges, color: "#2563EB", hint: GLOSSARY.fa_fusiones_confirmadas },
       { label: "Por filtrar", value: stats.assigned, color: "#3B82F6", hint: GLOSSARY.fa_por_filtrar },
       { label: "Aptas", value: stats.qualified, color: "#059669", hint: GLOSSARY.fa_aptas },
       { label: "Excluidas", value: stats.excluded, color: "#94A3B8", hint: GLOSSARY.fa_excluidas },

@@ -30,7 +30,7 @@ export default function SafeAvatar({ user, size = 36 }) {
         width: size,
         height: size,
         borderRadius: "50%",
-        background: "linear-gradient(135deg,#6366F1,#3B82F6)",
+        background: "linear-gradient(135deg,#2563EB,#3B82F6)",
         color: "#fff",
         display: "flex",
         alignItems: "center",

@@ -132,7 +132,7 @@ export default function SignalWindowPanel({ toast, canManage = true }) {
             {dated.map((y) => (
               <div key={y.year} style={{ textAlign: "center", fontSize: 11, color: "#475569", minWidth: 34 }} title={`${y.year}: ${y.signals} señal(es)`}>
                 <div style={{ fontWeight: 600 }}>{y.signals}</div>
-                <div style={{ height: Math.max(3, Math.round((48 * y.signals) / top)), background: "#4F46E5", borderRadius: "3px 3px 0 0" }} />
+                <div style={{ height: Math.max(3, Math.round((48 * y.signals) / top)), background: "#1D4ED8", borderRadius: "3px 3px 0 0" }} />
                 <div>{y.year}</div>
               </div>
             ))}

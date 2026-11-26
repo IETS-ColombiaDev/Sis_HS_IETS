@@ -122,7 +122,7 @@ export default function Chat() {
               style={{
                 borderRadius: 8,
                 marginBottom: 4,
-                background: activeId === s.id ? "#EEF2FF" : "transparent",
+                background: activeId === s.id ? "#EFF6FF" : "transparent",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
@@ -135,7 +135,7 @@ export default function Chat() {
                 type="button"
                 onClick={() => openSession(s.id)}
                 title={s.title}
-                style={{ flex: 1, minWidth: 0, textAlign: "left", border: "none", background: "none", padding: "10px 12px", cursor: "pointer", fontSize: 13, color: activeId === s.id ? "#4F46E5" : "#334155", fontWeight: activeId === s.id ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                style={{ flex: 1, minWidth: 0, textAlign: "left", border: "none", background: "none", padding: "10px 12px", cursor: "pointer", fontSize: 13, color: activeId === s.id ? "#1D4ED8" : "#334155", fontWeight: activeId === s.id ? 600 : 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
               >
                 💬 {s.title}
               </button>
@@ -156,7 +156,7 @@ export default function Chat() {
       {/* Conversacion */}
       <div style={{ background: "#fff", border: "1px solid #E2E8F0", borderRadius: 12, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div style={{ padding: "14px 20px", borderBottom: "1px solid #E2E8F0", display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#6366F1,#3B82F6)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg,#2563EB,#3B82F6)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
             <Icon name="spark" size={18} />
           </div>
           <div>
@@ -190,7 +190,7 @@ export default function Chat() {
                     key={s}
                     onClick={() => send(s)}
                     style={{ textAlign: "left", padding: "12px 14px", border: "1px solid #E2E8F0", borderRadius: 10, background: "#F8FAFC", fontSize: 14, color: "#334155", cursor: "pointer" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "#EEF2FF")}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "#EFF6FF")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "#F8FAFC")}
                   >
                     {s}
@@ -267,7 +267,7 @@ function Bubble({ message }) {
           maxWidth: "82%",
           padding: "12px 16px",
           borderRadius: 14,
-          background: isUser ? "linear-gradient(135deg,#6366F1,#3B82F6)" : "#F1F5F9",
+          background: isUser ? "linear-gradient(135deg,#2563EB,#3B82F6)" : "#F1F5F9",
           color: isUser ? "#fff" : "#0F172A",
           fontSize: 14,
         }}

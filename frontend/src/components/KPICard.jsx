@@ -5,13 +5,13 @@ import InfoTip from "./InfoTip";
  * Con `onClick` la tarjeta es un boton (p. ej. para profundizar en un tablero)
  * y `active` la marca como seleccionada; sin ellos se comporta como antes.
  */
-export default function KPICard({ label, value, icon, accent = "#6366F1", sub, hint, onClick, active = false, actionLabel }) {
+export default function KPICard({ label, value, icon, accent = "#2563EB", sub, hint, onClick, active = false, actionLabel }) {
   const interactive = typeof onClick === "function";
   const shell = {
-    background: active ? "#EEF2FF" : "#fff",
-    border: `1px solid ${active ? "#6366F1" : "#E2E8F0"}`,
+    background: active ? "#EFF6FF" : "#fff",
+    border: `1px solid ${active ? "#2563EB" : "#E2E8F0"}`,
     borderRadius: 12,
-    padding: 24,
+    padding: 16,
     transition: "all 200ms ease-in-out",
     position: "relative",
     minWidth: 0,
@@ -47,8 +47,8 @@ export default function KPICard({ label, value, icon, accent = "#6366F1", sub, h
         {icon && (
           <div
             style={{
-              width: 38,
-              height: 38,
+              width: 32,
+              height: 32,
               borderRadius: 10,
               background: `${accent}18`,
               color: accent,
@@ -63,7 +63,7 @@ export default function KPICard({ label, value, icon, accent = "#6366F1", sub, h
           </div>
         )}
       </div>
-      <div style={{ fontSize: 30, fontWeight: 700, color: "#0F172A", marginTop: 10 }}>{value}</div>
+      <div style={{ fontSize: 26, fontWeight: 700, color: "#0F172A", marginTop: 6 }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{sub}</div>}
     </>
   );

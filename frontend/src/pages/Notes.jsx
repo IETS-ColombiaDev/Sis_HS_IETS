@@ -320,7 +320,7 @@ export default function Notes() {
               <p style={{ fontSize: 13, color: "#64748B", marginBottom: 10 }}>
                 Vinculada a: <strong>{detail.entity_label}</strong>
                 {LINK_PATH[detail.entity_type] && (
-                  <> · <Link to={LINK_PATH[detail.entity_type]} style={{ color: "#4F46E5" }}>Ir al módulo</Link></>
+                  <> · <Link to={LINK_PATH[detail.entity_type]} style={{ color: "#1D4ED8" }}>Ir al módulo</Link></>
                 )}
               </p>
             )}

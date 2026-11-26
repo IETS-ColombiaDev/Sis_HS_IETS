@@ -1,11 +1,13 @@
+import { useLocation } from "react-router-dom";
 import InfoTip from "./InfoTip";
+import { sectionFor } from "../constants/navigation";
 
 /**
  * `title`, `hint` y `actions` son opcionales y componen la misma cabecera que
  * varias pantallas venian repitiendo a mano: un `SectionTitle` seguido de un
  * parrafo de contexto. Sin ellos el componente se comporta como antes.
  */
-export function Card({ children, style, padding = 24, title, hint, actions, className, "data-testid": testId }) {
+export function Card({ children, style, padding = 20, title, hint, actions, className, "data-testid": testId }) {
   const hasHeader = Boolean(title || actions);
   return (
     <div className={`ui-card${className ? ` ${className}` : ""}`} data-testid={testId} style={{ padding, ...style }}>
@@ -30,7 +32,13 @@ export function Card({ children, style, padding = 24, title, hint, actions, clas
   );
 }
 
-export function PageHeader({ title, subtitle, actions, titleHint }) {
+/**
+ * Cabecera de pantalla: una franja con la seccion del menu, el titulo, el
+ * proposito y las acciones. `eyebrow` reemplaza la seccion si se indica.
+ */
+export function PageHeader({ title, subtitle, actions, titleHint, eyebrow }) {
+  const { pathname } = useLocation();
+  const kicker = eyebrow ?? sectionFor(pathname);
   const heading =
     typeof title === "string" && titleHint ? (
       <span className="term-label">
@@ -43,6 +51,7 @@ export function PageHeader({ title, subtitle, actions, titleHint }) {
   return (
     <div className="page-header">
       <div className="page-header-text">
+        {kicker && <span className="page-eyebrow">{kicker}</span>}
         <h1 className="page-title">{heading}</h1>
         {subtitle && <p className="page-subtitle">{subtitle}</p>}
       </div>

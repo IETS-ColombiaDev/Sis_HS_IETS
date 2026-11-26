@@ -108,7 +108,7 @@ export default function Login() {
       <div
         className="login-brand"
         style={{
-          background: "linear-gradient(135deg,#4F46E5 0%,#3B82F6 100%)",
+          background: "linear-gradient(135deg,#1D4ED8 0%,#3B82F6 100%)",
           color: "#fff",
           padding: "64px 56px",
           display: "flex",
@@ -253,13 +253,13 @@ export default function Login() {
 
           <p style={{ fontSize: 13, color: "#64748B", marginTop: 20, textAlign: "center", lineHeight: 1.6 }}>
             ¿Desarrollador o sociedad científica?{" "}
-            <Link to="/postular" style={{ fontWeight: 700, color: "#4F46E5" }}>
+            <Link to="/postular" style={{ fontWeight: 700, color: "#1D4ED8" }}>
               Postule una tecnología
             </Link>
             <br />
-            <Link to="/expedientes" style={{ color: "#4F46E5" }}>Consultar fichas públicas</Link>
+            <Link to="/expedientes" style={{ color: "#1D4ED8" }}>Consultar fichas públicas</Link>
             {" · "}
-            <Link to="/transparencia" style={{ color: "#4F46E5" }}>Transparencia</Link>
+            <Link to="/transparencia" style={{ color: "#1D4ED8" }}>Transparencia</Link>
           </p>
           {status?.version && (
             <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 10, textAlign: "center" }}>Versión {status.version}</p>

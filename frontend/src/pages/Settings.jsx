@@ -18,17 +18,39 @@ import IntelligencePanel from "../components/IntelligencePanel";
 import BackupPanel from "../components/BackupPanel";
 import HorizonRulesPanel from "../components/HorizonRulesPanel";
 
-const TABS = [
-  { id: "metodologia", label: "Gobierno metodológico", icon: "sliders" },
-  { id: "ia", label: "Integración con IA", icon: "spark" },
-  { id: "prompts", label: "Prompts de vigilancia", icon: "doc" },
-  { id: "programacion", label: "Tareas programadas", icon: "clock" },
-  { id: "fuentes", label: "Llaves de fuentes", icon: "globe" },
-  { id: "parametros_fuentes", label: "Parámetros de fuentes", icon: "layers" },
-  { id: "reglas_horizonte", label: "Reglas de horizonte", icon: "sliders" },
-  { id: "inteligencia", label: "Inteligencia", icon: "spark" },
-  { id: "copia_local", label: "Persistencia (Firebase)", icon: "save" },
+// Las pestañas, agrupadas por tema y en el orden en que se suelen configurar.
+const TAB_GROUPS = [
+  {
+    title: "Metodología",
+    tabs: [
+      { id: "metodologia", label: "Gobierno metodológico", icon: "sliders", about: "Criterios, pesos y umbrales con los que se filtra y se prioriza." },
+      { id: "reglas_horizonte", label: "Reglas de horizonte", icon: "filter", about: "Palabras que incluyen o descartan una señal leída de páginas web." },
+    ],
+  },
+  {
+    title: "Fuentes y vigilancia",
+    tabs: [
+      { id: "parametros_fuentes", label: "Parámetros de fuentes", icon: "layers", about: "Listas de la matriz, búsqueda web y páginas útiles de cada fuente." },
+      { id: "fuentes", label: "Llaves de fuentes", icon: "globe", about: "Llaves de acceso de los registros oficiales de nivel A." },
+      { id: "programacion", label: "Tareas programadas", icon: "clock", about: "Cuándo corren solas la vigilancia y el barrido de duplicados." },
+      { id: "prompts", label: "Prompts de vigilancia", icon: "doc", about: "Instrucciones que sigue la IA al capturar señales." },
+    ],
+  },
+  {
+    title: "Inteligencia artificial",
+    tabs: [
+      { id: "ia", label: "Integración con IA", icon: "spark", about: "Proveedor, llave, modelo y lectura de sitios con OCR." },
+      { id: "inteligencia", label: "Inteligencia", icon: "bulb", about: "Sugerencia de clasificación, base de conocimiento, vigencia de señales y analítica." },
+    ],
+  },
+  {
+    title: "Datos y respaldo",
+    tabs: [
+      { id: "copia_local", label: "Persistencia (Firebase)", icon: "save", about: "Copia de la base, puntos de recuperación y restauración." },
+    ],
+  },
 ];
+const TABS = TAB_GROUPS.flatMap((g) => g.tabs);
 
 export default function Settings() {
   const toast = useToast();
@@ -284,7 +306,7 @@ export default function Settings() {
       <PageHeader
         title="Configuración del sistema"
         titleHint={GLOSSARY.minimax}
-        subtitle="Gobierne la metodología, MiniMax (con OCR de sitios) y las llaves de las fuentes de nivel A."
+        subtitle="Metodología, fuentes y vigilancia, inteligencia artificial y respaldo de datos."
       />
 
       <div
@@ -329,17 +351,29 @@ export default function Settings() {
         />
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
-        {TABS.map((t) => (
-          <Button
-            key={t.id}
-            variant={tab === t.id ? "primary" : "secondary"}
-            onClick={() => setTab(t.id)}
-          >
-            <Icon name={t.icon} size={16} /> {t.label}
-          </Button>
+      <nav className="settings-menu" aria-label="Secciones de configuración">
+        {TAB_GROUPS.map((g) => (
+          <div key={g.title} className="settings-group">
+            <div className="settings-group-title">{g.title}</div>
+            <div className="settings-group-tabs">
+              {g.tabs.map((t) => (
+                <Button
+                  key={t.id}
+                  variant={tab === t.id ? "primary" : "secondary"}
+                  onClick={() => setTab(t.id)}
+                  title={t.about}
+                  aria-pressed={tab === t.id}
+                >
+                  <Icon name={t.icon} size={16} /> {t.label}
+                </Button>
+              ))}
+            </div>
+          </div>
         ))}
-      </div>
+      </nav>
+      <p className="settings-about" data-testid="settings-about">
+        <strong>{TABS.find((t) => t.id === tab)?.label}.</strong> {TABS.find((t) => t.id === tab)?.about}
+      </p>
 
       {tab === "metodologia" && <MethodologyPanel />}
 

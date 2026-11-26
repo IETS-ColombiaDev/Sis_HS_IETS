@@ -105,7 +105,7 @@ function CycleCard({
 
   return (
     <Card
-      style={isSelected ? { borderColor: "#6366F1", boxShadow: "0 0 0 3px #EEF2FF" } : undefined}
+      style={isSelected ? { borderColor: "#2563EB", boxShadow: "0 0 0 3px #EFF6FF" } : undefined}
     >
       <div className="cycle-card-head" data-testid={`cycle-card-${cycle.id}`}>
         <div>

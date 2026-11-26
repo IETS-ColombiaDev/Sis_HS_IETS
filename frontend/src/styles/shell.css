@@ -17,7 +17,7 @@
   left: 12px;
   top: -48px;
   z-index: 2000;
-  background: #4f46e5;
+  background: #1d4ed8;
   color: #fff;
   padding: 8px 14px;
   border-radius: 8px;
@@ -220,8 +220,8 @@
   right: 10px;
 }
 .users-kpi.is-active {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px #e0e7ff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px #dbeafe;
 }
 .users-kpi-value {
   font-size: 26px;
@@ -360,8 +360,8 @@
   text-align: left;
 }
 .role-card.is-selected {
-  border-color: #6366f1;
-  background: #eef2ff;
+  border-color: #2563eb;
+  background: #eff6ff;
 }
 .role-card input {
   margin-top: 3px;
