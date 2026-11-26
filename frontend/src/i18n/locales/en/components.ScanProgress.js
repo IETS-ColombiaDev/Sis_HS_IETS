@@ -1,5 +1,6 @@
 // src/components/ScanProgress.jsx — avance en vivo, informe de acceso, historial y barra flotante.
 export default {
+  "Buscadores web": "Web search engines",
   // Pasos de una fuente
   "Cola": "Queue",
   "Acceso": "Access",

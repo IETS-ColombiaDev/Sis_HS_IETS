@@ -308,11 +308,12 @@ def test_a_failed_source_says_every_route_it_tried(db, monkeypatch):
         return (403, "text/html", "", b"")
 
     monkeypatch.setattr(scraper, "fetch_url", fetch)
+    monkeypatch.setattr("app.web_search.search_for_source", lambda *a, **k: {"results": [], "steps": []})
     monkeypatch.setattr(scraper, "_unreachable_until", {})
     job = ingest_service.run_job(db, ingest_service.enqueue(db, [src], triggered_by="test")[0].id)
     assert "sitio: HTTP 403" in job.message and "Google News: sin respuesta" in job.message
     state = scan_progress.get(src.id)
-    assert [a["route"] for a in state["access_attempts"]] == ["sitio", "google_news"]
+    assert [a["route"] for a in state["access_attempts"]] == ["sitio", "google_news", "busqueda_web"]
 
 
 def test_access_report_lists_every_active_source_with_its_outcome(api, monkeypatch):
@@ -408,3 +409,43 @@ def test_an_engine_with_zero_rows_is_not_a_success_and_one_block_is_short(monkey
     assert [a["status"] for a in out["attempts"]] == ["bloqueado", "sin_resultados", "ok"] and out["engine"] == "bing"
     assert web_search.cooldown_status()["yahoo"] <= 2 * 60  # primer bloqueo: 2 min, no 20
     web_search.reset_cooldowns()
+
+
+def test_when_google_news_also_fails_the_search_engines_are_the_last_backup(db, monkeypatch):
+    """Render: el sitio da 403 y Google News 503. Entran los resultados de buscadores del dominio."""
+    from app import web_search
+
+    src = _source(db)
+    monkeypatch.setattr(scraper, "fetch_url", lambda url, timeout=None, retries=None: (503 if "news.google.com" in url else 403, "text/html", "", b""))
+    monkeypatch.setattr(scraper, "_unreachable_until", {})
+    monkeypatch.setattr(scraper, "_enrich_with_ai", lambda data, **kw: data)
+    host = scraper._host_of(src.url).removeprefix("www.")
+    seen = {}
+
+    def fake_search(_db, source, profile, context=""):
+        seen["web_search"] = profile.get("web_search")
+        return {"results": [
+            {"url": f"https://{host}/news/fda-approves-gene-therapy", "title": "FDA approves new gene therapy for hemophilia B", "snippet": "Phase 3 trial results."},
+            {"url": f"https://{host}/careers", "title": "Careers", "snippet": "Join our team"},
+        ], "steps": []}
+
+    monkeypatch.setattr(web_search, "search_for_source", fake_search)
+    log = scraper.scrape_source(db, src, triggered_by="test")
+    assert seen["web_search"] is True
+    assert log.status == "parcial"
+    assert "buscadores" in log.message.lower()
+    titles = [f.title for f in db.query(Finding).filter(Finding.source_id == src.id)]
+    assert titles == ["FDA approves new gene therapy for hemophilia B"]
+    assert scraper.access_route(src, scraper.search_index_url(src)) == "busqueda_web"
+
+
+def test_without_search_results_the_source_is_reported_as_not_reached(db, monkeypatch):
+    from app import web_search
+
+    src = _source(db)
+    monkeypatch.setattr(scraper, "fetch_url", lambda url, timeout=None, retries=None: (503 if "news.google.com" in url else 403, "text/html", "", b""))
+    monkeypatch.setattr(scraper, "_unreachable_until", {})
+    monkeypatch.setattr(web_search, "search_for_source", lambda *a, **k: {"results": [], "steps": []})
+    log = scraper.scrape_source(db, src, triggered_by="test")
+    assert log.status == "error"
+    assert "Google News: HTTP 503" in log.message and "buscadores web: sin resultados" in log.message

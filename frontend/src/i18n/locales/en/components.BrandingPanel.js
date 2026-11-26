@@ -1,0 +1,23 @@
+// src/components/BrandingPanel.jsx y src/branding/BrandingContext.jsx
+export default {
+  "Logo institucional": "Institutional logo",
+  "Formato no admitido. Use una imagen PNG, JPG o WebP.": "Unsupported format. Use a PNG, JPG or WebP image.",
+  "El logo supera el máximo de 400 KB. Reduzca la imagen e intente de nuevo.": "The logo exceeds the 400 KB limit. Reduce the image and try again.",
+  "Logo actualizado. Ya se ve en el menú, el ingreso y las pantallas públicas.": "Logo updated. It now shows in the menu, the sign-in screen and the public screens.",
+  "No se pudo cargar el logo": "Could not upload the logo",
+  "Logo quitado. Se muestra de nuevo el distintivo del sistema.": "Logo removed. The system mark is shown again.",
+  "No se pudo quitar el logo": "Could not remove the logo",
+  "Se muestra en el menú lateral, en la pantalla de ingreso y en las pantallas públicas. Si no hay logo se usa el distintivo del sistema.": "It is shown in the side menu, on the sign-in screen and on the public screens. If there is no logo, the system mark is used.",
+  "Arrastre aquí la imagen o elija un archivo": "Drag the image here or choose a file",
+  "PNG, JPG o WebP · máximo 400 KB · mejor con fondo transparente y forma cuadrada o apaisada": "PNG, JPG or WebP · 400 KB maximum · best with a transparent background and a square or landscape shape",
+  "Archivo del logo": "Logo file",
+  "Reemplazar logo": "Replace logo",
+  "Cargar logo": "Upload logo",
+  "Quitar logo": "Remove logo",
+  "El cambio queda en la <b>bitácora de auditoría</b> y aplica para todas las personas al recargar la página.": "The change is recorded in the <b>audit log</b> and applies to everyone when they reload the page.",
+  "Vista previa": "Preview",
+  "Menú lateral e ingreso (fondo azul)": "Side menu and sign-in (blue background)",
+  "Pantallas públicas (fondo claro)": "Public screens (light background)",
+  "Quitar el logo": "Remove the logo",
+  "Se quitará el logo cargado y volverá el distintivo del sistema en todas las pantallas.": "The uploaded logo will be removed and the system mark will return on every screen.",
+};

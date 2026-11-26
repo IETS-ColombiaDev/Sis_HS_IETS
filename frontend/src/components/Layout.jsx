@@ -10,6 +10,7 @@ import { GLOSSARY } from "../constants/glossary";
 import { NAV, TITLES, fold, sectionFor } from "../constants/navigation";
 import { t, tr, ts, intlLocale } from "../i18n";
 import LanguageSwitch from "./LanguageSwitch";
+import { BrandMark } from "../branding/BrandingContext";
 import Icon from "./Icon";
 import Tooltip from "./Tooltip";
 import InfoTip from "./InfoTip";
@@ -59,9 +60,7 @@ function Sidebar({ open, onClose }) {
       {open && <div onClick={onClose} className="sidebar-overlay" />}
       <aside className={`sidebar sb ${open ? "sidebar-open" : ""}`} aria-label={t("Menú de módulos")}>
         <div className="sb-brand">
-          <div className="sb-logo">
-            <Icon name="radar" size={22} strokeWidth={2} />
-          </div>
+          <BrandMark className="sb-logo" />
           <div>
             <div className="sb-name">{t("Escaneo de Horizonte")}</div>
             <div className="sb-org">IETS Colombia</div>

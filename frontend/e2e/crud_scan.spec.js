@@ -33,7 +33,8 @@ test.describe("vigilancia · evaluador tecnico", () => {
     await expectToast(page, "Vigilancia encolada: 1 fuente(s)");
     await expect(page.getByTestId("ingest-jobs")).toContainText(two.title);
 
-    // Vista previa de un enlace del propio servidor.
+    // Vista previa de un enlace del propio servidor (plegada: se abre primero).
+    await page.getByTestId("scan-preview-toggle").click();
     await page.getByLabel("URL a previsualizar").fill(selfUrl(baseURL, "/transparencia"));
     await page.getByRole("button", { name: "Previsualizar" }).click();
     await expect(page.getByTestId("link-preview")).toBeVisible({ timeout: 30_000 });

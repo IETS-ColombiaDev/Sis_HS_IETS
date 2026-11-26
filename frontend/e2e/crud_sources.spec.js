@@ -19,7 +19,8 @@ test.describe("fuentes · superadministrador", () => {
     const name = uid("Fuente rapida");
 
     // Alta rapida, con vista previa del propio servidor (sin internet).
-    await page.getByRole("button", { name: "Alta rápida" }).click();
+    await page.getByTestId("sources-add-menu").click();
+    await page.getByRole("menuitem", { name: /Alta rápida/ }).click();
     await page.locator("#quick-title").fill(name);
     await page.locator("#quick-url").fill(selfUrl(baseURL, `/expedientes?e2e=${encodeURIComponent(name)}`));
     await page.getByRole("button", { name: "Vista previa" }).click();
@@ -74,7 +75,8 @@ test.describe("fuentes · superadministrador", () => {
 
     // Una fuente sin senales si se elimina, con confirmacion.
     const tmp = uid("Fuente temporal");
-    await page.getByRole("button", { name: "Alta rápida" }).click();
+    await page.getByTestId("sources-add-menu").click();
+    await page.getByRole("menuitem", { name: /Alta rápida/ }).click();
     await page.locator("#quick-title").fill(tmp);
     await page.locator("#quick-url").fill(`https://temporal.example.org/${encodeURIComponent(tmp)}`);
     await page.getByRole("button", { name: "Registrar fuente" }).click();
@@ -95,7 +97,8 @@ test.describe("fuentes · superadministrador", () => {
     await settle(page);
 
     // URL invalida y URL repetida: mensajes claros.
-    await page.getByRole("button", { name: "Alta rápida" }).click();
+    await page.getByTestId("sources-add-menu").click();
+    await page.getByRole("menuitem", { name: /Alta rápida/ }).click();
     await page.locator("#quick-title").fill("Sin esquema");
     await page.locator("#quick-url").fill("ftp://algo");
     await page.getByRole("button", { name: "Registrar fuente" }).click();
@@ -106,7 +109,7 @@ test.describe("fuentes · superadministrador", () => {
     await page.getByRole("button", { name: "Cancelar" }).click();
 
     // Exportar CSV.
-    const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "CSV" }).click()]);
+    const [download] = await Promise.all([page.waitForEvent("download"), (async () => { await page.getByTestId("sources-download-menu").click(); await page.getByRole("menuitem", { name: /^CSV/ }).click(); })()]);
     expect(download.suggestedFilename()).toMatch(/\.csv$/);
 
     // Vista de tabla con las acciones por fila.
@@ -122,7 +125,8 @@ test.describe("fuentes · superadministrador", () => {
 
     // Recargar el catalogo pide confirmacion.
     await page.getByRole("button", { name: "Catálogo", exact: true }).click();
-    await page.getByRole("button", { name: "Recargar catálogo" }).click();
+    await page.getByTestId("sources-maintenance-menu").click();
+    await page.getByRole("menuitem", { name: /Recargar catálogo/ }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Recargar" }).click();
     await expectToast(page, "actualizadas");
     expectClean(errors);
@@ -136,7 +140,9 @@ test.describe("fuentes · permisos", () => {
       await loginAs(page, role, "/fuentes");
       await settle(page);
       await expect(page.getByTestId("sources-readonly")).toBeVisible();
+      await page.getByTestId("sources-add-menu").click();
       await expect(disabledHint(page, "source:write").first()).toBeVisible();
+      await page.keyboard.press("Escape");
       await expect(page.locator(".registry-card").first().getByRole("button", { name: "Editar" })).toHaveCount(0);
       const api = await apiAs(page.request, role);
       await api.post("/sources/quick", { title: "No", url: "https://no.example.org" }, 403);
@@ -147,7 +153,8 @@ test.describe("fuentes · permisos", () => {
   test("evaluador clinico puede dar de alta y editar", async ({ page }) => {
     await loginAs(page, "evaluador_clinico", "/fuentes");
     await settle(page);
-    await expect(page.getByRole("button", { name: "Alta rápida" })).toBeEnabled();
+    await page.getByTestId("sources-add-menu").click();
+    await expect(page.getByRole("menuitem", { name: /Alta rápida/ })).not.toHaveAttribute("aria-disabled", "true");
     await expect(page.getByTestId("sources-readonly")).toHaveCount(0);
   });
 });

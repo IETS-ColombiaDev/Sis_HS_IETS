@@ -1,10 +1,10 @@
 """Estado del sistema y version de estado para tiempo real."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
-from .. import __version__, ai_service, firebase_db
+from .. import __version__, ai_service, branding, firebase_db
 from ..config import settings
 from ..database import get_db
 from ..deps import get_current_user
@@ -42,6 +42,13 @@ def system_status():
         firebase_db_synced=bool(fb.get("synced")),
         firebase_db_name=str(fb.get("database") or ""),
     )
+
+
+@router.get("/branding")
+def get_branding(response: Response, db: Session = Depends(get_db)):
+    """Logo institucional. Es público: lo usan el ingreso y las pantallas públicas."""
+    response.headers["Cache-Control"] = "no-cache"
+    return branding.get_logo(db)
 
 
 @router.get("/realtime/version", response_model=StateVersionOut)

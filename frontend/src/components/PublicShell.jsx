@@ -1,6 +1,7 @@
 import { Link, NavLink } from "react-router-dom";
 import Icon from "./Icon";
 import LanguageSwitch from "./LanguageSwitch";
+import { BrandMark } from "../branding/BrandingContext";
 import { t } from "../i18n";
 
 /**
@@ -12,9 +13,7 @@ export default function PublicShell({ kicker, title, lead, children, wide }) {
     <div className="public-shell">
       <header className="public-shell-bar">
         <Link to="/transparencia" className="public-shell-brand">
-          <span className="public-shell-mark">
-            <Icon name="radar" size={20} />
-          </span>
+          <BrandMark className="public-shell-mark" iconSize={20} />
           <span>
             <strong>{t("Escaneo de Horizonte")}</strong>
             <em>IETS Colombia</em>

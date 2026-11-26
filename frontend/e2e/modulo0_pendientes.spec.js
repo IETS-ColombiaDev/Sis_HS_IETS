@@ -39,8 +39,9 @@ test("el catálogo y el informe de sondas se descargan en Excel", async ({ page 
   const errors = watchErrors(page);
   await loginAs(page, "superadmin", "/fuentes");
   await settle(page);
-  const [catalog] = await Promise.all([page.waitForEvent("download"), page.getByTestId("sources-export-xlsx").click()]);
+  const [catalog] = await Promise.all([page.waitForEvent("download"), (async () => { await page.getByTestId("sources-download-menu").click(); await page.getByTestId("sources-export-xlsx").click(); })()]);
   expect(catalog.suggestedFilename()).toMatch(/^catalogo_fuentes_iets_\d{4}-\d{2}-\d{2}\.xlsx$/);
+  await page.getByTestId("sources-maintenance-menu").click();
   await expect(page.getByTestId("sources-probe-all")).toBeVisible();
 
   await page.getByText("Salud de fuentes", { exact: true }).first().click();

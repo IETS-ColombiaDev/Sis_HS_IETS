@@ -83,6 +83,8 @@ export default function Scan() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [preview, setPreview] = useState(null);
   const [previewing, setPreviewing] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [queueOpen, setQueueOpen] = useState(false);
   const firstLoad = useRef(true);
   // El avance lo sigue ScanContext en toda la aplicación (no se pierde al cambiar de módulo).
   const { progress, refresh: loadProgress, lastFetch } = useScan();
@@ -305,11 +307,11 @@ export default function Scan() {
         titleHint={GLOSSARY.vigilancia}
         purpose={t("Fase 1 · Identificación: el rastreador entra a cada fuente, sigue hasta las fichas internas y, si MiniMax está activo, extrae las señales.")}
         actions={
-          <div className="fb-toolbar">
-            <Button variant="secondary" onClick={() => navigate("/fuentes")}>
-              <Icon name="globe" size={16} /> {t("Inventario")}
-            </Button>
-            <div className="run-with-caption">
+          <div className="scan-hero-actions">
+            <div className="scan-hero-buttons">
+              <Button variant="secondary" onClick={() => navigate("/fuentes")}>
+                <Icon name="globe" size={16} /> {t("Inventario")}
+              </Button>
               <HintButton
                 size="lg"
                 onClick={() => runScan(null)}
@@ -320,8 +322,8 @@ export default function Scan() {
               >
                 <Icon name="radar" size={17} /> {t("Ejecutar vigilancia ({n})", { n: enabled.length })}
               </HintButton>
-              <LastRunCaption history={history} active={Boolean(progress?.active)} />
             </div>
+            <LastRunCaption history={history} active={Boolean(progress?.active)} />
           </div>
         }
       />
@@ -369,22 +371,22 @@ export default function Scan() {
 
       <ScanHistory history={history} onReload={loadHistory} />
 
-      <div className="fb-schedule-grid" style={{ marginBottom: 16 }}>
-        <Card padding={18} className="fb-schedule-card">
-          <h4>
+      <Card padding={0} className="scan-ops" style={{ marginBottom: 16 }}>
+        <div className="scan-ops-head">
+          <div className="scan-ops-title">
             <Icon name="clock" size={16} /> {t("Vigilancia programada")}
             <InfoTip text={GLOSSARY.fb_programada} label={t("Qué es la vigilancia programada")} />
-          </h4>
+          </div>
           {scanTask ? (
             <>
-              <dl className="fb-schedule-meta" data-testid="scan-schedule">
-                <dt>{t("Estado")}</dt>
-                <dd>{scanTask.enabled ? <Badge tone="ok">{t("Activa")}</Badge> : <Badge tone="viewer">{t("Apagada")}</Badge>}</dd>
-                <dt>{t("Cada")}</dt>
-                <dd>{scanTask.interval_hours} h <InfoTip text={GLOSSARY.fb_intervalo_vigilancia} /></dd>
-                <dt>{t("Próxima")}</dt>
-                <dd>{scanTask.enabled ? nextRun(scanTask.next_run_at) : "-"}</dd>
-                <dt>{t("Última")}</dt>
+              <dl className="scan-sched-meta" data-testid="scan-schedule">
+                <div className="scan-sched-pair"><dt>{t("Estado")}</dt>
+                <dd>{scanTask.enabled ? <Badge tone="ok">{t("Activa")}</Badge> : <Badge tone="viewer">{t("Apagada")}</Badge>}</dd></div>
+                <div className="scan-sched-pair"><dt>{t("Cada")}</dt>
+                <dd>{scanTask.interval_hours} h <InfoTip text={GLOSSARY.fb_intervalo_vigilancia} /></dd></div>
+                <div className="scan-sched-pair"><dt>{t("Próxima")}</dt>
+                <dd>{scanTask.enabled ? nextRun(scanTask.next_run_at) : "-"}</dd></div>
+                <div className="scan-sched-pair"><dt>{t("Última")}</dt>
                 <dd>
                   {scanTask.last_run ? (
                     <>
@@ -394,12 +396,11 @@ export default function Scan() {
                   ) : (
                     t("Aún no ha corrido")
                   )}
-                </dd>
-                <dt>Worker <InfoTip text={GLOSSARY.fb_worker} /></dt>
-                <dd>{schedule.worker_running ? t("En marcha") : schedule.worker_enabled ? t("Detenido") : t("Deshabilitado en este servidor")}</dd>
+                </dd></div>
+                <div className="scan-sched-pair"><dt>Worker <InfoTip text={GLOSSARY.fb_worker} /></dt>
+                <dd>{schedule.worker_running ? t("En marcha") : schedule.worker_enabled ? t("Detenido") : t("Deshabilitado en este servidor")}</dd></div>
               </dl>
-              {scanTask.last_run?.message && <p style={{ fontSize: 12.5, color: "#64748B", margin: "0 0 10px" }}>{ts(scanTask.last_run.message)}</p>}
-              <div className="fb-toolbar">
+              <div className="scan-sched-actions">
                 <HintButton
                   size="sm"
                   variant="outline"
@@ -424,37 +425,24 @@ export default function Scan() {
               </div>
             </>
           ) : (
-            <p style={{ fontSize: 13, color: "#64748B" }}>{t("No se pudo leer la programación.")}</p>
+            <p style={{ fontSize: 13, color: "#64748B", margin: 0 }}>{t("No se pudo leer la programación.")}</p>
           )}
-        </Card>
+        </div>
+        {scanTask?.last_run?.message && <p className="scan-ops-note">{ts(scanTask.last_run.message)}</p>}
 
-        <Card padding={18} className="fb-schedule-card">
-          <h4>
-            <Icon name="eye" size={16} /> {t("Vista previa de un enlace")}
-            <InfoTip text={GLOSSARY.fb_vista_previa} label={t("Qué es la vista previa")} />
-          </h4>
-          <form onSubmit={runPreview} className="fb-inline-row" style={{ marginTop: 10 }}>
-            <Input id="preview-url" placeholder="https://..." aria-label={t("URL a previsualizar")} value={previewUrl} onChange={(e) => setPreviewUrl(e.target.value)} style={{ marginBottom: 0 }} />
-            <div style={{ flex: "0 0 auto", marginBottom: 14 }}>
-              <HintButton type="submit" variant="outline" loading={previewing} disabled={!canScan} hint={GLOSSARY.fb_vista_previa} disabledHint={noScan}>
-                {t("Previsualizar")}
-              </HintButton>
+        <details className="scan-ops-fold" open={queueOpen || jobs.length > 0} onToggle={(e) => setQueueOpen(e.currentTarget.open)}>
+          <summary data-testid="scan-queue-toggle">
+            <Icon name="list" size={15} />
+            <span className="scan-ops-fold-title">{t("Cola de ingesta")}</span>
+            <InfoTip text={GLOSSARY.fb_cola} label={t("Qué es la cola de ingesta")} />
+            <span className="scan-ops-fold-meta">{jobs.length === 0 ? t("vacía") : t("{n} trabajo(s)", { n: jobs.length })}</span>
+            <span className="scan-ops-chevron" aria-hidden="true"><Icon name="chevron" size={15} /></span>
+          </summary>
+          <div className="scan-ops-fold-body">
+            <div className="scan-ops-fold-hint">
+              <span>{t("La extracción no corre en el hilo de la petición: el worker toma los trabajos en orden.")}</span>
+              <Button size="sm" variant="ghost" onClick={load}>{t("Actualizar")}</Button>
             </div>
-          </form>
-          <LinkPreview data={preview} />
-        </Card>
-      </div>
-
-      <Card
-        title={
-          <span className="term-label">
-            {t("Cola de ingesta")} <InfoTip text={GLOSSARY.fb_cola} label={t("Qué es la cola de ingesta")} />
-          </span>
-        }
-        actions={<Button size="sm" variant="ghost" onClick={load}>{t("Actualizar")}</Button>}
-        hint={t("La extracción no corre en el hilo de la petición: el worker toma los trabajos en orden.")}
-        style={{ marginBottom: 16 }}
-      >
         {jobs.length === 0 ? (
           <p style={{ fontSize: 13, color: "#94A3B8", margin: 0 }}>{t("La cola está vacía. Ejecute la vigilancia o espere a la programada.")}</p>
         ) : (
@@ -470,6 +458,29 @@ export default function Scan() {
             ))}
           </div>
         )}
+          </div>
+        </details>
+
+        <details className="scan-ops-fold" open={previewOpen} onToggle={(e) => setPreviewOpen(e.currentTarget.open)}>
+          <summary data-testid="scan-preview-toggle">
+            <Icon name="eye" size={15} />
+            <span className="scan-ops-fold-title">{t("Vista previa de un enlace")}</span>
+            <InfoTip text={GLOSSARY.fb_vista_previa} label={t("Qué es la vista previa")} />
+            <span className="scan-ops-fold-meta">{t("probar una URL sin guardar nada")}</span>
+            <span className="scan-ops-chevron" aria-hidden="true"><Icon name="chevron" size={15} /></span>
+          </summary>
+          <div className="scan-ops-fold-body">
+          <form onSubmit={runPreview} className="fb-inline-row" style={{ marginTop: 10 }}>
+            <Input id="preview-url" placeholder="https://..." aria-label={t("URL a previsualizar")} value={previewUrl} onChange={(e) => setPreviewUrl(e.target.value)} style={{ marginBottom: 0 }} />
+            <div style={{ flex: "0 0 auto", marginBottom: 14 }}>
+              <HintButton type="submit" variant="outline" loading={previewing} disabled={!canScan} hint={GLOSSARY.fb_vista_previa} disabledHint={noScan}>
+                {t("Previsualizar")}
+              </HintButton>
+            </div>
+          </form>
+          <LinkPreview data={preview} />
+          </div>
+        </details>
       </Card>
 
       {running && (
