@@ -4,7 +4,8 @@ import Button from "./Button";
 import HintButton from "./HintButton";
 import Icon from "./Icon";
 import { Card } from "./Card";
-import { elapsedSince, formatClock, formatDuration, formatRange } from "../scan/format";
+import { Spinner } from "./Spinner";
+import { elapsedSince, formatClock, formatDateTime, formatDuration, formatRange, formatSpan } from "../scan/format";
 
 /**
  * Estado en vivo de la vigilancia: barra global y, por fuente, en qué paso va
@@ -45,7 +46,16 @@ const STAGE_TONE = {
   cancelada: "viewer",
 };
 
-const VIA_TONE = { google_news: "warning", rss_oficial: "warning", ruta_matriz: "info", sitio: "success", api: "success", pdf: "info" };
+const VIA_TONE = {
+  google_news: "warning",
+  rss_oficial: "warning",
+  indice_pubmed: "warning",
+  ruta_matriz: "info",
+  sitio: "success",
+  navegador: "success",
+  api: "success",
+  pdf: "info",
+};
 
 /** Paso actual y si falló, a partir de la etapa del backend. */
 export function stepState(row) {
@@ -144,7 +154,15 @@ export function SourceProgress({ row }) {
 const ENGINE_LABEL = { base_conocimiento: "base de conocimiento", sitemap: "mapa del sitio", brave_api: "Brave", searxng: "SearXNG" };
 const engineLabel = (e) => ENGINE_LABEL[e] || e;
 
-const ROUTE_LABEL = { sitio: "Sitio", ruta_matriz: "Ruta de la matriz", rss_oficial: "RSS oficial", google_news: "Google News", api: "API" };
+const ROUTE_LABEL = {
+  sitio: "Sitio",
+  navegador: "Sitio (cliente compatible con navegador)",
+  ruta_matriz: "Ruta de la matriz",
+  rss_oficial: "RSS oficial",
+  indice_pubmed: "Índice de PubMed",
+  google_news: "Google News",
+  api: "API",
+};
 
 /** Línea corta: qué buscó en la web y qué hizo la IA. */
 export function SearchAndAiLine({ search, ai }) {
@@ -271,11 +289,18 @@ function csvCell(v) {
   return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-/** Informe de transparencia: una fila por fuente activa con su último desenlace. */
-export function AccessReport({ report, onReload }) {
+/**
+ * Informe de transparencia: una fila por fuente activa con su último desenlace.
+ * Va plegado para no ocupar la pantalla: la cabecera resume los desenlaces y,
+ * durante una corrida, avisa que se está actualizando en tiempo real.
+ */
+export function AccessReport({ report, onReload, live = false, updatedAt = null }) {
   const [filter, setFilter] = useState("");
   const [openId, setOpenId] = useState(null);
+  const [open, setOpen] = useState(false);
   if (!report) return null;
+  const c = report.counts || {};
+  const entered = (c.entro_directo || 0) + (c.entro_respaldo || 0) + (c.entro_sin_senales || 0);
   const rows = report.sources.filter((r) => !filter || r.outcome === filter);
   const download = () => {
     const head = ["Fuente", "URL", "Resultado", "Ruta", "HTTP", "Páginas", "Búsqueda web", "IA", "Detectadas", "Nuevas", "Detalle", "Fecha"];
@@ -302,13 +327,41 @@ export function AccessReport({ report, onReload }) {
     URL.revokeObjectURL(url);
   };
   return (
-    <Card padding={16} className="access-report" style={{ marginBottom: 16 }} data-testid="access-report">
+    <Card padding={0} className={`access-report fold${open ? " fold--open" : ""}`} style={{ marginBottom: 14 }} data-testid="access-report">
+      <button
+        type="button"
+        className="fold-head"
+        aria-expanded={open}
+        aria-controls="access-report-body"
+        onClick={() => setOpen((v) => !v)}
+        data-testid="access-report-toggle"
+      >
+        <span className={`fold-icon${live ? " fold-icon--live" : ""}`} aria-hidden="true">
+          {live ? <Spinner size={16} /> : <Icon name="doc" size={16} />}
+        </span>
+        <span className="fold-text">
+          <span className="fold-title">Informe de acceso por fuente</span>
+          <span className="fold-sub">
+            {live ? "Ver informe en tiempo real" : open ? "Ocultar el informe" : "Ver el informe"}
+            {" · "}
+            {entered} de {report.total} fuente(s) entraron
+            {c.no_entro ? ` · ${c.no_entro} no pudo entrar` : ""}
+            {c.sin_ejecutar ? ` · ${c.sin_ejecutar} sin ejecutar` : ""}
+            {updatedAt ? ` · actualizado ${formatClock(updatedAt)}` : ""}
+          </span>
+        </span>
+        {c.no_entro > 0 && <Badge tone="danger">{String(c.no_entro)} sin acceso</Badge>}
+        {live && <Badge tone="info">En vivo</Badge>}
+        <span className="fold-chevron" aria-hidden="true">
+          <Icon name="chevron" size={18} />
+        </span>
+      </button>
+      {open && (
+      <div className="fold-body" id="access-report-body">
       <div className="scan-run-head">
-        <div>
-          <div className="scan-run-title">Informe de acceso por fuente</div>
-          <div className="scan-run-sub">
-            Último resultado real de cada una de las {report.total} fuentes con ingesta activa: si entró, por dónde, qué buscó y qué encontró.
-          </div>
+        <div className="scan-run-sub" style={{ marginTop: 0 }}>
+          Último resultado real de cada una de las {report.total} fuentes con ingesta activa: si entró, por dónde, qué buscó y qué encontró.
+          {live ? " Se actualiza solo cada 15 segundos mientras corre la vigilancia." : ""}
         </div>
         <div className="fb-toolbar">
           <Button size="sm" variant="ghost" onClick={onReload}>Actualizar</Button>
@@ -316,6 +369,17 @@ export function AccessReport({ report, onReload }) {
         </div>
       </div>
       <SearchHealth health={report.search_health} />
+      {report.access_routes && (
+        <div className="search-health" data-testid="access-routes">
+          <Icon name="globe" size={14} /> Rutas de acceso: sitio de la fuente
+          {report.access_routes.browser_enabled
+            ? " → cliente compatible con navegador (encendido)"
+            : report.access_routes.browser_allowed && report.access_routes.browser_installed
+              ? " → cliente compatible con navegador (apagado; se enciende en Configuración › Parámetros de fuentes)"
+              : " → cliente compatible con navegador (no disponible en este servidor)"}
+          {" → rutas de la matriz → RSS oficial → índice de la revista en PubMed → Google News."}
+        </div>
+      )}
       <div className="scan-run-chips" style={{ marginTop: 10 }}>
         {Object.entries(report.labels).map(([key, label]) => (
           <button
@@ -386,6 +450,162 @@ export function AccessReport({ report, onReload }) {
           </tbody>
         </table>
       </div>
+      </div>
+      )}
+    </Card>
+  );
+}
+
+const HISTORY_STATUS = {
+  en_curso: { label: "En curso", tone: "info" },
+  ok: { label: "Completa", tone: "success" },
+  parcial: { label: "Con novedades", tone: "warning" },
+  error: { label: "Con error", tone: "danger" },
+};
+const HISTORY_PAGE = 5;
+
+/** Línea bajo el botón de ejecutar: cuándo terminó la última vigilancia. */
+export function LastRunCaption({ history, active }) {
+  if (active) {
+    return (
+      <span className="last-run-caption" data-testid="last-run-caption">
+        Vigilancia en curso…
+      </span>
+    );
+  }
+  const last = history?.last_finished;
+  return (
+    <span className="last-run-caption" data-testid="last-run-caption">
+      {last
+        ? `Última realizada: ${formatDateTime(last.finished_at || last.started_at)} · duró ${formatSpan(last.duration_seconds)}`
+        : "Última realizada: aún no hay vigilancias registradas"}
+    </span>
+  );
+}
+
+/** Historial de vigilancias: fecha y hora, duración, quién la lanzó y el resumen de cada corrida. */
+export function ScanHistory({ history, onReload }) {
+  const [openId, setOpenId] = useState(null);
+  const [all, setAll] = useState(false);
+  if (!history) return null;
+  const runs = history.runs || [];
+  const shown = all ? runs : runs.slice(0, HISTORY_PAGE);
+  return (
+    <Card padding={16} className="scan-history" style={{ marginBottom: 14 }} data-testid="scan-history">
+      <div className="scan-run-head">
+        <div>
+          <div className="scan-run-title">
+            <Icon name="clock" size={16} /> Historial de vigilancias
+          </div>
+          <div className="scan-run-sub">
+            Cada corrida con su fecha y hora, cuánto tardó, quién la lanzó y qué dejó. Pulse una fila para ver el resumen.
+          </div>
+        </div>
+        <Button size="sm" variant="ghost" onClick={onReload}>Actualizar</Button>
+      </div>
+      {runs.length === 0 ? (
+        <p className="scan-history-empty">
+          Aún no hay vigilancias registradas. El historial empieza con la próxima corrida, manual o programada.
+        </p>
+      ) : (
+        <div className="access-report-table-wrap" style={{ maxHeight: "none" }}>
+          <table className="access-report-table scan-history-table">
+            <thead>
+              <tr>
+                <th>Inicio</th>
+                <th>Duración</th>
+                <th>Estado</th>
+                <th>Alcance</th>
+                <th>Fuentes</th>
+                <th>Acceso</th>
+                <th>Señales</th>
+                <th>Lanzada por</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((run) => {
+                const st = HISTORY_STATUS[run.status] || { label: run.status, tone: "viewer" };
+                const o = run.outcomes || {};
+                const entered = (o.entro_directo || 0) + (o.entro_respaldo || 0) + (o.entro_sin_senales || 0) + (o.fallo_despues || 0);
+                const isOpen = openId === run.id;
+                return (
+                  <Fragment key={run.id}>
+                    <tr
+                      className={`scan-history-row${isOpen ? " scan-history-row--open" : ""}`}
+                      onClick={() => setOpenId(isOpen ? null : run.id)}
+                      data-testid={`scan-history-row-${run.id}`}
+                    >
+                      <td>
+                        <strong>{formatDateTime(run.started_at)}</strong>
+                        <div className="muted">
+                          {run.finished_at ? `terminó ${formatDateTime(run.finished_at)}` : "sin terminar"}
+                        </div>
+                      </td>
+                      <td>{formatSpan(run.duration_seconds)}{run.status === "en_curso" ? " (va)" : ""}</td>
+                      <td><Badge tone={st.tone}>{st.label}</Badge></td>
+                      <td>
+                        {run.scope_label}
+                        <div className="muted">{run.origin === "manual" ? "Manual" : "Programada"}</div>
+                      </td>
+                      <td>
+                        {run.sources_total}
+                        {run.sources_pending ? <div className="muted">{run.sources_pending} pendiente(s)</div> : null}
+                      </td>
+                      <td>
+                        {entered} entraron
+                        {o.no_entro ? <div className="txt-danger">{o.no_entro} sin acceso</div> : null}
+                      </td>
+                      <td>
+                        <strong className={run.items_new > 0 ? "txt-ok" : ""}>+{run.items_new}</strong> nuevas
+                        <div className="muted">{run.items_found} detectadas</div>
+                      </td>
+                      <td className="scan-history-who">
+                        {run.origin === "manual" ? run.triggered_by : "Programador"}
+                        <button type="button" className="scan-log-link" aria-expanded={isOpen} onClick={(e) => { e.stopPropagation(); setOpenId(isOpen ? null : run.id); }}>
+                          {isOpen ? "Ocultar resumen" : "Ver resumen"}
+                        </button>
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr className="scan-history-detail">
+                        <td colSpan={8}>
+                          <p>{run.message}</p>
+                          <ul className="scan-history-facts">
+                            <li><strong>{o.entro_directo || 0}</strong> entraron a la fuente</li>
+                            <li><strong>{o.entro_respaldo || 0}</strong> por ruta de respaldo</li>
+                            <li><strong>{o.entro_sin_senales || 0}</strong> entraron sin señales</li>
+                            <li><strong>{o.fallo_despues || 0}</strong> fallaron al extraer</li>
+                            <li><strong>{o.no_entro || 0}</strong> no pudieron entrar</li>
+                            <li><strong>{run.counts?.cancelado || 0}</strong> canceladas</li>
+                          </ul>
+                          {run.failed?.length > 0 && (
+                            <>
+                              <h5>Fuentes con problema en esta corrida</h5>
+                              <ul className="scan-history-failed">
+                                {run.failed.map((f) => (
+                                  <li key={f.source_id}>
+                                    <strong>{f.title}</strong>
+                                    <span className="muted"> · {f.message || "Sin detalle"}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {runs.length > HISTORY_PAGE && (
+        <button type="button" className="scan-log-link" style={{ marginTop: 8 }} onClick={() => setAll((v) => !v)}>
+          {all ? "Ver solo las últimas" : `Ver las ${runs.length} vigilancias registradas`}
+        </button>
+      )}
     </Card>
   );
 }

@@ -8,6 +8,7 @@ import Badge from "./Badge";
 import Icon from "./Icon";
 import { Input, Select, Textarea } from "./Field";
 import SignalWindowPanel from "./SignalWindowPanel";
+import ModelCard from "./ModelCard";
 import { METHOD } from "./ClassificationSuggestion";
 
 const pct = (v) => (v === null || v === undefined ? "-" : `${Math.round(v * 100)} %`);
@@ -151,6 +152,8 @@ export default function IntelligencePanel({ toast }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }} data-testid="intelligence-panel">
+      <ModelCard card={data.model_card} trace={data.trace} />
+
       <Card>
         <SectionTitle
           hint="Memoria del sistema: cada señal capturada con su origen y con lo que el equipo decidió sobre ella. De aquí aprende la sugerencia de clasificación."

@@ -106,3 +106,16 @@ def _hermetic_web_search(monkeypatch):
     from app import sitemap_search
 
     monkeypatch.setattr(sitemap_search, "_get", lambda client, url: "")
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_browser_fetch(monkeypatch):
+    """La ruta de navegador no sale a la red en las pruebas (la enciende la prueba que la cubre)."""
+    from app import access_routes
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "browser_fetch_enabled", False)
+    access_routes.configure(False)
+    access_routes.forget_hosts()
+    yield
+    access_routes.forget_hosts()

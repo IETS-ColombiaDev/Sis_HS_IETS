@@ -24,3 +24,6 @@ reportlab==4.2.5
 # DATABASE_URL de produccion: postgresql+psycopg://usuario:clave@host:5432/base
 alembic==1.19.2
 psycopg[binary]==3.3.5
+# Vigilancia: cliente compatible con navegador para sitios publicos que rechazan
+# a un cliente HTTP de servidor (403/406). Opcional: sin el, se usa solo httpx.
+curl_cffi==0.17.0

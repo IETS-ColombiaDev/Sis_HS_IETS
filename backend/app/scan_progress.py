@@ -52,6 +52,8 @@ STAGE_LABELS = {
 # Ruta por la que se obtuvo el contenido.
 ACCESS_VIA_LABELS = {
     "sitio": "Sitio de la fuente",
+    "navegador": "Sitio de la fuente, con cliente compatible con navegador",
+    "indice_pubmed": "Índice oficial de la revista en PubMed (el sitio no respondió)",
     "ruta_matriz": "URL de entrada de la matriz EH",
     "rss_oficial": "RSS oficial del sitio (la portada no respondió)",
     "google_news": "RSS de Google News (el sitio no respondió)",
@@ -185,7 +187,7 @@ def attempt(url: str, status: str, detail: str = "", *, route: str = "") -> None
             row["access_attempts"].append(
                 {"route": route, "url": (url or "")[:300], "status": status, "detail": (detail or "")[:160]}
             )
-            del row["access_attempts"][:-8]
+            del row["access_attempts"][:-12]
     except Exception:  # noqa: BLE001
         pass
 
@@ -278,6 +280,38 @@ def _copy(row: dict) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+#  Desenlace del acceso
+# --------------------------------------------------------------------------- #
+OUTCOME_LABELS = {
+    "entro_directo": "Entró a la fuente",
+    "entro_respaldo": "Entró por una ruta de respaldo",
+    "entro_sin_senales": "Entró, pero no encontró señales",
+    "no_entro": "No pudo entrar",
+    "fallo_despues": "Entró, pero la extracción falló",
+    "en_curso": "En curso",
+    "sin_ejecutar": "Sin ejecutar",
+}
+BACKUP_ROUTES = ("google_news", "rss_oficial", "indice_pubmed")
+
+
+def access_outcome(entry: dict | None, job_status: str = "") -> str:
+    """Clasifica el ultimo resultado guardado de una fuente."""
+    if job_status in ("pendiente", "ejecutando"):
+        return "en_curso"
+    if not entry:
+        return "sin_ejecutar"
+    if not entry.get("accessed"):
+        return "no_entro"
+    if entry.get("job_status") == "error":
+        return "fallo_despues"
+    if not (entry.get("items_found") or 0):
+        return "entro_sin_senales"
+    if entry.get("access_via") in BACKUP_ROUTES:
+        return "entro_respaldo"
+    return "entro_directo"
+
+
+# --------------------------------------------------------------------------- #
 #  Informe persistente: ultimo resultado de cada fuente
 # --------------------------------------------------------------------------- #
 REPORT_KEY = "cfg.scan.access_report"
@@ -297,7 +331,8 @@ def _summary(row: dict, job) -> dict:
         "pages_visited": int(row.get("pages_visited") or 0),
         "items_found": int(getattr(job, "items_found", 0) or row.get("items_found") or 0),
         "items_new": int(getattr(job, "items_new", 0) or row.get("items_new") or 0),
-        "access_attempts": list(row.get("access_attempts") or [])[-8:],
+        "access_attempts": list(row.get("access_attempts") or [])[-12:],
+        "started_at": row.get("started_at") or "",
         "search": dict(row.get("search") or {}),
         "ai": dict(row.get("ai") or {}),
         "message": (getattr(job, "message", "") or "")[:300],

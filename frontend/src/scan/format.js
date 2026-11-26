@@ -33,3 +33,21 @@ export function elapsedSince(iso) {
   if (!iso) return null;
   return Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
 }
+
+/** Fecha y hora completas en hora local: "25 nov 2026, 7:23 p. m.". */
+export function formatDateTime(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleString("es-CO", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+/** Duración exacta de una corrida: "45 s", "12 min 30 s", "1 h 05 min". */
+export function formatSpan(seconds) {
+  if (seconds == null || Number.isNaN(seconds)) return "-";
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min ${String(s % 60).padStart(2, "0")} s`;
+  return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min`;
+}

@@ -73,6 +73,14 @@ def run_ingest(
             detail="No hay fuentes habilitadas para ingerir.",
         )
     jobs = enqueue(db, sources, triggered_by=user.email, origin="manual")
+    from .. import scheduler_service
+
+    scheduler_service.record_manual_scan(
+        db,
+        jobs,
+        triggered_by=user.email,
+        scope=scheduler_service.SCOPE_SELECTION if payload.source_ids else scheduler_service.SCOPE_ALL,
+    )
     processed = 0
     if payload.process_now:
         for job in jobs:
@@ -297,31 +305,19 @@ def ingest_progress(
     }
 
 
-OUTCOME_LABELS = {
-    "entro_directo": "Entró a la fuente",
-    "entro_respaldo": "Entró por una ruta de respaldo",
-    "entro_sin_senales": "Entró, pero no encontró señales",
-    "no_entro": "No pudo entrar",
-    "fallo_despues": "Entró, pero la extracción falló",
-    "en_curso": "En curso",
-    "sin_ejecutar": "Sin ejecutar",
-}
+from ..scan_progress import OUTCOME_LABELS, access_outcome  # noqa: E402 - se reexportan para las pruebas
 
 
-def access_outcome(entry: dict | None, job_status: str = "") -> str:
-    if job_status in ("pendiente", "ejecutando"):
-        return "en_curso"
-    if not entry:
-        return "sin_ejecutar"
-    if not entry.get("accessed"):
-        return "no_entro"
-    if entry.get("job_status") == "error":
-        return "fallo_despues"
-    if not (entry.get("items_found") or 0):
-        return "entro_sin_senales"
-    if entry.get("access_via") in ("google_news", "rss_oficial"):
-        return "entro_respaldo"
-    return "entro_directo"
+@router.get("/runs")
+def scan_runs(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    limit: int = Query(30, ge=1, le=200),
+):
+    """Historial de vigilancias: fecha y hora de inicio y de fin, duracion, quien la lanzo y su resumen."""
+    from .. import scheduler_service
+
+    return scheduler_service.scan_history(db, limit=limit)
 
 
 @router.get("/access-report")
@@ -376,7 +372,16 @@ def access_report(
         "total": len(rows),
         "sources": rows,
         "search_health": _search_health(db, rows),
+        "access_routes": _access_routes(db),
     }
+
+
+def _access_routes(db: Session) -> dict:
+    """Estado de las rutas de acceso adicionales (cliente compatible con navegador, indice de PubMed)."""
+    from .. import access_routes
+
+    access_routes.configure_from_db(db)
+    return access_routes.status()
 
 
 def _search_health(db: Session, rows: list[dict]) -> dict:

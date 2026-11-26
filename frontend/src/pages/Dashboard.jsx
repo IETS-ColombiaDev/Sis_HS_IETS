@@ -18,6 +18,7 @@ import { useScreeningThreshold } from "../scan/useScreeningThreshold";
 import { GLOSSARY } from "../constants/glossary";
 import InfoTip from "../components/InfoTip";
 import TechSearch from "../components/TechSearch";
+import { formatDateTime, formatSpan } from "../scan/format";
 import "./dashboards.css";
 
 // Que mide cada indicador y como se calcula (criterio operativo: sin
@@ -91,10 +92,54 @@ function WorkCard({ item }) {
   );
 }
 
+const RUN_STATE = {
+  en_curso: { label: "En curso", tone: "info" },
+  ok: { label: "Completa", tone: "success" },
+  parcial: { label: "Con novedades", tone: "warning" },
+  error: { label: "Con error", tone: "danger" },
+};
+
+/** Última vigilancia del historial: cuándo corrió, cuánto tardó y qué dejó. */
+function LastVigilance({ run }) {
+  const state = RUN_STATE[run.status] || { label: run.status, tone: "viewer" };
+  const o = run.outcomes || {};
+  const entered = (o.entro_directo || 0) + (o.entro_respaldo || 0) + (o.entro_sin_senales || 0) + (o.fallo_despues || 0);
+  return (
+    <div className="dc-last-run" data-testid="bandeja-last-run">
+      <div className="dc-last-run-head">
+        <strong>Última vigilancia</strong>
+        <Badge tone={state.tone}>{state.label}</Badge>
+      </div>
+      <div className="dc-last-run-when">
+        {formatDateTime(run.finished_at || run.started_at)} · {run.status === "en_curso" ? "lleva" : "duró"} {formatSpan(run.duration_seconds)}
+      </div>
+      <dl className="dc-last-run-facts">
+        <div>
+          <dt>Fuentes</dt>
+          <dd>{run.sources_total}</dd>
+        </div>
+        <div>
+          <dt>Entraron</dt>
+          <dd>{entered}</dd>
+        </div>
+        <div>
+          <dt>Sin acceso</dt>
+          <dd className={o.no_entro ? "dc-warn" : ""}>{o.no_entro || 0}</dd>
+        </div>
+        <div>
+          <dt>Señales nuevas</dt>
+          <dd className={run.items_new ? "dc-ok" : ""}>+{run.items_new}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const screeningThreshold = useScreeningThreshold();
   const [wb, setWb] = useState(null);
   const [work, setWork] = useState(null);
+  const [lastRun, setLastRun] = useState(null);
   const [loading, setLoading] = useState(true);
   const { version } = useRealtime();
   const { isEditor, user } = useAuth();
@@ -104,11 +149,13 @@ export default function Dashboard() {
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
     try {
-      const [a, b] = await Promise.allSettled([
+      const [a, b, c] = await Promise.allSettled([
         api.get("/dashboard/workbench"),
         api.get("/dashboard/my-work"),
+        api.get("/ingest/runs", { params: { limit: 3 } }),
       ]);
       if (a.status === "fulfilled") setWb(a.value.data);
+      if (c.status === "fulfilled") setLastRun(c.value.data.runs?.[0] || null);
       if (b.status === "fulfilled") {
         setWork(b.value.data);
       } else if (!silent) {
@@ -358,7 +405,8 @@ export default function Dashboard() {
               <span>Señales últimos 7 días</span>
               <strong>{wb.findings_last_7d}</strong>
             </div>
-            {wb.last_scan ? (
+            {lastRun && <LastVigilance run={lastRun} />}
+            {lastRun ? null : wb.last_scan ? (
               <div style={{ marginTop: 8, padding: 12, background: "#F8FAFC", borderRadius: 10, fontSize: 13 }}>
                 <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
                   <Badge tone={wb.last_scan.status}>{wb.last_scan.status}</Badge>
