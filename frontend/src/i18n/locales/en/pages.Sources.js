@@ -1,5 +1,11 @@
 // src/pages/Sources.jsx — catálogo de fuentes proactivas, salud de fuentes y cobertura.
 export default {
+  "Descargar": "Download",
+  "Mantenimiento": "Maintenance",
+  "Registro completo": "Full registration",
+  "Catálogo en .xlsx: fuentes con filtros e hipervínculos, fuentes tipo E, resumen y retiradas.": "Catalog in .xlsx: sources with filters and hyperlinks, type E sources, summary and retired sources.",
+  "Prueba todas las fuentes activas en segundo plano y deja su estado verde, ámbar o rojo y un informe en Excel.": "Probes every active source in the background and leaves each one green, amber or red, with a report in Excel.",
+  "Sube el Excel de la matriz de fuentes o una hoja de Google Sheets: muestra las diferencias y no guarda nada hasta que usted confirme.": "Upload the source matrix Excel file or a Google Sheets sheet: it shows the differences and saves nothing until you confirm.",
   // Bloques del catálogo (el valor se guarda en español; solo cambia la etiqueta)
   "Registros de ensayos clínicos": "Clinical trial registries",
   "Agencias regulatorias": "Regulatory agencies",

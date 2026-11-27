@@ -9,11 +9,11 @@ import re
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from .. import __version__, ai_service, gemini_service, minimax_service, prompt_store, scan_trace, scheduler_service, settings_store, usage_meter
+from .. import __version__, ai_service, branding, gemini_service, minimax_service, prompt_store, scan_trace, scheduler_service, settings_store, usage_meter
 from ..config import settings
 from ..database import get_db
 from ..deps import get_current_user, require_permission
@@ -220,6 +220,43 @@ def _prompt_out() -> ScanPromptOut:
         placeholders=["source_title", "source_url", "pages_visited", "source_context", "content", "ocr_note", "max_items"],
         defaults=prompt_store.defaults(),
     )
+
+
+@router.put("/branding")
+async def put_branding(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CONFIG_MANAGE)),
+):
+    """Carga o reemplaza el logo institucional (PNG, JPG o WebP)."""
+    from ..audit import record_action
+
+    # Un byte de más basta para saber que se pasó: no se lee un archivo enorme entero.
+    content = await file.read(branding.MAX_LOGO_BYTES + 1)
+    try:
+        out = branding.save_logo(db, content)
+    except branding.LogoError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    record_action(
+        db,
+        entity_type="config",
+        entity_id="branding",
+        action="branding_logo_update",
+        new_value={"bytes": len(content), "type": branding.detect_type(content), "file": (file.filename or "")[:120]},
+    )
+    db.commit()
+    return out
+
+
+@router.delete("/branding")
+def delete_branding(db: Session = Depends(get_db), user: User = Depends(require_permission(P_CONFIG_MANAGE))):
+    """Quita el logo cargado y vuelve al distintivo del sistema."""
+    from ..audit import record_action
+
+    out = branding.remove_logo(db)
+    record_action(db, entity_type="config", entity_id="branding", action="branding_logo_remove")
+    db.commit()
+    return out
 
 
 @router.get("/prompts", response_model=ScanPromptOut)

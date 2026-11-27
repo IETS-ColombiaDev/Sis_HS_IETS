@@ -1,5 +1,8 @@
 // src/pages/Settings.jsx — Configuración del sistema.
 export default {
+  "Apariencia": "Appearance",
+  "Identidad institucional": "Institutional identity",
+  "Logo que se muestra en el menú, el ingreso y las pantallas públicas.": "Logo shown in the menu, the sign-in screen and the public screens.",
   // Pestañas
   "Metodología": "Methodology",
   "Gobierno metodológico": "Methodological governance",

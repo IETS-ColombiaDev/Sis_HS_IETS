@@ -63,8 +63,9 @@ test("Configuracion agrupa las pestañas por tema y explica la que esta abierta"
     "Fuentes y vigilancia",
     "Inteligencia artificial",
     "Datos y respaldo",
+    "Apariencia",
   ]);
-  await expect(page.locator(".settings-menu button")).toHaveCount(9);
+  await expect(page.locator(".settings-menu button")).toHaveCount(10);
   await expect(page.getByTestId("settings-about")).toContainText("Gobierno metodológico");
   await page.locator(".settings-menu").getByRole("button", { name: "Tareas programadas" }).click();
   await expect(page).toHaveURL(/tab=programacion/);
