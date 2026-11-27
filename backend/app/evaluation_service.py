@@ -554,6 +554,8 @@ def add_comment(
     text = (body or "").strip()
     if not text:
         raise EvaluationRuleError("El comentario no puede ir vacío.")
+    if len(text) > MAX_COMMENT_CHARS:
+        raise EvaluationRuleError(f"El comentario supera el máximo de {MAX_COMMENT_CHARS} caracteres.")
     latest = (
         db.query(EvaluationVersion)
         .filter(EvaluationVersion.doc_id == doc.id)
@@ -622,6 +624,102 @@ def submit_review(
         new_value={"verdict": verdict, "note": note},
     )
     return assignment
+
+
+MAX_COMMENT_CHARS = 4000
+
+
+def resolve_comment(db: Session, comment: ReviewComment, *, actor: str, note: str = "") -> ReviewComment:
+    """Cierra una observacion con la respuesta de quien redacta."""
+    if comment.resolved_at is not None:
+        raise EvaluationRuleError("La observación ya estaba resuelta.")
+    doc = db.get(EvaluationDoc, comment.doc_id)
+    if doc is not None and doc.status == "publicado":
+        raise EvaluationRuleError("El documento ya fue publicado; sus observaciones quedaron cerradas.")
+    comment.resolved_at = _utcnow()
+    comment.resolved_by = actor
+    comment.resolution_note = (note or "").strip()
+    audit.record_action(
+        db,
+        entity_type="review_comments",
+        entity_id=comment.id,
+        action="review:comment_resolved",
+        new_value={"doc_id": comment.doc_id, "note": comment.resolution_note, "actor": actor},
+    )
+    return comment
+
+
+def reopen_comment(db: Session, comment: ReviewComment, *, actor: str) -> ReviewComment:
+    if comment.resolved_at is None:
+        raise EvaluationRuleError("La observación ya está abierta.")
+    doc = db.get(EvaluationDoc, comment.doc_id)
+    if doc is not None and doc.status == "publicado":
+        raise EvaluationRuleError("El documento ya fue publicado; sus observaciones quedaron cerradas.")
+    previous = {"resolved_by": comment.resolved_by, "note": comment.resolution_note}
+    comment.resolved_at = None
+    comment.resolved_by = ""
+    comment.resolution_note = ""
+    audit.record_action(
+        db,
+        entity_type="review_comments",
+        entity_id=comment.id,
+        action="review:comment_reopened",
+        old_value=previous,
+        new_value={"doc_id": comment.doc_id, "actor": actor},
+    )
+    return comment
+
+
+def version_labels(db: Session, doc_id: int) -> dict[int, str]:
+    return {v.id: f"v{v.major}.{v.minor}" for v in versions_of(db, doc_id)}
+
+
+def changed_fields(previous: dict | None, current: dict | None) -> list[str]:
+    """Campos cuyo texto difiere entre dos instantaneas del cuerpo."""
+    before, after = previous or {}, current or {}
+    keys = [k for k in catalog.FIELD_LABELS if k in before or k in after]
+    return [k for k in keys if str(before.get(k) or "").strip() != str(after.get(k) or "").strip()]
+
+
+def queue_facts(db: Session, cycle_id: int) -> dict[int, dict]:
+    """Por expediente del ciclo: observaciones abiertas, revisiones y desde cuando esta en su estado."""
+    docs = db.query(EvaluationDoc).filter(EvaluationDoc.cycle_id == cycle_id).all()
+    ids = [d.id for d in docs]
+    facts = {
+        d.id: {"open_comments": 0, "reviews_done": 0, "reviews_pending": 0, "invites_expiring": 0, "status_since": None}
+        for d in docs
+    }
+    if not ids:
+        return facts
+    for row in db.query(ReviewComment).filter(ReviewComment.doc_id.in_(ids), ReviewComment.resolved_at.is_(None)):
+        facts[row.doc_id]["open_comments"] += 1
+    now = _utcnow()
+    soon = now + timedelta(days=3)
+    for row in db.query(ReviewAssignment).filter(ReviewAssignment.doc_id.in_(ids)):
+        if row.status == "revocado":
+            continue
+        if row.status in catalog.REVIEW_VERDICTS:
+            facts[row.doc_id]["reviews_done"] += 1
+            continue
+        # El autor queda como asignacion interna al abrir el expediente: no es un revisor pendiente.
+        if row.kind == "externo":
+            facts[row.doc_id]["reviews_pending"] += 1
+            expires = row.expires_at
+            if expires is not None:
+                if expires.tzinfo is None:
+                    expires = expires.replace(tzinfo=timezone.utc)
+                if now <= expires <= soon:
+                    facts[row.doc_id]["invites_expiring"] += 1
+    by_status = {d.id: d.status for d in docs}
+    for row in db.query(EvaluationVersion).filter(EvaluationVersion.doc_id.in_(ids)).order_by(EvaluationVersion.id.asc()):
+        if row.status == by_status.get(row.doc_id):
+            # La primera instantanea del tramo actual de ese estado.
+            if facts[row.doc_id].get("_last") != row.status:
+                facts[row.doc_id]["status_since"] = row.created_at
+        facts[row.doc_id]["_last"] = row.status
+    for item in facts.values():
+        item.pop("_last", None)
+    return facts
 
 
 def assignments_of(db: Session, doc_id: int) -> list[ReviewAssignment]:

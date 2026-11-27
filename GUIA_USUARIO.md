@@ -5,7 +5,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.9.0 · actualizada el 27 de noviembre de 2026 (priorización: avance por criterio, matriz del ciclo, recorrido, justificación al cambiar una respuesta y exporte; antes, 7.8.0: postulaciones: radicado y consulta pública del estado, motivos de rechazo, reapertura, duplicados, búsqueda, indicadores y exporte; antes, 7.7.0: respaldo por buscadores cuando un sitio y Google Noticias rechazan la lectura, Vigilancia y Catálogo de fuentes reorganizados, Configuración con menú lateral y carga del logo institucional; antes, 7.6.0: interfaz en español, inglés británico e inglés americano con selector de idioma; antes, 7.5.0: entrega final: rutas de acceso a las fuentes, historial de vigilancias con fecha, hora y duración, informe de acceso plegable y ficha de modelos de inteligencia; antes, 7.4.2: búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
+| **Versión del sistema** | 7.10.0 · actualizada el 27 de noviembre de 2026 (evaluación: expediente por pestañas, observaciones que se resuelven y reabren, cambios entre versiones, aviso de cambios sin guardar y exporte; antes, 7.9.0: priorización: avance por criterio, matriz del ciclo, recorrido, justificación al cambiar una respuesta y exporte; antes, 7.8.0: postulaciones: radicado y consulta pública del estado, motivos de rechazo, reapertura, duplicados, búsqueda, indicadores y exporte; antes, 7.7.0: respaldo por buscadores cuando un sitio y Google Noticias rechazan la lectura, Vigilancia y Catálogo de fuentes reorganizados, Configuración con menú lateral y carga del logo institucional; antes, 7.6.0: interfaz en español, inglés británico e inglés americano con selector de idioma; antes, 7.5.0: entrega final: rutas de acceso a las fuentes, historial de vigilancias con fecha, hora y duración, informe de acceso plegable y ficha de modelos de inteligencia; antes, 7.4.2: búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
@@ -1018,6 +1018,18 @@ El cruce no acepta ni rechaza: es evidencia para decidir. Si la vigilancia ya la
 
 ---
 
+
+### Evaluación: expediente por pestañas, observaciones con estado y versiones (versión 7.10.0)
+
+- **Indicadores.** Arriba verá cuántas tecnologías no tienen expediente, cuántos expedientes están en redacción, en revisión, en comité y publicados, y cuántas **observaciones abiertas** hay en el ciclo.
+- **Cola.** Busque por nombre, DCI o clúster y filtre por estado editorial. Cada tecnología muestra su avance, las observaciones sin resolver y los revisores externos que aún no entregan.
+- **Expediente por pestañas.** «Documento» (campos y vista previa), «Revisión por pares» (revisores e invitaciones), «Observaciones» y «Versiones». Los botones de guardar y de cambio de estado están siempre arriba.
+- **Cambios sin guardar.** Mientras edita aparece el aviso «Cambios sin guardar». El sistema pregunta antes de cambiar de tecnología o de cerrar la pestaña, y no deja mover el documento de estado hasta guardar.
+- **Avance por sección.** Bajo la completitud, cada sección (ficha, informe, Mini-HTA) dice cuántos campos lleva. Un campo con texto queda marcado en verde y, si tiene observaciones abiertas, lo indica debajo.
+- **Observaciones con estado.** Cada observación está abierta o resuelta. Quien redacta la resuelve con «Resolver» y puede escribir qué cambió; quien revisa puede reabrirla. Al aprobar en comité con observaciones abiertas, el sistema avisa y pide confirmar.
+- **Versiones.** Cada versión dice el estado, la fecha, quién la generó y qué campos cambiaron frente a la anterior. «Ver esta versión» muestra el documento como estaba.
+- **Revisores.** Cada revisor aparece con su estado, si firmó el conflicto de interés y cuántos días le quedan al enlace.
+- **Exportar.** «Exportar CSV» (arriba) descarga el estado editorial de todo el ciclo; la descarga queda en la bitácora. El HTML institucional y el PDF del documento están en el menú «Exportar» del expediente.
 
 ### Priorización: avance, matriz del ciclo y recorrido (versión 7.9.0)
 

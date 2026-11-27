@@ -1,6 +1,9 @@
 """Editor de fichas, informes y Mini-HTA (RF13-RF15)."""
 from __future__ import annotations
 
+import csv
+import io
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.orm import Session
 
@@ -12,7 +15,7 @@ from ..database import get_db
 from ..deps import get_current_user, require_permission
 from ..evaluation_service import EvaluationRuleError
 from ..events import bump_state_version
-from ..models import Cycle, CycleTechnology, EvaluationDoc, ReviewAssignment, Technology, User
+from ..models import Cycle, CycleTechnology, EvaluationDoc, ReviewAssignment, ReviewComment, Technology, User
 from ..rbac import P_CYCLE_WRITE, P_REPORT_WRITE, P_REVIEW_SUBMIT, has_permission
 from ..schemas import (
     EvaluationCoiIn,
@@ -26,6 +29,7 @@ from ..schemas import (
     ReviewAssignmentOut,
     ReviewCommentIn,
     ReviewCommentOut,
+    ReviewCommentResolveIn,
     ReviewInviteIn,
     ReviewInviteOut,
 )
@@ -61,29 +65,24 @@ def _to_out(
     out.assignments = [
         ReviewAssignmentOut.model_validate(a) for a in evaluation_service.assignments_of(db, doc.id)
     ]
-    out.comments = [
-        ReviewCommentOut.model_validate(c) for c in evaluation_service.comments_of(db, doc.id)
-    ]
+    out.comments = _comments_out(db, doc.id)
     out.transition_hints = evaluation_service.transition_hints(db, doc, user)
     if not include_body or not coi_ok:
         out.body = None
     return out
 
 
-def _get_doc(db: Session, doc_id: int) -> EvaluationDoc:
-    doc = db.get(EvaluationDoc, doc_id)
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Documento no encontrado")
-    return doc
+def _comments_out(db: Session, doc_id: int) -> list[ReviewCommentOut]:
+    labels = evaluation_service.version_labels(db, doc_id)
+    out = []
+    for row in evaluation_service.comments_of(db, doc_id):
+        item = ReviewCommentOut.model_validate(row)
+        item.version_label = labels.get(row.version_id or 0, "")
+        out.append(item)
+    return out
 
 
-@router.get("", response_model=list[EvaluationQueueItem])
-def list_queue(
-    cycle_id: int = Query(...),
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """Tecnologias del ciclo en evaluacion o priorizadas, con su expediente si existe."""
+def _queue_items(db: Session, cycle_id: int) -> list[EvaluationQueueItem]:
     entries = (
         db.query(CycleTechnology)
         .filter(
@@ -96,6 +95,7 @@ def list_queue(
         d.technology_id: d
         for d in db.query(EvaluationDoc).filter(EvaluationDoc.cycle_id == cycle_id).all()
     }
+    facts = evaluation_service.queue_facts(db, cycle_id)
     tech_ids = [e.technology_id for e in entries]
     techs = {
         t.id: t
@@ -106,7 +106,8 @@ def list_queue(
         tech = techs.get(entry.technology_id)
         doc = docs.get(entry.technology_id)
         suggested = evaluation_service.suggest_product_level(db, entry.priority_points)
-        complete = evaluation_service.completeness(doc) if doc else {"pct": 0}
+        complete = evaluation_service.completeness(doc) if doc else {"pct": 0, "missing": []}
+        extra = facts.get(doc.id, {}) if doc else {}
         items.append(
             EvaluationQueueItem(
                 technology_id=entry.technology_id,
@@ -123,9 +124,84 @@ def list_queue(
                 doc_status_label=catalog.EDITORIAL_STATUS_LABELS.get(doc.status, "") if doc else "",
                 product_level=doc.product_level if doc else "",
                 completeness_pct=complete.get("pct", 0),
+                cluster_name=(tech.cluster.name if tech and tech.cluster else ""),
+                missing_count=len(complete.get("missing") or []),
+                open_comments=extra.get("open_comments", 0),
+                reviews_done=extra.get("reviews_done", 0),
+                reviews_pending=extra.get("reviews_pending", 0),
+                invites_expiring=extra.get("invites_expiring", 0),
+                confidential=bool(doc.confidential) if doc else False,
+                version=f"{doc.version_major}.{doc.version_minor}" if doc else "",
+                updated_at=doc.updated_at if doc else None,
+                status_since=extra.get("status_since"),
             )
         )
     return items
+
+
+def _get_doc(db: Session, doc_id: int) -> EvaluationDoc:
+    doc = db.get(EvaluationDoc, doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
+    return doc
+
+
+@router.get("", response_model=list[EvaluationQueueItem])
+def list_queue(
+    cycle_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Tecnologias del ciclo en evaluacion o priorizadas, con su expediente si existe."""
+    return _queue_items(db, cycle_id)
+
+
+@router.get("/export.csv")
+def export_queue(
+    cycle_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Estado editorial del ciclo en CSV (punto y coma, UTF-8 con BOM para Excel). Queda en bitácora."""
+    cycle = db.get(Cycle, cycle_id)
+    if cycle is None:
+        raise HTTPException(status_code=404, detail="Ciclo no encontrado")
+    items = _queue_items(db, cycle_id)
+
+    def safe(value) -> str:
+        text = "" if value is None else str(value)
+        # Una celda que empieza por =, +, - o @ se ejecutaria como formula al abrir el archivo.
+        return "'" + text if text[:1] in ("=", "+", "-", "@") else text
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";", lineterminator="\n")
+    writer.writerow([
+        "ID", "Tecnología", "DCI", "Clúster", "Puntos", "Producto", "Estado editorial", "En este estado desde",
+        "Versión", "Completitud %", "Campos pendientes", "Observaciones abiertas", "Revisiones entregadas",
+        "Revisiones externas pendientes", "Confidencial", "Última edición",
+    ])
+    for i in items:
+        writer.writerow([
+            safe(v) for v in (
+                i.technology_id, i.commercial_name or i.inn_name, i.inn_name, i.cluster_name,
+                i.priority_points if i.priority_points is not None else "",
+                i.suggested_level_label, i.doc_status_label or "Sin expediente",
+                i.status_since.isoformat() if i.status_since else "",
+                i.version, i.completeness_pct if i.doc_id else "", i.missing_count if i.doc_id else "",
+                i.open_comments, i.reviews_done, i.reviews_pending,
+                ("Sí" if i.confidential else "No") if i.doc_id else "",
+                i.updated_at.isoformat() if i.updated_at else "",
+            )
+        ])
+    audit.record_action(
+        db, entity_type="cycles", entity_id=cycle_id, action="report:export_queue", new_value={"rows": len(items)},
+    )
+    db.commit()
+    return Response(
+        content="\ufeff" + buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="evaluacion_{cycle.code or cycle_id}.csv"'},
+    )
 
 
 @router.post("", response_model=EvaluationDocOut)
@@ -371,10 +447,73 @@ def list_versions(
             status_code=403,
             detail="Sin declaración de conflicto de interés no se habilita la lectura.",
         )
-    return [
-        EvaluationVersionOut.model_validate(v)
-        for v in evaluation_service.versions_of(db, doc.id)
-    ]
+    out: list[EvaluationVersionOut] = []
+    previous: dict | None = None
+    for row in evaluation_service.versions_of(db, doc.id):
+        item = EvaluationVersionOut.model_validate(row)
+        item.status_label = catalog.EDITORIAL_STATUS_LABELS.get(row.status, row.status)
+        item.changed_fields = evaluation_service.changed_fields(previous, row.body) if previous is not None else []
+        previous = row.body or {}
+        out.append(item)
+    return out
+
+
+def _comment_for(db: Session, doc_id: int, comment_id: int, user: User) -> tuple[EvaluationDoc, ReviewComment]:
+    doc = _get_doc(db, doc_id)
+    comment = db.get(ReviewComment, comment_id)
+    if comment is None or comment.doc_id != doc.id:
+        raise HTTPException(status_code=404, detail="Observación no encontrada")
+    assignment = evaluation_service.ensure_internal_assignment(db, doc, user)
+    if not assignment.coi_signed:
+        raise HTTPException(
+            status_code=403,
+            detail="Sin declaración de conflicto de interés no se habilitan las observaciones.",
+        )
+    return doc, comment
+
+
+@router.post("/{doc_id}/comments/{comment_id}/resolve", response_model=EvaluationDocOut)
+def resolve_comment(
+    doc_id: int,
+    comment_id: int,
+    payload: ReviewCommentResolveIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_REPORT_WRITE)),
+):
+    """Quien redacta responde la observación y la cierra."""
+    doc, comment = _comment_for(db, doc_id, comment_id, user)
+    try:
+        evaluation_service.resolve_comment(db, comment, actor=user.email, note=payload.note)
+    except EvaluationRuleError as exc:
+        raise _http(exc) from exc
+    db.commit()
+    db.refresh(doc)
+    bump_state_version(db)
+    return _to_out(db, doc, include_body=True, user=user)
+
+
+@router.post("/{doc_id}/comments/{comment_id}/reopen", response_model=EvaluationDocOut)
+def reopen_comment(
+    doc_id: int,
+    comment_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Vuelve a abrir una observación resuelta (quien revisa o quien redacta)."""
+    if not (has_permission(user, P_REVIEW_SUBMIT) or has_permission(user, P_REPORT_WRITE)):
+        raise HTTPException(
+            status_code=403,
+            detail="Se requiere permiso de informe o de revisión para reabrir una observación.",
+        )
+    doc, comment = _comment_for(db, doc_id, comment_id, user)
+    try:
+        evaluation_service.reopen_comment(db, comment, actor=user.email)
+    except EvaluationRuleError as exc:
+        raise _http(exc) from exc
+    db.commit()
+    db.refresh(doc)
+    bump_state_version(db)
+    return _to_out(db, doc, include_body=True, user=user)
 
 
 @router.post("/{doc_id}/comments", response_model=ReviewCommentOut)

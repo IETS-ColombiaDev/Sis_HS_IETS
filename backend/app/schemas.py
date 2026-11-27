@@ -1503,6 +1503,17 @@ class EvaluationQueueItem(BaseModel):
     doc_status_label: str = ""
     product_level: str = ""
     completeness_pct: int = 0
+    # Estado del expediente para la cola: lo que falta y quien lo tiene.
+    cluster_name: str = ""
+    missing_count: int = 0
+    open_comments: int = 0
+    reviews_done: int = 0
+    reviews_pending: int = 0
+    invites_expiring: int = 0
+    confidential: bool = False
+    version: str = ""
+    updated_at: datetime | None = None
+    status_since: datetime | None = None
 
 
 class EvaluationDocUpdate(BaseModel):
@@ -1566,6 +1577,10 @@ class ReviewCommentIn(BaseModel):
     body: str
 
 
+class ReviewCommentResolveIn(BaseModel):
+    note: str = Field(default="", max_length=2000)
+
+
 class ReviewCommentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -1577,6 +1592,10 @@ class ReviewCommentOut(BaseModel):
     body: str
     author: str = ""
     created_at: datetime
+    resolved_at: datetime | None = None
+    resolved_by: str = ""
+    resolution_note: str = ""
+    version_label: str = ""
 
 
 class ReviewSubmitIn(BaseModel):
@@ -1596,6 +1615,9 @@ class EvaluationVersionOut(BaseModel):
     note: str = ""
     created_by: str = ""
     created_at: datetime
+    status_label: str = ""
+    # Campos cuyo texto cambio frente a la version anterior.
+    changed_fields: list[str] = []
 
 
 class EvaluationCompleteness(BaseModel):
