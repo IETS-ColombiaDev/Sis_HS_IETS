@@ -477,14 +477,79 @@ def export_bulletin(
 
 @router.get("/api/alerts", response_model=list[AlertEventOut])
 def list_alerts(
+    response: Response,
     unread: bool = False,
+    kind: str = "",
+    cluster_id: int | None = None,
+    q: str = "",
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    q = db.query(AlertEvent).filter(AlertEvent.user_id == user.id)
-    if unread:
-        q = q.filter(AlertEvent.read_at.is_(None))
-    return q.order_by(AlertEvent.created_at.desc()).limit(50).all()
+    """Bandeja del usuario, la más reciente primero. `X-Total-Count` trae el total del filtro."""
+    from .. import alert_service
+
+    query = alert_service.base_query(db, user, unread=unread, kind=kind, cluster_id=cluster_id, q=q)
+    response.headers["X-Total-Count"] = str(query.count())
+    response.headers["Access-Control-Expose-Headers"] = "X-Total-Count"
+    rows = query.order_by(AlertEvent.created_at.desc(), AlertEvent.id.desc()).offset(offset).limit(limit).all()
+    return alert_service.enrich(db, rows)
+
+
+@router.get("/api/alerts/summary")
+def alerts_summary(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Totales de la bandeja del usuario: sin leer, por tipo y fecha de la última."""
+    from .. import alert_service
+
+    return alert_service.summary(db, user)
+
+
+@router.get("/api/alerts/rules")
+def alerts_rules(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Qué dispara cada tipo de alerta, con el umbral vigente."""
+    from .. import alert_service
+
+    return alert_service.rules(db, user)
+
+
+@router.get("/api/alerts/export")
+def export_alerts(
+    unread: bool = False,
+    kind: str = "",
+    cluster_id: int | None = None,
+    q: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Las alertas del usuario (con el mismo filtro de la pantalla) en CSV."""
+    import csv
+    import io
+
+    from .. import alert_service
+
+    rows = (
+        alert_service.base_query(db, user, unread=unread, kind=kind, cluster_id=cluster_id, q=q)
+        .order_by(AlertEvent.created_at.desc(), AlertEvent.id.desc())
+        .limit(2000)
+        .all()
+    )
+
+    def safe(value) -> str:
+        text = "" if value is None else str(value)
+        # Una celda que empieza por =, +, - o @ se ejecutaria como formula al abrir el archivo.
+        return "'" + text if text[:1] in ("=", "+", "-", "@") else text
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";", lineterminator="\n")
+    writer.writerow(alert_service.EXPORT_HEADER)
+    for row in alert_service.export_rows(db, rows):
+        writer.writerow([safe(v) for v in row])
+    return Response(
+        content="\ufeff" + buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="alertas_tempranas.csv"'},
+    )
 
 
 @router.get("/api/alerts/channels")
@@ -497,20 +562,36 @@ def alert_channels(user: User = Depends(get_current_user)):
 
 @router.post("/api/alerts/read-all")
 def mark_all_read(
+    kind: str = "",
+    cluster_id: int | None = None,
+    q: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Marca como leidas todas las alertas pendientes del usuario."""
-    rows = (
-        db.query(AlertEvent)
-        .filter(AlertEvent.user_id == user.id, AlertEvent.read_at.is_(None))
-        .all()
-    )
+    """Marca como leidas las alertas pendientes del usuario (todas, o las del filtro)."""
+    from .. import alert_service
+
+    rows = alert_service.base_query(db, user, unread=True, kind=kind, cluster_id=cluster_id, q=q).all()
     now = strategy_service._utcnow()
     for row in rows:
         row.read_at = now
     db.commit()
     return {"updated": len(rows)}
+
+
+@router.post("/api/alerts/clear-read")
+def clear_read_alerts(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Quita de la bandeja las alertas que el usuario ya leyó. Las sin leer se conservan."""
+    deleted = (
+        db.query(AlertEvent)
+        .filter(AlertEvent.user_id == user.id, AlertEvent.read_at.isnot(None))
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"deleted": int(deleted or 0)}
 
 
 @router.post("/api/alerts/{alert_id}/read", response_model=AlertEventOut)
@@ -519,13 +600,49 @@ def mark_read(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    from .. import alert_service
+
+    row = _own_alert(db, user, alert_id)
+    if row.read_at is None:  # la primera lectura es la que cuenta
+        row.read_at = strategy_service._utcnow()
+        db.commit()
+        db.refresh(row)
+    return alert_service.enrich(db, [row])[0]
+
+
+def _own_alert(db: Session, user: User, alert_id: int) -> AlertEvent:
     row = db.get(AlertEvent, alert_id)
     if row is None or row.user_id != user.id:
         raise HTTPException(status_code=404, detail="Alerta no encontrada")
-    row.read_at = strategy_service._utcnow()
+    return row
+
+
+@router.post("/api/alerts/{alert_id}/unread", response_model=AlertEventOut)
+def mark_unread(
+    alert_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Devuelve la alerta a sin leer, para atenderla después."""
+    from .. import alert_service
+
+    row = _own_alert(db, user, alert_id)
+    row.read_at = None
     db.commit()
     db.refresh(row)
-    return row
+    return alert_service.enrich(db, [row])[0]
+
+
+@router.delete("/api/alerts/{alert_id}", status_code=204)
+def delete_alert(
+    alert_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Quita una alerta de la bandeja del usuario."""
+    db.delete(_own_alert(db, user, alert_id))
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.get("/api/alerts/subscriptions", response_model=list[AlertSubscriptionOut])

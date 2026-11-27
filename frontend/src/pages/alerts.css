@@ -1,0 +1,208 @@
+/* Alertas: indicadores, suscripciones, reglas, filtros y bandeja por día. */
+
+.al-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.al-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #2563eb;
+  border-radius: 12px;
+  background: #fff;
+}
+.al-tile > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+.al-tile strong {
+  font-size: 24px;
+  line-height: 1.15;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+.al-tile strong.al-tile-text {
+  font-size: 16px;
+  line-height: 1.35;
+}
+.al-tile em {
+  font-style: normal;
+  font-size: 12px;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+.al-tile.is-hot {
+  border-left-color: #d97706;
+}
+.al-tile.is-off {
+  border-left-color: #94a3b8;
+}
+
+/* --- Suscripciones y reglas --- */
+.al-sub-list {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+}
+.al-sub-list li {
+  min-width: 0;
+}
+.al-sub-list li > :last-child {
+  flex: none;
+}
+.al-sub-list li.is-on {
+  border-color: #a7f3d0;
+  background: #f0fdf4;
+}
+.al-sub-list li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.al-rules {
+  margin-top: 16px;
+}
+.al-rule-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 14px 12px;
+  display: grid;
+  gap: 12px;
+}
+.al-rule-list li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  font-size: 13px;
+  color: #334155;
+}
+.al-rule-list p {
+  margin: 2px 0 0;
+  line-height: 1.5;
+}
+.al-rule-scope {
+  color: #64748b;
+}
+.al-rule-list em {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d4ed8;
+  white-space: nowrap;
+}
+.al-kind-icon {
+  flex: 0 0 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.al-kind-icon.kind-new_phase3_colombia {
+  background: #d1fae5;
+  color: #065f46;
+}
+.al-kind-icon.kind-phase_change_high_budget,
+.al-kind-icon.kind-clinical_phase_change_high_budget {
+  background: #fef3c7;
+  color: #92400e;
+}
+.al-kind-icon.kind-vigilancia_programada,
+.al-kind-icon.kind-duplicados_propuestos {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+/* --- Bandeja --- */
+.al-inbox-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.al-inbox-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.al-select {
+  width: auto;
+  max-width: 100%;
+  min-width: 150px;
+}
+.al-day h4 {
+  margin: 14px 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.al-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.al-card.is-unread {
+  padding-left: 12px;
+}
+.al-card-body {
+  flex: 1;
+  min-width: 0;
+}
+.al-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.al-card-body p {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: #334155;
+  overflow-wrap: anywhere;
+}
+.al-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.al-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d4ed8;
+}
+.al-count {
+  margin: 6px 0 12px;
+  text-align: center;
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+@media (max-width: 640px) {
+  .al-rule-list li {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+  .al-rule-list em {
+    grid-column: 2;
+  }
+  .al-select {
+    width: 100%;
+  }
+}

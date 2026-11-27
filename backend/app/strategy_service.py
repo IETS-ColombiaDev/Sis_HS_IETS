@@ -1494,11 +1494,14 @@ def _notify(db: Session, *, kind: str, title: str, body: str, tech: Technology) 
         )
         if exists:
             continue
+        user = db.get(User, sub.user_id)
+        if user is None or not user.is_active:
+            continue  # un usuario retirado no acumula alertas
         db.add(
             AlertEvent(
                 user_id=sub.user_id,
                 kind=kind,
-                title=title,
+                title=title[:400],
                 body=body,
                 technology_id=tech.id,
                 cluster_id=tech.cluster_id,
@@ -1507,8 +1510,7 @@ def _notify(db: Session, *, kind: str, title: str, body: str, tech: Technology) 
         sent += 1
         # P4-2: con SMTP configurado la alerta tambien sale por correo (en segundo
         # plano, sin demorar ni romper la operacion que la disparo).
-        user = db.get(User, sub.user_id)
-        if user is not None and user.is_active and user.email:
+        if user.email:
             from . import mailer
 
             base = (get_settings_public_base_url() or "").rstrip("/")
@@ -1552,7 +1554,10 @@ def watch_technology(db: Session, tech: Technology, *, previous_phase: str = "",
             db,
             kind="phase_change_high_budget",
             title=f"Cambio de fase en tecnología de alto riesgo: {_tech_name(tech)}",
-            body=f"Paso de {previous_status} a {tech.status} con {points} puntos de priorización.",
+            body=(
+                f"Pasó de «{TECHNOLOGY_STATUS_LABELS.get(previous_status, previous_status)}» a "
+                f"«{TECHNOLOGY_STATUS_LABELS.get(tech.status, tech.status)}» con {points} puntos de priorización."
+            ),
             tech=tech,
         )
 
