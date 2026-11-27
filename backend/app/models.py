@@ -836,6 +836,8 @@ class Submission(Base):
     # recibida | aceptada | rechazada
     status: Mapped[str] = mapped_column(String(20), default="recibida", index=True)
     review_note: Mapped[str] = mapped_column(Text, default="")
+    # Motivo tipificado del rechazo (codigo de submission_service.REJECT_REASONS; migracion 0010).
+    reject_reason: Mapped[str] = mapped_column(String(40), default="", server_default="")
     reviewed_by: Mapped[str] = mapped_column(String(255), default="")
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     technology_id: Mapped[int | None] = mapped_column(

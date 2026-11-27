@@ -73,7 +73,7 @@ Todos los comandos se ejecutan desde la raíz del repositorio y **siempre** con 
 3. **Construya la imagen** (etiquete con la versión para poder revertir):
 
    ```bash
-   export IMAGE_TAG=7.7.0        # o fije IMAGE_TAG en deploy/.env.production
+   export IMAGE_TAG=7.8.0        # o fije IMAGE_TAG en deploy/.env.production
    docker compose --env-file deploy/.env.production build
    ```
 

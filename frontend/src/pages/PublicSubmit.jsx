@@ -4,7 +4,8 @@ import axios from "axios";
 import Button from "../components/Button";
 import { Input, Textarea, Select } from "../components/Field";
 import PublicShell from "../components/PublicShell";
-import { t, ts } from "../i18n";
+import { t, ts, fmtDate } from "../i18n";
+import "./submissions.css";
 
 const empty = {
   commercial_name: "",
@@ -62,6 +63,40 @@ export default function PublicSubmit() {
   const [captcha, setCaptcha] = useState(null);
   const [captchaReady, setCaptchaReady] = useState(false);
   const recaptcha = useRef(null);
+  const [track, setTrack] = useState({ code: "", email: "" });
+  const [tracking, setTracking] = useState(false);
+  const [trackResult, setTrackResult] = useState(null);
+  const [trackError, setTrackError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const checkStatus = async (e) => {
+    e.preventDefault();
+    setTrackError("");
+    setTrackResult(null);
+    if (!track.code.trim() || !track.email.trim()) {
+      setTrackError(t("Escriba el radicado y el correo con el que envió la postulación."));
+      return;
+    }
+    setTracking(true);
+    try {
+      const { data } = await axios.post("/api/public/submissions/status", { code: track.code.trim(), email: track.email.trim() });
+      setTrackResult(data);
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setTrackError(typeof detail === "string" ? ts(detail) : t("No se pudo consultar el estado. Intente de nuevo en unos minutos."));
+    } finally {
+      setTracking(false);
+    }
+  };
+
+  const copyCode = async (code) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   useEffect(() => {
     axios
@@ -146,12 +181,46 @@ export default function PublicSubmit() {
       title={t("Postular una tecnología sanitaria")}
       lead={t("La postulación no entra sola al catálogo metodológico: el equipo del IETS la revisa, con declaración de conflicto de interés, antes de asignarla a un ciclo.")}
     >
+      <details className="ps-status" data-testid="status-check">
+        <summary>{t("¿Ya postuló? Consulte el estado de su postulación")}</summary>
+        <form className="ps-status-body" onSubmit={checkStatus} noValidate>
+          <div className="form-two-col">
+            <Input id="ps-track-code" label={t("Radicado")} placeholder="POS-2026-00001" value={track.code} onChange={(e) => setTrack((p) => ({ ...p, code: e.target.value }))} />
+            <Input id="ps-track-email" label={t("Correo con el que postuló")} type="email" value={track.email} onChange={(e) => setTrack((p) => ({ ...p, email: e.target.value }))} />
+          </div>
+          <Button type="submit" variant="secondary" loading={tracking}>{t("Consultar estado")}</Button>
+          {trackError && <p className="public-submit-error" role="alert">{trackError}</p>}
+          {trackResult && (
+            <div className={`ps-status-result is-${trackResult.status}`} data-testid="status-result">
+              <strong>{trackResult.tracking_code} · {ts(trackResult.status_label)}</strong>
+              <p style={{ margin: "4px 0 0" }}>{ts(trackResult.message)}</p>
+              <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "#64748B" }}>
+                {t("Recibida el {fecha}", { fecha: fmtDate(trackResult.received_at) })}
+                {trackResult.resolved_at ? " · " + t("Decisión del {fecha}", { fecha: fmtDate(trackResult.resolved_at) }) : ""}
+              </p>
+            </div>
+          )}
+        </form>
+      </details>
+
       {done ? (
         <div className="public-submit-ok" data-testid="submit-ok">
           <strong>{t("Postulación recibida.")}</strong>
           <p>{ts(done.message)}</p>
+          {done.tracking_code && (
+            <>
+              <div className="ps-tracking" data-testid="submit-tracking">
+                <span>{t("Su radicado:")}</span>
+                <span className="ps-tracking-code">{done.tracking_code}</span>
+                <button type="button" className="linkish" onClick={() => copyCode(done.tracking_code)}>
+                  {copied ? t("Copiado") : t("Copiar")}
+                </button>
+              </div>
+              <p>{t("Guárdelo: con el radicado y su correo puede consultar el estado de la postulación en esta misma página.")}</p>
+            </>
+          )}
           <p style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <button type="button" className="linkish" onClick={() => { setDone(null); setForm(empty); }}>
+            <button type="button" className="linkish" onClick={() => { setDone(null); setForm(empty); setCopied(false); }}>
               {t("Enviar otra postulación")}
             </button>
             <Link to="/expedientes">{t("Consultar expedientes publicados")}</Link>

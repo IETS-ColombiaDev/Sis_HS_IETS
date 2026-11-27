@@ -115,7 +115,7 @@ def test_verification_outage_is_a_503_without_internal_details(api, keys, monkey
 def test_rate_limit_is_configurable_and_not_bypassed_by_forged_headers(api, monkeypatch):
     monkeypatch.setattr(settings, "public_submissions_per_window", 2)
     for i in range(2):
-        assert api.client.post("/api/public/submissions", json=_payload()).status_code == 201
+        assert api.client.post("/api/public/submissions", json=_payload(submitter_email=f"persona{i}@example.org")).status_code == 201
     third = api.client.post("/api/public/submissions", json=_payload())
     assert third.status_code == 429
 

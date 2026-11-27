@@ -5,7 +5,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.7.0 · actualizada el 26 de noviembre de 2026 (respaldo por buscadores cuando un sitio y Google Noticias rechazan la lectura, Vigilancia y Catálogo de fuentes reorganizados, Configuración con menú lateral y carga del logo institucional; antes, 7.6.0: interfaz en español, inglés británico e inglés americano con selector de idioma; antes, 7.5.0: entrega final: rutas de acceso a las fuentes, historial de vigilancias con fecha, hora y duración, informe de acceso plegable y ficha de modelos de inteligencia; antes, 7.4.2: búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
+| **Versión del sistema** | 7.8.0 · actualizada el 27 de noviembre de 2026 (postulaciones: radicado y consulta pública del estado, motivos de rechazo, reapertura, duplicados, búsqueda, indicadores y exporte; antes, 7.7.0: respaldo por buscadores cuando un sitio y Google Noticias rechazan la lectura, Vigilancia y Catálogo de fuentes reorganizados, Configuración con menú lateral y carga del logo institucional; antes, 7.6.0: interfaz en español, inglés británico e inglés americano con selector de idioma; antes, 7.5.0: entrega final: rutas de acceso a las fuentes, historial de vigilancias con fecha, hora y duración, informe de acceso plegable y ficha de modelos de inteligencia; antes, 7.4.2: búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
@@ -1017,6 +1017,20 @@ Cada postulación se cruza sola al llegar (RF-02-F); el botón (Cruzar de nuevo)
 El cruce no acepta ni rechaza: es evidencia para decidir. Si la vigilancia ya la detectó, al aceptarla la bandeja la marcará «En varias fuentes».
 
 ---
+
+
+### Moderación de postulaciones (versión 7.8.0)
+
+- **Indicadores.** Arriba de la cola: por moderar, las que esperan 7 días o más, las pendientes con conflicto de interés declarado, aceptadas, rechazadas (con el motivo más frecuente) y el tiempo de respuesta (mediana en días).
+- **Buscar y filtrar.** Busque por tecnología, indicación, fabricante, postulante o radicado. Filtre por conflicto de interés, ordene por antigüedad o deje solo las que esperan 7 días o más. Cada pestaña muestra cuántas hay.
+- **Radicado.** Cada postulación tiene un radicado (`POS-2026-00012`). Quien postula lo recibe al enviar el formulario.
+- **Duplicados.** Si hay otra postulación de la misma tecnología (mismo nombre comercial o misma DCI), la tarjeta lo avisa con el radicado y el estado de la otra; pulse el radicado para abrirla. El formulario no deja que la misma persona radique dos veces la misma tecnología mientras la primera siga en moderación.
+- **Revisar y decidir.** La ventana muestra los datos, el cruce con la vigilancia y la web, y a la derecha la decisión y el **recorrido** (recibida, cruces, rechazo, reapertura, aceptación, con fecha y persona).
+- **Rechazar con motivo.** Elija el motivo de la lista (fuera de alcance, ya en vigilancia, duplicada, fuente insuficiente, sin novedad, datos incompletos, no válida). La nota es opcional salvo en «Otro motivo». Quien postula solo ve el motivo de la lista, nunca la nota.
+- **Reabrir.** Una postulación rechazada se puede devolver a la cola con «Reabrir», explicando por qué. Una aceptada no se reabre: ya creó una señal en la bandeja de entrada.
+- **Exportar CSV.** Descarga las postulaciones del filtro actual con su decisión y motivo. La descarga queda en la bitácora.
+
+**Para quien postula.** En `/postular`, «¿Ya postuló? Consulte el estado de su postulación» pide el radicado y el correo y responde si está en moderación, aceptada o no aceptada. Con un correo distinto al de la postulación no muestra nada.
 
 ## 12. Filtrado y depuración
 

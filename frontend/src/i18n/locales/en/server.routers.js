@@ -2,6 +2,26 @@
 // rbac.py, schemas.py y main.py. La llave es el texto en español tal como sale del backend.
 
 export default {
+  "En moderación": "In moderation",
+  "No aceptada": "Not accepted",
+  "Su postulación está en moderación. El equipo del IETS aún no ha tomado una decisión.": "Your submission is in moderation. The IETS team has not made a decision yet.",
+  "Su postulación fue aceptada y pasó a la vigilancia del IETS. Esto no implica una evaluación ni una recomendación.": "Your submission was accepted and moved into IETS surveillance. This does not imply an assessment or a recommendation.",
+  "Su postulación no fue aceptada en esta revisión.": "Your submission was not accepted in this review.",
+  "No encontramos una postulación con ese radicado y ese correo. Revise ambos datos.": "We could not find a submission with that tracking code and email. Check both.",
+  "Fuera del alcance del escaneo de horizonte": "Outside the scope of horizon scanning",
+  "La tecnología ya está en vigilancia o en el sistema": "The technology is already under surveillance or in the system",
+  "Postulación duplicada": "Duplicate submission",
+  "Fuente de información insuficiente o no verificable": "Insufficient or unverifiable source of information",
+  "Tecnología ya disponible en el país (sin novedad)": "Technology already available in the country (no novelty)",
+  "Datos incompletos o no identificables": "Incomplete or unidentifiable data",
+  "No es una postulación válida (prueba o envío automático)": "Not a valid submission (test or automated sending)",
+  "Otro motivo (se explica en la nota)": "Other reason (explained in the note)",
+  "Postulación recibida por el formulario público": "Submission received through the public form",
+  "Aceptada y enviada a la bandeja de entrada": "Accepted and sent to the inbox",
+  "Reabierta para una nueva revisión": "Reopened for a new review",
+  "El motivo de rechazo no existe. Elija uno de la lista.": "The rejection reason does not exist. Choose one from the list.",
+  "Solo se reabren postulaciones rechazadas. Una aceptada ya creó una señal en la bandeja de entrada.": "Only rejected submissions can be reopened. An accepted one has already created a signal in the inbox.",
+  "Explique por qué se reabre la postulación: queda en la bitácora.": "Explain why the submission is being reopened: it is recorded in the audit log.",
   // ------------------------------------------------------------------ deps.py
   "No autenticado": "Not authenticated",
   "Token inválido o expirado": "Invalid or expired token",

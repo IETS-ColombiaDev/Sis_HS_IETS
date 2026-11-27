@@ -89,9 +89,9 @@ test.describe("moderacion en /postulaciones", () => {
     await expectToast(page, "Postulación rechazada");
 
     // Pestanas de resultados.
-    await page.getByRole("button", { name: "Aceptadas" }).click();
+    await page.getByRole("button", { name: /^Aceptadas/ }).click();
     await expect(page.locator(".merge-list > div", { hasText: accepted })).toContainText("Ver en la bandeja");
-    await page.getByRole("button", { name: "Rechazadas" }).click();
+    await page.getByRole("button", { name: /^Rechazadas/ }).click();
     await expect(page.locator(".merge-list > div", { hasText: rejected })).toContainText("Fuera del alcance");
 
     // La tecnologia aceptada esta en la bandeja de entrada, marcada como reactiva.
