@@ -1336,3 +1336,34 @@ eliminar, y conteo de destinatarios válidos. Traducciones en `pages.Bulletins.j
   publicados se quedan como están.
 - `freshness` recalcula el embudo del ciclo por cada boletín sin publicar que se muestra.
 - Los nombres de clúster y las franjas del contenido quedan en español dentro del boletín guardado.
+
+## Alertas robustas: bandeja con filtros, contexto, reglas y limpieza (27-11-2026, versión 7.15.0)
+
+**Por qué.** La bandeja mostraba las 50 alertas más recientes sin filtro ni total, el tipo de las alertas de vigilancia
+programada y de duplicados salía con su código interno, no había forma de ir a la tecnología ni de quitar una alerta, y
+no se explicaba qué dispara cada aviso.
+
+**Servidor** (`alert_service.py` nuevo, `routers/strategy.py`, `strategy_service.py`; sin migración).
+
+- `GET /api/alerts`: suma `kind`, `cluster_id`, `q`, `limit` (1-200) y `offset`; el total del filtro va en
+  `X-Total-Count`. Cada alerta trae `kind_label`, `technology_name`, `technology_status`, `cluster_name` y `link`.
+- `GET /api/alerts/summary`, `GET /api/alerts/rules` y `GET /api/alerts/export` (CSV con el mismo filtro).
+- `POST /api/alerts/{id}/unread`, `DELETE /api/alerts/{id}` y `POST /api/alerts/clear-read`. Todo es sobre la bandeja de
+  quien llama: una alerta ajena responde 404.
+- `POST /api/alerts/read-all` acepta `kind`, `cluster_id` y `q`.
+- `POST /api/alerts/{id}/read` conserva la primera fecha de lectura.
+- `_notify` omite a usuarios inactivos (antes solo les omitía el correo) y corta el título a 400 caracteres.
+- El cuerpo de `phase_change_high_budget` usa los nombres de las etapas. Las alertas ya guardadas conservan el texto
+  anterior; el patrón de traducción viejo sigue en `server.domain.js`.
+
+**Interfaz** (`pages/Alerts.jsx`, `pages/alerts.css`): indicadores, reglas, filtros, grupos por día, enlace a la
+tecnología con `pageForStatus`, marcar sin leer, quitar, quitar las leídas, exporte y «Ver más». Las fechas se leen con
+la misma regla de `fmtDateTime` (sin zona = UTC). Traducciones en `pages.Alerts.js` y `server.alerts.js` (nuevo).
+
+**Pruebas.** `tests/test_alertas_robustas.py` (7) y `e2e/alertas_robustas.spec.js` (1).
+
+**Pendientes.**
+
+- No hay preferencia por persona para apagar el correo: necesita una columna nueva.
+- «Ver más» llega hasta 200 alertas; para las anteriores hay que filtrar.
+- El enlace a la tecnología usa su estado global, no el de un ciclo en particular.
