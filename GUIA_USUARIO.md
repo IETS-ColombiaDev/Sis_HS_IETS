@@ -5,7 +5,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.10.0 · actualizada el 27 de noviembre de 2026 (evaluación: expediente por pestañas, observaciones que se resuelven y reabren, cambios entre versiones, aviso de cambios sin guardar y exporte; antes, 7.9.0: priorización: avance por criterio, matriz del ciclo, recorrido, justificación al cambiar una respuesta y exporte; antes, 7.8.0: postulaciones: radicado y consulta pública del estado, motivos de rechazo, reapertura, duplicados, búsqueda, indicadores y exporte; antes, 7.7.0: respaldo por buscadores cuando un sitio y Google Noticias rechazan la lectura, Vigilancia y Catálogo de fuentes reorganizados, Configuración con menú lateral y carga del logo institucional; antes, 7.6.0: interfaz en español, inglés británico e inglés americano con selector de idioma; antes, 7.5.0: entrega final: rutas de acceso a las fuentes, historial de vigilancias con fecha, hora y duración, informe de acceso plegable y ficha de modelos de inteligencia; antes, 7.4.2: búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
+| **Versión del sistema** | 7.11.0 · actualizada el 27 de noviembre de 2026 (diseminación: informes en borrador o validados, origen y recorrido de cada informe, vista previa del paquete del ciclo y exporte; antes, 7.10.0: evaluación: expediente por pestañas, observaciones que se resuelven y reabren, cambios entre versiones, aviso de cambios sin guardar y exporte; antes, 7.9.0: priorización: avance por criterio, matriz del ciclo, recorrido, justificación al cambiar una respuesta y exporte; antes, 7.8.0: postulaciones: radicado y consulta pública del estado, motivos de rechazo, reapertura, duplicados, búsqueda, indicadores y exporte; antes, 7.7.0: respaldo por buscadores cuando un sitio y Google Noticias rechazan la lectura, Vigilancia y Catálogo de fuentes reorganizados, Configuración con menú lateral y carga del logo institucional; antes, 7.6.0: interfaz en español, inglés británico e inglés americano con selector de idioma; antes, 7.5.0: entrega final: rutas de acceso a las fuentes, historial de vigilancias con fecha, hora y duración, informe de acceso plegable y ficha de modelos de inteligencia; antes, 7.4.2: búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
@@ -1018,6 +1018,20 @@ El cruce no acepta ni rechaza: es evidencia para decidir. Si la vigilancia ya la
 
 ---
 
+
+### Diseminación: informes con validación, origen y paquete con vista previa (versión 7.11.0)
+
+- **Borrador y validado.** Todo informe nace como **borrador**, lo redacte una persona o la IA. Para que salga a quien decide, alguien con permiso de redacción lo abre y pulsa **Validar informe**: con eso confirma que revisó el contenido. El informe necesita impacto definido y un contenido mínimo.
+- **Editar un validado lo devuelve a borrador.** Si cambia el título, el contenido o el impacto de un informe validado, vuelve a borrador y hay que validarlo de nuevo. También puede devolverlo con «Devolver a borrador» y escribir el motivo. Un informe validado no se elimina sin devolverlo antes.
+- **Indicadores.** Por validar, validados, **IA sin revisar** (generados desde una señal que nadie ha editado ni validado) e impacto.
+- **Filtros.** Pestañas por estado con su conteo, búsqueda (también por señal o tecnología), origen (a mano, con IA, preliminar sin IA), impacto y «Solo del ciclo actual».
+- **Origen a la vista.** Cada tarjeta muestra la tecnología y la señal de la que sale el informe.
+- **Ventana de lectura.** A la derecha del contenido: estado, datos (origen, quién lo creó y editó, extensión) y el **recorrido** (creado, editado, validado, devuelto, con fecha y persona). «Descargar Markdown» baja el informe.
+- **Paquete del ciclo.** Antes de descargar, la tarjeta dice **qué trae** (tecnologías del Listado Único, informes de evaluación, recomendaciones, notas, boletín) y **qué se queda por fuera** (recomendaciones sin validar, informes en redacción, confidenciales). Solo viajan las recomendaciones validadas, salvo que marque «Incluir borradores».
+- **Exportar CSV.** Descarga el listado de informes con estado, impacto, origen y quién validó. Queda en la bitácora.
+- **Boletines.** Un boletín aprobado y aún sin publicar ahora dice «Aprobado, listo para publicar».
+
+> **Importante:** los informes que existían antes de esta versión quedan como **borrador**, porque nadie los había validado de forma explícita. Mientras no se validen, no se incluyen en el paquete (a menos que marque «Incluir borradores»).
 
 ### Evaluación: expediente por pestañas, observaciones con estado y versiones (versión 7.10.0)
 

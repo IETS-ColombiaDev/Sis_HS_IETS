@@ -81,4 +81,5 @@ export default {
   "Publicar boletín": "Publish bulletin",
   'Se publicará "{title}" con las cifras aprobadas. La publicación no se deshace.':
     '"{title}" will be published with the approved figures. Publication cannot be undone.',
+  "Aprobado, listo para publicar": "Approved, ready to publish",
 };

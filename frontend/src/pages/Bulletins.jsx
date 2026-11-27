@@ -233,8 +233,8 @@ export default function Bulletins() {
                   {b.published_at ? " · " + t("Publicado {date}", { date: new Date(b.published_at).toLocaleDateString(intlLocale()) }) : ""}
                 </p>
               </div>
-              <Badge tone={b.status === "publicado" ? "ok" : "warning"}>
-                {BULLETIN_STATUS[b.status] || b.status}
+              <Badge tone={b.status === "publicado" || b.approved_by ? "ok" : "warning"}>
+                {b.status !== "publicado" && b.approved_by ? t("Aprobado, listo para publicar") : BULLETIN_STATUS[b.status] || b.status}
               </Badge>
             </div>
             <BulletinKpis body={b.body} />

@@ -92,6 +92,7 @@ def build_package(
         "evaluation_docs_skipped_confidential": 0,
         "evaluation_docs_skipped_draft": 0,
         "recommendations": 0,
+        "recommendations_skipped_draft": 0,
         "notes": 0,
         "bulletin": False,
     }
@@ -163,6 +164,10 @@ def build_package(
             else []
         )
         rec_index = []
+        if not include_drafts:
+            # Un informe sin validar es un borrador: no sale a quien decide.
+            manifest["recommendations_skipped_draft"] = sum(1 for r in recs if r.status != "validado")
+            recs = [r for r in recs if r.status == "validado"]
         for rec in recs:
             finding = db.get(Finding, rec.finding_id) if rec.finding_id else None
             name = f"recomendaciones/{rec.id:04d}_{_slug(rec.title)}.md"
@@ -172,15 +177,16 @@ def build_package(
                 f"- Señal: {finding.title if finding else '—'}\n"
                 f"- Impacto: {rec.impact or 'sin definir'}\n"
                 f"- Origen: {rec.model_used or 'manual'} · {rec.created_by or ''}\n"
+                f"- Estado: {'validado por ' + (rec.validated_by or '-') if rec.status == 'validado' else 'borrador sin validar'}\n"
                 f"- Fecha: {rec.created_at.date().isoformat() if rec.created_at else ''}\n\n"
                 "> Toda salida de IA es un borrador sujeto a validación humana.\n\n---\n\n"
             )
             zf.writestr(name, header + (rec.content or ""))
-            rec_index.append([rec.id, rec.title, rec.impact, rec.model_used, rec.created_by, name])
+            rec_index.append([rec.id, rec.title, rec.impact, rec.model_used, rec.created_by, rec.status, rec.validated_by, name])
             manifest["recommendations"] += 1
         zf.writestr(
             "recomendaciones/indice.csv",
-            _csv(rec_index, ["id", "titulo", "impacto", "origen", "autor", "archivo"]),
+            _csv(rec_index, ["id", "titulo", "impacto", "origen", "autor", "estado", "validado_por", "archivo"]),
         )
 
         # 4. Notas del equipo sobre esas senales y recomendaciones.
@@ -236,13 +242,15 @@ def _readme(m: dict) -> str:
         f"- Listado Único por clúster: {m['unique_list']} tecnología(s).",
         f"- Informes de evaluación: {m['evaluation_docs']} "
         + ("(incluye borradores)." if m["include_drafts"] else "(solo aprobados por comité o publicados)."),
-        f"- Recomendaciones de adopción: {m['recommendations']}.",
+        f"- Recomendaciones de adopción: {m['recommendations']} "
+        + ("(incluye borradores sin validar)." if m["include_drafts"] else "(solo validadas)."),
         f"- Notas del equipo: {m['notes']}.",
         f"- Boletín publicado: {'sí' if m['bulletin'] else 'no (aún no publicado)'}.",
         "",
         "Omitido a propósito:",
         f"- {m['evaluation_docs_skipped_confidential']} informe(s) marcados como confidenciales.",
         f"- {m['evaluation_docs_skipped_draft']} informe(s) aún en redacción o revisión.",
+        f"- {m.get('recommendations_skipped_draft', 0)} recomendación(es) en borrador, sin validar.",
         "",
         "Los CSV usan punto y coma como separador y codificación UTF-8 con BOM (abren en Excel).",
         "Las recomendaciones generadas con IA son borradores sujetos a validación humana.",
