@@ -8,7 +8,10 @@ import { LoadingBlock } from "./Spinner";
 import { TECH_STATUS_LABELS } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
 import InfoTip from "./InfoTip";
-import { t, ts, intlLocale } from "../i18n";
+import { t, ts, fmtDateTime } from "../i18n";
+
+// El servidor exige esta longitud mínima para cambiar una respuesta ya registrada.
+const MIN_CHANGE_NOTE = 10;
 
 /**
  * Matriz oficial de priorizacion P1 a P6.
@@ -74,7 +77,22 @@ const ROLE_SCOPE_LABEL = {
 function CriterionRow({ criterion, score, onRate, disabled, blockedReason, busy }) {
   const [justification, setJustification] = useState(score?.justification || "");
   const [open, setOpen] = useState(false);
+  const [needsNote, setNeedsNote] = useState(false);
   const value = score?.value;
+  const stored = score?.justification || "";
+
+  // Cambiar una respuesta mueve el %P: se pide explicar el cambio antes de enviarlo.
+  const answer = (next) => {
+    const note = justification.trim();
+    const changing = value != null && value !== next;
+    if (changing && (note.length < MIN_CHANGE_NOTE || note === stored.trim())) {
+      setOpen(true);
+      setNeedsNote(true);
+      return;
+    }
+    setNeedsNote(false);
+    onRate(criterion.code, next, note);
+  };
   const canRate = score?.can_rate && !disabled;
   const roleLabel = ROLE_SCOPE_LABEL[criterion.role_scope] || (criterion.role_scope || "").replace(/_/g, " ");
   const lockedWhy =
@@ -82,7 +100,8 @@ function CriterionRow({ criterion, score, onRate, disabled, blockedReason, busy 
 
   useEffect(() => {
     setJustification(score?.justification || "");
-  }, [score?.justification]);
+    setNeedsNote(false);
+  }, [score?.justification, score?.value]);
 
   return (
     <div className="pm-row" data-rated={value != null ? "true" : "false"} data-testid={`pm-row-${criterion.code}`}>
@@ -122,7 +141,7 @@ function CriterionRow({ criterion, score, onRate, disabled, blockedReason, busy 
         {score?.rated_by_email && (
           <div className="pm-signature">
             {t("Calificado por {quien}", { quien: score.rated_by_email })}
-            {score.rated_at ? ` · ${new Date(score.rated_at).toLocaleString(intlLocale())}` : ""}
+            {score.rated_at ? ` · ${fmtDateTime(score.rated_at)}` : ""}
             {score.justification ? ` · "${score.justification}"` : ""}
           </div>
         )}
@@ -135,7 +154,16 @@ function CriterionRow({ criterion, score, onRate, disabled, blockedReason, busy 
             placeholder={t("Justificación (opcional pero recomendada para auditoría)")}
             value={justification}
             onChange={(e) => setJustification(e.target.value)}
+            maxLength={2000}
           />
+        )}
+        {needsNote && canRate && (
+          <p className="pm-change-note" role="alert" data-testid={`pm-change-note-${criterion.code}`}>
+            {t("Para cambiar la respuesta de {codigo}, escriba por qué (mínimo {n} caracteres) y pulse de nuevo Sí o No. El cambio queda en el recorrido.", {
+              codigo: criterion.code,
+              n: MIN_CHANGE_NOTE,
+            })}
+          </p>
         )}
       </div>
 
@@ -145,7 +173,7 @@ function CriterionRow({ criterion, score, onRate, disabled, blockedReason, busy 
             <button
               type="button"
               className={`pm-btn pm-btn-yes ${value === 1 ? "pm-btn-active" : ""}`}
-              onClick={() => onRate(criterion.code, 1, justification)}
+              onClick={() => answer(1)}
               disabled={busy}
               title={t("Responder Sí a {codigo}: suma 1 punto.", { codigo: criterion.code })}
               aria-label={`${criterion.code} ${t("Sí")}`}
@@ -155,7 +183,7 @@ function CriterionRow({ criterion, score, onRate, disabled, blockedReason, busy 
             <button
               type="button"
               className={`pm-btn pm-btn-no ${value === 0 ? "pm-btn-active" : ""}`}
-              onClick={() => onRate(criterion.code, 0, justification)}
+              onClick={() => answer(0)}
               disabled={busy}
               title={t("Responder No a {codigo}: no suma puntos.", { codigo: criterion.code })}
               aria-label={`${criterion.code} ${t("No")}`}

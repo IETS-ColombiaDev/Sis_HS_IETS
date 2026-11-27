@@ -1,0 +1,466 @@
+/* Priorización: avance del ciclo, cola con puntos por criterio, matriz del ciclo y recorrido. */
+
+/* ---- Selector de vista ---- */
+.prio-view {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #f1f5f9;
+}
+.prio-view button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.prio-view button[aria-pressed="true"] {
+  background: #fff;
+  color: #1d4ed8;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+.prio-view button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+/* ---- Avance del ciclo ---- */
+.prio-progress {
+  margin-bottom: 16px;
+}
+.prio-progress-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 14px;
+}
+.prio-progress-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.prio-progress-head strong {
+  font-size: 14px;
+  color: #0f172a;
+}
+.prio-progress-head span {
+  font-size: 12.5px;
+  color: #64748b;
+}
+.prio-progress-track,
+.prio-criteria-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #e8edf5;
+  overflow: hidden;
+}
+.prio-progress-track > div {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2563eb, #10b981);
+  transition: width 240ms ease;
+}
+.prio-progress-pct {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+.prio-criteria {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+.prio-criteria li {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.prio-criteria li.is-mine {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+.prio-criteria-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.prio-criteria-top b {
+  font-size: 14px;
+  color: #0f172a;
+}
+.prio-criteria-top span {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+.prio-criteria-label {
+  margin: 1px 0 7px;
+  font-size: 11.5px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prio-criteria-track {
+  height: 5px;
+}
+.prio-criteria-track > div {
+  height: 100%;
+  border-radius: 999px;
+  background: #2563eb;
+  transition: width 240ms ease;
+}
+.prio-criteria li.is-done .prio-criteria-track > div {
+  background: #10b981;
+}
+.prio-criteria-foot {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #64748b;
+}
+.prio-criteria-foot em {
+  font-style: normal;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+/* ---- Cola ---- */
+.prio-layout {
+  grid-template-columns: 340px minmax(0, 1fr);
+}
+.prio-layout > * {
+  min-width: 0;
+}
+.prio-list {
+  max-height: 720px;
+}
+.prio-dots {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+.prio-dot {
+  flex: 1 1 0;
+  max-width: 34px;
+  height: 6px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1.5px #cbd5e1;
+}
+.prio-dot.is-yes {
+  background: #10b981;
+  box-shadow: none;
+}
+.prio-dot.is-no {
+  background: #94a3b8;
+  box-shadow: none;
+}
+.prio-dot.is-mine {
+  background: #fef3c7;
+  box-shadow: inset 0 0 0 1.5px #f59e0b;
+}
+
+/* ---- Detalle ---- */
+.prio-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.prio-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 3px 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+  color: #334155;
+  overflow-wrap: anywhere;
+}
+.prio-chip.is-soft {
+  border-color: transparent;
+  background: #f1f5f9;
+  color: #475569;
+}
+.prio-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #f1f5f9;
+}
+.prio-nav > span {
+  margin-right: auto;
+  font-size: 12.5px;
+  color: #64748b;
+}
+.pm-change-note {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  background: #fffbeb;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #92400e;
+}
+
+/* ---- Recorrido ---- */
+.prio-history-fold {
+  margin-top: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.prio-history-fold > summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 11px 14px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: #0f172a;
+}
+.prio-history-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.prio-history-fold > summary span {
+  font-size: 12px;
+  font-weight: 400;
+  color: #64748b;
+}
+.prio-history-empty {
+  margin: 0;
+  padding: 0 14px 14px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+.prio-history {
+  list-style: none;
+  margin: 0;
+  padding: 2px 14px 14px;
+  display: grid;
+  gap: 12px;
+}
+.prio-history li {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  color: #334155;
+}
+.prio-history li:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 26px;
+  bottom: -12px;
+  width: 2px;
+  background: #e2e8f0;
+}
+.prio-history-dot {
+  flex: 0 0 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+}
+.prio-history li.is-rated .prio-history-dot,
+.prio-history li.is-apt .prio-history-dot {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.prio-history li.is-changed .prio-history-dot {
+  background: #fef3c7;
+  color: #92400e;
+}
+.prio-history li.is-classified .prio-history-dot,
+.prio-history li.is-evaluation .prio-history-dot,
+.prio-history li.is-published .prio-history-dot {
+  background: #d1fae5;
+  color: #065f46;
+}
+.prio-history li.is-excluded .prio-history-dot {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.prio-history strong {
+  display: block;
+  line-height: 1.35;
+  color: #0f172a;
+}
+.prio-history-meta {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+.prio-history p {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: #475569;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Matriz del ciclo ---- */
+.prio-table-wrap {
+  overflow-x: auto;
+}
+.prio-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.prio-table thead th {
+  position: sticky;
+  top: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: left;
+  color: #64748b;
+  white-space: nowrap;
+}
+.prio-table tbody th,
+.prio-table tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+  text-align: left;
+  font-weight: 400;
+}
+.prio-table tbody tr:hover {
+  background: #f8fafc;
+}
+.prio-table .is-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.prio-table .is-crit {
+  width: 52px;
+  text-align: center;
+}
+.prio-table td.is-crit {
+  font-size: 12px;
+  font-weight: 700;
+}
+.prio-table td.is-yes {
+  background: #ecfdf5;
+  color: #047857;
+}
+.prio-table td.is-no {
+  background: #f1f5f9;
+  color: #475569;
+}
+.prio-table td.is-pending {
+  color: #cbd5e1;
+}
+.prio-table td.is-mine {
+  background: #fffbeb;
+  color: #d97706;
+}
+.prio-table-name {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 650;
+  text-align: left;
+  color: #0f172a;
+  cursor: pointer;
+}
+.prio-table-name:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+.prio-table-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+.prio-table-meta em {
+  padding: 1px 7px;
+  border: 1px solid #fde68a;
+  border-radius: 999px;
+  background: #fef3c7;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #92400e;
+}
+.prio-table-dash {
+  color: #cbd5e1;
+}
+
+@media (max-width: 1100px) {
+  .prio-criteria {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .prio-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .prio-list {
+    max-height: 360px;
+  }
+}
+@media (max-width: 560px) {
+  .prio-criteria {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .prio-view button {
+    padding: 0 9px;
+  }
+}

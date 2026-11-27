@@ -5,7 +5,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.8.0 · actualizada el 27 de noviembre de 2026 (postulaciones: radicado y consulta pública del estado, motivos de rechazo, reapertura, duplicados, búsqueda, indicadores y exporte; antes, 7.7.0: respaldo por buscadores cuando un sitio y Google Noticias rechazan la lectura, Vigilancia y Catálogo de fuentes reorganizados, Configuración con menú lateral y carga del logo institucional; antes, 7.6.0: interfaz en español, inglés británico e inglés americano con selector de idioma; antes, 7.5.0: entrega final: rutas de acceso a las fuentes, historial de vigilancias con fecha, hora y duración, informe de acceso plegable y ficha de modelos de inteligencia; antes, 7.4.2: búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
+| **Versión del sistema** | 7.9.0 · actualizada el 27 de noviembre de 2026 (priorización: avance por criterio, matriz del ciclo, recorrido, justificación al cambiar una respuesta y exporte; antes, 7.8.0: postulaciones: radicado y consulta pública del estado, motivos de rechazo, reapertura, duplicados, búsqueda, indicadores y exporte; antes, 7.7.0: respaldo por buscadores cuando un sitio y Google Noticias rechazan la lectura, Vigilancia y Catálogo de fuentes reorganizados, Configuración con menú lateral y carga del logo institucional; antes, 7.6.0: interfaz en español, inglés británico e inglés americano con selector de idioma; antes, 7.5.0: entrega final: rutas de acceso a las fuentes, historial de vigilancias con fecha, hora y duración, informe de acceso plegable y ficha de modelos de inteligencia; antes, 7.4.2: búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
@@ -1018,6 +1018,17 @@ El cruce no acepta ni rechaza: es evidencia para decidir. Si la vigilancia ya la
 
 ---
 
+
+### Priorización: avance, matriz del ciclo y recorrido (versión 7.9.0)
+
+- **Indicadores.** Además de la cola y las franjas, verá cuántas tecnologías **le tocan a usted** (les falta un criterio que su perfil califica) y cuántas ya pasaron a evaluación.
+- **Avance de la matriz.** Una barra muestra cuántas tecnologías tienen los seis criterios y, debajo, cada criterio (P1 a P6) con cuántas respuestas lleva. Los que califica su perfil aparecen resaltados.
+- **Cola.** Cada tecnología trae seis marcas, una por criterio: verde es «Sí», gris es «No», hueca es pendiente y ámbar es pendiente que le toca a usted. Puede filtrar por avance (con criterios pendientes o matriz completa) y ordenar por cribado, %P, cercanía a completar, calificación reciente o nombre.
+- **Matriz del ciclo.** El botón «Matriz del ciclo» cambia la pantalla a una tabla con una fila por tecnología y una columna por criterio, con puntos, %P y estado. Pulse el nombre para abrirla y calificar.
+- **Cambiar una respuesta.** Si un criterio ya tiene respuesta y la cambia, el sistema pide una justificación de al menos 10 caracteres. Repetir la misma respuesta no la pide.
+- **Recorrido.** Bajo la matriz de cada tecnología, «Recorrido en la matriz» muestra quién calificó o cambió cada criterio, cuándo, con qué justificación, y cada vez que la matriz quedó completa.
+- **Siguiente que me toca.** Al pie del detalle, lleva a la siguiente tecnología de la página que espera una respuesta suya.
+- **Exportar CSV.** Descarga la matriz completa del ciclo con la respuesta de cada criterio, quién la dio, cuándo y su justificación. La descarga queda en la bitácora.
 
 ### Moderación de postulaciones (versión 7.8.0)
 

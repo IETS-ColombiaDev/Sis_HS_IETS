@@ -1112,3 +1112,41 @@ en qué iba su trámite.
 - No se envía correo a quien postula cuando hay decisión: la consulta es por radicado. Activarlo requiere decidir el
   texto y confirmar el servidor de correo.
 - El desfase de hora en las pantallas que no usan `fmtDateTime` queda por revisar una a una.
+
+## Priorización robusta: avance, matriz del ciclo, recorrido y exporte (27-11-2026, versión 7.9.0)
+
+**Por qué.** La pantalla solo dejaba calificar una tecnología a la vez. No se veía qué criterio frenaba el ciclo, no
+había una vista de toda la matriz, una respuesta se podía cambiar sin explicación y no se podía sacar la matriz.
+
+**Servidor.** Sin migración.
+
+- `priority_overview.py` (nuevo, solo lectura): `stats` (avance por criterio, pendientes del perfil, %P promedio,
+  distribución de puntos), `history` y `export_rows`.
+- El recorrido sale de `audit_log`: altas y cambios de `priority_scores` (los captura el listener del ORM), más
+  `priority:classify` y los cambios de estado de `cycle_technologies`. No hay tabla nueva.
+- `priority_engine.rate_criterion`: cambiar el valor de un criterio ya calificado exige justificación de 10 caracteres
+  o más (`MIN_CHANGE_NOTE`); repetir el mismo valor no. Justificación hasta 2.000 caracteres. Responde 409.
+- `routers/priority.py`:
+  - `GET /api/priority/{ciclo}/queue` acepta `order` (`cribado`, `pct`, `avance`, `nombre`, `recientes`) y `progress`
+    (`completas`, `incompletas`); cada fila trae `scores` (valor por criterio), `my_missing` y `last_rated_at`.
+  - `GET /api/priority/{ciclo}/stats` suma `progress_pct`, `pending_for_me`, `avg_pct`, `points_distribution`,
+    `criteria`, `excluded` e `in_evaluation`.
+  - `GET /api/priority/{ciclo}/export.csv` (cualquier usuario con sesión, queda como `priority:export` en bitácora,
+    neutraliza celdas que empiezan por `=`, `+`, `-` o `@`).
+  - `GET /api/priority/{ciclo}/{tecnología}/history`.
+
+**Interfaz.**
+
+- `pages/Prioritization.jsx` y `pages/prioritization.css`: selector de vista (calificar o matriz del ciclo), panel de
+  avance por criterio, marcas por criterio en la cola, filtro por avance y orden, fichas en el detalle, recorrido
+  plegable, navegación anterior/siguiente y «Siguiente que me toca», exporte.
+- `components/PriorityMatrix.jsx`: al cambiar una respuesta abre la justificación y explica la regla antes de enviar;
+  la fecha de la firma usa `fmtDateTime` (corrige el desfase de cinco horas).
+- `i18n/locales/en/server.priority.js`: textos del recorrido y de la regla en inglés.
+
+**Pruebas.** `tests/test_priorizacion_robusta.py` (5) y `e2e/priorizacion_robusta.spec.js` (1).
+
+**Pendientes.**
+
+- El exporte no respeta los filtros de la cola: siempre baja la matriz completa del ciclo.
+- La matriz del ciclo pagina de a 50 como la cola; no hay vista de todo el ciclo en una sola tabla.
