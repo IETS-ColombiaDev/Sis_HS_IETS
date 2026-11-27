@@ -1300,3 +1300,39 @@ actualizado (motivo al devolver, vista previa de cierre y arrastre).
 - La ventana usa la fecha del navegador; el exporte usa la fecha de Colombia (`ttm.today_co`).
 - `history` lee todos los eventos `cycle:carry_over` para encontrar los que salieron del ciclo: son pocos, pero no está
   indexado.
+
+## Boletines robustos: contenido ampliado, mensaje del líder, vigencia y recorrido (27-11-2026, versión 7.14.0)
+
+**Por qué.** El boletín solo llevaba el embudo y dos tablas de conteo: no decía qué tecnologías se priorizaron ni
+permitía una nota del líder. Tampoco avisaba si el ciclo cambiaba después de compilar, y una aprobación solo se
+deshacía recompilando.
+
+**Servidor** (`bulletin_service.py` nuevo, `strategy_service.py`, `routers/strategy.py`, `report_html.py`; sin migración).
+
+- `compile_bulletin` suma a `body`: `summary`, `top_prioritized` (10), `top_prioritized_total`, `previous`
+  (código y embudo del ciclo anterior), `quality_pct` y `total` (`bulletin_service.extra_body`). Conserva `note` y
+  `note_by` al recompilar. Sin montos: el boletín lo abre cualquier perfil.
+- `PUT /api/bulletins/{id}` (título y `note`): solo sin publicar; si cambia algo y estaba aprobado, anula la aprobación.
+  Registra `bulletin:edit`.
+- `POST /api/bulletins/{id}/unapprove` con `reason` obligatorio (`bulletin:unapprove`).
+- `DELETE /api/bulletins/{id}`: solo sin publicar (409 si está publicado).
+- `GET /api/bulletins/{id}/freshness`: compara el embudo compilado con el actual del ciclo.
+- `GET /api/bulletins/{id}/history`: recorrido desde la bitácora.
+- `GET /api/bulletins/{id}/export?format=pdf` registra `bulletin:export`; ver el HTML no deja registro.
+- `BulletinOut` suma `cycle_code` y `updated_at`.
+- Correcciones: aprobar dos veces responde 409 (antes reemplazaba al aprobador en silencio); publicar un boletín ya
+  aprobado conserva `approved_by` y guarda `body.published_by`. Publicar sin aprobación previa en una sola llamada
+  (`publish: true`) sigue aprobando y publicando con la misma persona, como antes.
+
+**Interfaz** (`pages/Bulletins.jsx`, `pages/bulletins.css`): pestañas, casilla de todos los ciclos, `BulletinSteps`,
+`StaleNotice`, `BulletinContent`, `Distribution`, `BulletinHistory`, ventanas de título y mensaje, anular aprobación y
+eliminar, y conteo de destinatarios válidos. Traducciones en `pages.Bulletins.js` y `server.bulletins.js` (nuevo).
+
+**Pruebas.** `tests/test_boletines_robustos.py` (6) y `e2e/boletines_robustos.spec.js` (1).
+
+**Pendientes.**
+
+- Los boletines compilados antes de esta versión no tienen las secciones nuevas hasta que se recompilan; los
+  publicados se quedan como están.
+- `freshness` recalcula el embudo del ciclo por cada boletín sin publicar que se muestra.
+- Los nombres de clúster y las franjas del contenido quedan en español dentro del boletín guardado.

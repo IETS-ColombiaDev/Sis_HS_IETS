@@ -1822,10 +1822,29 @@ class BulletinOut(BaseModel):
     approved_by: str = ""
     published_at: datetime | None = None
     created_at: datetime
+    updated_at: datetime | None = None
+    cycle_code: str = ""
 
 
 class BulletinDecisionIn(BaseModel):
     publish: bool = False
+
+
+class BulletinUpdateIn(BaseModel):
+    title: str | None = None
+    note: str | None = None
+
+
+class BulletinUnapproveIn(BaseModel):
+    reason: str = ""
+
+
+class BulletinHistoryEvent(BaseModel):
+    kind: str
+    label: str
+    detail: str = ""
+    at: str = ""
+    by: str = ""
 
 
 class BulletinDistributeIn(BaseModel):

@@ -1,0 +1,197 @@
+/* Boletines: pestañas, avance, mensaje del líder, tablas del contenido, envíos y recorrido. */
+
+.bl-tabs {
+  margin: 0 0 12px;
+}
+.bl-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.bl-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: #334155;
+  cursor: pointer;
+}
+
+/* --- Avance --- */
+.bl-steps {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 14px 0 0;
+  padding: 0;
+}
+.bl-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 5px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  font-size: 12px;
+  color: #94a3b8;
+}
+.bl-steps li > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.bl-steps li.is-done {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #065f46;
+  font-weight: 600;
+}
+.bl-steps li.is-done > span {
+  background: #10b981;
+  color: #fff;
+}
+.bl-steps li.is-next {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1e40af;
+  font-weight: 600;
+}
+.bl-steps li.is-next > span {
+  background: #2563eb;
+  color: #fff;
+}
+
+.bl-stale {
+  margin-top: 14px;
+}
+
+/* --- Contenido --- */
+.bl-note {
+  margin: 16px 0 0;
+  padding: 10px 14px;
+  border-left: 4px solid #1d4ed8;
+  border-radius: 0 10px 10px 0;
+  background: #eff6ff;
+  color: #1e293b;
+}
+.bl-note b {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1d4ed8;
+}
+.bl-note p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bl-lead {
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #334155;
+}
+.bl-fold {
+  margin: 0 0 12px;
+}
+.bl-table-wrap {
+  overflow-x: auto;
+  padding: 0 14px 12px;
+}
+.bl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.bl-table th,
+.bl-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.bl-table th {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.bl-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* --- Envíos --- */
+.bl-sends {
+  list-style: none;
+  margin: 0;
+  padding: 0 14px 12px;
+  display: grid;
+  gap: 10px;
+  font-size: 13px;
+  color: #334155;
+}
+.bl-sends li {
+  overflow-wrap: anywhere;
+}
+.bl-sends-failed {
+  color: #b45309;
+}
+.bl-recipients {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: #047857;
+  overflow-wrap: anywhere;
+}
+.bl-recipients.is-bad {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+/* --- Acciones y recorrido --- */
+.bl-actions {
+  justify-content: flex-start;
+  margin-top: 4px;
+}
+.bl-actions + .bl-fold {
+  margin-top: 14px;
+  margin-bottom: 0;
+}
+.bl-history li.is-compiled .prio-history-dot,
+.bl-history li.is-recompiled .prio-history-dot {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.bl-history li.is-edited .prio-history-dot,
+.bl-history li.is-unapproved .prio-history-dot {
+  background: #fef3c7;
+  color: #92400e;
+}
+.bl-history li.is-approved .prio-history-dot,
+.bl-history li.is-published .prio-history-dot,
+.bl-history li.is-distributed .prio-history-dot {
+  background: #d1fae5;
+  color: #065f46;
+}
+.bl-history li p {
+  overflow-wrap: anywhere;
+}
