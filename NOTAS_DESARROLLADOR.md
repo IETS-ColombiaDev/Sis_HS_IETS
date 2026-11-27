@@ -1190,3 +1190,44 @@ versiones, se podía perder lo escrito al cambiar de tecnología y la cola no de
 - El portal del revisor externo (`/revisar/<token>`) no muestra si una observación fue resuelta ni la respuesta.
 - No se avisa por correo al revisor cuando su observación se resuelve.
 - No hay comparación lado a lado de dos versiones: solo la lista de campos que cambiaron.
+
+## Diseminación robusta: validación de informes, origen, recorrido y paquete (27-11-2026, versión 7.11.0)
+
+**Por qué.** Un informe generado por IA quedaba igual que uno revisado por una persona y viajaba en el paquete del
+ciclo sin que nadie respondiera por él. La tarjeta no decía de qué señal salía, no había forma de saber quién lo
+cambió y el paquete se descargaba a ciegas.
+
+**Servidor.**
+
+- `alembic/versions/0012_recommendation_validation.py`: `recommendations.status` (`borrador` | `validado`),
+  `validated_by`, `validated_at`, `updated_by`, `updated_at`. Los informes existentes quedan en `borrador`: el sistema
+  no afirma una validación que nadie hizo.
+- `recommendation_service.py` (nuevo): `validate` (exige impacto y 80 caracteres), `reopen`, `origin_of` (manual, ia,
+  preliminar), `context_for` (señal y tecnología en dos consultas), `history` (desde `audit_log`) y `export_rows`.
+- `routers/recommendations.py`:
+  - `GET /api/recommendations` acepta `cycle_id` y `status`; cada fila trae `status`, `origin`, `edited`, `words`,
+    `finding_title`, `technology_id`, `technology_name`, validación y última edición.
+  - `POST /{id}/validate`, `POST /{id}/reopen` (permiso `report:write`), `GET /{id}/history`.
+  - `PUT /{id}`: si cambia título, contenido o impacto de un validado, vuelve a borrador (queda `recommendation:reopened`
+    con motivo «Editado después de validar»). Guardar sin cambios no toca nada.
+  - `DELETE /{id}`: 409 si está validado.
+  - `GET /export.csv` (queda como `recommendation:export`, neutraliza fórmulas).
+  - `GET /package/{ciclo}/preview`: el manifiesto del paquete sin descargarlo ni dejar registro.
+- `dissemination_service.build_package`: solo recomendaciones validadas salvo `include_drafts`; el manifiesto suma
+  `recommendations_skipped_draft` y cada `.md` dice quién validó.
+
+**Interfaz.**
+
+- `pages/Recommendations.jsx` y `pages/recommendations.css`: indicadores, pestañas por estado, filtros por origen y
+  ciclo, tarjetas con estado y origen, ventana de lectura a dos columnas con validar, devolver y recorrido, tarjeta
+  del paquete con vista previa, exporte y descarga en Markdown.
+- `pages/Bulletins.jsx`: la insignia de un boletín aprobado sin publicar dice «Aprobado, listo para publicar».
+
+**Pruebas.** `tests/test_diseminacion_robusta.py` (6) y `e2e/diseminacion_robusta.spec.js` (1); en
+`test_frente_b_dissemination.py` la recomendación de la semilla ahora está validada.
+
+**Pendientes.**
+
+- Quien crea un informe puede validarlo: no se exige una segunda persona.
+- La vista previa arma el paquete completo en memoria para contar; con ciclos muy grandes convendría contar sin armar.
+- Boletines no se rediseñó; solo se corrigió la insignia.

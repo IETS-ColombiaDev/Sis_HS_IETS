@@ -217,6 +217,12 @@ class Recommendation(Base):
     model_used: Mapped[str] = mapped_column(String(120), default="")
     created_by: Mapped[str] = mapped_column(String(255), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Validacion humana: borrador | validado. Solo lo validado viaja en el paquete.
+    status: Mapped[str] = mapped_column(String(20), default="borrador", server_default="borrador")
+    validated_by: Mapped[str] = mapped_column(String(255), default="", server_default="")
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_by: Mapped[str] = mapped_column(String(255), default="", server_default="")
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     finding: Mapped["Finding"] = relationship(back_populates="recommendations")
 

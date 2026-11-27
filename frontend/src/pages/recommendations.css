@@ -1,0 +1,244 @@
+/* Diseminación: paquete del ciclo, informes con estado y ventana de lectura. */
+
+/* ---- Paquete ---- */
+.rec-package-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  padding: 16px 18px;
+}
+.rec-package-title {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.rec-package-title strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14.5px;
+  color: #0f172a;
+}
+.rec-package-title p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+.rec-package-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+.rec-package-controls .field,
+.rec-package-controls select {
+  min-width: 190px;
+}
+.rec-package-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #334155;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.rec-package-preview {
+  padding: 12px 18px 14px;
+  border-top: 1px solid #eef2f7;
+  background: #f8fafc;
+}
+.rec-package-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.rec-package-preview ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rec-package-preview li {
+  padding: 5px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12.5px;
+  color: #475569;
+}
+.rec-package-preview li b {
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+.rec-package-preview li.is-ok {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+.rec-package-preview li.is-empty {
+  color: #94a3b8;
+}
+.rec-package-skipped {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: #92400e;
+}
+
+/* ---- Filtros ---- */
+.rec-tabs {
+  margin: 0 0 12px;
+}
+.rec-select {
+  flex: 0 1 190px;
+  min-width: 150px;
+}
+
+/* ---- Tarjetas ---- */
+.rec-card.is-borrador {
+  border-left-color: #f59e0b;
+}
+.rec-card.is-validado {
+  border-left-color: #10b981;
+}
+.rec-card-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rec-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.rec-status.is-borrador {
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+.rec-status.is-validado {
+  border: 1px solid #a7f3d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+.rec-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: #64748b;
+}
+.rec-source svg {
+  flex: 0 0 auto;
+}
+.rec-source b {
+  flex: 0 0 auto;
+  color: #1e293b;
+}
+.rec-source span {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rec-validated-by {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #047857;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Ventana de lectura ---- */
+.rec-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(240px, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+.rec-detail-main {
+  min-width: 0;
+}
+.rec-detail-side {
+  display: grid;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+.rec-detail-side h4 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.rec-side-note {
+  margin: 8px 0 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+.rec-facts {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  font-size: 13px;
+}
+.rec-facts dt {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: #64748b;
+}
+.rec-facts dt:first-child {
+  margin-top: 0;
+}
+.rec-facts dd {
+  margin: 0;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+.rec-history {
+  padding: 0;
+}
+.prio-history li.is-created .prio-history-dot,
+.prio-history li.is-edited .prio-history-dot {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.prio-history li.is-validated .prio-history-dot {
+  background: #d1fae5;
+  color: #065f46;
+}
+.prio-history li.is-reopened .prio-history-dot {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+@media (max-width: 900px) {
+  .rec-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .rec-package-controls > * {
+    flex: 1 1 100%;
+  }
+}
