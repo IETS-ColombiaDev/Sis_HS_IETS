@@ -1,0 +1,366 @@
+/* Ciclos: indicadores, calendario del año, etapas, ventana y recorrido. */
+
+/* --- Indicadores --- */
+.cy-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.cy-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #2563eb;
+  border-radius: 12px;
+  background: #fff;
+}
+.cy-tile > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+.cy-tile strong {
+  font-size: 24px;
+  line-height: 1.15;
+  color: #0f172a;
+}
+.cy-tile em {
+  font-style: normal;
+  font-size: 12px;
+  color: #64748b;
+}
+.cy-tile.is-full {
+  border-left-color: #059669;
+}
+.cy-tile.is-late {
+  border-left-color: #d97706;
+}
+.cy-tile.is-late em {
+  color: #b45309;
+  font-weight: 600;
+}
+
+/* --- Calendario del año --- */
+.cy-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.cy-cal-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.cy-year {
+  width: auto;
+  min-width: 96px;
+}
+.cy-cal {
+  display: grid;
+  gap: 8px;
+}
+.cy-cal-row {
+  display: grid;
+  grid-template-columns: minmax(84px, 170px) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+.cy-cal-months > div {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: capitalize;
+}
+.cy-cal-months > div > span {
+  overflow: hidden;
+  white-space: nowrap;
+  border-left: 1px solid #e2e8f0;
+  padding-left: 3px;
+}
+.cy-cal-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #334155;
+}
+.cy-cal-track {
+  position: relative;
+  height: 20px;
+  border-radius: 999px;
+  background: #f1f5f9;
+}
+.cy-cal-bar {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #94a3b8;
+  cursor: pointer;
+}
+.cy-cal-bar:hover,
+.cy-cal-bar:focus-visible {
+  filter: brightness(0.9);
+  outline: 2px solid #1e3a8a;
+  outline-offset: 1px;
+}
+.cy-cal-bar.is-selected {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #2563eb;
+}
+.cy-cal-bar.tone-en_configuracion { background: #94a3b8; }
+.cy-cal-bar.tone-en_filtrado { background: #3b82f6; }
+.cy-cal-bar.tone-en_priorizacion { background: #1d4ed8; }
+.cy-cal-bar.tone-en_evaluacion { background: #7c3aed; }
+.cy-cal-bar.tone-cerrado_consolidado { background: #059669; }
+.cy-cal-today {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: #dc2626;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.cy-cal-empty {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+/* --- Pestañas y listado --- */
+.cy-tabs {
+  margin: 0 0 14px;
+}
+.cy-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+/* --- Tarjeta: etapas --- */
+.cy-steps {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0 0 14px;
+  padding: 0;
+}
+.cy-steps li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 10.5px;
+  color: #94a3b8;
+  text-align: center;
+}
+.cy-steps li:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  right: calc(50% + 13px);
+  width: calc(100% - 22px);
+  height: 2px;
+  background: #e2e8f0;
+}
+.cy-steps li.is-done:not(:first-child)::before,
+.cy-steps li.is-current:not(:first-child)::before {
+  background: #93c5fd;
+}
+.cy-step-dot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+.cy-step-label {
+  white-space: nowrap;
+}
+.cy-steps li.is-done .cy-step-dot {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.cy-steps li.is-current .cy-step-dot {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 0 0 3px #dbeafe;
+}
+.cy-steps li.is-current {
+  color: #1e40af;
+  font-weight: 600;
+}
+.cy-steps li.is-done {
+  color: #475569;
+}
+
+/* --- Tarjeta: ventana --- */
+.cy-schedule {
+  margin-bottom: 14px;
+}
+.cy-schedule-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+.cy-schedule-track > div {
+  height: 100%;
+  border-radius: 999px;
+  background: #10b981;
+}
+.cy-schedule p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: #475569;
+}
+.cy-schedule.is-idle .cy-schedule-track > div { background: #cbd5e1; }
+.cy-schedule.is-soon .cy-schedule-track > div { background: #f59e0b; }
+.cy-schedule.is-soon p { color: #92400e; }
+.cy-schedule.is-late .cy-schedule-track > div { background: #dc2626; }
+.cy-schedule.is-late p {
+  color: #b91c1c;
+  font-weight: 600;
+}
+.cy-closed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  color: #047857;
+}
+.cy-total {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  color: #64748b;
+}
+.cy-total a {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+/* --- Recorrido --- */
+.cy-history-fold {
+  margin-top: 14px;
+}
+.cy-history li.is-created .prio-history-dot,
+.cy-history li.is-advanced .prio-history-dot {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.cy-history li.is-returned .prio-history-dot,
+.cy-history li.is-edited .prio-history-dot {
+  background: #fef3c7;
+  color: #92400e;
+}
+.cy-history li.is-closed .prio-history-dot,
+.cy-history li.is-carried_in .prio-history-dot,
+.cy-history li.is-carried_out .prio-history-dot {
+  background: #d1fae5;
+  color: #065f46;
+}
+.cy-history li p {
+  overflow-wrap: anywhere;
+}
+
+/* --- Diálogos --- */
+.cy-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+}
+.cy-list li {
+  overflow-wrap: anywhere;
+}
+.cy-close-facts {
+  margin: 0 0 14px;
+  color: #334155;
+}
+.cy-close-facts li.is-warn {
+  color: #92400e;
+}
+.cy-carry {
+  margin-top: 4px;
+  font-size: 13.5px;
+  color: #334155;
+}
+.cy-carry ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+.cy-carry li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+}
+.cy-carry li:not(:last-child) {
+  border-bottom: 1px solid #f1f5f9;
+}
+.cy-carry li span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cy-carry li em {
+  flex: none;
+  font-style: normal;
+  font-size: 12px;
+  color: #64748b;
+}
+.cy-carry li.is-skip span {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+@media (max-width: 640px) {
+  .cy-cal-row {
+    grid-template-columns: 84px minmax(0, 1fr);
+  }
+  .cy-cal-months > div > span {
+    overflow: visible;
+  }
+  .cy-cal-months > div > span:nth-child(even) {
+    visibility: hidden;
+  }
+  .cy-carry li {
+    flex-direction: column;
+    gap: 2px;
+  }
+}

@@ -800,6 +800,14 @@ class CycleStatusUpdate(BaseModel):
     justification: str = ""
 
 
+class CycleHistoryEvent(BaseModel):
+    kind: str
+    label: str
+    detail: str = ""
+    at: str = ""
+    by: str = ""
+
+
 class CycleSummary(BaseModel):
     total: int = 0
     assigned: int = 0
@@ -821,6 +829,7 @@ class CycleOut(CycleBase):
     status_label: str = ""
     is_historic: bool = False
     closed_at: datetime | None = None
+    closed_by_name: str = ""
     created_at: datetime
     allowed_transitions: list[str] = []
     summary: CycleSummary = CycleSummary()
