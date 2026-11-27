@@ -16,7 +16,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from . import audit
-from .methodology import CYCLE_TRANSITIONS, get_param
+from .methodology import CYCLE_STATUS_LABELS, CYCLE_TRANSITIONS, get_param
 from .models import Cycle, CycleTechnology, EvaluationDoc, Recommendation, Technology
 
 
@@ -149,7 +149,17 @@ def can_transition(current: str, target: str) -> bool:
     return target in CYCLE_TRANSITIONS.get(current, ())
 
 
-def transition(db: Session, cycle: Cycle, target: str, *, actor: str = "") -> Cycle:
+STATUS_ORDER = ("en_configuracion", "en_filtrado", "en_priorizacion", "en_evaluacion", "cerrado_consolidado")
+
+
+def is_backwards(current: str, target: str) -> bool:
+    """La transicion devuelve el ciclo a una etapa anterior."""
+    if current not in STATUS_ORDER or target not in STATUS_ORDER:
+        return False
+    return STATUS_ORDER.index(target) < STATUS_ORDER.index(current)
+
+
+def transition(db: Session, cycle: Cycle, target: str, *, actor: str = "", note: str = "") -> Cycle:
     if cycle.status == target:
         return cycle
     if not can_transition(cycle.status, target):
@@ -169,7 +179,7 @@ def transition(db: Session, cycle: Cycle, target: str, *, actor: str = "") -> Cy
         entity_id=cycle.id,
         action="cycle:transition",
         old_value={"status": previous},
-        new_value={"status": target},
+        new_value={"status": target, **({"justification": note.strip()[:500]} if note.strip() else {})},
     )
     db.commit()
     db.refresh(cycle)
@@ -358,3 +368,202 @@ def cycle_summary(db: Session, cycle: Cycle) -> dict:
         "in_evaluation": by_status.get("en_evaluacion", 0),
         "published": by_status.get("publicada", 0),
     }
+
+
+# --------------------------------------------------------------------------- #
+#  Vista de conjunto: cierre, arrastre, recorrido y exporte (solo lectura)
+# --------------------------------------------------------------------------- #
+def _tech_name(tech: Technology | None, technology_id: int) -> str:
+    if tech is None:
+        return f"Tecnología {technology_id}"
+    return (tech.commercial_name or tech.inn_name or f"Tecnología {technology_id}").strip()
+
+
+def _names(db: Session, technology_ids: list[int]) -> dict[int, str]:
+    if not technology_ids:
+        return {}
+    rows = db.query(Technology).filter(Technology.id.in_(technology_ids)).all()
+    found = {t.id: t for t in rows}
+    return {tid: _tech_name(found.get(tid), tid) for tid in technology_ids}
+
+
+def close_preview(db: Session, cycle: Cycle) -> dict:
+    """Que pasa si el ciclo se cierra ahora: bloqueos, lo que se congela y lo que queda a medias."""
+    blocking = blocking_entries(db, cycle)
+    names = _names(db, [e.technology_id for e in blocking])
+    summary = cycle_summary(db, cycle)
+    to_freeze = (
+        db.query(func.count(CycleTechnology.id))
+        .filter(CycleTechnology.cycle_id == cycle.id, CycleTechnology.frozen == False)  # noqa: E712
+        .scalar()
+        or 0
+    )
+    return {
+        "can_close": not blocking,
+        "blocking_count": len(blocking),
+        "blocking_technology_ids": [e.technology_id for e in blocking],
+        "blocking": [{"technology_id": e.technology_id, "name": names[e.technology_id]} for e in blocking],
+        "to_freeze": to_freeze,
+        "watchlist": summary["watchlist"],
+        "pending_screening": summary["assigned"],
+        "pending_rating": summary["filtered"],
+        "message": (
+            "El ciclo puede cerrarse."
+            if not blocking
+            else f"{len(blocking)} tecnología(s) en evaluación sin informe final."
+        ),
+    }
+
+
+def carry_preview(db: Session, source_cycle: Cycle, target_cycle: Cycle | None) -> dict:
+    """Tecnologias bajo vigilancia del ciclo de origen y cuales ya estan en el destino."""
+    watch = (
+        db.query(CycleTechnology)
+        .filter(CycleTechnology.cycle_id == source_cycle.id, CycleTechnology.status == "bajo_vigilancia")
+        .order_by(CycleTechnology.id.asc())
+        .all()
+    )
+    existing: set[int] = set()
+    if target_cycle is not None:
+        existing = {
+            row[0]
+            for row in db.query(CycleTechnology.technology_id).filter(CycleTechnology.cycle_id == target_cycle.id).all()
+        }
+    names = _names(db, [e.technology_id for e in watch])
+    items = [
+        {
+            "technology_id": e.technology_id,
+            "name": names[e.technology_id],
+            "priority_pct": float(e.priority_pct) if e.priority_pct is not None else None,
+            "already_in_target": e.technology_id in existing,
+        }
+        for e in watch
+    ]
+    return {
+        "total": len(items),
+        "to_carry": sum(1 for i in items if not i["already_in_target"]),
+        "already_in_target": sum(1 for i in items if i["already_in_target"]),
+        "items": items,
+    }
+
+
+HISTORY_FIELDS = {
+    "code": "código",
+    "opened_on": "apertura",
+    "data_cutoff_on": "corte de datos",
+    "bulletin_due_on": "boletín",
+    "notes": "notas",
+}
+
+
+def history(db: Session, cycle: Cycle) -> list[dict]:
+    """Recorrido del ciclo segun la bitacora, del mas antiguo al mas reciente."""
+    from .models import AuditLog
+
+    own = (
+        db.query(AuditLog)
+        .filter(AuditLog.entity_type == "cycles", AuditLog.entity_id == str(cycle.id))
+        .all()
+    )
+    # Los arrastres se registran en el ciclo destino: se suman los que salieron de este.
+    sent = [
+        ev
+        for ev in db.query(AuditLog).filter(AuditLog.entity_type == "cycles", AuditLog.action == "cycle:carry_over").all()
+        if isinstance(ev.new_value, dict)
+        and ev.new_value.get("from_cycle_id") == cycle.id
+        and ev.entity_id != str(cycle.id)
+    ]
+    codes = {c.id: c.code for c in db.query(Cycle).all()}
+
+    def label_of(status: str) -> str:
+        return CYCLE_STATUS_LABELS.get(status, status or "")
+
+    out: list[dict] = []
+    for ev in sorted(own + sent, key=lambda e: (e.occurred_at, e.id)):
+        new = ev.new_value if isinstance(ev.new_value, dict) else {}
+        old = ev.old_value if isinstance(ev.old_value, dict) else {}
+        kind = label = detail = ""
+        if ev.action == "create":
+            kind, label = "created", "Ciclo creado"
+            parts = [f"Apertura {new.get('opened_on') or '-'}", f"corte {new.get('data_cutoff_on') or '-'}"]
+            if new.get("bulletin_due_on"):
+                parts.append(f"boletín {new['bulletin_due_on']}")
+            detail = " · ".join(parts)
+        elif ev.action == "update":
+            changed = []
+            for key, name in HISTORY_FIELDS.items():
+                if key not in new:
+                    continue
+                if key == "notes":
+                    changed.append(name)
+                else:
+                    changed.append(f"{name} ({old.get(key) or '-'} → {new.get(key) or '-'})")
+            if not changed:
+                continue  # los cambios de estado tienen su propio evento
+            kind, label = "edited", "Datos editados"
+            detail = "Cambió: " + ", ".join(changed)
+        elif ev.action == "cycle:transition":
+            back = is_backwards(old.get("status", ""), new.get("status", ""))
+            kind, label = ("returned", "Devuelto a una etapa anterior") if back else ("advanced", "Avanzó de etapa")
+            detail = f"{label_of(old.get('status', ''))} → {label_of(new.get('status', ''))}"
+            if new.get("justification"):
+                detail += f" · Motivo: {new['justification']}"
+        elif ev.action == "cycle:close":
+            kind, label = "closed", "Cerrado y consolidado"
+            detail = f"{int(new.get('frozen_entries') or 0)} puntaje(s) congelados"
+            if new.get("justification"):
+                detail += f" · Justificación: {new['justification']}"
+        elif ev.action == "cycle:carry_over":
+            n = int(new.get("carried") or 0)
+            if ev.entity_id == str(cycle.id):
+                kind, label = "carried_in", "Recibió tecnologías bajo vigilancia"
+                detail = f"{n} tecnología(s) desde {codes.get(new.get('from_cycle_id'), 'otro ciclo')}"
+            else:
+                kind, label = "carried_out", "Arrastró tecnologías bajo vigilancia"
+                target_id = int(ev.entity_id) if str(ev.entity_id).isdigit() else None
+                detail = f"{n} tecnología(s) hacia {codes.get(target_id, 'otro ciclo')}"
+        else:
+            continue
+        out.append(
+            {
+                "kind": kind,
+                "label": label,
+                "detail": detail[:600],
+                "at": ev.occurred_at.isoformat() if ev.occurred_at else "",
+                "by": ev.user_email or "",
+            }
+        )
+    return out
+
+
+EXPORT_HEADER = [
+    "Código", "Año", "Estado", "Histórico", "Apertura", "Corte de datos", "Boletín proyectado",
+    "Ventana (semanas)", "Días para el cierre de la ventana", "Tecnologías", "Asignadas", "Aptas", "Excluidas",
+    "Priorizadas", "Bajo vigilancia", "No priorizadas", "En evaluación", "Publicadas", "Cerrado el", "Cerrado por", "Notas",
+]
+
+
+def export_rows(db: Session, cycles: list[Cycle], *, today: date | None = None) -> tuple[list[str], list[list]]:
+    """Una fila por ciclo, con fechas, ventana y embudo. Los dias solo aplican a ciclos abiertos."""
+    from . import ttm
+    from .models import User
+
+    today = today or ttm.today_co()
+    closer_ids = [c.closed_by for c in cycles if c.closed_by]
+    closers = (
+        {u.id: (u.name or u.email) for u in db.query(User).filter(User.id.in_(closer_ids)).all()} if closer_ids else {}
+    )
+    rows = []
+    for c in cycles:
+        s = cycle_summary(db, c)
+        closing = c.bulletin_due_on or c.data_cutoff_on
+        is_open = c.status != "cerrado_consolidado" and not c.is_historic
+        rows.append([
+            c.code, c.year, CYCLE_STATUS_LABELS.get(c.status, c.status), "Sí" if c.is_historic else "No",
+            c.opened_on.isoformat(), c.data_cutoff_on.isoformat(), c.bulletin_due_on.isoformat() if c.bulletin_due_on else "",
+            round(_weeks_between(c.opened_on, closing), 1), (closing - today).days if is_open else "",
+            s["total"], s["assigned"], s["filtered"], s["excluded"], s["prioritized"], s["watchlist"],
+            s["not_prioritized"], s["in_evaluation"], s["published"],
+            c.closed_at.isoformat() if c.closed_at else "", closers.get(c.closed_by, ""), c.notes or "",
+        ])
+    return EXPORT_HEADER, rows
