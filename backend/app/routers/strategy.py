@@ -22,7 +22,10 @@ from ..schemas import (
     AlertSubscriptionOut,
     BulletinDecisionIn,
     BulletinDistributeIn,
+    BulletinHistoryEvent,
     BulletinOut,
+    BulletinUnapproveIn,
+    BulletinUpdateIn,
     StrategyActivityEvent,
     StrategyDashboardOut,
     StrategyGraphIn,
@@ -250,6 +253,24 @@ def dashboard_activity(
     return strategy_service.activity(db, _cycle(db, cycle_id))
 
 
+def _bulletins_out(db: Session, rows: list[Bulletin]) -> list[BulletinOut]:
+    ids = {r.cycle_id for r in rows}
+    codes = dict(db.query(Cycle.id, Cycle.code).filter(Cycle.id.in_(ids)).all()) if ids else {}
+    out = []
+    for row in rows:
+        item = BulletinOut.model_validate(row)
+        item.cycle_code = codes.get(row.cycle_id, "")
+        out.append(item)
+    return out
+
+
+def _bulletin(db: Session, bulletin_id: int) -> Bulletin:
+    row = db.get(Bulletin, bulletin_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Boletín no encontrado")
+    return row
+
+
 @router.get("/api/bulletins", response_model=list[BulletinOut])
 def list_bulletins(
     cycle_id: int | None = None,
@@ -259,7 +280,7 @@ def list_bulletins(
     q = db.query(Bulletin)
     if cycle_id:
         q = q.filter(Bulletin.cycle_id == cycle_id)
-    return q.order_by(Bulletin.created_at.desc()).all()
+    return _bulletins_out(db, q.order_by(Bulletin.created_at.desc()).all())
 
 
 @router.post("/api/bulletins/compile/{cycle_id}", response_model=BulletinOut)
@@ -275,7 +296,7 @@ def compile_bulletin(
     db.commit()
     db.refresh(row)
     bump_state_version(db)
-    return row
+    return _bulletins_out(db, [row])[0]
 
 
 @router.post("/api/bulletins/{bulletin_id}/approve", response_model=BulletinOut)
@@ -289,15 +310,103 @@ def approve_bulletin(
     if row is None:
         raise HTTPException(status_code=404, detail="Boletín no encontrado")
     try:
-        strategy_service.approve_bulletin(db, row, actor=user.email, publish=False)
+        # Publicar un boletín ya aprobado conserva a quien lo aprobó.
+        if not (payload.publish and (row.approved_by or "").strip() and row.status != "publicado"):
+            strategy_service.approve_bulletin(db, row, actor=user.email, publish=False)
         if payload.publish:
             strategy_service.publish_bulletin(db, row, actor=user.email)
     except StrategyRuleError as exc:
+        db.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     db.commit()
     db.refresh(row)
     bump_state_version(db)
-    return row
+    return _bulletins_out(db, [row])[0]
+
+
+@router.put("/api/bulletins/{bulletin_id}", response_model=BulletinOut)
+def update_bulletin(
+    bulletin_id: int,
+    payload: BulletinUpdateIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CYCLE_WRITE)),
+):
+    """Título y nota editorial de un boletín sin publicar. Si estaba aprobado, la aprobación se anula."""
+    from .. import bulletin_service
+
+    row = _bulletin(db, bulletin_id)
+    try:
+        bulletin_service.update(db, row, title=payload.title, note=payload.note, actor=user.email)
+    except StrategyRuleError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409 if row.status == "publicado" else 422, detail=str(exc)) from exc
+    db.commit()
+    db.refresh(row)
+    bump_state_version(db)
+    return _bulletins_out(db, [row])[0]
+
+
+@router.post("/api/bulletins/{bulletin_id}/unapprove", response_model=BulletinOut)
+def unapprove_bulletin(
+    bulletin_id: int,
+    payload: BulletinUnapproveIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CYCLE_WRITE)),
+):
+    """Anula la aprobación de un boletín sin publicar, con motivo."""
+    from .. import bulletin_service
+
+    row = _bulletin(db, bulletin_id)
+    if not (payload.reason or "").strip() and row.status != "publicado" and (row.approved_by or "").strip():
+        raise HTTPException(status_code=422, detail="Escriba el motivo para anular la aprobación.")
+    try:
+        bulletin_service.unapprove(db, row, actor=user.email, reason=payload.reason)
+    except StrategyRuleError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    db.commit()
+    db.refresh(row)
+    bump_state_version(db)
+    return _bulletins_out(db, [row])[0]
+
+
+@router.delete("/api/bulletins/{bulletin_id}", status_code=204)
+def delete_bulletin(
+    bulletin_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CYCLE_WRITE)),
+):
+    """Elimina un boletín sin publicar (compilado por error). La baja queda en la bitácora."""
+    row = _bulletin(db, bulletin_id)
+    if row.status == "publicado":
+        raise HTTPException(status_code=409, detail="Un boletín publicado no se elimina.")
+    db.delete(row)
+    db.commit()
+    bump_state_version(db)
+    return Response(status_code=204)
+
+
+@router.get("/api/bulletins/{bulletin_id}/freshness")
+def bulletin_freshness(
+    bulletin_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Si las cifras del ciclo cambiaron desde que se compiló el boletín."""
+    from .. import bulletin_service
+
+    return bulletin_service.freshness(db, _bulletin(db, bulletin_id))
+
+
+@router.get("/api/bulletins/{bulletin_id}/history", response_model=list[BulletinHistoryEvent])
+def bulletin_history(
+    bulletin_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from .. import bulletin_service
+
+    return bulletin_service.history(db, _bulletin(db, bulletin_id))
 
 
 @router.get("/api/bulletins/distribution")
@@ -350,6 +459,14 @@ def export_bulletin(
     if format == "pdf":
         from ..pdf_export import pdf_response
 
+        record_action(
+            db,
+            entity_type="bulletins",
+            entity_id=row.id,
+            action="bulletin:export",
+            new_value={"format": "pdf", "status": row.status},
+        )
+        db.commit()
         return pdf_response(html, f"boletin-{row.id}.pdf", row.title or "Boletín")
     return Response(
         content=html,

@@ -139,6 +139,71 @@ def render_bulletin_html(bulletin) -> str:
         f"<tr><td>{escape(str(i.get('label') or '—'))}</td><td>{int(i.get('value') or 0)}</td></tr>"
         for i in body.get("by_band") or []
     )
+    status_label = {
+        "borrador": "Borrador",
+        "pendiente_aprobacion": "Pendiente de aprobación",
+        "publicado": "Publicado",
+    }.get(bulletin.status, bulletin.status)
+    if bulletin.status != "publicado" and (bulletin.approved_by or "").strip():
+        status_label = "Aprobado, sin publicar"
+    note = str(body.get("note") or "").strip()
+    note_html = f"<section class='note'><h2>Mensaje del líder del ciclo</h2>{_paras(note)}</section>" if note else ""
+    summary = body.get("summary") or {}
+    highlights = ""
+    if summary:
+        highlights = (
+            "<p class='lead'>"
+            f"<b>{int(summary.get('imminent') or 0)}</b> tecnología(s) llegan al mercado en menos de un año; "
+            f"<b>{int(summary.get('act_now') or 0)}</b> de ellas están priorizadas. "
+            f"Hay <b>{int(summary.get('docs') or 0)}</b> expediente(s) de evaluación, "
+            f"<b>{int(summary.get('docs_published') or 0)}</b> publicado(s)."
+            "</p>"
+        )
+    top_rows = "".join(
+        "<tr>"
+        f"<td>{escape(str(i.get('name') or '—'))}</td>"
+        f"<td>{escape(str(i.get('cluster') or '—'))}</td>"
+        f"<td>{int(i.get('points') or 0)}</td>"
+        f"<td>{escape(str(i.get('band_label') or '—'))}</td>"
+        "</tr>"
+        for i in body.get("top_prioritized") or []
+    )
+    top_total = int(body.get("top_prioritized_total") or 0)
+    top_more = (
+        f"<p class='more'>Se muestran {len(body.get('top_prioritized') or [])} de {top_total} tecnologías priorizadas.</p>"
+        if top_total > len(body.get("top_prioritized") or [])
+        else ""
+    )
+    top_html = (
+        "<h2>Tecnologías priorizadas</h2>"
+        "<table><thead><tr><th>Tecnología</th><th>Clúster</th><th>Puntos</th><th>Llegada al mercado</th></tr></thead>"
+        f"<tbody>{top_rows}</tbody></table>{top_more}"
+        if top_rows
+        else ""
+    )
+    previous = body.get("previous") or None
+    prev_html = ""
+    if previous:
+        prev_funnel = previous.get("funnel") or {}
+        labels = (
+            ("captured", "Capturadas"), ("filtered", "Filtradas"), ("prioritized", "Priorizadas"),
+            ("evaluated", "Evaluadas"), ("published", "Publicadas"),
+        )
+        prev_rows = "".join(
+            f"<tr><td>{name}</td><td>{int(funnel.get(key) or 0)}</td><td>{int(prev_funnel.get(key) or 0)}</td></tr>"
+            for key, name in labels
+        )
+        prev_html = (
+            "<h2>Frente al ciclo anterior</h2>"
+            f"<table><thead><tr><th>Etapa</th><th>Este ciclo</th><th>{escape(str(previous.get('cycle_code') or ''))}</th></tr></thead>"
+            f"<tbody>{prev_rows}</tbody></table>"
+        )
+    signed = []
+    if (bulletin.approved_by or "").strip():
+        signed.append(f"Aprobado por {escape(bulletin.approved_by)}")
+    if bulletin.published_at:
+        signed.append(f"Publicado el {bulletin.published_at.date().isoformat()}")
+    signed_html = f"<p>{' · '.join(signed)}</p>" if signed else ""
     return f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -159,6 +224,12 @@ def render_bulletin_html(bulletin) -> str:
     th, td {{ text-align:left; padding:8px 10px; border-bottom:1px solid #E2E8F0; font-size:13px; }}
     th {{ font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:#64748B; }}
     footer {{ font-size:11px; color:#94A3B8; border-top:1px solid #E2E8F0; padding-top:10px; }}
+    h2 {{ font-size:15px; margin:18px 0 6px; }}
+    .lead {{ font-size:13.5px; line-height:1.6; margin:0 0 6px; }}
+    .note {{ border-left:4px solid #1D4ED8; background:#EFF6FF; padding:10px 14px; margin:0 0 16px; border-radius:0 10px 10px 0; }}
+    .note h2 {{ margin:0 0 6px; font-size:13px; }}
+    .note p {{ margin:0 0 6px; font-size:13px; line-height:1.6; }}
+    .more {{ font-size:11.5px; color:#64748B; margin:-12px 0 18px; }}
   </style>
 </head>
 <body>
@@ -166,8 +237,11 @@ def render_bulletin_html(bulletin) -> str:
     <header>
       <div class="kicker">IETS · Boletín epidemiológico y financiero</div>
       <h1>{escape(bulletin.title)}</h1>
-      <p>Estado: {escape(bulletin.status)} · Compilado: {escape(str(body.get("compiled_on") or "—"))}</p>
+      <p>Estado: {escape(status_label)} · Compilado: {escape(str(body.get("compiled_on") or "—"))}</p>
+      {signed_html}
     </header>
+    {note_html}
+    {highlights}
     <div class="kpis">
       <div class="kpi"><b>{funnel.get("captured", funnel.get("assigned", 0))}</b><span>Capturadas / asignadas</span></div>
       <div class="kpi"><b>{funnel.get("filtered", 0)}</b><span>Filtradas</span></div>
@@ -178,6 +252,8 @@ def render_bulletin_html(bulletin) -> str:
     <table><thead><tr><th>Clúster</th><th>N</th></tr></thead><tbody>{cluster_rows or "<tr><td>Sin datos</td><td>0</td></tr>"}</tbody></table>
     <h2>Time-to-market</h2>
     <table><thead><tr><th>Banda</th><th>N</th></tr></thead><tbody>{band_rows or "<tr><td>Sin datos</td><td>0</td></tr>"}</tbody></table>
+    {top_html}
+    {prev_html}
     <footer>Boletín de la plataforma de escaneo de horizonte del IETS. Difusión formal solo con aprobación del líder de ciclo.</footer>
   </div>
 </body>
