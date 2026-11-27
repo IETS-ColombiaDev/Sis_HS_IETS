@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import api, { apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useCycle } from "../cycle/CycleContext";
@@ -17,7 +18,10 @@ import EmptyState from "../components/EmptyState";
 import { LoadingBlock } from "../components/Spinner";
 import { CYCLE_STATUS_LABELS, PERM } from "../constants/methodology";
 import { GLOSSARY } from "../constants/glossary";
-import { t, tr, ts } from "../i18n";
+import { downloadFromApi } from "../utils/download";
+import { fmtDateTime, intlLocale, t, tr, ts } from "../i18n";
+import "./prioritization.css";
+import "./cycles.css";
 
 const FUNNEL = [
   { key: "assigned", label: t("Asignadas"), hint: GLOSSARY.fa_embudo_asignadas },
@@ -37,6 +41,14 @@ const STATUS_ORDER = [
   "cerrado_consolidado",
 ];
 
+const STEP_LABEL = {
+  en_configuracion: t("Preparación"),
+  en_filtrado: t("Filtrado"),
+  en_priorizacion: t("Priorización"),
+  en_evaluacion: t("Evaluación"),
+  cerrado_consolidado: t("Cierre"),
+};
+
 const STATUS_HINT = {
   en_configuracion: GLOSSARY.fa_ciclo_en_configuracion,
   en_filtrado: GLOSSARY.fa_ciclo_en_filtrado,
@@ -44,6 +56,18 @@ const STATUS_HINT = {
   en_evaluacion: GLOSSARY.fa_ciclo_en_evaluacion,
   cerrado_consolidado: GLOSSARY.fa_ciclo_cerrado_consolidado,
 };
+
+const HISTORY_ICON = {
+  created: "plus",
+  edited: "edit",
+  advanced: "chevron",
+  returned: "refresh",
+  closed: "check",
+  carried_in: "layers",
+  carried_out: "layers",
+};
+
+const DAY = 1000 * 60 * 60 * 24;
 
 function addWeeks(dateStr, weeks) {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -53,13 +77,64 @@ function addWeeks(dateStr, weeks) {
 
 function weeksBetween(a, b) {
   if (!a || !b) return 0;
-  return Math.round(((new Date(b) - new Date(a)) / (1000 * 60 * 60 * 24 * 7)) * 10) / 10;
+  return Math.round(((new Date(b) - new Date(a)) / (DAY * 7)) * 10) / 10;
+}
+
+// Las fechas del ciclo son dias sin hora: se comparan como dias en UTC para no depender del huso.
+function dayNumber(iso) {
+  return Math.round(Date.parse(`${iso}T00:00:00Z`) / DAY);
+}
+
+function todayIso() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function daysBetween(a, b) {
+  return dayNumber(b) - dayNumber(a);
+}
+
+function isOpen(cycle) {
+  return !cycle.is_historic && cycle.status !== "cerrado_consolidado";
 }
 
 function paramValue(params, key, fallback) {
   const row = params.find((p) => p.key === key);
   const n = Number(row?.value);
   return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+/** En qué punto de su ventana está un ciclo abierto. */
+function scheduleOf(cycle, today) {
+  const closing = cycle.bulletin_due_on || cycle.data_cutoff_on;
+  const span = Math.max(1, daysBetween(cycle.opened_on, closing));
+  const pct = Math.max(0, Math.min(100, Math.round((daysBetween(cycle.opened_on, today) / span) * 100)));
+  const toOpen = daysBetween(today, cycle.opened_on);
+  const toCutoff = daysBetween(today, cycle.data_cutoff_on);
+  const toClosing = daysBetween(today, closing);
+  if (toOpen > 0) return { pct: 0, tone: "idle", text: t("Abre en {n} día(s)", { n: toOpen }) };
+  if (toCutoff > 0) return { pct, tone: "ok", text: t("Faltan {n} día(s) para el corte de datos", { n: toCutoff }) };
+  if (toCutoff === 0) return { pct, tone: "soon", text: t("El corte de datos es hoy") };
+  if (toClosing > 0)
+    return { pct, tone: "soon", text: t("Corte de datos cumplido · faltan {n} día(s) para el boletín", { n: toClosing }) };
+  if (toClosing === 0) return { pct: 100, tone: "soon", text: t("La ventana termina hoy") };
+  return { pct: 100, tone: "late", text: t("La ventana terminó hace {n} día(s) y el ciclo sigue abierto", { n: -toClosing }) };
+}
+
+/** Lo que conviene saber antes de avanzar de etapa. Avisa; no impide. */
+function advanceWarnings(cycle, target) {
+  const s = cycle.summary || {};
+  const out = [];
+  if (target === "en_priorizacion" || target === "en_evaluacion") {
+    if (s.assigned > 0) out.push(t("{n} tecnología(s) siguen sin filtrar.", { n: s.assigned }));
+  }
+  if (target === "en_evaluacion") {
+    if (s.filtered > 0) out.push(t("{n} tecnología(s) aptas siguen sin calificar.", { n: s.filtered }));
+    if (!((s.prioritized || 0) + (s.in_evaluation || 0) + (s.published || 0)))
+      out.push(t("Ninguna tecnología quedó priorizada todavía."));
+  }
+  return out;
 }
 
 function CycleFunnel({ summary }) {
@@ -87,8 +162,83 @@ function CycleFunnel({ summary }) {
   );
 }
 
+function CycleSteps({ status }) {
+  const current = STATUS_ORDER.indexOf(status);
+  return (
+    <ol className="cy-steps" aria-label={t("Etapas del ciclo")}>
+      {STATUS_ORDER.map((key, i) => {
+        const state = i < current || status === "cerrado_consolidado" ? "done" : i === current ? "current" : "todo";
+        return (
+          <li key={key} className={`is-${state}`} aria-current={state === "current" ? "step" : undefined}>
+            <span className="cy-step-dot" aria-hidden="true">
+              {state === "done" ? <Icon name="check" size={11} /> : i + 1}
+            </span>
+            <span className="cy-step-label">{STEP_LABEL[key]}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function CycleHistory({ cycle }) {
+  const [open, setOpen] = useState(false);
+  const [events, setEvents] = useState(null);
+  const [failed, setFailed] = useState(false);
+  // Cambia cuando el ciclo cambia: el recorrido abierto se vuelve a pedir.
+  const version = `${cycle.status}|${cycle.code}|${cycle.opened_on}|${cycle.data_cutoff_on}|${cycle.bulletin_due_on}|${cycle.notes}|${cycle.summary?.total}`;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let alive = true;
+    setFailed(false);
+    api
+      .get(`/cycles/${cycle.id}/history`)
+      .then(({ data }) => alive && setEvents(Array.isArray(data) ? data : []))
+      .catch(() => alive && setFailed(true));
+    return () => {
+      alive = false;
+    };
+  }, [open, cycle.id, version]);
+
+  return (
+    <details className="prio-history-fold cy-history-fold" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary data-testid={`cycle-history-toggle-${cycle.id}`}>
+        <Icon name="clock" size={14} /> {t("Recorrido del ciclo")}
+        <span>{t("Creación, ediciones, cambios de etapa, cierre y arrastres")}</span>
+      </summary>
+      {failed ? (
+        <p className="prio-history-empty">{t("No se pudo cargar el recorrido del ciclo.")}</p>
+      ) : events == null ? (
+        <p className="prio-history-empty">{t("Cargando el recorrido...")}</p>
+      ) : events.length === 0 ? (
+        <p className="prio-history-empty">{t("Este ciclo es anterior al registro de eventos: no tiene recorrido guardado.")}</p>
+      ) : (
+        <ol className="prio-history cy-history" data-testid={`cycle-history-${cycle.id}`}>
+          {events.map((ev, i) => (
+            <li key={`${ev.at}-${i}`} className={`is-${ev.kind}`}>
+              <span className="prio-history-dot" aria-hidden="true">
+                <Icon name={HISTORY_ICON[ev.kind] || "info"} size={13} />
+              </span>
+              <div>
+                <strong>{ts(ev.label)}</strong>
+                <span className="prio-history-meta">
+                  {fmtDateTime(ev.at)}
+                  {ev.by ? ` · ${ev.by}` : ""}
+                </span>
+                {ev.detail && <p>{ts(ev.detail)}</p>}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </details>
+  );
+}
+
 function CycleCard({
   cycle,
+  today,
   isSelected,
   onSelect,
   onTransition,
@@ -103,12 +253,13 @@ function CycleCard({
   const isClosed = cycle.status === "cerrado_consolidado";
   const currentIdx = STATUS_ORDER.indexOf(cycle.status);
   const hasWork = (cycle.summary?.total || 0) > 0;
+  const schedule = isOpen(cycle) ? scheduleOf(cycle, today) : null;
 
   return (
     <Card
       style={isSelected ? { borderColor: "#2563EB", boxShadow: "0 0 0 3px #EFF6FF" } : undefined}
     >
-      <div className="cycle-card-head" data-testid={`cycle-card-${cycle.id}`}>
+      <div className="cycle-card-head" id={`cycle-${cycle.id}`} data-testid={`cycle-card-${cycle.id}`}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{cycle.code}</h3>
@@ -143,7 +294,35 @@ function CycleCard({
         )}
       </div>
 
+      {!cycle.is_historic && <CycleSteps status={cycle.status} />}
+
+      {schedule && (
+        <div className={`cy-schedule is-${schedule.tone}`} data-testid={`cycle-schedule-${cycle.id}`}>
+          <div className="cy-schedule-track" role="img" aria-label={t("{pct}% de la ventana transcurrido", { pct: schedule.pct })}>
+            <div style={{ width: `${schedule.pct}%` }} />
+          </div>
+          <p>
+            <Icon name={schedule.tone === "late" ? "alert" : "calendar"} size={13} /> {schedule.text}
+          </p>
+        </div>
+      )}
+      {isClosed && cycle.closed_at && (
+        <p className="cy-closed" data-testid={`cycle-closed-${cycle.id}`}>
+          <Icon name="check" size={13} />{" "}
+          {cycle.closed_by_name
+            ? t("Cerrado el {fecha} por {persona}", { fecha: fmtDateTime(cycle.closed_at), persona: cycle.closed_by_name })
+            : t("Cerrado el {fecha}", { fecha: fmtDateTime(cycle.closed_at) })}
+        </p>
+      )}
+
       <CycleFunnel summary={cycle.summary} />
+      <p className="cy-total">
+        {t("{n} tecnología(s) en el ciclo", { n: cycle.summary?.total || 0 })}
+        {(cycle.summary?.excluded || 0) > 0 && ` · ${t("{n} excluida(s)", { n: cycle.summary.excluded })}`}
+        {(cycle.summary?.not_prioritized || 0) > 0 && ` · ${t("{n} no priorizada(s)", { n: cycle.summary.not_prioritized })}`}
+        {" · "}
+        <Link to={`/dashboards?ciclo=${cycle.id}`}>{t("Ver tablero")}</Link>
+      </p>
 
       {cycle.notes && <p className="cycle-card-notes">{cycle.notes}</p>}
 
@@ -214,6 +393,97 @@ function CycleCard({
           )}
         </div>
       )}
+
+      <CycleHistory cycle={cycle} />
+    </Card>
+  );
+}
+
+/** Ventanas de los ciclos formales de un año, sobre los doce meses. */
+function YearCalendar({ cycles, year, years, onYear, today, cycleId, onPick }) {
+  const start = dayNumber(`${year}-01-01`);
+  const total = dayNumber(`${year + 1}-01-01`) - start;
+  const months = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, m) => new Date(Date.UTC(2020, m, 1)).toLocaleDateString(intlLocale(), { month: "short", timeZone: "UTC" })),
+    []
+  );
+  const rows = cycles
+    .filter((c) => !c.is_historic)
+    .map((c) => {
+      const from = dayNumber(c.opened_on) - start;
+      const to = dayNumber(c.bulletin_due_on || c.data_cutoff_on) - start;
+      return { cycle: c, from: Math.max(0, from), to: Math.min(total, to) };
+    })
+    .filter((r) => r.to > 0 && r.from < total)
+    .sort((a, b) => a.from - b.from);
+  const todayOffset = dayNumber(today) - start;
+
+  return (
+    <Card padding={16} style={{ marginBottom: 16 }}>
+      <div className="cy-cal-head">
+        <h3>
+          <span className="term-label">
+            {t("Calendario de ciclos")}
+            <InfoTip
+              text={t("La barra de cada ciclo va de su apertura a la fecha del boletín (o al corte de datos, si no hay boletín). Sirve para ver cuándo se cruzan y cuánto del año queda libre.")}
+              label={t("Qué muestra el calendario de ciclos")}
+            />
+          </span>
+        </h3>
+        <select
+          className="filter-input cy-year"
+          aria-label={t("Año del calendario")}
+          value={year}
+          onChange={(e) => onYear(Number(e.target.value))}
+          data-testid="cycles-year"
+        >
+          {years.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="cy-cal" data-testid="cycles-calendar">
+        <div className="cy-cal-row cy-cal-months" aria-hidden="true">
+          <span />
+          <div>
+            {months.map((m, i) => (
+              <span key={i}>{m}</span>
+            ))}
+          </div>
+        </div>
+        {rows.length === 0 ? (
+          <p className="cy-cal-empty">{t("No hay ciclos formales en {year}.", { year })}</p>
+        ) : (
+          rows.map(({ cycle, from, to }) => (
+            <div key={cycle.id} className="cy-cal-row">
+              <span className="cy-cal-label" title={cycle.code}>
+                {cycle.code}
+              </span>
+              <div className="cy-cal-track">
+                {todayOffset >= 0 && todayOffset <= total && (
+                  <i className="cy-cal-today" style={{ left: `${(todayOffset / total) * 100}%` }} aria-hidden="true" />
+                )}
+                <button
+                  type="button"
+                  className={`cy-cal-bar tone-${cycle.status}${cycle.id === cycleId ? " is-selected" : ""}`}
+                  style={{ left: `${(from / total) * 100}%`, width: `${Math.max(1.5, ((to - from) / total) * 100)}%` }}
+                  title={`${cycle.code}: ${cycle.opened_on} → ${cycle.bulletin_due_on || cycle.data_cutoff_on}`}
+                  aria-label={t("Ir a {code}: del {desde} al {hasta}", {
+                    code: cycle.code,
+                    desde: cycle.opened_on,
+                    hasta: cycle.bulletin_due_on || cycle.data_cutoff_on,
+                  })}
+                  onClick={() => onPick(cycle)}
+                  data-testid={`cycles-bar-${cycle.id}`}
+                />
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </Card>
   );
 }
@@ -233,6 +503,13 @@ function emptyForm(cycles) {
   };
 }
 
+const TABS = [
+  { key: "todos", label: t("Todos"), match: () => true },
+  { key: "abiertos", label: t("Abiertos"), match: (c) => isOpen(c) },
+  { key: "cerrados", label: t("Cerrados"), match: (c) => !c.is_historic && c.status === "cerrado_consolidado" },
+  { key: "historico", label: t("Histórico"), match: (c) => c.is_historic },
+];
+
 export default function Cycles() {
   const { cycles, cycleId, setCycleId, reload, loading } = useCycle();
   const { can } = useAuth();
@@ -240,6 +517,8 @@ export default function Cycles() {
 
   const canWrite = can(PERM.CYCLE_WRITE);
   const canClose = can(PERM.CYCLE_CLOSE);
+  const today = todayIso();
+  const thisYear = Number(today.slice(0, 4));
 
   const [params, setParams] = useState([]);
   const [formOpen, setFormOpen] = useState(false);
@@ -250,7 +529,15 @@ export default function Cycles() {
   const [justification, setJustification] = useState("");
   const [carrySource, setCarrySource] = useState(null);
   const [carryTarget, setCarryTarget] = useState("");
+  const [carryPreview, setCarryPreview] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [tab, setTab] = useState("todos");
+  const [search, setSearch] = useState("");
+  const [calYear, setCalYear] = useState(null);
+  const [exporting, setExporting] = useState("");
+  // { cycle, target, warnings } al avanzar con avisos; { cycle, target, back: true } al devolver.
+  const [move, setMove] = useState(null);
+  const [moveReason, setMoveReason] = useState("");
 
   useEffect(() => {
     api
@@ -263,10 +550,37 @@ export default function Cycles() {
   const wmax = paramValue(params, "cycle.window_weeks_max", 16);
   const quota = paramValue(params, "cycle.max_per_year", 3);
 
-  const openCycles = useMemo(
-    () => cycles.filter((c) => !c.is_historic && c.status !== "cerrado_consolidado"),
-    [cycles]
-  );
+  const openCycles = useMemo(() => cycles.filter(isOpen), [cycles]);
+
+  const counts = useMemo(() => Object.fromEntries(TABS.map((x) => [x.key, cycles.filter(x.match).length])), [cycles]);
+  const visible = useMemo(() => {
+    const match = TABS.find((x) => x.key === tab)?.match || (() => true);
+    const q = search.trim().toLowerCase();
+    return cycles.filter((c) => match(c) && (!q || `${c.code} ${c.notes || ""} ${c.year}`.toLowerCase().includes(q)));
+  }, [cycles, tab, search]);
+
+  const years = useMemo(() => {
+    const set = new Set([thisYear]);
+    cycles.filter((c) => !c.is_historic).forEach((c) => {
+      set.add(Number(c.opened_on.slice(0, 4)));
+      set.add(Number((c.bulletin_due_on || c.data_cutoff_on).slice(0, 4)));
+    });
+    return [...set].sort((a, b) => b - a);
+  }, [cycles, thisYear]);
+  const selected = cycles.find((c) => c.id === cycleId);
+  const year = calYear ?? (selected && !selected.is_historic ? Number(selected.opened_on.slice(0, 4)) : thisYear);
+
+  const stats = useMemo(() => {
+    const formal = cycles.filter((c) => !c.is_historic);
+    const late = openCycles.filter((c) => daysBetween(today, c.bulletin_due_on || c.data_cutoff_on) < 0).length;
+    return {
+      thisYear: formal.filter((c) => c.year === thisYear).length,
+      open: openCycles.length,
+      late,
+      closed: formal.filter((c) => c.status === "cerrado_consolidado").length,
+      inOpen: openCycles.reduce((sum, c) => sum + (c.summary?.total || 0), 0),
+    };
+  }, [cycles, openCycles, today, thisYear]);
 
   const startCreate = () => {
     setForm(emptyForm(cycles));
@@ -287,9 +601,10 @@ export default function Cycles() {
 
   // Validacion en vivo: la misma que aplica el backend, para no descubrirla por un rechazo.
   const formCheck = useMemo(() => {
-    if (!form) return { errors: {}, window: 0, yearCount: 0, year: null };
+    if (!form) return { errors: {}, window: 0, yearCount: 0, year: null, overlaps: [] };
     const errors = {};
     if (!form.code?.trim()) errors.code = t("El código es obligatorio.");
+    else if (form.code.trim().length > 120) errors.code = t("El código admite hasta 120 caracteres.");
     else if (cycles.some((c) => c.code.trim() === form.code.trim() && c.id !== form.id))
       errors.code = t("Ya existe un ciclo con este código.");
     if (!form.opened_on) errors.opened_on = t("Indique la fecha de apertura.");
@@ -309,7 +624,20 @@ export default function Cycles() {
         n: yearCount,
         max: quota,
       });
-    return { errors, window, yearCount, year };
+    if ((form.notes || "").length > 4000) errors.notes = t("Las notas admiten hasta 4000 caracteres.");
+    // Cruce de ventanas con otros ciclos formales: se avisa, no se impide.
+    const closing = form.bulletin_due_on || form.data_cutoff_on;
+    const overlaps =
+      form.opened_on && closing && closing > form.opened_on
+        ? cycles.filter(
+            (c) =>
+              !c.is_historic &&
+              c.id !== form.id &&
+              c.opened_on <= closing &&
+              (c.bulletin_due_on || c.data_cutoff_on) >= form.opened_on
+          )
+        : [];
+    return { errors, window, yearCount, year, overlaps };
   }, [form, cycles, wmin, wmax, quota]);
 
   const firstError = Object.values(formCheck.errors)[0];
@@ -331,6 +659,8 @@ export default function Cycles() {
         const { data } = await api.post("/cycles", payload);
         toast.success(t("Ciclo {code} creado.", { code: data.code }));
         setCycleId(data.id);
+        setTab("todos");
+        setSearch("");
       }
       setFormOpen(false);
       await reload();
@@ -355,6 +685,20 @@ export default function Cycles() {
     }
   };
 
+  const applyTransition = async (cycle, target, reason = "") => {
+    setSaving(true);
+    try {
+      await api.put(`/cycles/${cycle.id}/status`, { status: target, justification: reason });
+      toast.success(`${cycle.code}: ${CYCLE_STATUS_LABELS[target]}.`);
+      setMove(null);
+      await reload();
+    } catch (e) {
+      toast.error(apiError(e, t("No se pudo cambiar el estado")));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleTransition = async (cycle, target) => {
     if (target === "cerrado_consolidado") {
       try {
@@ -367,13 +711,18 @@ export default function Cycles() {
       }
       return;
     }
-    try {
-      await api.put(`/cycles/${cycle.id}/status`, { status: target, justification: "" });
-      toast.success(`${cycle.code}: ${CYCLE_STATUS_LABELS[target]}.`);
-      await reload();
-    } catch (e) {
-      toast.error(apiError(e, t("No se pudo cambiar el estado")));
+    const back = STATUS_ORDER.indexOf(target) < STATUS_ORDER.indexOf(cycle.status);
+    if (back) {
+      setMoveReason("");
+      setMove({ cycle, target, back: true, warnings: [] });
+      return;
     }
+    const warnings = advanceWarnings(cycle, target);
+    if (warnings.length) {
+      setMove({ cycle, target, back: false, warnings });
+      return;
+    }
+    await applyTransition(cycle, target);
   };
 
   const confirmClose = async () => {
@@ -400,6 +749,23 @@ export default function Cycles() {
     }
   };
 
+  // Vista previa del arrastre: qué viaja y qué ya está en el destino.
+  useEffect(() => {
+    if (!carrySource) {
+      setCarryPreview(null);
+      return undefined;
+    }
+    let alive = true;
+    setCarryPreview(null);
+    api
+      .get(`/cycles/${carrySource.id}/carry-over/preview`, { params: { target_cycle_id: carryTarget || undefined } })
+      .then(({ data }) => alive && setCarryPreview(data))
+      .catch(() => alive && setCarryPreview({ failed: true, items: [] }));
+    return () => {
+      alive = false;
+    };
+  }, [carrySource, carryTarget]);
+
   const confirmCarryOver = async () => {
     setSaving(true);
     try {
@@ -415,6 +781,26 @@ export default function Cycles() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const exportList = async (format) => {
+    setExporting(format);
+    try {
+      await downloadFromApi(api, "/cycles/export", `ciclos_de_escaneo.${format}`, { params: { format } });
+    } catch (e) {
+      toast.error(apiError(e, t("No se pudo descargar el listado de ciclos")));
+    } finally {
+      setExporting("");
+    }
+  };
+
+  const goToCycle = (cycle) => {
+    setTab("todos");
+    setSearch("");
+    // La tarjeta puede no estar en pantalla hasta que se quite el filtro.
+    window.setTimeout(() => {
+      document.getElementById(`cycle-${cycle.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
   };
 
   if (loading) return <LoadingBlock label={t("Cargando ciclos...")} />;
@@ -449,25 +835,123 @@ export default function Cycles() {
           />
         </Card>
       ) : (
-        <div className="cycle-grid">
-          {cycles.map((c) => (
-            <CycleCard
-              key={c.id}
-              cycle={c}
-              isSelected={c.id === cycleId}
-              onSelect={setCycleId}
-              onTransition={handleTransition}
-              onEdit={startEdit}
-              onDelete={setDeleting}
-              onCarryOver={(cy) => {
-                setCarrySource(cy);
-                setCarryTarget(openCycles[0]?.id ? String(openCycles[0].id) : "");
-              }}
-              canWrite={canWrite}
-              canClose={canClose}
-            />
-          ))}
-        </div>
+        <>
+          <div className="cy-tiles" data-testid="cycles-tiles">
+            <div className={`cy-tile${stats.thisYear >= quota ? " is-full" : ""}`} data-testid="cycles-tile-quota">
+              <span className="term-label">
+                {t("Ciclos formales en {year}", { year: thisYear })}
+                <InfoTip text={GLOSSARY.fa_cuota} label={t("Qué es la cuota anual")} />
+              </span>
+              <strong>{t("{n} de {max}", { n: stats.thisYear, max: quota })}</strong>
+              <em>
+                {stats.thisYear >= quota
+                  ? t("Cuota del año completa")
+                  : t("Queda(n) {n} por abrir este año", { n: quota - stats.thisYear })}
+              </em>
+            </div>
+            <div className={`cy-tile${stats.late ? " is-late" : ""}`} data-testid="cycles-tile-open">
+              <span>{t("Ciclos abiertos")}</span>
+              <strong>{stats.open}</strong>
+              <em>{stats.late ? t("{n} con la ventana vencida", { n: stats.late }) : t("Ninguno con la ventana vencida")}</em>
+            </div>
+            <div className="cy-tile">
+              <span>{t("Tecnologías en ciclos abiertos")}</span>
+              <strong>{stats.inOpen}</strong>
+              <em>{t("Suma de los ciclos que siguen en curso")}</em>
+            </div>
+            <div className="cy-tile">
+              <span>{t("Ciclos cerrados")}</span>
+              <strong>{stats.closed}</strong>
+              <em>{t("Con puntajes congelados")}</em>
+            </div>
+          </div>
+
+          <YearCalendar
+            cycles={cycles}
+            year={year}
+            years={years}
+            onYear={setCalYear}
+            today={today}
+            cycleId={cycleId}
+            onPick={goToCycle}
+          />
+
+          <Card padding={16} style={{ marginBottom: 16 }}>
+            <div className="screening-tabs cy-tabs">
+              {TABS.map((x) => (
+                <button
+                  key={x.key}
+                  type="button"
+                  className={`screening-tab${tab === x.key ? " is-active" : ""}`}
+                  onClick={() => setTab(x.key)}
+                  data-testid={`cycles-tab-${x.key}`}
+                >
+                  {x.label}
+                  <span className="cy-count">{counts[x.key]}</span>
+                </button>
+              ))}
+            </div>
+            <div className="fb-toolbar">
+              <input
+                placeholder={t("Buscar por código, año o notas...")}
+                aria-label={t("Buscar ciclo")}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="filter-input"
+                style={{ flex: 1, minWidth: 180 }}
+                data-testid="cycles-search"
+              />
+              <Button variant="outline" size="sm" loading={exporting === "csv"} onClick={() => exportList("csv")} data-testid="cycles-export-csv">
+                {t("Exportar CSV")}
+              </Button>
+              <Button variant="outline" size="sm" loading={exporting === "xlsx"} onClick={() => exportList("xlsx")} data-testid="cycles-export-xlsx">
+                {t("Exportar Excel")}
+              </Button>
+            </div>
+          </Card>
+
+          {visible.length === 0 ? (
+            <Card>
+              <EmptyState
+                icon="🔎"
+                title={t("Ningún ciclo coincide")}
+                message={t("Cambie la pestaña o borre la búsqueda para ver los demás ciclos.")}
+                action={
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setTab("todos");
+                      setSearch("");
+                    }}
+                  >
+                    {t("Ver todos los ciclos")}
+                  </Button>
+                }
+              />
+            </Card>
+          ) : (
+            <div className="cycle-grid">
+              {visible.map((c) => (
+                <CycleCard
+                  key={c.id}
+                  cycle={c}
+                  today={today}
+                  isSelected={c.id === cycleId}
+                  onSelect={setCycleId}
+                  onTransition={handleTransition}
+                  onEdit={startEdit}
+                  onDelete={setDeleting}
+                  onCarryOver={(cy) => {
+                    setCarrySource(cy);
+                    setCarryTarget(openCycles[0]?.id ? String(openCycles[0].id) : "");
+                  }}
+                  canWrite={canWrite}
+                  canClose={canClose}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <Modal
@@ -564,11 +1048,24 @@ export default function Cycles() {
                 {formCheck.errors.quota ? ` - ${formCheck.errors.quota}` : ""}
               </div>
             )}
+            {formCheck.overlaps.length > 0 && (
+              <div className="fa-notice fa-notice--info" data-testid="cycle-overlap" style={{ marginBottom: 14 }}>
+                <div>
+                  <strong>
+                    {t("La ventana se cruza con: {ciclos}.", { ciclos: formCheck.overlaps.map((c) => c.code).join(", ") })}
+                  </strong>
+                  <div style={{ marginTop: 4 }}>
+                    {t("Se puede guardar así. Tenga en cuenta que el equipo trabajará dos ciclos al mismo tiempo en esas fechas.")}
+                  </div>
+                </div>
+              </div>
+            )}
             <Textarea
               id="cycle-notes"
               label={t("Notas")}
               rows={3}
               value={form.notes}
+              error={formCheck.errors.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
           </>
@@ -584,6 +1081,66 @@ export default function Cycles() {
         message={t("El ciclo está en configuración y no tiene trabajo asociado. Se eliminará de forma definitiva; la baja queda registrada en la bitácora.")}
         confirmLabel={t("Eliminar ciclo")}
       />
+
+      <Modal
+        open={Boolean(move)}
+        onClose={() => setMove(null)}
+        title={
+          move?.back
+            ? t("Devolver {code} a: {estado}", { code: move.cycle.code, estado: CYCLE_STATUS_LABELS[move.target] })
+            : t("Pasar {code} a: {estado}", { code: move?.cycle.code || "", estado: CYCLE_STATUS_LABELS[move?.target] || "" })
+        }
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setMove(null)}>
+              {t("Cancelar")}
+            </Button>
+            <HintButton
+              onClick={() => applyTransition(move.cycle, move.target, move.back ? moveReason.trim() : "")}
+              loading={saving}
+              disabled={Boolean(move?.back && !moveReason.trim())}
+              disabledHint={t("Escriba el motivo de la devolución.")}
+              data-testid="cycle-move-confirm"
+            >
+              {move?.back ? t("Devolver el ciclo") : t("Avanzar de todos modos")}
+            </HintButton>
+          </>
+        }
+      >
+        {move?.back ? (
+          <>
+            <p style={{ fontSize: 14, color: "#475569", marginBottom: 14 }}>
+              {t("El ciclo vuelve a una etapa anterior. No se borra nada de lo ya trabajado. El motivo queda en el recorrido del ciclo y en la bitácora.")}
+            </p>
+            <Textarea
+              id="cycle-move-reason"
+              label={t("Motivo de la devolución")}
+              required
+              rows={3}
+              maxLength={500}
+              value={moveReason}
+              onChange={(e) => setMoveReason(e.target.value)}
+              placeholder={t("Por ejemplo: faltó depurar duplicados antes de calificar")}
+            />
+          </>
+        ) : (
+          move && (
+            <div className="fa-notice fa-notice--warn" data-testid="cycle-move-warnings">
+              <div>
+                <strong>{t("Antes de avanzar, tenga en cuenta:")}</strong>
+                <ul className="cy-list">
+                  {move.warnings.map((w) => (
+                    <li key={w}>{w}</li>
+                  ))}
+                </ul>
+                <div style={{ marginTop: 6 }}>
+                  {t("Puede avanzar y terminar ese trabajo después: la etapa del ciclo no bloquea las pantallas anteriores.")}
+                </div>
+              </div>
+            </div>
+          )
+        )}
+      </Modal>
 
       <Modal
         open={Boolean(closeTarget)}
@@ -613,11 +1170,33 @@ export default function Cycles() {
             { b: (c) => <strong>{c}</strong> }
           )}
         </p>
+        {closeCheck && (
+          <ul className="cy-list cy-close-facts" data-testid="cycle-close-facts">
+            <li>{t("Se congelan {n} puntaje(s).", { n: closeCheck.to_freeze ?? 0 })}</li>
+            {(closeCheck.watchlist || 0) > 0 && (
+              <li>{t("{n} tecnología(s) quedan bajo vigilancia y se podrán arrastrar a otro ciclo.", { n: closeCheck.watchlist })}</li>
+            )}
+            {(closeCheck.pending_screening || 0) > 0 && (
+              <li className="is-warn">{t("{n} tecnología(s) quedan sin filtrar: no pasan solas al ciclo siguiente.", { n: closeCheck.pending_screening })}</li>
+            )}
+            {(closeCheck.pending_rating || 0) > 0 && (
+              <li className="is-warn">{t("{n} tecnología(s) aptas quedan sin calificar.", { n: closeCheck.pending_rating })}</li>
+            )}
+          </ul>
+        )}
         {closeCheck && !closeCheck.can_close && (
           <>
             <div className="fa-notice fa-notice--warn">
               <div>
                 <strong>{ts(closeCheck.message)}</strong>
+                {(closeCheck.blocking || []).length > 0 && (
+                  <ul className="cy-list" data-testid="cycle-close-blocking">
+                    {closeCheck.blocking.slice(0, 8).map((b) => (
+                      <li key={b.technology_id}>{b.name}</li>
+                    ))}
+                    {closeCheck.blocking.length > 8 && <li>{t("y {n} más", { n: closeCheck.blocking.length - 8 })}</li>}
+                  </ul>
+                )}
                 <div style={{ marginTop: 4 }}>
                   {t("Publique el informe correspondiente o registre la justificación de cierre. La justificación queda en la bitácora inmutable.")}
                 </div>
@@ -674,6 +1253,30 @@ export default function Cycles() {
         ) : (
           <div className="fa-notice fa-notice--warn">
             {t("No hay ciclos abiertos. Cree un ciclo destino antes de arrastrar el monitoreo activo.")}
+          </div>
+        )}
+        {carryPreview && !carryPreview.failed && carryPreview.items.length > 0 && (
+          <div className="cy-carry" data-testid="cycle-carry-preview">
+            <strong>
+              {carryTarget
+                ? t("Se arrastran {n} de {total}", { n: carryPreview.to_carry, total: carryPreview.total })
+                : t("{total} tecnología(s) bajo vigilancia", { total: carryPreview.total })}
+            </strong>
+            <ul>
+              {carryPreview.items.slice(0, 12).map((item) => (
+                <li key={item.technology_id} className={item.already_in_target ? "is-skip" : ""}>
+                  <span>{item.name}</span>
+                  <em>
+                    {item.already_in_target
+                      ? t("ya está en el destino")
+                      : item.priority_pct != null
+                      ? t("calificación previa {pct}%", { pct: item.priority_pct })
+                      : t("sin calificación previa")}
+                  </em>
+                </li>
+              ))}
+              {carryPreview.items.length > 12 && <li>{t("y {n} más", { n: carryPreview.items.length - 12 })}</li>}
+            </ul>
           </div>
         )}
       </Modal>

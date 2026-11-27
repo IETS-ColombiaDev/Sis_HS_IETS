@@ -1262,3 +1262,41 @@ Traducciones en `pages.Dashboards.js` y `server.strategy.js` (nuevo).
 
 - La comparación calcula en vivo el ciclo anterior si no está cerrado: duplica el costo de la consulta.
 - La bandeja de trabajo (`pages/Dashboard.jsx`) no se tocó.
+
+## Ciclos robustos: calendario, motivo al devolver, recorrido y exporte (27-11-2026, versión 7.13.0)
+
+**Por qué.** La pantalla de ciclos era una lista de tarjetas sin fechas relativas ni historia: no decía cuánto faltaba para
+el corte, un ciclo se devolvía de etapa sin dejar motivo, el cierre no mostraba qué quedaba a medias y el arrastre no
+mostraba qué tecnologías viajaban.
+
+**Servidor** (`cycle_service.py`, `routers/cycles.py`, sin migración).
+
+- `PUT /api/cycles/{id}/status`: devolver a una etapa anterior exige `justification` (422 si falta). Se guarda en el
+  evento `cycle:transition` (`new_value.justification`). `cycle_service.transition` acepta `note`; la exigencia está en
+  el router, así que el servicio sigue sirviendo a scripts y pruebas.
+- `GET /api/cycles/{id}/close-check` suma `blocking` (id y nombre), `to_freeze`, `watchlist`, `pending_screening` y
+  `pending_rating`. Conserva los campos anteriores.
+- `GET /api/cycles/{id}/history`: recorrido desde la bitácora (`create`, `update`, `cycle:transition`, `cycle:close`,
+  `cycle:carry_over`). El arrastre se registra en el ciclo destino; el recorrido del origen lo incluye buscando
+  `from_cycle_id`.
+- `GET /api/cycles/{id}/carry-over/preview?target_cycle_id=`: qué se arrastraría, sin cambiar nada.
+- `GET /api/cycles/export?format=csv|xlsx`: una fila por ciclo. Registra `cycle:export` (entidad `cycles`, id `listado`).
+  Está declarado antes de `/{cycle_id}`: si se mueve debajo, FastAPI intenta leer `export` como número.
+- `CycleOut.closed_by_name`.
+- Correcciones: el código se limpia de espacios antes de buscar duplicados (antes ` X ` pasaba la revisión y la base
+  respondía 500); código de más de 120 caracteres y notas de más de 4000 responden 422.
+
+**Interfaz** (`pages/Cycles.jsx`, `pages/cycles.css`): indicadores, `YearCalendar`, pestañas y búsqueda, `CycleSteps`,
+ventana (`scheduleOf`), `CycleHistory`, diálogo de avance con avisos (`advanceWarnings`) y de devolución con motivo,
+cierre y arrastre con vista previa, aviso de cruce de ventanas. Los avisos de avance y la ventana se calculan en el
+navegador con el resumen que ya trae cada ciclo. Traducciones en `pages.Cycles.js` y `server.cycles.js` (nuevo).
+
+**Pruebas.** `tests/test_ciclos_robustos.py` (6), `e2e/ciclos_robustos.spec.js` (1) y `e2e/flow_cycles.spec.js`
+actualizado (motivo al devolver, vista previa de cierre y arrastre).
+
+**Pendientes.**
+
+- Un ciclo cerrado no se reabre: no se agregó esa transición.
+- La ventana usa la fecha del navegador; el exporte usa la fecha de Colombia (`ttm.today_co`).
+- `history` lee todos los eventos `cycle:carry_over` para encontrar los que salieron del ciclo: son pocos, pero no está
+  indexado.

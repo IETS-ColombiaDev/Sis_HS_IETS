@@ -75,8 +75,16 @@ test.describe("ciclos de escaneo", () => {
     await card.getByRole("button", { name: "Pasar a: En filtrado" }).click();
     await expectToast(page, `${code}: En filtrado.`);
     await expect(card.getByRole("button", { name: "Eliminar" })).toHaveCount(0);
+    // Devolver exige un motivo, que queda en el recorrido.
     await card.getByRole("button", { name: "Devolver a: En configuración" }).click();
+    await expect(page.getByTestId("cycle-move-confirm")).toBeDisabled();
+    await page.locator("#cycle-move-reason").fill("Faltaba ajustar las fechas");
+    await page.getByTestId("cycle-move-confirm").click();
     await expectToast(page, `${code}: En configuración.`);
+    await page.getByTestId(`cycle-history-toggle-${created.id}`).click();
+    const history = page.getByTestId(`cycle-history-${created.id}`);
+    await expect(history).toContainText("Ciclo creado");
+    await expect(history).toContainText("Motivo: Faltaba ajustar las fechas");
 
     // Eliminar con confirmacion
     await card.getByRole("button", { name: "Eliminar" }).click();
@@ -93,7 +101,8 @@ test.describe("ciclos de escaneo", () => {
     const api = await apiAs(page.request);
     const source = await createCycle(api, { status: "en_evaluacion" });
     const target = await createCycle(api, { status: "en_filtrado" });
-    const inEval = await techInCycle(api, source.id, { name: uid("En evaluacion") });
+    const inEvalName = uid("En evaluacion");
+    const inEval = await techInCycle(api, source.id, { name: inEvalName });
     await api.post(`/technologies/${inEval.id}/cycles/${source.id}/to-evaluation`);
     const watched = await techInCycle(api, source.id, { name: uid("Vigilada"), values: [1, 1, 1, 0, 0, 0] });
 
@@ -104,6 +113,8 @@ test.describe("ciclos de escaneo", () => {
 
     await expect(page.getByText("tecnología(s) en evaluación sin informe final")).toBeVisible();
     await expect(page.getByTestId("cycle-close-confirm")).toBeDisabled();
+    await expect(page.getByTestId("cycle-close-facts")).toContainText("Se congelan 2 puntaje(s).");
+    await expect(page.getByTestId("cycle-close-blocking")).toContainText(inEvalName);
     await page.locator("#cycle-close-justification").fill("Cierre E2E: el informe se publica en el ciclo siguiente.");
     await page.getByTestId("cycle-close-confirm").click();
     await expectToast(page, `${source.code} cerrado.`);
@@ -111,6 +122,8 @@ test.describe("ciclos de escaneo", () => {
 
     await card.getByRole("button", { name: /Arrastrar 1 bajo vigilancia/ }).click();
     await page.locator("#cycle-carry-target").selectOption(String(target.id));
+    await expect(page.getByTestId("cycle-carry-preview")).toContainText("Se arrastran 1 de 1");
+    await expect(page.getByTestId("cycle-carry-preview")).toContainText("calificación previa 50%");
     await page.getByTestId("cycle-carry-confirm").click();
     await expectToast(page, `propuestas para ${target.code}`);
 
