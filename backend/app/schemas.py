@@ -328,12 +328,36 @@ class RecommendationOut(BaseModel):
     model_used: str
     created_by: str
     created_at: datetime
+    status: str = "borrador"
+    validated_by: str = ""
+    validated_at: datetime | None = None
+    updated_by: str = ""
+    updated_at: datetime | None = None
+    # Contexto para la pantalla: de donde sale el informe y como se hizo.
+    origin: str = "manual"
+    edited: bool = False
+    words: int = 0
+    finding_title: str = ""
+    technology_id: int | None = None
+    technology_name: str = ""
 
 
 class RecommendationUpdate(BaseModel):
     title: str | None = None
     content: str | None = None
     impact: str | None = None
+
+
+class RecommendationReopenIn(BaseModel):
+    reason: str = Field(default="", max_length=300)
+
+
+class RecommendationHistoryEvent(BaseModel):
+    kind: str
+    label: str
+    detail: str = ""
+    at: str = ""
+    by: str = ""
 
 
 class GenerateRecommendationIn(BaseModel):

@@ -30,7 +30,7 @@ def _seed_cycle(api) -> int:
         db.add(EvaluationDoc(cycle_id=cycle.id, technology_id=tech.id, title="Ficha Novamab", status="publicado", body={"resumen": "Texto"}))
         db.add(EvaluationDoc(cycle_id=cycle.id, technology_id=other.id, title="Ficha Confimab", status="publicado", confidential=True))
         db.add(EvaluationDoc(cycle_id=cycle.id, technology_id=draft.id, title="Ficha Borramab", status="borrador"))
-        rec = Recommendation(finding_id=finding.id, title="Recomendacion Novamab", content="Adoptar con condiciones", impact="alto", model_used="manual")
+        rec = Recommendation(finding_id=finding.id, title="Recomendacion Novamab", content="Adoptar con condiciones", impact="alto", model_used="manual", status="validado", validated_by="lider@iets.org.co")
         db.add(rec)
         db.flush()
         db.add(Note(entity_type="finding", entity_id=finding.id, content="Nota de la senal", author_email="a@iets.org.co"))
