@@ -1150,3 +1150,43 @@ había una vista de toda la matriz, una respuesta se podía cambiar sin explicac
 
 - El exporte no respeta los filtros de la cola: siempre baja la matriz completa del ciclo.
 - La matriz del ciclo pagina de a 50 como la cola; no hay vista de todo el ciclo en una sola tabla.
+
+## Evaluación robusta: pestañas, observaciones con estado, versiones y exporte (27-11-2026, versión 7.10.0)
+
+**Por qué.** El expediente era una sola tarjeta larga con el documento, la invitación, los revisores, las observaciones
+y el historial uno tras otro. Las observaciones eran texto sin estado ni fecha, no se sabía qué había cambiado entre
+versiones, se podía perder lo escrito al cambiar de tecnología y la cola no decía qué esperaba cada expediente.
+
+**Servidor.**
+
+- `alembic/versions/0011_review_comment_resolution.py`: `review_comments.resolved_at`, `resolved_by` y
+  `resolution_note`. Se aplica sola al arrancar.
+- `evaluation_service.py`: `resolve_comment` y `reopen_comment` (quedan en bitácora como `review:comment_resolved` y
+  `review:comment_reopened`; un documento publicado ya no las admite), `queue_facts` (observaciones abiertas,
+  revisiones entregadas y pendientes, invitaciones que vencen en 3 días y desde cuándo está en su estado),
+  `changed_fields` y tope de 4.000 caracteres por observación.
+- `routers/evaluation.py`:
+  - `GET /api/reports` suma a cada fila `cluster_name`, `missing_count`, `open_comments`, `reviews_done`,
+    `reviews_pending`, `invites_expiring`, `confidential`, `version`, `updated_at` y `status_since`.
+  - `POST /api/reports/{doc}/comments/{id}/resolve` (permiso `report:write`) y `.../reopen` (informe o revisión).
+  - `GET /api/reports/{doc}/versions` agrega `status_label` y `changed_fields` frente a la versión anterior.
+  - `GET /api/reports/export.csv?cycle_id=` (queda como `report:export_queue`, neutraliza fórmulas).
+  - Cada observación trae `version_label`.
+
+**Interfaz.**
+
+- `pages/Evaluation.jsx` y `pages/evaluation.css`: indicadores, cola con búsqueda y filtro, cabecera fija del
+  expediente, pestañas, avance por sección, observaciones con resolver y reabrir, versiones con vista del documento,
+  revisores en tarjetas, menú «Exportar».
+- Cambios sin guardar: aviso, confirmación al cambiar de tecnología, `beforeunload` y transiciones bloqueadas hasta
+  guardar.
+- Aprobar en comité con observaciones abiertas pide confirmación; no lo impide.
+
+**Pruebas.** `tests/test_evaluacion_robusta.py` (6) y `e2e/evaluacion_robusta.spec.js` (1); se ajustó
+`flow_evaluation.spec.js` (pestaña de revisión, confirmación del comité y menú de exporte).
+
+**Pendientes.**
+
+- El portal del revisor externo (`/revisar/<token>`) no muestra si una observación fue resuelta ni la respuesta.
+- No se avisa por correo al revisor cuando su observación se resuelve.
+- No hay comparación lado a lado de dos versiones: solo la lista de campos que cambiaron.
