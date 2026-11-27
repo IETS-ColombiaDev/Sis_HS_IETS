@@ -1212,3 +1212,235 @@ button.dc-tile-btn:focus-visible {
     display: none !important;
   }
 }
+
+/* ---- Ciclo anterior, calidad de datos, secciones y actividad (7.12.0) ---- */
+.dc-nav {
+  position: sticky;
+  top: 72px;
+  z-index: 15;
+  display: flex;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(6px);
+  overflow-x: auto;
+}
+.dc-nav button {
+  flex: 0 0 auto;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dc-nav button:hover {
+  background: #eef2ff;
+  color: #3730a3;
+}
+.dc-nav button:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: -2px;
+}
+.dc-section-title,
+.dc-anchor {
+  scroll-margin-top: 132px;
+}
+.dc-section-title:focus,
+.dc-anchor:focus {
+  outline: none;
+}
+.dc-anchor {
+  display: block;
+  height: 0;
+}
+
+.dc-delta {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+.dc-delta[data-dir="up"] {
+  color: #047857;
+}
+.dc-delta[data-dir="down"] {
+  color: #b45309;
+}
+
+.dc-compare {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.dc-compare th,
+.dc-compare td {
+  padding: 8px 8px;
+  border-bottom: 1px solid #eef2f7;
+  text-align: left;
+  vertical-align: baseline;
+}
+.dc-compare thead th {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  overflow-wrap: break-word;
+}
+.dc-compare thead th:last-child {
+  white-space: nowrap;
+}
+.dc-compare tbody th {
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+}
+.dc-compare tbody th i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border-radius: 3px;
+}
+.dc-compare .is-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #334155;
+}
+.dc-compare td b {
+  color: #0f172a;
+}
+.dc-compare td small {
+  display: inline-block;
+  min-width: 38px;
+  margin-left: 6px;
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+.dc-compare td[data-dir="up"] {
+  color: #047857;
+  font-weight: 700;
+}
+.dc-compare td[data-dir="down"] {
+  color: #b45309;
+  font-weight: 700;
+}
+.dc-compare td[data-dir="same"] {
+  color: #94a3b8;
+}
+
+.dc-quality-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 13px;
+  color: #475569;
+}
+.dc-quality-head strong {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #047857;
+  font-variant-numeric: tabular-nums;
+}
+.dc-quality-head[data-tone="warn"] strong {
+  color: #b45309;
+}
+.dc-quality-head[data-tone="alert"] strong {
+  color: #b91c1c;
+}
+.dc-quality-bar {
+  height: 8px;
+  margin: 8px 0 12px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+.dc-quality-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #10b981;
+}
+.dc-quality-bar[data-tone="warn"] i {
+  background: #f59e0b;
+}
+.dc-quality-bar[data-tone="alert"] i {
+  background: #ef4444;
+}
+.dc-quality-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dc-quality-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid #eef2f7;
+  font-size: 13px;
+  color: #334155;
+}
+.dc-quality-list li:last-child {
+  border-bottom: 0;
+}
+.dc-quality-list li[data-zero="true"] {
+  color: #94a3b8;
+}
+.dc-quality-list li b {
+  color: #047857;
+  font-variant-numeric: tabular-nums;
+}
+.dc-quality-list .dc-linkbtn {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.dc-activity {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.dc-activity li {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 8px 0 8px 14px;
+  border-left: 3px solid #c7d2fe;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+  color: #475569;
+}
+.dc-activity li[data-kind="refresh"] {
+  border-left-color: #a7f3d0;
+}
+.dc-activity li strong {
+  color: #0f172a;
+}
+.dc-activity li small {
+  margin-left: auto;
+  font-size: 12px;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .dc-nav {
+    top: 60px;
+  }
+  .dc-activity li small {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+}
