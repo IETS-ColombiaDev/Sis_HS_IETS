@@ -200,7 +200,10 @@ export function ts(text) {
 // ---------------------------------------------------------------- fechas y números
 function asDate(value) {
   if (value == null || value === "") return null;
-  const d = value instanceof Date ? value : new Date(value);
+  // El servidor guarda en UTC; SQLite devuelve la fecha sin zona y el navegador la
+  // leería como hora local (cinco horas corrida en Colombia).
+  const naive = typeof value === "string" && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(value);
+  const d = value instanceof Date ? value : new Date(naive ? `${value.replace(" ", "T")}Z` : value);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 

@@ -1066,3 +1066,49 @@ dirección del centro de datos. En esa misma corrida la búsqueda web del sistem
   desde Render y de que tengan indexado el dominio. Las que sigan sin entrar necesitan el cliente compatible con
   navegador (decisión del IETS, Configuración › Parámetros de fuentes) o revisión de la URL en la matriz.
 - Las señales que llegan por buscadores son titulares y fragmentos: conviene abrir el enlace antes de clasificarlas.
+
+## Postulaciones robustas: radicado, motivos, reapertura y recorrido (27-11-2026, versión 7.8.0)
+
+**Por qué.** El submódulo solo listaba las postulaciones y dejaba aceptar o rechazar con una nota libre. No había forma
+de buscar, medir la cola, saber si una tecnología ya se había postulado, corregir un rechazo ni decirle a quien postuló
+en qué iba su trámite.
+
+**Servidor.**
+
+- `alembic/versions/0010_submission_reject_reason.py`: columna `submissions.reject_reason` (código del motivo).
+- `submission_service.py`:
+  - `REJECT_REASONS` (ocho motivos). `reject_submission` recibe `reason`; sin motivo vale «otro», que exige nota.
+  - `reopen_submission`: una rechazada vuelve a `recibida`; exige nota y deja `submission_reopened` en bitácora con la
+    decisión anterior. Una aceptada no se reabre porque ya creó una `Technology`.
+  - `tracking_code` (`POS-<año>-<id>`, derivado, sin columna) y `find_by_tracking` (radicado + correo).
+  - `duplicates_of` (mismo nombre comercial o misma DCI) para avisar a quien modera; `_same_filing`, más estricta,
+    impide que la misma persona radique dos veces la misma tecnología mientras la primera siga en moderación.
+  - Validación: máximo 10 enlaces, sin repetidos, con dominio válido; textos hasta 4.000 caracteres.
+  - `summary` (indicadores) e `history` (recorrido desde `audit_logs`, solo acciones `submission_*`).
+- `routers/submissions.py`:
+  - `GET /api/submissions` acepta `q`, `conflict`, `stale` y `order`; cada fila trae `tracking_code`,
+    `reject_reason_label`, `waiting_days` y `duplicates`.
+  - `GET /api/submissions/summary`, `GET /api/submissions/{id}`, `GET /api/submissions/{id}/history`,
+    `POST /api/submissions/{id}/reopen`, `GET /api/submissions/export.csv` (permiso `staging:assign`, queda en bitácora,
+    neutraliza celdas que empiezan por `=`, `+`, `-` o `@`).
+  - `POST /api/public/submissions/status` (público, con el mismo tope por IP): responde igual si el radicado no existe
+    o si el correo no coincide. Publica el motivo de la lista, nunca la nota interna ni los motivos «otro» y «no válida».
+
+**Interfaz.**
+
+- `pages/Submissions.jsx` y `pages/submissions.css`: indicadores, pestañas con conteo, búsqueda y filtros, tarjetas con
+  radicado, espera y aviso de duplicados, ventana de revisión a dos columnas con decisión y recorrido, reapertura y
+  exporte.
+- `pages/PublicSubmit.jsx`: muestra el radicado al enviar y agrega la consulta de estado.
+- `i18n/index.js`: las fechas que el servidor entrega sin zona horaria (SQLite) se leen como UTC en `fmtDate`,
+  `fmtDateTime` y `fmtTime`. Antes la hora de recibida salía cinco horas corrida. Las pantallas que aún usan
+  `new Date(x).toLocale…` directamente conservan ese desfase.
+
+**Pruebas.** `tests/test_postulaciones_robustas.py` (8) y `e2e/postulaciones_robustas.spec.js` (2); se ajustaron
+`test_frente_b_submissions.py` y `crud_submissions.spec.js`.
+
+**Pendientes.**
+
+- No se envía correo a quien postula cuando hay decisión: la consulta es por radicado. Activarlo requiere decidir el
+  texto y confirmar el servidor de correo.
+- El desfase de hora en las pantallas que no usan `fmtDateTime` queda por revisar una a una.
