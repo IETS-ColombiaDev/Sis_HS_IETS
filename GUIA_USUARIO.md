@@ -5,7 +5,7 @@ No es un resumen técnico: explica **qué ve en pantalla**, **qué botón oprimi
 
 | | |
 |---|---|
-| **Versión del sistema** | 7.11.0 · actualizada el 27 de noviembre de 2026 (diseminación: informes en borrador o validados, origen y recorrido de cada informe, vista previa del paquete del ciclo y exporte; antes, 7.10.0: evaluación: expediente por pestañas, observaciones que se resuelven y reabren, cambios entre versiones, aviso de cambios sin guardar y exporte; antes, 7.9.0: priorización: avance por criterio, matriz del ciclo, recorrido, justificación al cambiar una respuesta y exporte; antes, 7.8.0: postulaciones: radicado y consulta pública del estado, motivos de rechazo, reapertura, duplicados, búsqueda, indicadores y exporte; antes, 7.7.0: respaldo por buscadores cuando un sitio y Google Noticias rechazan la lectura, Vigilancia y Catálogo de fuentes reorganizados, Configuración con menú lateral y carga del logo institucional; antes, 7.6.0: interfaz en español, inglés británico e inglés americano con selector de idioma; antes, 7.5.0: entrega final: rutas de acceso a las fuentes, historial de vigilancias con fecha, hora y duración, informe de acceso plegable y ficha de modelos de inteligencia; antes, 7.4.2: búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
+| **Versión del sistema** | 7.12.0 · actualizada el 27 de noviembre de 2026 (tablero estratégico: comparación con el ciclo anterior, calidad de los datos del recorte, secciones, hoja de resumen en Excel y registro de descargas; antes, 7.11.0: diseminación: informes en borrador o validados, origen y recorrido de cada informe, vista previa del paquete del ciclo y exporte; antes, 7.10.0: evaluación: expediente por pestañas, observaciones que se resuelven y reabren, cambios entre versiones, aviso de cambios sin guardar y exporte; antes, 7.9.0: priorización: avance por criterio, matriz del ciclo, recorrido, justificación al cambiar una respuesta y exporte; antes, 7.8.0: postulaciones: radicado y consulta pública del estado, motivos de rechazo, reapertura, duplicados, búsqueda, indicadores y exporte; antes, 7.7.0: respaldo por buscadores cuando un sitio y Google Noticias rechazan la lectura, Vigilancia y Catálogo de fuentes reorganizados, Configuración con menú lateral y carga del logo institucional; antes, 7.6.0: interfaz en español, inglés británico e inglés americano con selector de idioma; antes, 7.5.0: entrega final: rutas de acceso a las fuentes, historial de vigilancias con fecha, hora y duración, informe de acceso plegable y ficha de modelos de inteligencia; antes, 7.4.2: búsqueda a fondo: contenido plegado y tablas, vigilancia que no se queda, enlaces verificados y botones de dirección en Clasificar; prompt de captura reforzado tras la prueba real con IA) |
 | **Público** | Evaluadores técnicos y clínicos, tomadores de decisiones, revisores, superadministradores y personal de apoyo |
 | **Cómo leerla** | Siga el orden de un ciclo nuevo la primera vez; después use el índice para el módulo del día |
 | **Documentación técnica** | [`README.md`](README.md) · [`DEPLOY.md`](DEPLOY.md) · [`Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md`](Catalogo_Fuentes_Proactivas_Verificadas_EH_IETS.md) |
@@ -1018,6 +1018,16 @@ El cruce no acepta ni rechaza: es evidencia para decidir. Si la vigilancia ya la
 
 ---
 
+
+### Tablero estratégico: ciclo anterior, calidad de los datos y registro de descargas (versión 7.12.0)
+
+- **Frente al ciclo anterior.** Una tabla compara cada etapa del embudo (capturadas, filtradas, priorizadas, evaluadas, publicadas) con el ciclo que abrió justo antes, y dice la diferencia. Los indicadores de arriba (Priorizadas, Actuar ya, Llegan en menos de un año, Expedientes) también dicen si hay más o menos que en ese ciclo. Se aplica el mismo recorte a los dos ciclos, salvo las fechas de captura.
+- **Calidad de los datos.** Muestra qué porcentaje de las tecnologías del recorte tiene clúster, tipología, fase y fecha de llegada, y cuántas tienen cada vacío. Al pulsar una cifra, el tablero se filtra por esas tecnologías para completarlas. Quien ve montos también ve cuántos expedientes no tienen impacto presupuestal o lo tienen en un texto que no se pudo interpretar.
+- **Secciones.** Una barra que acompaña al desplazarse lleva a Resumen, Mercado, Trabajo del ciclo, Presupuesto y Tecnologías.
+- **Hora del cálculo.** En un ciclo abierto el tablero dice a qué hora se calculó y tiene «Actualizar».
+- **Copiar enlace.** Copia la dirección con el ciclo y los filtros actuales, para compartir el mismo recorte.
+- **Excel con resumen.** El archivo de Excel suma la hoja «Resumen»: embudo (con el ciclo anterior), franjas de llegada y calidad de los datos.
+- **Descargas y recálculos.** Cada descarga del recorte y cada recálculo del datamart queda en la bitácora, con el formato, el número de tecnologías y si iba con montos. Quien gestiona ciclos ve la lista al final del tablero.
 
 ### Diseminación: informes con validación, origen y paquete con vista previa (versión 7.11.0)
 

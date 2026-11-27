@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from .. import graph_service, strategy_service
+from ..audit import record_action
 from ..database import get_db
 from ..deps import get_current_user, require_permission
 from ..events import bump_state_version
@@ -22,6 +23,7 @@ from ..schemas import (
     BulletinDecisionIn,
     BulletinDistributeIn,
     BulletinOut,
+    StrategyActivityEvent,
     StrategyDashboardOut,
     StrategyGraphIn,
     StrategyGraphOut,
@@ -114,6 +116,20 @@ def export_dashboard(
     content, media_type, filename = strategy_service.export_dashboard(
         cycle, data, fmt=format, include_restricted=restricted
     )
+    # Quien se lleva las cifras (y si iban con montos) queda en la bitacora.
+    record_action(
+        db,
+        entity_type="strategy_dashboard",
+        entity_id=cycle.id,
+        action="strategy:export",
+        new_value={
+            "format": format,
+            "rows": len(data.get("ttm_scatter") or []),
+            "restricted": restricted,
+            "filters": data.get("filters_applied") or {},
+        },
+    )
+    db.commit()
     return Response(
         content=content,
         media_type=media_type,
@@ -212,9 +228,26 @@ def refresh_datamart(
     cycle = _cycle(db, cycle_id)
     strategy_service.snapshot_ttm(db, cycle)
     row = strategy_service.refresh_datamart(db, cycle)
+    record_action(
+        db,
+        entity_type="strategy_dashboard",
+        entity_id=cycle.id,
+        action="strategy:refresh",
+        new_value={"rows": len((row.payload or {}).get("rows") or [])},
+    )
     db.commit()
     bump_state_version(db)
     return {"cycle_id": cycle.id, "refreshed_at": row.refreshed_at}
+
+
+@router.get("/api/strategy/dashboard/activity", response_model=list[StrategyActivityEvent])
+def dashboard_activity(
+    cycle_id: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_CYCLE_WRITE)),
+):
+    """Descargas y recalculos del tablero del ciclo (desde la bitacora)."""
+    return strategy_service.activity(db, _cycle(db, cycle_id))
 
 
 @router.get("/api/bulletins", response_model=list[BulletinOut])

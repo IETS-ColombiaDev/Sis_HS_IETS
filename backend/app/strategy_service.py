@@ -671,6 +671,159 @@ def _cached_rows(cached: CycleDatamart | None) -> list[dict] | None:
     return None
 
 
+# --------------------------------------------------------------------------- #
+#  Resumen, calidad de datos y comparacion con el ciclo anterior
+# --------------------------------------------------------------------------- #
+QUALITY_CHECKS = (
+    ("sin_cluster", "Sin clúster"),
+    ("sin_tipologia", "Sin tipología"),
+    ("sin_fase", "Sin fase clínica declarada"),
+    ("sin_ttm", "Sin fecha para estimar la llegada al mercado"),
+    ("sin_calificar", "Aptas sin calificación P1-P6 completa"),
+)
+QUALITY_RESTRICTED_CHECKS = (
+    ("sin_monto", "Expedientes sin impacto presupuestal"),
+    ("monto_ilegible", "Montos que no se pudieron interpretar"),
+)
+
+
+def summary_counts(rows: list[dict]) -> dict:
+    """Las cifras de los indicadores del resumen, con la misma regla que la interfaz."""
+    imminent = [r for r in rows if r.get("band") == "inminente"]
+    docs = [r for r in rows if r.get("doc_status")]
+    return {
+        "imminent": len(imminent),
+        "act_now": sum(1 for r in imminent if r.get("points_rated") and int(r.get("points") or 0) >= 4),
+        "docs": len(docs),
+        "docs_published": sum(1 for r in docs if r.get("doc_status") == "publicado"),
+        "to_rate": sum(1 for r in rows if r.get("status") == "filtrada_apta_priorizacion"),
+    }
+
+
+def _quality_flags(row: dict, *, include_restricted: bool) -> set[str]:
+    flags = set()
+    if row.get("cluster_id") is None:
+        flags.add("sin_cluster")
+    if row.get("tech_type_id") is None:
+        flags.add("sin_tipologia")
+    if (row.get("phase_bucket") or "sin_fase") == "sin_fase":
+        flags.add("sin_fase")
+    if row.get("months") is None:
+        flags.add("sin_ttm")
+    if row.get("status") == "filtrada_apta_priorizacion" and not row.get("points_rated"):
+        flags.add("sin_calificar")
+    if include_restricted:
+        if row.get("budget_unparsed"):
+            flags.add("monto_ilegible")
+        if row.get("doc_status") and not (row.get("year1") or row.get("year2") or row.get("year3")):
+            flags.add("sin_monto")
+    return flags
+
+
+def data_quality(rows: list[dict], *, include_restricted: bool) -> dict:
+    """Que tan completos estan los datos del recorte: lo que falta sesga los graficos."""
+    checks = QUALITY_CHECKS + (QUALITY_RESTRICTED_CHECKS if include_restricted else ())
+    counts = {key: 0 for key, _ in checks}
+    complete = 0
+    for row in rows:
+        # Los montos son un dato aparte: no cuentan para "ficha completa".
+        flags = _quality_flags(row, include_restricted=include_restricted)
+        for key in flags:
+            counts[key] += 1
+        if not (flags - {"sin_monto", "monto_ilegible", "sin_calificar"}):
+            complete += 1
+    total = len(rows)
+    return {
+        "total": total,
+        "complete": complete,
+        "complete_pct": _pct(complete, total),
+        "items": [{"key": key, "label": label, "count": counts[key]} for key, label in checks],
+    }
+
+
+def previous_cycle(db: Session, cycle: Cycle) -> Cycle | None:
+    """El ciclo que abrio justo antes de este."""
+    if cycle.opened_on is None:
+        return None
+    return (
+        db.query(Cycle)
+        .filter(Cycle.id != cycle.id, Cycle.opened_on < cycle.opened_on)
+        .order_by(Cycle.opened_on.desc(), Cycle.id.desc())
+        .first()
+    )
+
+
+def _rows_for(db: Session, cycle: Cycle) -> tuple[list[dict], CycleDatamart | None]:
+    """Filas del ciclo: del datamart si esta cerrado y vigente, en vivo si no."""
+    cached = db.query(CycleDatamart).filter(CycleDatamart.cycle_id == cycle.id).first()
+    rows = _cached_rows(cached) if cycle.status == "cerrado_consolidado" else None
+    if rows is not None:
+        return rows, cached
+    return collect_rows(db, cycle), None
+
+
+def comparison_for(db: Session, cycle: Cycle, filters: dict) -> dict | None:
+    """Las mismas cifras en el ciclo anterior, con el mismo recorte (sin las fechas de captura)."""
+    prev = previous_cycle(db, cycle)
+    if prev is None:
+        return None
+    rows, _ = _rows_for(db, prev)
+    selected = filter_rows(rows, {**filters, "date_from": None, "date_to": None})
+    funnel = aggregate(selected)["funnel"]
+    return {
+        "cycle_id": prev.id,
+        "cycle_code": prev.code,
+        "cycle_status": prev.status,
+        "total": len(selected),
+        "funnel": funnel,
+        "conversion": _conversion(funnel),
+        "summary": summary_counts(selected),
+    }
+
+
+ACTIVITY_ACTIONS = {
+    "strategy:export": "Descarga del recorte",
+    "strategy:refresh": "Datamart recalculado",
+}
+
+
+def activity(db: Session, cycle: Cycle, limit: int = 20) -> list[dict]:
+    """Descargas y recalculos del tablero de este ciclo, del mas reciente al mas antiguo."""
+    from .models import AuditLog
+
+    events = (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.entity_type == "strategy_dashboard",
+            AuditLog.entity_id == str(cycle.id),
+            AuditLog.action.in_(tuple(ACTIVITY_ACTIONS)),
+        )
+        .order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())
+        .limit(limit)
+        .all()
+    )
+    out = []
+    for ev in events:
+        new = ev.new_value if isinstance(ev.new_value, dict) else {}
+        detail = ""
+        if ev.action == "strategy:export":
+            parts = [str(new.get("format") or "").upper(), f"{int(new.get('rows') or 0)} tecnología(s)"]
+            parts.append("con montos" if new.get("restricted") else "sin montos")
+            if new.get("filters"):
+                parts.append("con filtros")
+            detail = " · ".join(p for p in parts if p)
+        out.append(
+            {
+                "kind": "export" if ev.action == "strategy:export" else "refresh",
+                "label": ACTIVITY_ACTIONS[ev.action],
+                "detail": detail,
+                "at": ev.occurred_at.isoformat() if ev.occurred_at else "",
+                "by": ev.user_email or "",
+            }
+        )
+    return out
+
+
 def dashboard_for(
     db: Session,
     cycle: Cycle,
@@ -702,18 +855,20 @@ def dashboard_for(
         priority_min=priority_min,
         stage=stage,
     )
-    cached = db.query(CycleDatamart).filter(CycleDatamart.cycle_id == cycle.id).first()
-    rows = _cached_rows(cached) if cycle.status == "cerrado_consolidado" else None
-    use_cache = rows is not None
-    if rows is None:
-        rows = collect_rows(db, cycle)
+    rows, cached = _rows_for(db, cycle)
+    use_cache = cached is not None
     thresholds = (
         (cached.payload or {}).get("ttm_thresholds") if use_cache and cached else None
     ) or ttm.load_params(db)
     payload = build_payload(db, cycle, rows=rows, **filters)
 
     active = _active(filters)
+    selected = filter_rows(rows, filters)
     public = {
+        "summary": summary_counts(selected),
+        "data_quality": data_quality(selected, include_restricted=include_restricted),
+        "comparison": comparison_for(db, cycle, filters),
+        "generated_at": _utcnow(),
         "cycle_id": cycle.id,
         "cycle_code": cycle.code,
         "funnel": payload["funnel"],
@@ -859,6 +1014,35 @@ def export_dashboard(cycle: Cycle, data: dict, *, fmt: str, include_restricted: 
         meta.append(["Fuente", "Datamart al cierre" if data.get("from_cache") else "Calculo en vivo"])
         meta.append(["Capa", "Restringida (con montos)" if include_restricted else "Agregada (sin montos)"])
         meta.append(["Generado", datetime.now(COLOMBIA_TZ).strftime("%Y-%m-%d %H:%M")])
+        summary = wb.create_sheet("Resumen")
+        comparison = data.get("comparison") or {}
+        prev_funnel = comparison.get("funnel") or {}
+        head = ["Etapa del embudo", f"Tecnologías ({cycle.code})"]
+        if comparison:
+            head.append(f"Ciclo anterior ({comparison.get('cycle_code')})")
+        summary.append(head)
+        for stage in FUNNEL_STAGES:
+            line = [FUNNEL_LABELS.get(stage, stage), int((data.get("funnel") or {}).get(stage) or 0)]
+            if comparison:
+                line.append(int(prev_funnel.get(stage) or 0))
+            summary.append(line)
+        summary.append([])
+        summary.append(["Franja de llegada al mercado", "Tecnologías"])
+        for item in data.get("by_band") or []:
+            summary.append([item.get("label"), int(item.get("value") or 0)])
+        summary.append([])
+        summary.append(["Calidad de los datos", "Tecnologías"])
+        quality = data.get("data_quality") or {}
+        summary.append(["Con clúster, tipología, fase y fecha de llegada", int(quality.get("complete") or 0)])
+        for item in quality.get("items") or []:
+            summary.append([item.get("label"), int(item.get("count") or 0)])
+        for row_cells in summary.iter_rows():
+            if row_cells[0].value in (head[0], "Franja de llegada al mercado", "Calidad de los datos"):
+                for cell in row_cells:
+                    cell.font = Font(bold=True)
+        summary.column_dimensions["A"].width = 52
+        summary.column_dimensions["B"].width = 26
+        summary.column_dimensions["C"].width = 34
         buffer = BytesIO()
         wb.save(buffer)
         return (
