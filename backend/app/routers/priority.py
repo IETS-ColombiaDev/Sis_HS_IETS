@@ -2,19 +2,24 @@
 con permisos a nivel de campo."""
 from __future__ import annotations
 
+import csv
+import io
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from .. import priority_engine, rbac
+from .. import priority_engine, priority_overview, rbac
+from ..audit import record_action
 from ..database import get_db
 from ..deps import get_current_user
 from ..events import bump_state_version
 from ..methodology import get_param
-from ..models import Cycle, CycleTechnology, PriorityScore, Technology, User
+from ..models import Cycle, CycleTechnology, Technology, User
 from ..priority_engine import RATEABLE_STATUSES, PriorityRuleError
 from ..schemas import (
     PriorityCriterionOut,
+    PriorityHistoryEvent,
     PriorityQueueItem,
     PriorityScoreOut,
     PriorityStateOut,
@@ -110,6 +115,8 @@ def priority_queue(
     limit: int = Query(200, ge=1, le=500),
     offset: int = Query(0, ge=0),
     focus: int | None = Query(None, description="Tecnología que debe quedar en la página devuelta"),
+    order: str = Query("cribado", description="cribado, pct, avance, nombre o recientes"),
+    progress: str | None = Query(None, description="completas o incompletas"),
 ):
     """Bandeja de calificacion del ciclo, filtrable por lo pendiente para el perfil.
 
@@ -134,6 +141,15 @@ def priority_queue(
                 detail=f"Estado no válido para la cola. Opciones: {', '.join(RATEABLE_STATUSES)}.",
             )
         statuses = (status_filter,)
+    if order not in priority_overview.QUEUE_ORDERS:
+        raise HTTPException(
+            status_code=422, detail=f"Orden no válido. Opciones: {', '.join(priority_overview.QUEUE_ORDERS)}."
+        )
+    if progress and progress not in priority_overview.PROGRESS_FILTERS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Filtro de avance no válido. Opciones: {', '.join(priority_overview.PROGRESS_FILTERS)}.",
+        )
 
     query = (
         db.query(Technology, CycleTechnology)
@@ -157,20 +173,21 @@ def priority_queue(
         )
     rows = query.order_by(Technology.screening_score.desc(), Technology.id.asc()).all()
 
-    rated_map: dict[int, set[str]] = {}
-    for tech_id, criterion in (
-        db.query(PriorityScore.technology_id, PriorityScore.criterion)
-        .filter(PriorityScore.cycle_id == cycle_id)
-        .all()
-    ):
-        rated_map.setdefault(tech_id, set()).add(criterion)
+    score_map = priority_overview.score_rows(db, cycle_id)
 
     items: list[PriorityQueueItem] = []
     for tech, entry in rows:
-        rated = rated_map.get(tech.id, set())
+        tech_scores = score_map.get(tech.id, {})
+        rated = set(tech_scores)
         pending_for_me = bool(my_criteria - rated) and not entry.frozen
         if only_pending and not pending_for_me:
             continue
+        is_complete = all(code in rated for code in all_codes)
+        if progress == "completas" and not is_complete:
+            continue
+        if progress == "incompletas" and is_complete:
+            continue
+        stamps = [row.rated_at for row in tech_scores.values() if row.rated_at]
         items.append(
             PriorityQueueItem(
                 technology_id=tech.id,
@@ -191,8 +208,24 @@ def priority_queue(
                     float(entry.previous_priority_pct) if entry.previous_priority_pct is not None else None
                 ),
                 carried_from_cycle_id=entry.carried_from_cycle_id,
+                scores={
+                    code: (int(tech_scores[code].value) if code in tech_scores else None) for code in all_codes
+                },
+                my_missing=(
+                    [] if entry.frozen else [c for c in all_codes if c in my_criteria and c not in rated]
+                ),
+                last_rated_at=max(stamps) if stamps else None,
             )
         )
+    if order == "pct":
+        # Sin %P al final; el empate lo resuelve el cribado, que ya es el orden de llegada.
+        items.sort(key=lambda i: (i.priority_pct is None, -(i.priority_pct or 0)))
+    elif order == "avance":
+        items.sort(key=lambda i: (i.rated >= i.total_criteria, -i.rated))
+    elif order == "nombre":
+        items.sort(key=lambda i: i.name.lower())
+    elif order == "recientes":
+        items.sort(key=lambda i: i.last_rated_at.timestamp() if i.last_rated_at else 0, reverse=True)
     response.headers["X-Total-Count"] = str(len(items))
     if focus is not None:
         # Enlace directo: se devuelve la pagina que contiene la tecnologia pedida
@@ -239,7 +272,43 @@ def priority_stats(
         "watchlist": by_status.get("bajo_vigilancia", 0),
         "not_prioritized": by_status.get("no_priorizada", 0),
         "my_criteria": rbac.rateable_criteria(user),
+        "excluded": by_status.get("excluida", 0),
+        "in_evaluation": by_status.get("en_evaluacion", 0) + by_status.get("publicada", 0),
+        **priority_overview.stats(db, cycle_id, user),
     }
+
+
+@router.get("/{cycle_id}/export.csv")
+def export_matrix(
+    cycle_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Matriz del ciclo en CSV (punto y coma, UTF-8 con BOM para Excel). Queda en bitácora."""
+    cycle = db.get(Cycle, cycle_id)
+    if cycle is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ciclo no encontrado")
+    header, rows = priority_overview.export_rows(db, cycle_id)
+
+    def safe(value) -> str:
+        text = "" if value is None else str(value)
+        # Una celda que empieza por =, +, - o @ se ejecutaria como formula al abrir el archivo.
+        return "'" + text if text[:1] in ("=", "+", "-", "@") else text
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";", lineterminator="\n")
+    writer.writerow(header)
+    for row in rows:
+        writer.writerow([safe(v) for v in row])
+    record_action(
+        db, entity_type="cycles", entity_id=cycle_id, action="priority:export", new_value={"rows": len(rows)},
+    )
+    db.commit()
+    return Response(
+        content="\ufeff" + buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="priorizacion_{cycle.code or cycle_id}.csv"'},
+    )
 
 
 @router.get("/{cycle_id}/{technology_id}", response_model=PriorityStateOut)
@@ -250,6 +319,24 @@ def get_state(
     user: User = Depends(get_current_user),
 ):
     return _build_state(db, cycle_id, technology_id, user)
+
+
+@router.get("/{cycle_id}/{technology_id}/history", response_model=list[PriorityHistoryEvent])
+def get_history(
+    cycle_id: int,
+    technology_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Recorrido de la tecnología en la matriz: quién calificó o cambió qué y cuándo."""
+    entry = (
+        db.query(CycleTechnology)
+        .filter(CycleTechnology.cycle_id == cycle_id, CycleTechnology.technology_id == technology_id)
+        .first()
+    )
+    if entry is None:
+        raise HTTPException(status_code=404, detail="La tecnología no está asignada a este ciclo.")
+    return priority_overview.history(db, entry)
 
 
 @router.post("/{cycle_id}/{technology_id}/rate", response_model=PriorityStateOut)

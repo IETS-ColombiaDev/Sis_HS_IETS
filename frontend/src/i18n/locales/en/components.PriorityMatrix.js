@@ -40,4 +40,5 @@ export default {
   "Cómo se clasifican las franjas": "How the bands are classified",
   "Ciclo cerrado: los puntajes están congelados. Una reevaluación debe hacerse en un ciclo posterior y generará un registro nuevo.":
     "Cycle closed: the scores are frozen. A reassessment must be carried out in a later cycle and will create a new record.",
+  "Para cambiar la respuesta de {codigo}, escriba por qué (mínimo {n} caracteres) y pulse de nuevo Sí o No. El cambio queda en el recorrido.": "To change the answer to {codigo}, write why (at least {n} characters) and press Yes or No again. The change is kept in the history.",
 };

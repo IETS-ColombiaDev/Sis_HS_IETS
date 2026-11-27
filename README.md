@@ -2,7 +2,7 @@
 
 Aplicación web del **Instituto de Evaluación Tecnológica en Salud (IETS)** de Colombia para el escaneo de horizonte (*horizon scanning*) de tecnologías sanitarias: vigila fuentes públicas, captura señales, las depura y cruza con el registro sanitario, las prioriza con la matriz %P, soporta la evaluación temprana con revisión por pares y publica los resultados. Todo cambio queda en una bitácora de auditoría y el acceso se gobierna por perfiles.
 
-**Versión de esta entrega:** `7.8.0` (`backend/app/__init__.py`, `frontend/package.json`).
+**Versión de esta entrega:** `7.9.0` (`backend/app/__init__.py`, `frontend/package.json`).
 
 ---
 

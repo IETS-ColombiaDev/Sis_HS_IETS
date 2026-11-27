@@ -1037,6 +1037,18 @@ class PriorityQueueItem(BaseModel):
     # Frente A: referencia visible del arrastre entre ciclos.
     previous_priority_pct: float | None = None
     carried_from_cycle_id: int | None = None
+    # Valor por criterio (1, 0 o None si falta) para dibujar la fila de la matriz.
+    scores: dict[str, int | None] = {}
+    my_missing: list[str] = []
+    last_rated_at: datetime | None = None
+
+
+class PriorityHistoryEvent(BaseModel):
+    kind: str
+    label: str
+    detail: str = ""
+    at: str = ""
+    by: str = ""
 
 
 # =========================================================================== #

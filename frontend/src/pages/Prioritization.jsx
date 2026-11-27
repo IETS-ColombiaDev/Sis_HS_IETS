@@ -29,9 +29,155 @@ import {
   resolveTechLink,
   useTechDeepLink,
 } from "../utils/techLink";
-import { t, tr, ts } from "../i18n";
+import { downloadFromApi } from "../utils/download";
+import { t, tr, ts, fmtDateTime } from "../i18n";
+import "./prioritization.css";
 
 const PAGE_SIZE = 50;
+
+const ORDER_OPTIONS = [
+  { value: "cribado", label: t("Orden: puntaje de cribado") },
+  { value: "pct", label: t("Orden: %P más alto") },
+  { value: "avance", label: t("Orden: más cerca de completar") },
+  { value: "recientes", label: t("Orden: calificadas hace poco") },
+  { value: "nombre", label: t("Orden: nombre (A-Z)") },
+];
+
+const PROGRESS_OPTIONS = [
+  { value: "", label: t("Cualquier avance") },
+  { value: "incompletas", label: t("Con criterios pendientes") },
+  { value: "completas", label: t("Matriz completa") },
+];
+
+const HISTORY_ICON = {
+  assigned: "inbox",
+  apt: "filter",
+  rated: "check",
+  changed: "edit",
+  classified: "chart",
+  excluded: "x",
+  evaluation: "send",
+  published: "book",
+};
+
+/** Seis puntos, uno por criterio: verde Sí, gris No, hueco pendiente, ámbar si le toca al perfil. */
+function CriteriaDots({ item }) {
+  const codes = Object.keys(item.scores || {});
+  if (!codes.length) return null;
+  const mine = new Set(item.my_missing || []);
+  return (
+    <span className="prio-dots" role="img" aria-label={t("{n} de {total} criterios calificados", { n: item.rated, total: item.total_criteria })}>
+      {codes.map((code) => {
+        const value = item.scores[code];
+        const state = value === 1 ? "yes" : value === 0 ? "no" : mine.has(code) ? "mine" : "pending";
+        const title =
+          value === 1 ? t("{codigo}: Sí", { codigo: code })
+          : value === 0 ? t("{codigo}: No", { codigo: code })
+          : mine.has(code) ? t("{codigo}: pendiente, lo califica su perfil", { codigo: code })
+          : t("{codigo}: pendiente", { codigo: code });
+        return <span key={code} className={`prio-dot is-${state}`} title={title} />;
+      })}
+    </span>
+  );
+}
+
+function History({ cycleId, technologyId, refreshKey }) {
+  const [events, setEvents] = useState(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    setEvents(null);
+  }, [technologyId]);
+  useEffect(() => {
+    if (!open) return undefined;
+    let cancelled = false;
+    api
+      .get(`/priority/${cycleId}/${technologyId}/history`)
+      .then(({ data }) => !cancelled && setEvents(Array.isArray(data) ? data : []))
+      .catch(() => !cancelled && setEvents([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [open, cycleId, technologyId, refreshKey]);
+  return (
+    <details className="prio-history-fold" open={open} onToggle={(e) => setOpen(e.currentTarget.open)} data-testid="prio-history-toggle">
+      <summary>
+        <Icon name="clock" size={15} /> {t("Recorrido en la matriz")}
+        <span>{t("Quién calificó o cambió cada criterio y cuándo")}</span>
+      </summary>
+      {open &&
+        (events == null ? (
+          <p className="prio-history-empty">{t("Cargando el recorrido...")}</p>
+        ) : events.length === 0 ? (
+          <p className="prio-history-empty">{t("Sin eventos registrados.")}</p>
+        ) : (
+          <ol className="prio-history" data-testid="prio-history">
+            {events.map((ev, i) => (
+              <li key={`${ev.at}-${i}`} className={`is-${ev.kind}`}>
+                <span className="prio-history-dot" aria-hidden="true">
+                  <Icon name={HISTORY_ICON[ev.kind] || "info"} size={13} />
+                </span>
+                <div>
+                  <strong>{ts(ev.label)}</strong>
+                  <span className="prio-history-meta">
+                    {fmtDateTime(ev.at)}
+                    {ev.by ? ` · ${ev.by}` : ""}
+                  </span>
+                  {ev.detail && <p>{ts(ev.detail)}</p>}
+                </div>
+              </li>
+            ))}
+          </ol>
+        ))}
+    </details>
+  );
+}
+
+/** Avance del ciclo: barra general y una pastilla por criterio. */
+function ProgressPanel({ stats }) {
+  if (!stats?.criteria?.length || !stats.rateable) return null;
+  return (
+    <Card className="prio-progress" data-testid="prio-progress">
+      <div className="prio-progress-main">
+        <div className="prio-progress-head">
+          <strong>{t("Avance de la matriz")}</strong>
+          <span>
+            {t("{n} de {total} tecnologías con los seis criterios", { n: stats.complete, total: stats.rateable })}
+            {stats.avg_pct != null ? ` · ${t("%P promedio {pct}%", { pct: stats.avg_pct })}` : ""}
+          </span>
+        </div>
+        <div className="prio-progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={stats.progress_pct}>
+          <div style={{ width: `${stats.progress_pct}%` }} />
+        </div>
+        <span className="prio-progress-pct">{stats.progress_pct}%</span>
+      </div>
+      <ul className="prio-criteria">
+        {stats.criteria.map((c) => {
+          const pct = c.total ? Math.round((c.rated * 100) / c.total) : 0;
+          return (
+            <li key={c.code} className={`${c.mine ? "is-mine" : ""} ${c.rated >= c.total ? "is-done" : ""}`} data-testid={`prio-crit-${c.code}`}>
+              <div className="prio-criteria-top">
+                <b>{c.code}</b>
+                <span>
+                  {c.rated}/{c.total}
+                </span>
+              </div>
+              <div className="prio-criteria-label" title={ts(c.short_label)}>
+                {ts(c.short_label)}
+              </div>
+              <div className="prio-criteria-track">
+                <div style={{ width: `${pct}%` }} />
+              </div>
+              <div className="prio-criteria-foot">
+                <span>{t("{n} con Sí", { n: c.yes })}</span>
+                {c.mine && <em>{t("Lo califica usted")}</em>}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}
 
 const STATUS_FILTERS = [
   { value: "", label: t("Todos los estados") },
@@ -69,6 +215,11 @@ export default function Prioritization() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [clusterFilter, setClusterFilter] = useState("");
+  const [order, setOrder] = useState("cribado");
+  const [progress, setProgress] = useState("");
+  const [view, setView] = useState("calificar");
+  const [exporting, setExporting] = useState(false);
+  const [historyKey, setHistoryKey] = useState(0);
   const [excluding, setExcluding] = useState(null);
   const [exclusionReasons, setExclusionReasons] = useState({});
   const [exclusionForm, setExclusionForm] = useState({ reason_code: "", note: "" });
@@ -100,7 +251,7 @@ export default function Prioritization() {
   useEffect(() => {
     resetActive.current = true;
     setPage(0);
-  }, [search, statusFilter, clusterFilter, onlyMine, cycleId]);
+  }, [search, statusFilter, clusterFilter, onlyMine, cycleId, order, progress]);
   useEffect(() => {
     resetActive.current = true;
   }, [page]);
@@ -111,7 +262,8 @@ export default function Prioritization() {
       return;
     }
     try {
-      const params = { only_pending: onlyMine, limit: PAGE_SIZE, offset: page * PAGE_SIZE };
+      const params = { only_pending: onlyMine, limit: PAGE_SIZE, offset: page * PAGE_SIZE, order };
+      if (progress) params.progress = progress;
       if (focusRef.current) params.focus = focusRef.current;
       if (search) params.q = search;
       if (statusFilter) params.status = statusFilter;
@@ -165,7 +317,7 @@ export default function Prioritization() {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cycleId, onlyMine, page, search, statusFilter, clusterFilter]);
+  }, [cycleId, onlyMine, page, search, statusFilter, clusterFilter, order, progress]);
 
   useEffect(() => {
     load();
@@ -218,12 +370,14 @@ export default function Prioritization() {
         setLinkNotice(null);
         focusRef.current = techId;
         // Si algun filtro cambia, su efecto recarga la cola; si no, se recarga aqui.
-        const filtered = onlyMine || searchText || search || statusFilter || clusterFilter;
+        const filtered = onlyMine || searchText || search || statusFilter || clusterFilter || progress;
+        setView("calificar");
         setOnlyMine(false);
         setSearchText("");
         setSearch("");
         setStatusFilter("");
         setClusterFilter("");
+        setProgress("");
         if (!filtered) load();
       } catch (e) {
         toast.error(apiError(e, t("No se pudo abrir la tecnología del enlace")));
@@ -242,7 +396,30 @@ export default function Prioritization() {
     setTechId(id);
   };
 
+  const position = queue.findIndex((i) => i.technology_id === activeId);
+  const step = (delta) => {
+    const next = queue[position + delta];
+    if (next) selectItem(next.technology_id);
+  };
+  // La siguiente que espera una respuesta de este perfil, empezando después de la abierta.
+  const nextMine = useMemo(() => {
+    const rest = [...queue.slice(position + 1), ...queue.slice(0, Math.max(position, 0))];
+    return rest.find((i) => i.pending_for_me && i.technology_id !== activeId) || null;
+  }, [queue, position, activeId]);
+
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      await downloadFromApi(api, `/priority/${cycleId}/export.csv`, `priorizacion_${cycle?.code || cycleId}.csv`);
+    } catch (e) {
+      toast.error(apiError(e, t("No se pudo descargar la matriz")));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const onRated = (state) => {
+    setHistoryKey((k) => k + 1);
     if (state?.complete && pinned && pinned.technology_id === activeId) {
       setPinned((p) => ({ ...p, status: state.classification, priority_pct: state.priority_pct, points: state.points }));
     }
@@ -304,10 +481,112 @@ export default function Prioritization() {
     );
   }
 
-  const filtered = Boolean(search || statusFilter || clusterFilter || onlyMine);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const from = total === 0 ? 0 : page * PAGE_SIZE + 1;
   const to = Math.min(total, (page + 1) * PAGE_SIZE);
+  const filtered = Boolean(search || statusFilter || clusterFilter || onlyMine || progress);
+  const clearFilters = () => {
+    setSearchText("");
+    setStatusFilter("");
+    setClusterFilter("");
+    setProgress("");
+    setOnlyMine(false);
+  };
+  const toolbar = (
+    <div className="fa-toolbar">
+      <input
+        type="search"
+        aria-label={t("Buscar en la cola de priorización")}
+        placeholder={t("Buscar por nombre, DCI o indicación...")}
+        value={searchText}
+        onChange={(e) => setSearchText(e.target.value)}
+        data-testid="prio-search"
+      />
+      <div className="fa-toolbar-row">
+        <select
+          aria-label={t("Filtrar por estado")}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          data-testid="prio-status"
+        >
+          {STATUS_FILTERS.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+        <select aria-label={t("Filtrar por clúster")} value={clusterFilter} onChange={(e) => setClusterFilter(e.target.value)}>
+          <option value="">{t("Todos los clústeres")}</option>
+          {clusters.map((c) => (
+            <option key={c.id} value={c.id}>
+              {ts(c.name)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="fa-toolbar-row">
+        <select aria-label={t("Filtrar por avance")} value={progress} onChange={(e) => setProgress(e.target.value)} data-testid="prio-progress-filter">
+          {PROGRESS_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <select aria-label={t("Ordenar la cola")} value={order} onChange={(e) => setOrder(e.target.value)} data-testid="prio-order">
+          {ORDER_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+  const emptyQueue = (
+    <div style={{ padding: 16 }}>
+      <EmptyState
+        icon="🧮"
+        title={
+          filtered
+            ? onlyMine && !search && !statusFilter && !clusterFilter && !progress
+              ? t("Nada pendiente para su perfil")
+              : t("Sin resultados")
+            : t("No hay tecnologías en la cola")
+        }
+        message={
+          filtered
+            ? t("Ninguna tecnología coincide con los filtros actuales.")
+            : t("Asigne señales al ciclo desde la bandeja de entrada y márquelas como aptas en Filtrado y depuración.")
+        }
+        action={
+          filtered ? (
+            <Button variant="secondary" size="sm" onClick={clearFilters}>
+              {t("Limpiar filtros")}
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => navigate("/filtrado")}>
+              {t("Ir a filtrado")}
+            </Button>
+          )
+        }
+      />
+    </div>
+  );
+  const pager = total > 0 && (
+    <div className="fa-pager" data-testid="prio-pager">
+      <span>{t("{from}-{to} de {total}", { from, to, total })}</span>
+      <span style={{ display: "flex", gap: 6 }}>
+        <button type="button" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+          {t("Anterior")}
+        </button>
+        <span style={{ alignSelf: "center" }}>{t("Página {n} de {total}", { n: page + 1, total: pages })}</span>
+        <button type="button" disabled={page + 1 >= pages} onClick={() => setPage((p) => p + 1)} data-testid="prio-next-page">
+          {t("Siguiente")}
+        </button>
+      </span>
+    </div>
+  );
+  const codes = stats?.criteria?.map((c) => c.code) || [];
 
   return (
     <div>
@@ -319,15 +598,36 @@ export default function Prioritization() {
           { ciclo: cycle?.code }
         )}
         actions={
-          <HintButton
-            variant={onlyMine ? "primary" : "secondary"}
-            onClick={() => setOnlyMine((v) => !v)}
-            hint={GLOSSARY.fa_solo_mio}
-            data-testid="prio-only-mine"
-          >
-            <Icon name="filter" size={16} />
-            {onlyMine ? t("Viendo lo mío") : t("Solo lo que me toca")}
-          </HintButton>
+          <>
+            <div className="prio-view" role="group" aria-label={t("Vista de la priorización")}>
+              <button type="button" aria-pressed={view === "calificar"} onClick={() => setView("calificar")} data-testid="prio-view-rate">
+                <Icon name="list" size={15} /> {t("Calificar")}
+              </button>
+              <button type="button" aria-pressed={view === "matriz"} onClick={() => setView("matriz")} data-testid="prio-view-matrix">
+                <Icon name="layers" size={15} /> {t("Matriz del ciclo")}
+              </button>
+            </div>
+            <HintButton
+              variant={onlyMine ? "primary" : "secondary"}
+              onClick={() => setOnlyMine((v) => !v)}
+              hint={GLOSSARY.fa_solo_mio}
+              data-testid="prio-only-mine"
+            >
+              <Icon name="filter" size={16} />
+              {onlyMine ? t("Viendo lo mío") : t("Solo lo que me toca")}
+            </HintButton>
+            <HintButton
+              variant="secondary"
+              onClick={exportCsv}
+              loading={exporting}
+              disabled={!stats?.rateable}
+              disabledHint={t("Aún no hay tecnologías en la matriz de este ciclo.")}
+              hint={t("Descarga la matriz completa del ciclo: respuesta de cada criterio, quién la dio, cuándo y su justificación. La descarga queda en la bitácora.")}
+              data-testid="prio-export"
+            >
+              <Icon name="doc" size={16} /> {t("Exportar CSV")}
+            </HintButton>
+          </>
         }
       />
 
@@ -356,12 +656,35 @@ export default function Prioritization() {
               color: stats.pending ? "#D97706" : undefined,
               hint: GLOSSARY.fa_pendientes,
             },
-            { label: t("Priorizadas"), value: stats.prioritized, color: "#059669", hint: GLOSSARY.fa_priorizada },
+            {
+              label: t("Le tocan a usted"),
+              value: stats.pending_for_me,
+              color: stats.pending_for_me ? "#2563EB" : undefined,
+              sub: rateableCriteria.length ? rateableCriteria.join(", ") : t("Solo consulta"),
+              hint: t("Tecnologías de la cola a las que les falta un criterio que su perfil puede calificar."),
+              testId: "prio-kpi-mine",
+            },
+            {
+              label: t("Priorizadas"),
+              value: stats.prioritized,
+              color: "#059669",
+              sub: stats.prioritized ? t("Listas para evaluación") : undefined,
+              hint: GLOSSARY.fa_priorizada,
+            },
             { label: t("Bajo vigilancia"), value: stats.watchlist, color: "#D97706", hint: GLOSSARY.fa_bajo_vigilancia },
             { label: t("No priorizadas"), value: stats.not_prioritized, hint: GLOSSARY.fa_no_priorizada },
+            {
+              label: t("Ya en evaluación"),
+              value: stats.in_evaluation,
+              color: stats.in_evaluation ? "#7C3AED" : undefined,
+              sub: stats.excluded ? t("{n} excluida(s) del ciclo", { n: stats.excluded }) : undefined,
+              hint: t("Tecnologías que salieron de la matriz hacia evaluación temprana o ya están publicadas. Su calificación quedó fija."),
+            },
           ]}
         />
       )}
+
+      <ProgressPanel stats={stats} />
 
       <TechLinkNotice notice={linkNotice} onClose={() => setLinkNotice(null)} />
 
@@ -377,83 +700,79 @@ export default function Prioritization() {
         </div>
       )}
 
+      {view === "matriz" ? (
+        <Card padding={0} style={{ overflow: "hidden" }} data-testid="prio-matrix-view">
+          <div className="prio-list-head">{t("Matriz del ciclo · {total} tecnología(s)", { total })}</div>
+          {toolbar}
+          {queue.length === 0 ? (
+            emptyQueue
+          ) : (
+            <div className="prio-table-wrap">
+              <table className="prio-table" data-testid="prio-matrix-table">
+                <thead>
+                  <tr>
+                    <th scope="col">{t("Tecnología")}</th>
+                    {codes.map((code) => (
+                      <th key={code} scope="col" className="is-crit">
+                        {code}
+                      </th>
+                    ))}
+                    <th scope="col" className="is-num">{t("Puntos")}</th>
+                    <th scope="col" className="is-num">%P</th>
+                    <th scope="col">{t("Estado")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {queue.map((item) => (
+                    <tr key={item.technology_id} data-testid={`prio-row-${item.technology_id}`}>
+                      <th scope="row">
+                        <button
+                          type="button"
+                          className="prio-table-name"
+                          onClick={() => {
+                            selectItem(item.technology_id);
+                            setView("calificar");
+                          }}
+                          title={t("Abrir para calificar")}
+                        >
+                          <ClampText text={item.name} lines={2} />
+                        </button>
+                        <span className="prio-table-meta">
+                          {item.cluster_name || t("Sin clúster")}
+                          {item.pending_for_me ? <em>{t("Le toca")}</em> : null}
+                        </span>
+                      </th>
+                      {codes.map((code) => {
+                        const value = item.scores?.[code];
+                        const mine = (item.my_missing || []).includes(code);
+                        return (
+                          <td key={code} className={`is-crit ${value === 1 ? "is-yes" : value === 0 ? "is-no" : mine ? "is-mine" : "is-pending"}`}>
+                            {value === 1 ? t("Sí") : value === 0 ? t("No") : "·"}
+                          </td>
+                        );
+                      })}
+                      <td className="is-num">{item.points ?? `${item.rated}/${item.total_criteria}`}</td>
+                      <td className="is-num">
+                        {item.priority_pct != null ? <strong>{item.priority_pct}%</strong> : <span className="prio-table-dash">-</span>}
+                      </td>
+                      <td>
+                        <Badge tone={item.status}>{TECH_STATUS_LABELS[item.status]}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {pager}
+        </Card>
+      ) : (
       <div className="prio-layout">
         <Card padding={0} style={{ overflow: "hidden" }}>
           <div className="prio-list-head">{t("Cola del ciclo · {total} tecnología(s)", { total })}</div>
-          <div className="fa-toolbar">
-            <input
-              type="search"
-              aria-label={t("Buscar en la cola de priorización")}
-              placeholder={t("Buscar por nombre, DCI o indicación...")}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              data-testid="prio-search"
-            />
-            <div className="fa-toolbar-row">
-              <select
-                aria-label={t("Filtrar por estado")}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                data-testid="prio-status"
-              >
-                {STATUS_FILTERS.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                aria-label={t("Filtrar por clúster")}
-                value={clusterFilter}
-                onChange={(e) => setClusterFilter(e.target.value)}
-              >
-                <option value="">{t("Todos los clústeres")}</option>
-                {clusters.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {ts(c.name)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          {toolbar}
           {queue.length === 0 ? (
-            <div style={{ padding: 16 }}>
-              <EmptyState
-                icon="🧮"
-                title={
-                  filtered
-                    ? onlyMine && !search && !statusFilter && !clusterFilter
-                      ? t("Nada pendiente para su perfil")
-                      : t("Sin resultados")
-                    : t("No hay tecnologías en la cola")
-                }
-                message={
-                  filtered
-                    ? t("Ninguna tecnología coincide con los filtros actuales.")
-                    : t("Asigne señales al ciclo desde la bandeja de entrada y márquelas como aptas en Filtrado y depuración.")
-                }
-                action={
-                  filtered ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => {
-                        setSearchText("");
-                        setStatusFilter("");
-                        setClusterFilter("");
-                        setOnlyMine(false);
-                      }}
-                    >
-                      {t("Limpiar filtros")}
-                    </Button>
-                  ) : (
-                    <Button size="sm" onClick={() => navigate("/filtrado")}>
-                      {t("Ir a filtrado")}
-                    </Button>
-                  )
-                }
-              />
-            </div>
+            emptyQueue
           ) : (
             <div className="prio-list" data-testid="prio-queue">
               {queue.map((item) => (
@@ -468,6 +787,7 @@ export default function Prioritization() {
                   <div className="prio-item-meta">
                     {item.cluster_name || t("Sin clúster")} · {ts(item.tech_type_name) || t("Sin tipología")}
                   </div>
+                  <CriteriaDots item={item} />
                   <div className="prio-item-foot">
                     <Badge tone={item.status}>{TECH_STATUS_LABELS[item.status]}</Badge>
                     {item.priority_pct != null ? (
@@ -497,29 +817,7 @@ export default function Prioritization() {
               ))}
             </div>
           )}
-          {total > 0 && (
-            <div className="fa-pager" data-testid="prio-pager">
-              <span>
-                {t("{from}-{to} de {total}", { from, to, total })}
-              </span>
-              <span style={{ display: "flex", gap: 6 }}>
-                <button type="button" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-                  {t("Anterior")}
-                </button>
-                <span style={{ alignSelf: "center" }}>
-                  {t("Página {n} de {total}", { n: page + 1, total: pages })}
-                </span>
-                <button
-                  type="button"
-                  disabled={page + 1 >= pages}
-                  onClick={() => setPage((p) => p + 1)}
-                  data-testid="prio-next-page"
-                >
-                  {t("Siguiente")}
-                </button>
-              </span>
-            </div>
-          )}
+          {pager}
         </Card>
 
         <div>
@@ -535,19 +833,26 @@ export default function Prioritization() {
                     expandable
                     testId="prio-detail-title"
                   />
-                  <div className="prio-detail-meta">
-                    {active.cluster_name || t("Sin clúster")} ·{" "}
-                    {ts(active.tech_type_name) || t("Sin tipología")}
-                    {active.condition ? ` · ${active.condition}` : ""} ·{" "}
-                    <Tooltip text={GLOSSARY.cribado}>
-                      <span style={{ textDecoration: "underline dotted" }}>{t("Cribado {puntaje}", { puntaje: active.screening_score })}</span>
-                    </Tooltip>
-                    {" · "}
+                  <div className="prio-detail-meta prio-chips">
                     <Tooltip text={STATUS_HINT[active.status]}>
-                      <span style={{ textDecoration: "underline dotted" }}>
-                        {TECH_STATUS_LABELS[active.status]}
+                      <span>
+                        <Badge tone={active.status}>{TECH_STATUS_LABELS[active.status]}</Badge>
                       </span>
                     </Tooltip>
+                    <span className="prio-chip">{active.cluster_name || t("Sin clúster")}</span>
+                    <span className="prio-chip">{ts(active.tech_type_name) || t("Sin tipología")}</span>
+                    {active.condition ? <span className="prio-chip">{active.condition}</span> : null}
+                    <Tooltip text={GLOSSARY.cribado}>
+                      <span className="prio-chip is-soft">{t("Cribado {puntaje}", { puntaje: active.screening_score })}</span>
+                    </Tooltip>
+                    {active.carried_from_cycle_id ? (
+                      <Tooltip text={GLOSSARY.fa_arrastrada}>
+                        <span className="prio-chip is-soft">
+                          {t("Arrastrada")}
+                          {active.previous_priority_pct != null ? ` · ${t("antes {pct}%", { pct: active.previous_priority_pct })}` : ""}
+                        </span>
+                      </Tooltip>
+                    ) : null}
                   </div>
                 </div>
                 <div className="prio-detail-actions">
@@ -594,6 +899,23 @@ export default function Prioritization() {
                 technologyId={active.technology_id}
                 onChange={onRated}
               />
+              <History cycleId={cycleId} technologyId={active.technology_id} refreshKey={historyKey} />
+              {found && queue.length > 1 && (
+                <div className="prio-nav" data-testid="prio-nav">
+                  <Button variant="secondary" size="sm" disabled={position <= 0} onClick={() => step(-1)}>
+                    {t("Anterior")}
+                  </Button>
+                  <span>{t("{n} de {total} en esta página", { n: position + 1, total: queue.length })}</span>
+                  {nextMine && (
+                    <Button size="sm" onClick={() => selectItem(nextMine.technology_id)} data-testid="prio-next-mine">
+                      {t("Siguiente que me toca")}
+                    </Button>
+                  )}
+                  <Button variant="secondary" size="sm" disabled={position + 1 >= queue.length} onClick={() => step(1)}>
+                    {t("Siguiente")}
+                  </Button>
+                </div>
+              )}
             </Card>
           ) : (
             <Card>
@@ -605,6 +927,7 @@ export default function Prioritization() {
           )}
         </div>
       </div>
+      )}
 
       <ConfirmDialog
         open={Boolean(sending)}

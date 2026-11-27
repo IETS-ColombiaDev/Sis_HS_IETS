@@ -36,6 +36,10 @@ CRITERIA_CODES = ("P1", "P2", "P3", "P4", "P5", "P6")
 # devolveria el estado a "priorizada" y sacaria la tecnologia de evaluacion.
 RATEABLE_STATUSES = ("filtrada_apta_priorizacion", "priorizada", "bajo_vigilancia", "no_priorizada")
 
+# Corregir una respuesta ya registrada mueve el %P: debe poder explicarse ante una auditoria.
+MIN_CHANGE_NOTE = 10
+MAX_NOTE_CHARS = 2000
+
 
 class PriorityRuleError(ValueError):
     """Violacion de una regla del motor de priorizacion."""
@@ -251,6 +255,15 @@ def rate_criterion(
         )
         .first()
     )
+    note = (justification or "").strip()
+    if existing and int(existing.value) != value and len(note) < MIN_CHANGE_NOTE:
+        raise PriorityRuleError(
+            f"Cambiar la respuesta de {code} exige una justificación de al menos "
+            f"{MIN_CHANGE_NOTE} caracteres: el cambio queda en la bitácora."
+        )
+    if len(note) > MAX_NOTE_CHARS:
+        raise PriorityRuleError(f"La justificación supera el máximo de {MAX_NOTE_CHARS} caracteres.")
+    justification = note
     if existing:
         existing.value = value
         existing.justification = justification
