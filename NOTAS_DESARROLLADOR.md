@@ -1231,3 +1231,34 @@ cambió y el paquete se descargaba a ciegas.
 - Quien crea un informe puede validarlo: no se exige una segunda persona.
 - La vista previa arma el paquete completo en memoria para contar; con ciclos muy grandes convendría contar sin armar.
 - Boletines no se rediseñó; solo se corrigió la insignia.
+
+## Tablero robusto: ciclo anterior, calidad de datos y bitácora de descargas (27-11-2026, versión 7.12.0)
+
+**Por qué.** El tablero mostraba el ciclo sin referencia: no decía si se priorizó más o menos que antes. Tampoco decía
+cuántas tecnologías quedaban en «sin dato» por fichas incompletas, y las descargas del recorte (que pueden llevar
+montos) no dejaban registro.
+
+**Servidor** (`strategy_service.py`, `routers/strategy.py`, sin migración).
+
+- `dashboard_for` suma `summary` (`summary_counts`), `data_quality` (`data_quality`), `comparison`
+  (`comparison_for`) y `generated_at`.
+- `previous_cycle`: el ciclo con `opened_on` inmediatamente anterior. `comparison_for` le aplica los mismos filtros
+  menos `date_from` y `date_to`, y usa su datamart si está cerrado (`_rows_for`).
+- `data_quality`: sin clúster, sin tipología, sin fase, sin fecha para el time-to-market, aptas sin calificar; con
+  `analytics:restricted`, también expedientes sin monto y montos ilegibles. «Completa» = tiene clúster, tipología,
+  fase y fecha.
+- `GET /api/strategy/dashboard/export` registra `strategy:export` y `POST /api/strategy/refresh/{ciclo}` registra
+  `strategy:refresh` (entidad `strategy_dashboard`, id del ciclo).
+- `GET /api/strategy/dashboard/activity?cycle_id=` (permiso `cycle:write`): esos eventos, del más reciente al más antiguo.
+- El Excel suma la hoja `Resumen`.
+
+**Interfaz** (`pages/Dashboards.jsx`, `pages/dashboards.css`): `DeltaText` en los indicadores, `ComparisonTable`,
+`DataQuality`, `SectionNav`, `ActivityLog`, hora del cálculo con «Actualizar» y «Copiar enlace».
+Traducciones en `pages.Dashboards.js` y `server.strategy.js` (nuevo).
+
+**Pruebas.** `tests/test_tablero_robusto.py` (6) y `e2e/tablero_robusto.spec.js` (1).
+
+**Pendientes.**
+
+- La comparación calcula en vivo el ciclo anterior si no está cerrado: duplica el costo de la consulta.
+- La bandeja de trabajo (`pages/Dashboard.jsx`) no se tocó.

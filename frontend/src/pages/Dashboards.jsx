@@ -33,7 +33,7 @@ import ClampText from "../components/ClampText";
 import StrategyGraph from "../components/StrategyGraph";
 import AnalyticsInsights from "../components/AnalyticsInsights";
 import { PERM, TECH_STATUS_LABELS } from "../constants/methodology";
-import { t, tr, ts, intlLocale } from "../i18n";
+import { t, tr, ts, intlLocale, fmtDateTime, fmtTime } from "../i18n";
 import "./dashboards.css";
 
 // --------------------------------------------------------------------------- //
@@ -176,6 +176,10 @@ const HELP = {
     t("Comparadores del SGSSS: tratamientos que ya se usan en Colombia para la misma condición, contra los que se compara la nueva tecnología."),
   restringido:
     t("Los montos presupuestales y los comparadores solo los ven perfiles con acceso restringido (MinSalud, INVIMA, administración). El resto ve el tablero agregado, también en las exportaciones."),
+  comparacion:
+    t("Las mismas etapas del embudo en el ciclo que abrió justo antes, con el mismo recorte. Sirve para saber si este ciclo priorizó, evaluó o publicó más o menos que el anterior."),
+  calidad:
+    t("Qué tan completos están los datos del recorte. Una tecnología sin clúster, tipología, fase o fecha de llegada queda en 'sin dato' y no aparece donde debería en los gráficos. Clic en una cifra para ver esas tecnologías y completarlas."),
   exportar: t("Descarga las tecnologías del recorte actual con sus dimensiones. Sin acceso restringido, el archivo no incluye montos presupuestales."),
 };
 
@@ -405,14 +409,207 @@ function Legend({ items }) {
 }
 
 // --------------------------------------------------------------------------- //
+//  Ciclo anterior, calidad de datos, secciones y actividad
+// --------------------------------------------------------------------------- //
+/** Diferencia frente al ciclo anterior con el mismo recorte. */
+function deltaOf(current, previous, code) {
+  if (previous == null || !code) return null;
+  return { diff: Number(current || 0) - Number(previous || 0), code };
+}
+
+function DeltaText({ delta }) {
+  if (!delta) return null;
+  const dir = delta.diff > 0 ? "up" : delta.diff < 0 ? "down" : "same";
+  const n = fmt0.format(Math.abs(delta.diff));
+  return (
+    <span className="dc-delta" data-dir={dir}>
+      {dir === "same"
+        ? t("Igual que en {ciclo}", { ciclo: delta.code })
+        : dir === "up"
+          ? t("▲ {n} más que en {ciclo}", { n, ciclo: delta.code })
+          : t("▼ {n} menos que en {ciclo}", { n, ciclo: delta.code })}
+    </span>
+  );
+}
+
+function ComparisonTable({ funnel, comparison, currentCode }) {
+  const prev = comparison.funnel || {};
+  const base = funnel[0]?.count || 0;
+  const prevBase = Number(prev.captured || 0);
+  const pct = (part, whole) => (whole ? `${Math.round((100 * part) / whole)}%` : "-");
+  return (
+    <div data-testid="dc-comparison">
+      <table className="dc-compare">
+        <thead>
+          <tr>
+            <th scope="col">{t("Etapa alcanzada")}</th>
+            <th scope="col" className="is-num">{currentCode}</th>
+            <th scope="col" className="is-num">{comparison.cycle_code}</th>
+            <th scope="col" className="is-num">{t("Diferencia")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {funnel.map((step) => {
+            const before = Number(prev[step.id] || 0);
+            const diff = step.count - before;
+            return (
+              <tr key={step.id} data-testid={`dc-compare-${step.id}`}>
+                <th scope="row">
+                  <i style={{ background: step.color }} aria-hidden="true" />
+                  {step.label}
+                </th>
+                <td className="is-num">
+                  <b>{fmt0.format(step.count)}</b>
+                  <small>{pct(step.count, base)}</small>
+                </td>
+                <td className="is-num">
+                  {fmt0.format(before)}
+                  <small>{pct(before, prevBase)}</small>
+                </td>
+                <td className="is-num" data-dir={diff > 0 ? "up" : diff < 0 ? "down" : "same"}>
+                  {diff > 0 ? `+${fmt0.format(diff)}` : diff < 0 ? `−${fmt0.format(-diff)}` : "="}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p className="dc-chart-note">
+        {t("El porcentaje es la parte de las capturadas de cada ciclo que alcanzó la etapa. Se aplica el mismo recorte a los dos ciclos, salvo las fechas de captura.")}
+      </p>
+    </div>
+  );
+}
+
+// A que filtro lleva cada vacio de datos.
+const QUALITY_FILTER = {
+  sin_cluster: { cluster_id: "0" },
+  sin_tipologia: { tech_type_id: "0" },
+  sin_fase: { phase: "sin_fase" },
+  sin_ttm: { band: "desconocido" },
+  sin_calificar: { status: "filtrada_apta_priorizacion" },
+};
+
+function DataQuality({ quality, onPick }) {
+  const total = Number(quality.total || 0);
+  const pct = Number(quality.complete_pct || 0);
+  const tone = pct >= 80 ? "ok" : pct >= 50 ? "warn" : "alert";
+  return (
+    <div data-testid="dc-quality">
+      <div className="dc-quality-head" data-tone={tone}>
+        <strong data-testid="dc-quality-pct">{pct}%</strong>
+        <span>
+          {t("{n} de {total} con clúster, tipología, fase y fecha de llegada", { n: fmt0.format(quality.complete || 0), total: fmt0.format(total) })}
+        </span>
+      </div>
+      <div className="dc-quality-bar" data-tone={tone} role="img" aria-label={t("{pct}% de fichas completas", { pct })}>
+        <i style={{ width: `${pct}%` }} />
+      </div>
+      <ul className="dc-quality-list">
+        {(quality.items || []).map((item) => {
+          const target = QUALITY_FILTER[item.key];
+          const label = ts(item.label);
+          return (
+            <li key={item.key} data-zero={item.count === 0 ? "true" : "false"}>
+              <span>{label}</span>
+              {item.count > 0 && target ? (
+                <button
+                  type="button"
+                  className="dc-linkbtn"
+                  onClick={() => onPick(target)}
+                  data-testid={`dc-quality-${item.key}`}
+                  aria-label={t("Ver las {n}: {label}", { n: item.count, label })}
+                >
+                  {fmt0.format(item.count)} <span aria-hidden="true">→</span>
+                </button>
+              ) : (
+                <b data-testid={`dc-quality-${item.key}`}>{item.count === 0 ? "✓" : fmt0.format(item.count)}</b>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function SectionNav({ sections }) {
+  const go = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.focus?.({ preventScroll: true });
+  };
+  return (
+    <nav className="dc-nav no-print" aria-label={t("Secciones del tablero")} data-testid="dc-nav">
+      {sections.map((s) => (
+        <button key={s.id} type="button" onClick={() => go(s.id)}>
+          {s.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+/** Quien descargo el recorte o recalculo el datamart (desde la bitacora). */
+function ActivityLog({ cycleId, version }) {
+  const [open, setOpen] = useState(false);
+  const [events, setEvents] = useState(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (!open || !cycleId) return undefined;
+    let alive = true;
+    setFailed(false);
+    api
+      .get("/strategy/dashboard/activity", { params: { cycle_id: cycleId } })
+      .then((r) => alive && setEvents(Array.isArray(r.data) ? r.data : []))
+      .catch(() => alive && setFailed(true));
+    return () => {
+      alive = false;
+    };
+  }, [open, cycleId, version]);
+  return (
+    <div className="no-print">
+      <button type="button" className="dc-graph-toggle" aria-expanded={open} onClick={() => setOpen(!open)} data-testid="dc-activity-toggle">
+        <span style={{ fontSize: 16, fontWeight: 600 }}>{t("Descargas y recálculos")}</span>
+        <span className="dc-muted">{open ? t("Ocultar ▲") : t("Mostrar ▼")}</span>
+      </button>
+      {!open && <p className="dc-chart-note">{t("Quién descargó el recorte de este ciclo, con o sin montos, y cuándo se recalculó el datamart.")}</p>}
+      {open &&
+        (failed ? (
+          <p className="dc-error" role="alert">{t("No se pudo cargar la actividad del tablero.")}</p>
+        ) : events == null ? (
+          <p className="dc-muted">{t("Cargando…")}</p>
+        ) : events.length === 0 ? (
+          <p className="dc-muted" data-testid="dc-activity">{t("Aún no hay descargas ni recálculos de este ciclo.")}</p>
+        ) : (
+          <ol className="dc-activity" data-testid="dc-activity">
+            {events.map((ev, i) => (
+              <li key={`${ev.at}-${i}`} data-kind={ev.kind}>
+                <strong>{ts(ev.label)}</strong>
+                {ev.detail && <span>{ts(ev.detail)}</span>}
+                <small>
+                  {fmtDateTime(ev.at)}
+                  {ev.by ? ` · ${ev.by}` : ""}
+                </small>
+              </li>
+            ))}
+          </ol>
+        ))}
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------- //
 //  Resumen ejecutivo
 // --------------------------------------------------------------------------- //
-function DecisionTile({ label, value, sub, tone, onClick, hint, testId }) {
+function DecisionTile({ label, value, sub, tone, onClick, hint, testId, delta }) {
   const body = (
     <>
       <span className="dc-tile-label">{label}</span>
       <span className="dc-tile-value" data-long={String(value).length > 6 ? "true" : undefined}>{value}</span>
       {sub && <span className="dc-tile-sub">{sub}</span>}
+      <DeltaText delta={delta} />
     </>
   );
   return (
@@ -1405,6 +1602,15 @@ export default function Dashboards() {
     }
   };
 
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success(t("Enlace copiado: abre este mismo ciclo y recorte."));
+    } catch {
+      toast.error(t("No se pudo copiar el enlace. Cópielo desde la barra de direcciones."));
+    }
+  };
+
   const clusterName = (id) => {
     if (String(id) === "0") return t("Sin clúster");
     return ts(clusters.find((c) => String(c.id) === String(id))?.name) || t("Clúster {id}", { id });
@@ -1506,6 +1712,18 @@ export default function Dashboards() {
     );
   }
 
+  const cmp = data.comparison || null;
+  const cmpCode = cmp?.cycle_code || "";
+  const cmpSummary = cmp?.summary || {};
+  const quality = data.data_quality || null;
+  const sections = [
+    { id: "dc-resumen", label: t("Resumen") },
+    { id: "dc-mercado", label: t("Mercado") },
+    { id: "dc-trabajo", label: t("Trabajo del ciclo") },
+    { id: "dc-presupuesto", label: t("Presupuesto") },
+    { id: "dc-tabla", label: t("Tecnologías") },
+  ];
+
   const cycleEmpty = (data.total_in_cycle || 0) === 0;
   const noMatch = !cycleEmpty && rows.length === 0;
   const emptyChart = (text) => (
@@ -1599,6 +1817,16 @@ export default function Dashboards() {
               <TermLabel tip={HELP.en_vivo} label={t("Qué es cálculo en vivo")}>
                 <Badge tone="info">{t("Cálculo en vivo")}</Badge>
               </TermLabel>
+            )}
+            {!data.from_cache && data.generated_at && (
+              <span className="strategy-cache-meta" data-testid="dc-generated">
+                {t("Calculado a las {hora}", { hora: fmtTime(data.generated_at) })}
+              </span>
+            )}
+            {!data.from_cache && (
+              <button type="button" className="dc-linkbtn" onClick={load} disabled={updating} data-testid="dc-reload">
+                {t("Actualizar")}
+              </button>
             )}
             {data.from_cache && data.refreshed_at && <span className="strategy-cache-meta">{t("Actualizado {fecha}", { fecha: new Date(data.refreshed_at).toLocaleString(intlLocale()) })}</span>}
             <TermLabel tip={HELP.restringido} label={t("Qué capa de acceso veo")}>
@@ -1694,6 +1922,7 @@ export default function Dashboards() {
           <button type="button" className="dc-linkbtn" aria-expanded={showMore} onClick={() => setMoreFilters(!moreFilters)} disabled={secondaryActive}>
             {showMore ? (secondaryActive ? t("Más filtros (en uso)") : t("Menos filtros ▲")) : t("Más filtros: fase, estado, puntos y fechas ▼")}
           </button>
+          <div className="dc-toolbar-right">
           <span className="term-label">
             <HintButton size="sm" variant="secondary" onClick={() => doExport("csv")} loading={exporting === "csv"} disabled={!rows.length || Boolean(exporting)} disabledHint={rows.length ? t("Espere a que termine la exportación en curso.") : t("No hay tecnologías en el recorte para exportar.")}>
               {t("Exportar CSV")}
@@ -1703,8 +1932,14 @@ export default function Dashboards() {
             </HintButton>
             <InfoTip text={HELP.exportar} label={t("Qué incluye la exportación")} />
           </span>
+            <Button size="sm" variant="ghost" onClick={copyLink} data-testid="dc-copy-link" title={t("Copia la dirección de esta página con el ciclo y los filtros actuales.")}>
+              {t("Copiar enlace")}
+            </Button>
+          </div>
         </div>
       </Card>
+
+      {!cycleEmpty && !noMatch && <SectionNav sections={sections} />}
 
       {cycleEmpty ? (
         <Card style={{ marginTop: 16 }}>
@@ -1728,7 +1963,7 @@ export default function Dashboards() {
         <>
           {/* ------------------------------------------------ Resumen ejecutivo */}
           <section className="dc-section" aria-labelledby="dc-resumen">
-            <h2 id="dc-resumen" className="dc-section-title">
+            <h2 id="dc-resumen" className="dc-section-title" tabIndex={-1}>
               {t("Resumen para decidir")}
             </h2>
             <div className="dc-tiles">
@@ -1739,6 +1974,7 @@ export default function Dashboards() {
                 sub={t("{pct}% de las {n} capturadas", { pct: captured ? Math.round((100 * prioritized) / captured) : 0, n: fmt0.format(captured) })}
                 tone="indigo"
                 hint={HELP.priorizadas}
+                delta={deltaOf(prioritized, cmp?.funnel?.prioritized, cmpCode)}
                 onClick={() => toggleFilter("stage", "prioritized")}
               />
               <DecisionTile
@@ -1748,6 +1984,7 @@ export default function Dashboards() {
                 sub={t("priorizadas que llegan en ≤ {n} meses", { n: fmt0.format(inm) })}
                 tone="green"
                 hint={t("Tecnologías con 4 o más puntos P1-P6 cuya llegada estimada al mercado está dentro del tope de 'inminente'. Es la lista de mayor urgencia para quien decide.")}
+                delta={deltaOf(actNow.length, cmpSummary.act_now, cmpCode)}
                 onClick={() => setFilters({ band: "inminente", priority_min: "4" })}
               />
               <DecisionTile
@@ -1757,6 +1994,7 @@ export default function Dashboards() {
                 sub={t("{n} ya aprobadas por FDA/EMA", { n: fmt0.format(imminent.filter((r) => r.approved).length) })}
                 tone="blue"
                 hint={t("Tecnologías en la franja inminente de time-to-market, priorizadas o no.")}
+                delta={deltaOf(imminent.length, cmpSummary.imminent, cmpCode)}
                 onClick={() => toggleFilter("band", "inminente")}
               />
               <DecisionTile
@@ -1766,6 +2004,7 @@ export default function Dashboards() {
                 sub={t("{publicados} publicados · {curso} en curso", { publicados: fmt0.format(published), curso: fmt0.format(docs.length - published) })}
                 tone="cyan"
                 hint={t("Fichas, informes y Mini-HTA del recorte, en cualquier estado editorial.")}
+                delta={deltaOf(docs.length, cmpSummary.docs, cmpCode)}
                 onClick={() => toggleFilter("stage", "evaluated")}
               />
               {restricted ? (
@@ -1802,6 +2041,25 @@ export default function Dashboards() {
               <SectionTitle hint={HELP.embudo}>{t("Embudo del ciclo")}</SectionTitle>
               <FunnelFlow funnel={funnel} total={data.total_in_cycle || 0} activeStage={filters.stage} onPick={(v) => toggleFilter("stage", v)} />
             </Card>
+
+            <div className="dc-grid">
+              <Card padding={18}>
+                <SectionTitle hint={HELP.comparacion}>{t("Frente al ciclo anterior")}</SectionTitle>
+                {cmp ? (
+                  <ComparisonTable funnel={funnel} comparison={cmp} currentCode={data.cycle_code} />
+                ) : (
+                  <p className="dc-muted" data-testid="dc-comparison-empty">
+                    {t("Este es el primer ciclo registrado: todavía no hay un ciclo anterior con el cual comparar.")}
+                  </p>
+                )}
+              </Card>
+              {quality && (
+                <Card padding={18}>
+                  <SectionTitle hint={HELP.calidad}>{t("Calidad de los datos")}</SectionTitle>
+                  <DataQuality quality={quality} onPick={setFilters} />
+                </Card>
+              )}
+            </div>
 
             <div className="dc-grid dc-grid-13">
               <Card padding={18}>
@@ -1852,7 +2110,7 @@ export default function Dashboards() {
 
           {/* ----------------------------------------------- Mercado y prioridad */}
           <section className="dc-section" aria-labelledby="dc-mercado">
-            <h2 id="dc-mercado" className="dc-section-title">
+            <h2 id="dc-mercado" className="dc-section-title" tabIndex={-1}>
               {t("Llegada al mercado y prioridad")}
             </h2>
             <div className="dc-grid">
@@ -1878,7 +2136,7 @@ export default function Dashboards() {
 
           {/* ------------------------------------------------ Trabajo del ciclo */}
           <section className="dc-section" aria-labelledby="dc-trabajo">
-            <h2 id="dc-trabajo" className="dc-section-title">
+            <h2 id="dc-trabajo" className="dc-section-title" tabIndex={-1}>
               {t("Dónde está el trabajo")}
             </h2>
             <div className="dc-grid">
@@ -1899,7 +2157,7 @@ export default function Dashboards() {
 
           {/* ------------------------------------------------------- Presupuesto */}
           <section className="dc-section" aria-labelledby="dc-presupuesto">
-            <h2 id="dc-presupuesto" className="dc-section-title">
+            <h2 id="dc-presupuesto" className="dc-section-title" tabIndex={-1}>
               {t("Impacto presupuestal")}
             </h2>
             <div className="dc-grid">
@@ -1939,6 +2197,7 @@ export default function Dashboards() {
 
       {!cycleEmpty && !noMatch && (
         <Card style={{ marginTop: 16 }}>
+          <span id="dc-tabla" className="dc-anchor" tabIndex={-1} />
           <SectionTitle hint={HELP.recorte}>{t("Tecnologías del recorte")}</SectionTitle>
           <RecorteTable rows={rows} focusTech={focusTech} onClearFocus={() => setFocusTech(null)} />
         </Card>
@@ -1972,6 +2231,12 @@ export default function Dashboards() {
           )}
         </div>
       </Card>
+
+      {canRefresh && (
+        <Card style={{ marginTop: 16 }} padding={18} className="no-print">
+          <ActivityLog cycleId={cycleId} version={`${version}-${data.generated_at || ""}`} />
+        </Card>
+      )}
     </div>
   );
 }

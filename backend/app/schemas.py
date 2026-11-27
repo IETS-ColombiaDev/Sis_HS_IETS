@@ -1726,11 +1726,24 @@ class StrategyDashboardOut(BaseModel):
     ttm_thresholds: dict = {}
     total_in_cycle: int = 0
     filters_applied: dict = {}
+    # Indicadores del resumen, calidad de datos y las mismas cifras del ciclo anterior.
+    summary: dict = {}
+    data_quality: dict = {}
+    comparison: dict | None = None
+    generated_at: datetime | None = None
     # Capa restringida: solo viajan con `analytics:restricted`.
     budget_heatmap: list[dict] | None = None
     budget_items: list[dict] | None = None
     budget_unparsed: int | None = None
     comparators: list[dict] | None = None
+
+
+class StrategyActivityEvent(BaseModel):
+    kind: str
+    label: str
+    detail: str = ""
+    at: str = ""
+    by: str = ""
 
 
 class StrategyGraphOut(BaseModel):
