@@ -1262,7 +1262,10 @@ def public_fiche(db: Session, technology_id: int) -> dict:
 
 
 def compile_bulletin(db: Session, cycle: Cycle, *, actor: str = "") -> Bulletin:
-    payload = build_payload(db, cycle)
+    from . import bulletin_service
+
+    rows = collect_rows(db, cycle)
+    payload = build_payload(db, cycle, rows=rows)
     row = (
         db.query(Bulletin)
         .filter(Bulletin.cycle_id == cycle.id, Bulletin.status != "publicado")
@@ -1277,7 +1280,11 @@ def compile_bulletin(db: Session, cycle: Cycle, *, actor: str = "") -> Bulletin:
     # Recompilar cambia el contenido: la aprobacion previa correspondia a otras
     # cifras y no puede habilitar la publicacion de las nuevas (RF19).
     row.approved_by = ""
+    previous_body = row.body if isinstance(row.body, dict) else {}
     row.body = {
+        # La nota editorial es texto de una persona: recompilar no la borra.
+        **{k: previous_body[k] for k in ("note", "note_by") if previous_body.get(k)},
+        **bulletin_service.extra_body(db, cycle, rows),
         "cycle_code": cycle.code,
         "funnel": payload["funnel"],
         "by_cluster": payload["by_cluster"],
@@ -1301,6 +1308,8 @@ def compile_bulletin(db: Session, cycle: Cycle, *, actor: str = "") -> Bulletin:
 def approve_bulletin(db: Session, bulletin: Bulletin, *, actor: str, publish: bool = False) -> Bulletin:
     if bulletin.status == "publicado":
         raise StrategyRuleError("El boletín ya está publicado.")
+    if (bulletin.approved_by or "").strip() and not publish:
+        raise StrategyRuleError(f"El boletín ya fue aprobado por {bulletin.approved_by}.")
     bulletin.approved_by = actor
     if publish:
         bulletin.status = "publicado"
@@ -1322,8 +1331,12 @@ def approve_bulletin(db: Session, bulletin: Bulletin, *, actor: str, publish: bo
 def publish_bulletin(db: Session, bulletin: Bulletin, *, actor: str) -> Bulletin:
     if not (bulletin.approved_by or "").strip():
         raise StrategyRuleError("El boletín requiere aprobación del líder antes de publicarse.")
+    from sqlalchemy.orm.attributes import flag_modified
+
     bulletin.status = "publicado"
     bulletin.published_at = _utcnow()
+    bulletin.body = {**(bulletin.body or {}), "published_by": actor}
+    flag_modified(bulletin, "body")
     audit.record_action(
         db,
         entity_type="bulletins",
