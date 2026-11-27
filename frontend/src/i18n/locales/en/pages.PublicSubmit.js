@@ -1,5 +1,17 @@
 // src/pages/PublicSubmit.jsx
 export default {
+  "Escriba el radicado y el correo con el que envió la postulación.": "Enter the tracking code and the email you used to send the submission.",
+  "No se pudo consultar el estado. Intente de nuevo en unos minutos.": "Could not check the status. Try again in a few minutes.",
+  "Su radicado:": "Your tracking code:",
+  "Copiado": "Copied",
+  "Copiar": "Copy",
+  "Guárdelo: con el radicado y su correo puede consultar el estado de la postulación en esta misma página.": "Keep it: with the tracking code and your email you can check the status of the submission on this same page.",
+  "¿Ya postuló? Consulte el estado de su postulación": "Already submitted? Check the status of your submission",
+  "Radicado": "Tracking code",
+  "Correo con el que postuló": "Email you submitted with",
+  "Consultar estado": "Check status",
+  "Recibida el {fecha}": "Received on {fecha}",
+  "Decisión del {fecha}": "Decision on {fecha}",
   "Nombre con el que se comercializa o se conoce la tecnología (marca o nombre del dispositivo).":
     "Name under which the technology is marketed or known (brand name or device name).",
   "Denominación Común Internacional: el nombre genérico del principio activo (ej. pembrolizumab). Para dispositivos, el nombre genérico del equipo.":

@@ -1,11 +1,14 @@
 """Portal publico de postulacion y cola de moderacion (RF02)."""
 from __future__ import annotations
 
+import csv
+import io
 import time
 from collections import defaultdict
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -18,12 +21,16 @@ from ..schemas import (
     SubmissionPublicAck,
     SubmissionPublicIn,
     SubmissionReviewIn,
+    SubmissionStatusIn,
+    SubmissionStatusOut,
 )
+from .. import submission_service
 from ..submission_service import (
     SubmissionRuleError,
     accept_submission,
     create_submission,
     reject_submission,
+    reopen_submission,
 )
 
 router = APIRouter(tags=["submissions"])
@@ -161,7 +168,84 @@ def public_submit(payload: SubmissionPublicIn, request: Request, db: Session = D
         id=row.id,
         status=row.status,
         message="La postulación quedó en moderación. El equipo del IETS la revisará.",
+        tracking_code=submission_service.tracking_code(row),
     )
+
+
+_STATUS_MESSAGES = {
+    "recibida": "Su postulación está en moderación. El equipo del IETS aún no ha tomado una decisión.",
+    "aceptada": "Su postulación fue aceptada y pasó a la vigilancia del IETS. Esto no implica una evaluación ni una recomendación.",
+    "rechazada": "Su postulación no fue aceptada en esta revisión.",
+}
+
+
+@router.post("/api/public/submissions/status", response_model=SubmissionStatusOut)
+def public_submission_status(payload: SubmissionStatusIn, request: Request, db: Session = Depends(get_db)):
+    """Estado de una postulacion para quien la envio: pide el radicado y el correo.
+
+    No distingue entre "no existe" y "el correo no coincide": asi nadie puede
+    recorrer radicados para saber quien postulo que.
+    """
+    _rate_limit(f"estado:{_client_ip(request)}")
+    row = submission_service.find_by_tracking(db, payload.code, payload.email)
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No encontramos una postulación con ese radicado y ese correo. Revise ambos datos.",
+        )
+    message = _STATUS_MESSAGES.get(row.status, "")
+    if row.status == "rechazada" and row.reject_reason and row.reject_reason not in ("otro", "no_valida"):
+        message = f"{message} Motivo: {submission_service.REJECT_REASONS.get(row.reject_reason, '')}."
+    return SubmissionStatusOut(
+        tracking_code=submission_service.tracking_code(row),
+        status=row.status,
+        status_label=submission_service.STATUS_LABELS.get(row.status, row.status),
+        received_at=row.created_at,
+        resolved_at=row.reviewed_at if row.status != "recibida" else None,
+        message=message,
+    )
+
+
+def _out(db: Session, row: Submission, pool: list[Submission] | None = None) -> SubmissionOut:
+    """Postulacion con los datos derivados que usa la cola de moderacion."""
+    out = SubmissionOut.model_validate(row)
+    out.tracking_code = submission_service.tracking_code(row)
+    out.reject_reason = row.reject_reason or ""
+    out.reject_reason_label = submission_service.REJECT_REASONS.get(row.reject_reason or "", "")
+    out.waiting_days = submission_service.waiting_days(row)
+    out.duplicates = submission_service.duplicates_of(db, row, pool)
+    return out
+
+
+def _filtered(db: Session, status_filter: str | None, q: str, conflict: bool | None, stale: bool, order: str, limit: int) -> list[Submission]:
+    query = db.query(Submission)
+    if status_filter:
+        query = query.filter(Submission.status == status_filter)
+    if conflict is not None:
+        query = query.filter(Submission.has_conflict.is_(conflict))
+    text = (q or "").strip()
+    if text:
+        like = f"%{text}%"
+        clauses = [
+            Submission.commercial_name.ilike(like),
+            Submission.inn_name.ilike(like),
+            Submission.indication.ilike(like),
+            Submission.manufacturer.ilike(like),
+            Submission.submitter_name.ilike(like),
+            Submission.submitter_email.ilike(like),
+            Submission.submitter_org.ilike(like),
+        ]
+        match = submission_service.TRACKING_RE.match(text)
+        if match:
+            clauses.append(Submission.id == int(match.group(2)))
+        elif text.isdigit():
+            clauses.append(Submission.id == int(text))
+        query = query.filter(or_(*clauses))
+    query = query.order_by(Submission.created_at.asc() if order == "antiguas" else Submission.created_at.desc())
+    rows = query.limit(limit).all()
+    if stale:
+        rows = [r for r in rows if r.status == "recibida" and submission_service.waiting_days(r) >= 7]
+    return rows
 
 
 @router.get("/api/submissions", response_model=list[SubmissionOut])
@@ -169,13 +253,93 @@ def list_submissions(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     status_filter: str | None = Query(None, alias="status"),
+    q: str = Query("", max_length=200, description="Busca en tecnología, indicación, fabricante, postulante o radicado"),
+    conflict: bool | None = Query(None, description="Solo con (true) o sin (false) conflicto de interés declarado"),
+    stale: bool = Query(False, description="Solo las que llevan 7 días o más sin decisión"),
+    order: str = Query("recientes", pattern="^(recientes|antiguas)$"),
     limit: int = Query(80, le=300),
 ):
-    query = db.query(Submission)
-    if status_filter:
-        query = query.filter(Submission.status == status_filter)
-    rows = query.order_by(Submission.created_at.desc()).limit(limit).all()
-    return [SubmissionOut.model_validate(r) for r in rows]
+    rows = _filtered(db, status_filter, q, conflict, stale, order, limit)
+    pool = db.query(Submission).all() if rows else []
+    return [_out(db, r, pool) for r in rows]
+
+
+@router.get("/api/submissions/summary")
+def submissions_summary(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Indicadores de la cola y lista de motivos de rechazo."""
+    return {
+        **submission_service.summary(db),
+        "reasons": [{"code": code, "label": label} for code, label in submission_service.REJECT_REASONS.items()],
+    }
+
+
+@router.get("/api/submissions/export.csv")
+def export_submissions(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_STAGING_ASSIGN)),
+    status_filter: str | None = Query(None, alias="status"),
+    q: str = Query("", max_length=200),
+    conflict: bool | None = Query(None),
+):
+    """La cola filtrada en CSV (punto y coma, UTF-8 con BOM para Excel). Queda en bitácora."""
+    from ..audit import record_action
+
+    rows = _filtered(db, status_filter, q, conflict, False, "recientes", 2000)
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";", lineterminator="\n")
+    writer.writerow([
+        "Radicado", "Estado", "Recibida", "Días en moderación", "Nombre comercial", "DCI", "Indicación", "Fabricante",
+        "Fase de desarrollo", "Fuentes", "Conflicto de interés", "Descripción del conflicto", "Postulante", "Correo",
+        "Organización", "Motivo de rechazo", "Nota de revisión", "Revisada por", "Fecha de decisión", "Tecnología creada",
+    ])
+
+    def safe(value) -> str:
+        text = "" if value is None else str(value)
+        # Una celda que empieza por =, +, - o @ se ejecutaria como formula al abrir el archivo.
+        return "'" + text if text[:1] in ("=", "+", "-", "@") else text
+
+    for r in rows:
+        writer.writerow([
+            safe(v) for v in (
+                submission_service.tracking_code(r),
+                submission_service.STATUS_LABELS.get(r.status, r.status),
+                r.created_at.isoformat() if r.created_at else "",
+                submission_service.waiting_days(r),
+                r.commercial_name, r.inn_name, r.indication, r.manufacturer, r.development_phase,
+                " | ".join(r.evidence_links or []),
+                "Sí" if r.has_conflict else "No", r.conflict_statement,
+                r.submitter_name, r.submitter_email, r.submitter_org,
+                submission_service.REJECT_REASONS.get(r.reject_reason or "", ""), r.review_note, r.reviewed_by,
+                r.reviewed_at.isoformat() if r.reviewed_at else "", r.technology_id or "",
+            )
+        ])
+    record_action(
+        db, entity_type="submissions", entity_id="cola", action="submission_export",
+        new_value={"rows": len(rows), "status": status_filter or "todas", "q": q[:80]},
+    )
+    db.commit()
+    return Response(
+        content="\ufeff" + buf.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="postulaciones.csv"'},
+    )
+
+
+@router.get("/api/submissions/{submission_id}", response_model=SubmissionOut)
+def get_submission(submission_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    row = db.get(Submission, submission_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Postulación no encontrada")
+    return _out(db, row)
+
+
+@router.get("/api/submissions/{submission_id}/history")
+def submission_history(submission_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Recorrido de la postulacion (recibida, cruces, decision, reapertura) desde la bitacora."""
+    row = db.get(Submission, submission_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Postulación no encontrada")
+    return submission_service.history(db, row)
 
 
 @router.post("/api/submissions/{submission_id}/cross-check", response_model=SubmissionOut)
@@ -192,7 +356,7 @@ def cross_check(
     if row is None:
         raise HTTPException(status_code=404, detail="Postulación no encontrada")
     submission_crosscheck.run(db, row, web=web, actor=user.email)
-    return SubmissionOut.model_validate(row)
+    return _out(db, row)
 
 
 @router.post("/api/submissions/{submission_id}/accept", response_model=SubmissionOut)
@@ -210,7 +374,7 @@ def accept(
     except SubmissionRuleError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     db.refresh(row)
-    return SubmissionOut.model_validate(row)
+    return _out(db, row)
 
 
 @router.post("/api/submissions/{submission_id}/reject", response_model=SubmissionOut)
@@ -224,7 +388,25 @@ def reject(
     if row is None:
         raise HTTPException(status_code=404, detail="Postulación no encontrada")
     try:
-        reject_submission(db, row, reviewer=user.email, note=payload.note)
+        reject_submission(db, row, reviewer=user.email, note=payload.note, reason=payload.reason)
     except SubmissionRuleError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return SubmissionOut.model_validate(row)
+    return _out(db, row)
+
+
+@router.post("/api/submissions/{submission_id}/reopen", response_model=SubmissionOut)
+def reopen(
+    submission_id: int,
+    payload: SubmissionReviewIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_STAGING_ASSIGN)),
+):
+    """Devuelve a moderación una postulación rechazada. Exige explicar por qué."""
+    row = db.get(Submission, submission_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Postulación no encontrada")
+    try:
+        reopen_submission(db, row, reviewer=user.email, note=payload.note)
+    except SubmissionRuleError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _out(db, row)

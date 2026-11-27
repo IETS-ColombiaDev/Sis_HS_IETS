@@ -1438,16 +1438,41 @@ class SubmissionOut(BaseModel):
     technology_id: int | None = None
     created_at: datetime
     cross_check: dict | None = None
+    # Radicado que recibe quien postula y con el que consulta el estado.
+    tracking_code: str = ""
+    reject_reason: str = ""
+    reject_reason_label: str = ""
+    # Dias que lleva (o llevo) en moderacion.
+    waiting_days: int = 0
+    # Otras postulaciones de la misma tecnologia: [{id, tracking_code, status, created_at, same_submitter}]
+    duplicates: list[dict] = []
 
 
 class SubmissionReviewIn(BaseModel):
     note: str = ""
+    # Codigo del motivo de rechazo (solo al rechazar). Vacio = "otro": exige nota.
+    reason: str = ""
 
 
 class SubmissionPublicAck(BaseModel):
     id: int
     status: str
     message: str
+    tracking_code: str = ""
+
+
+class SubmissionStatusIn(BaseModel):
+    code: str
+    email: str
+
+
+class SubmissionStatusOut(BaseModel):
+    tracking_code: str
+    status: str
+    status_label: str
+    received_at: datetime
+    resolved_at: datetime | None = None
+    message: str = ""
 
 
 # --------------------------------------------------------------------------- #
