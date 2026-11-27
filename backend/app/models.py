@@ -963,6 +963,10 @@ class ReviewComment(Base):
     body: Mapped[str] = mapped_column(Text, default="")
     author: Mapped[str] = mapped_column(String(255), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Resolucion: quien redacta responde la observacion y la cierra.
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_by: Mapped[str] = mapped_column(String(255), default="", server_default="")
+    resolution_note: Mapped[str] = mapped_column(Text, default="", server_default="")
 
 
 # --------------------------------------------------------------------------- #

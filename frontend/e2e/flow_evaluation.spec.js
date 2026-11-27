@@ -59,6 +59,7 @@ test.describe("evaluacion temprana y revision por pares", () => {
     await expectToast(page, "Estado editorial: Revisión externa");
 
     // Invitacion externa: sin SMTP el enlace se muestra una vez para copiarlo.
+    await page.getByTestId("eval-tab-revision").click();
     await page.locator("#eval-invite-name").fill("Revisora Externa E2E");
     await page.locator("#eval-invite-email").fill(`par.${Date.now()}@universidad.edu`);
     await page.getByTestId("eval-invite-submit").click();
@@ -102,7 +103,10 @@ test.describe("evaluacion temprana y revision por pares", () => {
     // Comite y publicacion con confirmacion
     await page.reload();
     await settle(page);
+    // La observación del revisor sigue abierta: el sistema avisa antes de aprobar.
     await page.getByTestId("eval-move-aprobado_comite").click();
+    await expect(page.getByText("Este expediente tiene 1 observación(es) sin resolver")).toBeVisible();
+    await page.getByRole("button", { name: "Aprobar en comité", exact: true }).last().click();
     await expectToast(page, "Estado editorial: Aprobado por comité técnico");
     await page.getByTestId("eval-move-publicado").click();
     await page.getByRole("button", { name: "Publicar", exact: true }).last().click();
@@ -110,7 +114,10 @@ test.describe("evaluacion temprana y revision por pares", () => {
 
     const [popup] = await Promise.all([
       page.context().waitForEvent("page"),
-      page.getByRole("button", { name: "Exportar HTML institucional" }).click(),
+      (async () => {
+        await page.getByTestId("eval-export-menu").click();
+        await page.getByTestId("eval-export-html").click();
+      })(),
     ]);
     await popup.waitForLoadState();
     await expect(popup.locator("body")).toContainText("Instituto de Evaluación Tecnológica en Salud");
@@ -119,7 +126,10 @@ test.describe("evaluacion temprana y revision por pares", () => {
     // PDF nativo del documento institucional (RF14).
     const [download] = await Promise.all([
       page.waitForEvent("download"),
-      page.getByRole("button", { name: "Descargar PDF" }).click(),
+      (async () => {
+        await page.getByTestId("eval-export-menu").click();
+        await page.getByTestId("eval-export-pdf").click();
+      })(),
     ]);
     expect(download.suggestedFilename()).toMatch(/^iets-evaluacion-\d+-v[\d.]+\.pdf$/);
 
