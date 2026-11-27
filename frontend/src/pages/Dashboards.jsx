@@ -1922,6 +1922,7 @@ export default function Dashboards() {
           <button type="button" className="dc-linkbtn" aria-expanded={showMore} onClick={() => setMoreFilters(!moreFilters)} disabled={secondaryActive}>
             {showMore ? (secondaryActive ? t("Más filtros (en uso)") : t("Menos filtros ▲")) : t("Más filtros: fase, estado, puntos y fechas ▼")}
           </button>
+          <div className="dc-toolbar-right">
           <span className="term-label">
             <HintButton size="sm" variant="secondary" onClick={() => doExport("csv")} loading={exporting === "csv"} disabled={!rows.length || Boolean(exporting)} disabledHint={rows.length ? t("Espere a que termine la exportación en curso.") : t("No hay tecnologías en el recorte para exportar.")}>
               {t("Exportar CSV")}
@@ -1930,10 +1931,11 @@ export default function Dashboards() {
               {t("Exportar Excel")}
             </HintButton>
             <InfoTip text={HELP.exportar} label={t("Qué incluye la exportación")} />
+          </span>
             <Button size="sm" variant="ghost" onClick={copyLink} data-testid="dc-copy-link" title={t("Copia la dirección de esta página con el ciclo y los filtros actuales.")}>
               {t("Copiar enlace")}
             </Button>
-          </span>
+          </div>
         </div>
       </Card>
 
