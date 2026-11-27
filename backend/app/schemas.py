@@ -1871,10 +1871,15 @@ class AlertEventOut(BaseModel):
 
     id: int
     kind: str
+    kind_label: str = ""
     title: str
     body: str = ""
     technology_id: int | None = None
+    technology_name: str = ""
+    technology_status: str = ""
     cluster_id: int | None = None
+    cluster_name: str = ""
+    link: str = ""
     read_at: datetime | None = None
     created_at: datetime
 
