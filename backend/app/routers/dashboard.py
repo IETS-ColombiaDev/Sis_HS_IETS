@@ -1,6 +1,7 @@
 """Metricas agregadas para los dashboards del sistema."""
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
@@ -33,6 +34,8 @@ from ..models import (
 from ..priority import screening_threshold
 from ..rbac import rateable_criteria
 from ..schemas import CountItem, DashboardStats, FindingOut, ScrapeLogOut, WorkbenchStats
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -143,6 +146,7 @@ def get_workbench(db: Session = Depends(get_db), user: User = Depends(get_curren
     sources_enabled = (
         db.query(func.count(Source.id)).filter(Source.scrape_enabled == True).scalar() or 0  # noqa: E712
     )
+    findings_by_day = signals_by_day(db)
 
     pending_review = db.query(func.count(Finding.id)).filter(Finding.status == "nuevo").scalar() or 0
     in_triage = db.query(func.count(Finding.id)).filter(Finding.status == "revisado").scalar() or 0
@@ -220,6 +224,7 @@ def get_workbench(db: Session = Depends(get_db), user: User = Depends(get_curren
         needs_characterization=needs_characterization,
         pending_recommendations=pending_recommendations,
         findings_last_7d=findings_last_7d,
+        findings_by_day=findings_by_day,
         sources_enabled=sources_enabled,
         last_scan=last_scan,
         queue=queue,
@@ -288,6 +293,44 @@ ITEM_PERMISSION: dict[str, str | None] = {
 }
 
 
+# Fase de la metodología a la que pertenece cada bloque (las tarjetas de fase muestran el total).
+ITEM_PHASE: dict[str, str] = {
+    "classify": "identificacion",
+    "manual_sources": "identificacion",
+    "novelty": "identificacion",
+    "filter_ready": "identificacion",
+    "invima": "identificacion",
+    "submissions": "identificacion",
+    "merges": "identificacion",
+    "rate": "priorizacion",
+    "drafts": "caracterizacion",
+    "reviews": "caracterizacion",
+    "close_blockers": "caracterizacion",
+    "bulletins_pending": "diseminacion",
+    "bulletins_published": "diseminacion",
+    "alerts": "diseminacion",
+    "dashboard": "diseminacion",
+}
+
+
+def signals_by_day(db: Session, days: int = 7) -> list[dict]:
+    """Señales capturadas por día (fecha de Colombia), del más antiguo a hoy."""
+    tz = timezone(timedelta(hours=-5))
+    today = datetime.now(tz).date()
+    start = today - timedelta(days=days - 1)
+    since = datetime.combine(start, datetime.min.time(), tzinfo=tz).astimezone(timezone.utc)
+    counts = {start + timedelta(days=i): 0 for i in range(days)}
+    for (created,) in db.query(Finding.created_at).filter(Finding.created_at >= since).all():
+        if created is None:
+            continue
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        day = created.astimezone(tz).date()
+        if day in counts:
+            counts[day] += 1
+    return [{"date": day.isoformat(), "count": count} for day, count in counts.items()]
+
+
 class WorkSample(BaseModel):
     id: int
     name: str
@@ -305,6 +348,7 @@ class WorkItem(BaseModel):
     action_label: str
     help: str
     samples: list[WorkSample] = []
+    phase: str = ""
 
 
 class QueueItem(BaseModel):
@@ -333,6 +377,20 @@ class MyWorkOut(BaseModel):
     total_pending: int = 0
     queue: list[QueueItem] = []
     queue_total: int = 0
+    # Bloques que no se pudieron calcular: la bandeja muestra el resto y lo avisa.
+    degraded: list[str] = []
+    # Pendientes (por hacer y avisos) por fase de la metodología.
+    by_phase: dict[str, int] = {}
+    # Fechas y avance del ciclo en curso.
+    active_cycle_schedule: dict | None = None
+    generated_at: datetime | None = None
+
+
+class MyActivityItem(BaseModel):
+    label: str
+    name: str = ""
+    to: str = ""
+    at: str = ""
 
 
 def _today() -> date:
@@ -896,17 +954,50 @@ def build_my_work(db: Session, user: User, *, today: date | None = None) -> dict
         "reviews": lambda: _item_reviews(db, user),
     }
     items: list[WorkItem] = []
+    degraded: list[str] = []
     for key in ROLE_WORK_ITEMS.get(role, ()):
         perm = ITEM_PERMISSION.get(key)
         if perm is not None and not rbac.has_permission(user, perm):
             continue
-        item = builders[key]()
+        # Un bloque que falla no puede dejar a la persona sin bandeja: se omite y se avisa.
+        try:
+            item = builders[key]()
+        except Exception:  # noqa: BLE001
+            log.exception("Bandeja de trabajo: no se pudo calcular el bloque '%s'", key)
+            db.rollback()
+            degraded.append(key)
+            continue
         if item is not None:
+            item.phase = ITEM_PHASE.get(key, "")
             items.append(item)
 
     queue, queue_total = ([], 0)
     if rbac.has_permission(user, rbac.P_TECHNOLOGY_WRITE):
-        queue, queue_total = work_queue(db)
+        try:
+            queue, queue_total = work_queue(db)
+        except Exception:  # noqa: BLE001
+            log.exception("Bandeja de trabajo: no se pudo calcular la cola")
+            db.rollback()
+            degraded.append("queue")
+
+    by_phase: dict[str, int] = {}
+    for item in items:
+        if item.phase and item.severity in ("accion", "aviso") and item.count > 0:
+            by_phase[item.phase] = by_phase.get(item.phase, 0) + item.count
+
+    schedule = None
+    if cycle is not None:
+        closing = cycle.bulletin_due_on or cycle.data_cutoff_on
+        span = max(1, (closing - cycle.opened_on).days)
+        schedule = {
+            "opened_on": cycle.opened_on.isoformat(),
+            "data_cutoff_on": cycle.data_cutoff_on.isoformat(),
+            "bulletin_due_on": cycle.bulletin_due_on.isoformat() if cycle.bulletin_due_on else None,
+            "days_to_open": (cycle.opened_on - today).days,
+            "days_to_cutoff": (cycle.data_cutoff_on - today).days,
+            "days_to_closing": (closing - today).days,
+            "elapsed_pct": max(0, min(100, round((today - cycle.opened_on).days * 100 / span))),
+        }
 
     return {
         "role": role,
@@ -921,6 +1012,10 @@ def build_my_work(db: Session, user: User, *, today: date | None = None) -> dict
         "total_pending": sum(i.count for i in items if i.severity == "accion"),
         "queue": queue,
         "queue_total": queue_total,
+        "degraded": degraded,
+        "by_phase": by_phase,
+        "active_cycle_schedule": schedule,
+        "generated_at": datetime.now(timezone.utc),
     }
 
 
@@ -987,3 +1082,15 @@ def work_queue(db: Session, limit: int = QUEUE_LIMIT) -> tuple[list[QueueItem], 
 def my_work(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Pendientes accionables del perfil que inicia sesion, con enlace a la accion."""
     return MyWorkOut(**build_my_work(db, user))
+
+
+@router.get("/my-activity", response_model=list[MyActivityItem])
+def my_activity(
+    limit: int = 8,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Lo último que hizo quien consulta, con enlace para retomarlo."""
+    from .. import activity_service
+
+    return activity_service.recent(db, user, limit=max(1, min(20, limit)))

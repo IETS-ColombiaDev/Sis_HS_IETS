@@ -1,3 +1,3 @@
 """Sistema de Escaneo de Horizonte del IETS - backend package."""
 
-__version__ = "7.15.0"
+__version__ = "7.16.0"

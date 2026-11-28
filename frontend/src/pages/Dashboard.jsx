@@ -19,7 +19,7 @@ import { GLOSSARY } from "../constants/glossary";
 import InfoTip from "../components/InfoTip";
 import TechSearch from "../components/TechSearch";
 import { formatDateTime, formatSpan } from "../scan/format";
-import { t, tr, ts, intlLocale } from "../i18n";
+import { fmtDateTime, fmtTime, t, tr, ts, intlLocale } from "../i18n";
 import "./dashboards.css";
 
 // Que mide cada indicador y como se calcula (criterio operativo: sin
@@ -50,6 +50,46 @@ const KPI_HELP = {
 };
 
 const SEVERITY_LABEL = { accion: t("Por hacer"), aviso: t("Atención"), info: t("Para leer"), ok: t("Al día") };
+
+// Filtros de las tarjetas de pendientes. "Al día" agrupa lo que no tiene nada por hacer.
+const WORK_FILTERS = [
+  { key: "todos", label: t("Todos"), match: () => true },
+  { key: "accion", label: t("Por hacer"), match: (i) => !isIdle(i) && i.severity === "accion" },
+  { key: "aviso", label: t("Atención"), match: (i) => i.severity === "aviso" },
+  { key: "info", label: t("Para leer"), match: (i) => i.severity === "info" },
+  { key: "ok", label: t("Al día"), match: (i) => isIdle(i) },
+];
+
+/** En qué punto de su ventana va el ciclo en curso, con las cifras que calcula el servidor. */
+function cycleSchedule(s) {
+  if (s.days_to_open > 0) return { tone: "idle", text: t("Abre en {n} día(s)", { n: s.days_to_open }) };
+  if (s.days_to_cutoff > 0) return { tone: "ok", text: t("Faltan {n} día(s) para el corte de datos", { n: s.days_to_cutoff }) };
+  if (s.days_to_cutoff === 0) return { tone: "soon", text: t("El corte de datos es hoy") };
+  if (s.days_to_closing > 0) return { tone: "soon", text: t("Corte de datos cumplido · faltan {n} día(s) para el boletín", { n: s.days_to_closing }) };
+  if (s.days_to_closing === 0) return { tone: "soon", text: t("La ventana termina hoy") };
+  return { tone: "late", text: t("La ventana terminó hace {n} día(s) y el ciclo sigue abierto", { n: -s.days_to_closing }) };
+}
+
+/** Señales capturadas por día en la última semana. */
+function WeekBars({ days }) {
+  const max = Math.max(1, ...days.map((d) => d.count));
+  return (
+    <div className="bw-week" data-testid="bandeja-week" role="img" aria-label={t("Señales capturadas por día en los últimos 7 días")}>
+      {days.map((d) => {
+        const date = new Date(`${d.date}T12:00:00`);
+        return (
+          <div key={d.date} className="bw-week-day" title={`${date.toLocaleDateString(intlLocale(), { weekday: "long", day: "numeric", month: "short" })}: ${d.count}`}>
+            <span className="bw-week-count">{d.count}</span>
+            <span className="bw-week-track">
+              <i style={{ height: `${Math.max(d.count ? 8 : 0, (d.count / max) * 100)}%` }} />
+            </span>
+            <span className="bw-week-label">{date.toLocaleDateString(intlLocale(), { weekday: "narrow" })}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function isIdle(item) {
   return item.severity === "ok" || (item.severity === "accion" && item.count === 0);
@@ -151,6 +191,10 @@ export default function Dashboard() {
   const [wb, setWb] = useState(null);
   const [work, setWork] = useState(null);
   const [lastRun, setLastRun] = useState(null);
+  const [activity, setActivity] = useState([]);
+  const [workFilter, setWorkFilter] = useState("todos");
+  const [refreshing, setRefreshing] = useState(false);
+  const [workFailed, setWorkFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const { version } = useRealtime();
   const { isEditor, user } = useAuth();
@@ -160,13 +204,16 @@ export default function Dashboard() {
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
     try {
-      const [a, b, c] = await Promise.allSettled([
+      const [a, b, c, d] = await Promise.allSettled([
         api.get("/dashboard/workbench"),
         api.get("/dashboard/my-work"),
         api.get("/ingest/runs", { params: { limit: 3 } }),
+        api.get("/dashboard/my-activity"),
       ]);
       if (a.status === "fulfilled") setWb(a.value.data);
       if (c.status === "fulfilled") setLastRun(c.value.data.runs?.[0] || null);
+      if (d.status === "fulfilled") setActivity(Array.isArray(d.value.data) ? d.value.data : []);
+      setWorkFailed(b.status === "rejected");
       if (b.status === "fulfilled") {
         setWork(b.value.data);
       } else if (!silent) {
@@ -212,6 +259,12 @@ export default function Dashboard() {
     load({ silent: true });
   }, [load, version]);
 
+  const refresh = async () => {
+    setRefreshing(true);
+    await load({ silent: true });
+    setRefreshing(false);
+  };
+
   if (loading) return <LoadingBlock label={t("Cargando bandeja de trabajo...")} />;
   if (!wb) {
     return (
@@ -232,6 +285,10 @@ export default function Dashboard() {
   const pendingCount = work.total_pending || 0;
   const warnings = items.filter((i) => i.severity === "aviso").length;
   const hasCriteria = (work.my_criteria || []).length > 0;
+  const filterCounts = Object.fromEntries(WORK_FILTERS.map((f) => [f.key, items.filter(f.match).length]));
+  const shownItems = items.filter(WORK_FILTERS.find((f) => f.key === workFilter)?.match || (() => true));
+  const degraded = work.degraded || [];
+  const schedule = work.active_cycle_schedule ? { ...work.active_cycle_schedule, ...cycleSchedule(work.active_cycle_schedule) } : null;
   const firstName = (user?.first_name || user?.name || "").split(" ")[0];
 
   return (
@@ -252,16 +309,41 @@ export default function Dashboard() {
             ) : null}
           </p>
         </div>
-        {isEditor && (
-          <div className="page-actions">
+        <div className="page-actions bw-actions">
+          {work.generated_at && (
+            <span className="bw-updated" data-testid="bandeja-updated">
+              {t("Actualizado a las {hora}", { hora: fmtTime(work.generated_at, { hour: "2-digit", minute: "2-digit" }) })}
+            </span>
+          )}
+          <Button variant="secondary" onClick={refresh} loading={refreshing} data-testid="bandeja-refresh">
+            <Icon name="refresh" size={16} /> {t("Actualizar")}
+          </Button>
+          {isEditor && (
             <Button onClick={() => navigate("/vigilancia")}>
               <Icon name="radar" size={17} /> {t("Ejecutar vigilancia")}
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <TechSearch />
+
+      {(workFailed || degraded.length > 0) && (
+        <div className="fa-notice fa-notice--warn bw-degraded" role="status" data-testid="bandeja-degraded">
+          <div>
+            <strong>
+              {workFailed
+                ? t("No se pudieron cargar sus pendientes.")
+                : t("{n} bloque(s) de la bandeja no se pudieron calcular.", { n: degraded.length })}
+            </strong>
+            <div style={{ marginTop: 4 }}>
+              {workFailed
+                ? t("Los indicadores de abajo sí están al día. Pulse Actualizar; si se repite, avise al equipo técnico.")
+                : t("El resto de la bandeja está completo. Pulse Actualizar; si se repite, avise al equipo técnico.")}
+            </div>
+          </div>
+        </div>
+      )}
 
       {!work.active_cycle_id && (
         <Card style={{ marginBottom: 20, background: "#FEF3C7", borderColor: "#FDE68A" }} padding={16}>
@@ -293,9 +375,25 @@ export default function Dashboard() {
             {warnings > 0 ? " · " + t("{n} aviso(s) que requieren atención", { n: warnings }) : ""}
           </span>
         </div>
+        {items.length > 1 && (
+          <div className="bw-filters" role="group" aria-label={t("Filtrar mis pendientes")}>
+            {WORK_FILTERS.filter((f) => f.key === "todos" || filterCounts[f.key] > 0).map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                className={`bw-chip${workFilter === f.key ? " is-active" : ""}`}
+                aria-pressed={workFilter === f.key}
+                onClick={() => setWorkFilter(f.key)}
+                data-testid={`work-filter-${f.key}`}
+              >
+                {f.label} <span>{filterCounts[f.key]}</span>
+              </button>
+            ))}
+          </div>
+        )}
         {items.length ? (
           <div className="dc-work-grid" data-testid="work-grid" data-role={work.role}>
-            {items.map((item) => (
+            {(shownItems.length ? shownItems : items).map((item) => (
               <WorkCard key={item.key} item={item} />
             ))}
           </div>
@@ -336,6 +434,25 @@ export default function Dashboard() {
               {t("Gestionar ciclos")}
             </Button>
           </div>
+          {schedule && (
+            <div className={`bw-schedule is-${schedule.tone}`} data-testid="bandeja-schedule">
+              <div className="bw-schedule-track" role="img" aria-label={t("{pct}% de la ventana transcurrido", { pct: schedule.elapsed_pct })}>
+                <div style={{ width: `${schedule.elapsed_pct}%` }} />
+              </div>
+              <p>
+                <Icon name={schedule.tone === "late" ? "alert" : "calendar"} size={13} /> {schedule.text}
+                <span>
+                  {schedule.bulletin_due_on
+                    ? t("Apertura {apertura} · Corte {corte} · Boletín {boletin}", {
+                        apertura: schedule.opened_on,
+                        corte: schedule.data_cutoff_on,
+                        boletin: schedule.bulletin_due_on,
+                      })
+                    : t("Apertura {apertura} · Corte {corte}", { apertura: schedule.opened_on, corte: schedule.data_cutoff_on })}
+                </span>
+              </p>
+            </div>
+          )}
         </Card>
       )}
 
@@ -353,6 +470,11 @@ export default function Dashboard() {
               <span className="methodology-card-phase">{phase.phase}</span>
               <strong>{phase.label}</strong>
               <span>{phase.short}</span>
+              {(work.by_phase?.[phase.key] || 0) > 0 && (
+                <span className="bw-phase-count" data-testid={`phase-pending-${phase.key}`}>
+                  {t("{n} pendiente(s)", { n: work.by_phase[phase.key] })}
+                </span>
+              )}
             </button>
             <span style={{ position: "absolute", top: 12, right: 12 }}>
               <InfoTip text={phase.help || phase.hint} label={t("Qué es {label}", { label: phase.label })} />
@@ -419,6 +541,7 @@ export default function Dashboard() {
               <span>{t("Señales últimos 7 días")}</span>
               <strong>{wb.findings_last_7d}</strong>
             </div>
+            {(wb.findings_by_day || []).length > 0 && <WeekBars days={wb.findings_by_day} />}
             {lastRun && <LastVigilance run={lastRun} />}
             {lastRun ? null : wb.last_scan ? (
               <div style={{ marginTop: 8, padding: 12, background: "#F8FAFC", borderRadius: 10, fontSize: 13 }}>
@@ -447,6 +570,30 @@ export default function Dashboard() {
           </div>
         </Card>
       </div>
+
+      {activity.length > 0 && (
+        <Card style={{ marginTop: 16 }}>
+          <SectionTitle hint={t("Sus últimas acciones en el sistema, de la más reciente a la más antigua. Sirve para retomar el trabajo donde lo dejó. Solo usted ve esta lista.")}>
+            {t("Lo último que hice")}
+          </SectionTitle>
+          <ol className="bw-activity" data-testid="bandeja-activity">
+            {activity.map((a, i) => (
+              <li key={`${a.at}-${i}`}>
+                <div style={{ minWidth: 0 }}>
+                  <strong>{ts(a.label)}</strong>
+                  {a.name && <ClampText text={a.name} lines={1} as="span" className="bw-activity-name" />}
+                  <small>{fmtDateTime(a.at)}</small>
+                </div>
+                {a.to && (
+                  <Link className="dc-queue-go" to={a.to} aria-label={`${t("Retomar")}: ${ts(a.label)} ${a.name}`}>
+                    {t("Retomar")} <span aria-hidden="true">→</span>
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ol>
+        </Card>
+      )}
     </div>
   );
 }
