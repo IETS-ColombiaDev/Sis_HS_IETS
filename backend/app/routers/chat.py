@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -19,7 +21,10 @@ from ..schemas import (
     ChatSendOut,
     ChatSessionDetail,
     ChatSessionOut,
+    ChatSessionUpdate,
 )
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -104,43 +109,187 @@ def _retrieve_context(db: Session, question: str, max_findings: int = 8, max_sou
     return "\n".join(parts), used
 
 
+MESSAGE_MAX = 4000
+TITLE_MAX = 120
+HISTORY_FOR_AI = 20
+
+
+def _own_session(db: Session, user: User, session_id: int) -> ChatSession:
+    session = db.get(ChatSession, session_id)
+    if not session or session.user_email != user.email:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversación no encontrada")
+    return session
+
+
+def _sessions_out(db: Session, sessions: list[ChatSession]) -> list[ChatSessionOut]:
+    """Cada conversación con su número de mensajes y el comienzo del último."""
+    ids = [s.id for s in sessions]
+    counts: dict[int, int] = {}
+    previews: dict[int, str] = {}
+    if ids:
+        counts = dict(
+            db.query(ChatMessage.session_id, func.count(ChatMessage.id))
+            .filter(ChatMessage.session_id.in_(ids))
+            .group_by(ChatMessage.session_id)
+            .all()
+        )
+        last_ids = [
+            row[0]
+            for row in db.query(func.max(ChatMessage.id))
+            .filter(ChatMessage.session_id.in_(ids))
+            .group_by(ChatMessage.session_id)
+            .all()
+        ]
+        if last_ids:
+            for sid, content in db.query(ChatMessage.session_id, ChatMessage.content).filter(ChatMessage.id.in_(last_ids)).all():
+                previews[sid] = " ".join((content or "").split())[:140]
+    out = []
+    for s in sessions:
+        item = ChatSessionOut.model_validate(s)
+        item.message_count = int(counts.get(s.id, 0))
+        item.preview = previews.get(s.id, "")
+        out.append(item)
+    return out
+
+
 @router.get("/sessions", response_model=list[ChatSessionOut])
 def list_sessions(
     scope: str = "",
     node_key: str = "",
     cycle_id: int | None = None,
+    q: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    q = db.query(ChatSession).filter(ChatSession.user_email == user.email)
+    query = db.query(ChatSession).filter(ChatSession.user_email == user.email)
     if scope:
-        q = q.filter(ChatSession.scope == scope)
+        query = query.filter(ChatSession.scope == scope)
     else:
-        q = q.filter((ChatSession.scope == "") | (ChatSession.scope.is_(None)))
+        query = query.filter((ChatSession.scope == "") | (ChatSession.scope.is_(None)))
     if node_key:
-        q = q.filter(ChatSession.node_key == node_key)
+        query = query.filter(ChatSession.node_key == node_key)
     if cycle_id:
-        q = q.filter(ChatSession.cycle_id == cycle_id)
-    sessions = q.order_by(ChatSession.updated_at.desc()).all()
-    return [ChatSessionOut.model_validate(s) for s in sessions]
+        query = query.filter(ChatSession.cycle_id == cycle_id)
+    text = (q or "").strip().lower()[:80]
+    if text:
+        like = f"%{text}%"
+        in_messages = db.query(ChatMessage.session_id).filter(func.lower(ChatMessage.content).like(like))
+        query = query.filter(or_(func.lower(ChatSession.title).like(like), ChatSession.id.in_(in_messages)))
+    sessions = query.order_by(ChatSession.updated_at.desc(), ChatSession.id.desc()).all()
+    return _sessions_out(db, sessions)
+
+
+@router.delete("/sessions", status_code=status.HTTP_200_OK)
+def delete_all_sessions(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Elimina todas las conversaciones generales de quien llama. Las del grafo del tablero se conservan."""
+    sessions = (
+        db.query(ChatSession)
+        .filter(ChatSession.user_email == user.email)
+        .filter((ChatSession.scope == "") | (ChatSession.scope.is_(None)))
+        .all()
+    )
+    for session in sessions:
+        db.delete(session)
+    db.commit()
+    return {"deleted": len(sessions)}
 
 
 @router.get("/sessions/{session_id}", response_model=ChatSessionDetail)
 def get_session(session_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    session = db.get(ChatSession, session_id)
-    if not session or session.user_email != user.email:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversación no encontrada")
-    return ChatSessionDetail.model_validate(session)
+    session = _own_session(db, user, session_id)
+    out = ChatSessionDetail.model_validate(session)
+    out.message_count = len(out.messages)
+    return out
+
+
+@router.put("/sessions/{session_id}", response_model=ChatSessionOut)
+def rename_session(
+    session_id: int,
+    payload: ChatSessionUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Cambia el título de una conversación propia."""
+    session = _own_session(db, user, session_id)
+    title = " ".join((payload.title or "").split())
+    if not title:
+        raise HTTPException(status_code=422, detail="El título no puede quedar vacío.")
+    if len(title) > TITLE_MAX:
+        raise HTTPException(status_code=422, detail=f"El título admite hasta {TITLE_MAX} caracteres.")
+    session.title = title
+    db.commit()
+    db.refresh(session)
+    return _sessions_out(db, [session])[0]
+
+
+@router.get("/sessions/{session_id}/export")
+def export_session(session_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """La conversación en Markdown, para guardarla o pegarla en un informe."""
+    session = _own_session(db, user, session_id)
+    lines = [f"# {session.title or 'Conversación'}", ""]
+    if session.created_at:
+        lines += [f"Conversación del {session.created_at.date().isoformat()} con el asistente de escaneo de horizonte del IETS.", ""]
+    for m in session.messages:
+        who = "Pregunta" if m.role == "user" else "Respuesta"
+        lines += [f"## {who}", "", (m.content or "").strip(), ""]
+        if m.role != "user" and (m.sources_used or "").strip():
+            lines += [f"_Registros usados como contexto: {m.sources_used.strip()}_", ""]
+    lines += ["---", "Las respuestas del asistente son un apoyo: verifique cada dato en la fuente antes de usarlo.", ""]
+    return Response(
+        content="\n".join(lines),
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="conversacion-{session.id}.md"'},
+    )
 
 
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_session(session_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    session = db.get(ChatSession, session_id)
-    if not session or session.user_email != user.email:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversación no encontrada")
+    session = _own_session(db, user, session_id)
     db.delete(session)
     db.commit()
     return None
+
+
+def _answer(db: Session, session: ChatSession, question: str, user: User, language: str) -> tuple[ChatMessage, str]:
+    """Genera y guarda la respuesta a `question`. La pregunta ya está guardada."""
+    history = [{"role": m.role, "content": m.content} for m in session.messages][-HISTORY_FOR_AI:]
+    context, used = _retrieve_context(db, question)
+    if session.cycle_id and session.node_key:
+        cycle = db.get(Cycle, session.cycle_id)
+        if cycle is not None:
+            from ..rbac import P_RESTRICTED_ANALYTICS, has_permission
+
+            node_ctx = graph_service.node_context(
+                db,
+                cycle,
+                session.node_key,
+                include_restricted=has_permission(user, P_RESTRICTED_ANALYTICS),
+            )
+            context = f"{node_ctx}\n\n{context}"
+            used = [session.node_key, *used]
+    try:
+        answer_text, model = ai_service.chat_answer(question, context, history, language=language)
+    except Exception as exc:  # noqa: BLE001
+        log.exception("El asistente no pudo responder en la conversación %s", session.id)
+        db.rollback()
+        raise HTTPException(
+            status_code=502,
+            detail="El asistente no pudo responder. Su pregunta quedó guardada: pulse Reintentar.",
+        ) from exc
+
+    assistant_msg = ChatMessage(
+        session_id=session.id,
+        role="assistant",
+        content=answer_text,
+        sources_used=", ".join(used[:8]),
+    )
+    db.add(assistant_msg)
+    session.title = session.title or question[:80]
+    session.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(session)
+    db.refresh(assistant_msg)
+    return assistant_msg, model
 
 
 @router.post("/send", response_model=ChatSendOut)
@@ -150,15 +299,16 @@ def send_message(
     user: User = Depends(get_current_user),
     ui_language: str = Header(default="es", alias="X-UI-Language"),
 ):
-    if not payload.message.strip():
+    message = payload.message.strip()
+    if not message:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El mensaje no puede estar vacío")
+    if len(message) > MESSAGE_MAX:
+        raise HTTPException(status_code=422, detail=f"El mensaje admite hasta {MESSAGE_MAX} caracteres.")
 
     if payload.session_id:
-        session = db.get(ChatSession, payload.session_id)
-        if not session or session.user_email != user.email:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversación no encontrada")
+        session = _own_session(db, user, payload.session_id)
     else:
-        title = payload.message.strip()[:80]
+        title = message[:80]
         if payload.node_key:
             title = f"Grafo · {payload.node_key}"[:80]
         session = ChatSession(
@@ -172,43 +322,40 @@ def send_message(
         db.add(session)
         db.flush()
 
-    user_msg = ChatMessage(session_id=session.id, role="user", content=payload.message.strip())
+    user_msg = ChatMessage(session_id=session.id, role="user", content=message)
     db.add(user_msg)
     # Confirmado antes de esperar a la IA (~25 s): con un flush la escritura quedaba
     # abierta todo ese tiempo y en SQLite bloqueaba al resto de usuarios.
     db.commit()
 
-    history = [{"role": m.role, "content": m.content} for m in session.messages]
-    context, used = _retrieve_context(db, payload.message)
-    if payload.cycle_id and payload.node_key:
-        cycle = db.get(Cycle, payload.cycle_id)
-        if cycle is not None:
-            from ..rbac import P_RESTRICTED_ANALYTICS, has_permission
-
-            node_ctx = graph_service.node_context(
-                db,
-                cycle,
-                payload.node_key,
-                include_restricted=has_permission(user, P_RESTRICTED_ANALYTICS),
-            )
-            context = f"{node_ctx}\n\n{context}"
-            used = [payload.node_key, *used]
-    answer_text, model = ai_service.chat_answer(payload.message, context, history, language=ui_language)
-
-    assistant_msg = ChatMessage(
-        session_id=session.id,
-        role="assistant",
-        content=answer_text,
-        sources_used=", ".join(used[:8]),
+    assistant_msg, model = _answer(db, session, message, user, ui_language)
+    return ChatSendOut(
+        session=_sessions_out(db, [session])[0],
+        answer=ChatMessageOut.model_validate(assistant_msg),
+        model_used=model,
     )
-    db.add(assistant_msg)
-    session.title = session.title or payload.message.strip()[:80]
+
+
+@router.post("/sessions/{session_id}/retry", response_model=ChatSendOut)
+def retry_answer(
+    session_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    ui_language: str = Header(default="es", alias="X-UI-Language"),
+):
+    """Vuelve a responder la última pregunta: reemplaza la respuesta anterior, si la había."""
+    session = _own_session(db, user, session_id)
+    last_user = next((m for m in reversed(session.messages) if m.role == "user"), None)
+    if last_user is None:
+        raise HTTPException(status_code=409, detail="La conversación no tiene preguntas para responder.")
+    for m in list(session.messages):
+        if m.id > last_user.id:
+            db.delete(m)
     db.commit()
     db.refresh(session)
-    db.refresh(assistant_msg)
-
+    assistant_msg, model = _answer(db, session, last_user.content, user, ui_language)
     return ChatSendOut(
-        session=ChatSessionOut.model_validate(session),
+        session=_sessions_out(db, [session])[0],
         answer=ChatMessageOut.model_validate(assistant_msg),
         model_used=model,
     )

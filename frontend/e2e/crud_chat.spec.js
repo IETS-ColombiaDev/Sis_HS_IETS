@@ -24,7 +24,8 @@ test("revisor por pares conversa sin IA, reabre y elimina la sesion", async ({ p
   expect(session).toBeTruthy();
   await page.getByRole("button", { name: "Nueva conversación" }).click();
   await page.getByTestId(`chat-session-${session.id}`).getByRole("button").first().click();
-  await expect(page.getByText(question, { exact: true })).toBeVisible();
+  // El título de la conversación también aparece en la cabecera: se verifica el mensaje.
+  await expect(page.locator(".ch-bubble", { hasText: question })).toBeVisible();
 
   // Eliminar con confirmacion.
   await page.getByRole("button", { name: `Eliminar conversación ${session.title}` }).click();
