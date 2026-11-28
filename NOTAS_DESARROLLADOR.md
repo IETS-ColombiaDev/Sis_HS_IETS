@@ -1428,3 +1428,34 @@ vínculo perdido, `NoteHistory`, copiar, confirmación al cerrar con texto, busc
 - El panel de notas incrustado (`components/NotesPanel.jsx`) no tiene el recorrido ni la confirmación al cerrar.
 - La prueba `crud_notes.spec.js:15` falló de forma intermitente en dos baterías completas (el detalle mostraba el
   contenido anterior a la edición). No se reprodujo corriéndola sola y la causa sigue sin identificar.
+
+## Asistente robusto: reintento, búsqueda, título, exporte y borrado (27-11-2026, versión 7.18.0)
+
+**Por qué.** Si la respuesta fallaba, la pregunta ya estaba guardada en el servidor pero la pantalla la quitaba: la
+conversación quedaba con una pregunta huérfana y la persona tenía que reescribirla. La lista de conversaciones no tenía
+búsqueda ni forma de renombrar, y no había cómo sacar una conversación del sistema.
+
+**Servidor** (`routers/chat.py`; sin migración).
+
+- `_answer` genera y guarda la respuesta; `send` y el nuevo `POST /api/chat/sessions/{id}/retry` lo comparten. Si
+  `chat_answer` lanza una excepción responde 502 y conserva la pregunta. `retry` borra lo que haya después de la última
+  pregunta y vuelve a responder.
+- `GET /api/chat/sessions` suma `q` (título y contenido de los mensajes) y cada sesión trae `message_count` y `preview`.
+- `PUT /api/chat/sessions/{id}` (título, 1 a 120 caracteres), `GET /api/chat/sessions/{id}/export` (Markdown) y
+  `DELETE /api/chat/sessions` (solo las conversaciones generales de quien llama; las de `scope` distinto se conservan).
+- Mensaje de más de 4.000 caracteres responde 422. Al modelo se le pasan como máximo los últimos 20 mensajes
+  (`chat_answer` ya usaba solo los 6 últimos).
+- El contexto del grafo ahora sale de la sesión (`session.cycle_id`, `session.node_key`) y no del cuerpo de cada envío.
+- Todas las rutas con id verifican dueño con `_own_session` (404 para conversaciones ajenas).
+
+**Interfaz** (`pages/Chat.jsx` reescrita con `pages/chat.css`): grupos por fecha, buscador, renombrar, eliminar todas,
+aviso de respuesta fallida con «Reintentar», «Volver a responder», copiar, hora, descarga, `?c=<id>` en la dirección,
+cuadro que crece y contador. Traducciones en `pages.Chat.js` y `server.chat.js` (nuevo).
+
+**Pruebas.** `tests/test_asistente_robusto.py` (6), `e2e/asistente_robusto.spec.js` (2) y `e2e/crud_chat.spec.js`
+ajustado (el título de la conversación ahora también está en la cabecera).
+
+**Pendientes.**
+
+- Los registros usados como contexto siguen guardados como texto (`sources_used`), sin enlace a la señal o la fuente.
+- El chat del grafo del tablero (`components/StrategyGraph.jsx`) no tiene reintento ni exporte.
