@@ -45,6 +45,10 @@ ACTION_LABELS = {
     "strategy:refresh": "Recalculó el tablero",
     "schedule:config": "Cambió la vigilancia programada",
     "signals:window_apply": "Aplicó la ventana de señales",
+    "note:create": "Escribió una nota",
+    "note:edit": "Editó una nota",
+    "note:delete": "Eliminó una nota",
+    "note:export": "Descargó las notas",
 }
 ENTITY_NAMES = {
     "technologies": "una tecnología",
