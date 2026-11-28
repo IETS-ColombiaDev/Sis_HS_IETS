@@ -77,6 +77,7 @@ ENTITY_LABELS = {
     "signals": "Ventana de señales",
     "backup": "Copias de respaldo",
     "audit_log": "Bitácora",
+    "assistant_knowledge": "Memoria del asistente",
 }
 EXPORT_MAX = 10000
 

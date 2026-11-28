@@ -257,6 +257,8 @@ class ChatSession(Base):
     node_key: Mapped[str] = mapped_column(String(120), default="", index=True)
     cycle_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     graph_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    # Elementos que la persona fijó como contexto de la conversación: [{"type", "id"}].
+    context_refs: Mapped[list | None] = mapped_column(JSONType, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -275,9 +277,45 @@ class ChatMessage(Base):
     role: Mapped[str] = mapped_column(String(32), default="user")  # user | assistant
     content: Mapped[str] = mapped_column(Text, default="")
     sources_used: Mapped[str] = mapped_column(Text, default="")
+    # Registros con los que se armó la respuesta: [{"type", "id", "title", "origin"}].
+    refs: Mapped[list | None] = mapped_column(JSONType, nullable=True)
+    # Valoración de quien preguntó: "" | util | no_util.
+    feedback: Mapped[str] = mapped_column(String(12), default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     session: Mapped["ChatSession"] = relationship(back_populates="messages")
+
+
+class AssistantKnowledge(Base):
+    """Memoria del asistente: lo que el equipo marcó como útil o le enseñó a mano.
+
+    El asistente la consulta en cada pregunta, junto con las señales y las
+    fuentes. No entrena un modelo: es texto que se recupera y se le entrega como
+    contexto. Cada entrada conserva de qué conversación salió y con qué
+    registros se armó.
+    """
+
+    __tablename__ = "assistant_knowledge"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(300), default="")
+    content: Mapped[str] = mapped_column(Text, default="")
+    # respuesta (salió de una respuesta marcada útil) | dato (lo escribió una persona)
+    kind: Mapped[str] = mapped_column(String(20), default="dato", index=True)
+    question: Mapped[str] = mapped_column(Text, default="")
+    refs: Mapped[list | None] = mapped_column(JSONType, nullable=True)
+    # Solo se entrega a perfiles con analytics:restricted (salió de contenido reservado).
+    restricted: Mapped[bool] = mapped_column(Boolean, default=False)
+    # activa | archivada
+    status: Mapped[str] = mapped_column(String(20), default="activa", server_default="activa", index=True)
+    session_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    message_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    created_by: Mapped[str] = mapped_column(String(255), default="", index=True)
+    created_by_name: Mapped[str] = mapped_column(String(255), default="")
+    uses: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
 class AppMeta(Base):

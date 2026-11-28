@@ -19,4 +19,5 @@ export default {
   "Generar informe": "Generate report",
   "Corregir título, resumen y clasificación de la señal": "Correct the signal's title, summary and classification",
   "Estado de triage": "Triage status",
+  "Preguntar al asistente sobre esta señal": "Ask the assistant about this signal",
 };

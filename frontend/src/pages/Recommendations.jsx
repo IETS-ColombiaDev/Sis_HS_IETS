@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api, { AI_TIMEOUT, apiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useCycle } from "../cycle/CycleContext";
@@ -699,6 +699,11 @@ export default function Recommendations() {
                 )}
               </section>
               <section>
+                <p style={{ margin: "0 0 10px" }}>
+                  <Link to={`/chat?adjuntar=recommendation:${detail.id}`} data-testid="rec-ask-assistant" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "#1D4ED8" }}>
+                    <Icon name="spark" size={14} /> {t("Preguntar al asistente sobre este informe")}
+                  </Link>
+                </p>
                 <h4>{t("Datos")}</h4>
                 <dl className="rec-facts">
                   <dt>{t("Origen")}</dt>

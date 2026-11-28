@@ -477,6 +477,11 @@ class ChatMessageOut(BaseModel):
     content: str
     sources_used: str = ""
     created_at: datetime
+    # Registros con los que se armó la respuesta, con enlace a cada uno.
+    refs: list[dict] | None = None
+    feedback: str = ""
+    # La respuesta ya está guardada en la memoria del asistente.
+    remembered: bool = False
 
 
 class ChatSessionOut(BaseModel):
@@ -502,6 +507,32 @@ class ChatSessionUpdate(BaseModel):
 
 class ChatSessionDetail(ChatSessionOut):
     messages: list[ChatMessageOut] = []
+    # Elementos fijados como contexto de la conversación.
+    context: list[dict] = []
+
+
+class ChatContextIn(BaseModel):
+    context: list[dict] = Field(default_factory=list, max_length=40)
+
+
+class ChatFeedbackIn(BaseModel):
+    feedback: str = ""
+
+
+class ChatRememberIn(BaseModel):
+    title: str
+    content: str | None = None
+
+
+class AssistantMemoryIn(BaseModel):
+    title: str
+    content: str
+
+
+class AssistantMemoryUpdate(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    status: str | None = None
 
 
 class ChatSendIn(BaseModel):
@@ -511,6 +542,8 @@ class ChatSendIn(BaseModel):
     node_key: str = ""
     cycle_id: int | None = None
     graph_id: int | None = None
+    # Elementos elegidos como contexto. `None` conserva los que ya tenía la conversación.
+    context: list[dict] | None = None
 
 
 class ChatSendOut(BaseModel):

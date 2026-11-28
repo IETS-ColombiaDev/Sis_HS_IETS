@@ -182,4 +182,5 @@ export default {
   "El informe deja de estar validado y sale del paquete del ciclo hasta que alguien lo valide de nuevo.": "The report is no longer validated and leaves the cycle's package until someone validates it again.",
   "Motivo (opcional)": "Reason (optional)",
   "Este informe está validado. Si cambia el título, el contenido o el impacto, vuelve a borrador y habrá que validarlo de nuevo.": "This report is validated. If you change the title, content or impact, it goes back to draft and will have to be validated again.",
+  "Preguntar al asistente sobre este informe": "Ask the assistant about this report",
 };

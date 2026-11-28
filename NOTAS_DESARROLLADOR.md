@@ -1491,3 +1491,49 @@ rápidos, nombres de acciones, «Ver toda la operación», filtros en la direcci
   por fechas o agregar índices.
 - En PostgreSQL, si la aplicación se conecta con el dueño de la tabla, `REVOKE` puede no bastar: la pantalla lo
   mostrará en amarillo y habría que usar un rol aparte para la aplicación.
+
+## Asistente reinventado: contexto elegido, memoria del equipo y referencias (27-11-2026, versión 7.20.0)
+
+**Por qué.** El asistente respondía con lo que encontrara por palabras clave en señales y fuentes: no se le podía
+decir «lee esta señal y este informe», la respuesta no decía con qué registros se armó y nada de lo que el equipo
+validaba volvía a servir en otra conversación.
+
+**Datos** (migración `0013_assistant_memory`).
+
+- Tabla `assistant_knowledge`: memoria del asistente (`kind` respuesta o dato, `question`, `refs`, `restricted`,
+  `status` activa o archivada, `uses`, `last_used_at`, origen en `session_id` y `message_id`).
+- `chat_sessions.context_refs`, `chat_messages.refs` y `chat_messages.feedback`.
+
+**Servidor** (`assistant_service.py` nuevo, `routers/chat.py`).
+
+- `GET /api/chat/context/search`: registros que se pueden adjuntar (señal, tecnología, fuente, informe, expediente,
+  nota, boletín). `ChatSendIn.context` y `PUT /api/chat/sessions/{id}/context` fijan hasta 12 en la conversación;
+  `context: null` conserva los que había.
+- `_answer` arma el contexto en tres partes: adjuntos (`context_for_refs`, contenido completo con presupuesto de
+  9.000 caracteres), memoria (`memory_retrieve`, coincidencia de palabras, hasta 4 entradas) y lo encontrado por
+  palabras clave (menos registros cuando hay adjuntos). Guarda en `refs` de la respuesta cada registro con su origen
+  (`elegido`, `memoria`, `encontrado`) y suma un uso a cada entrada de memoria usada.
+- `POST /api/chat/messages/{id}/feedback` (útil, no útil o sin marca) y `POST /api/chat/messages/{id}/remember`.
+- `GET|POST /api/chat/memory` y `PUT|DELETE /api/chat/memory/{id}`. Escribir exige `note:write`; editar, archivar o
+  eliminar, ser el autor o superadministrador. Queda en la bitácora (`assistant:remember`, `assistant:teach`,
+  `assistant:memory_edit`, `assistant:forget`).
+- **Reserva.** Sin `analytics:restricted`, un expediente se entrega sin `PUBLIC_HIDDEN_FIELDS` ni sus
+  `confidential_fields`. Una entrada de memoria guardada por quien sí tiene el permiso, a partir de un expediente o de
+  una conversación del grafo, queda `restricted` y solo la recuperan y la listan quienes tienen el permiso.
+- Con adjuntos, el título de la conversación nueva es el del primer adjunto («… y N más»).
+
+**Interfaz** (`pages/Chat.jsx`, `pages/chat.css`): pestañas Conversaciones y Memoria, `ContextPicker`, acciones
+rápidas, `AnswerRefs`, valoración, guardar en la memoria, pasar a nota (usa `POST /api/notes`), `MemoryPanel` y
+`/chat?adjuntar=tipo:id,…`. Enlaces «Preguntar al asistente» en `FindingDetailModal` y en el detalle de
+`Recommendations`. Traducciones en `pages.Chat.js` y `server.chat.js`.
+
+**Pruebas.** `tests/test_asistente_reinventado.py` (7) y `e2e/asistente_reinventado.spec.js` (2).
+
+**Pendientes y límites.**
+
+- La memoria se recupera por coincidencia de palabras, no por significado: una entrada escrita con otras palabras
+  puede no aparecer. `intelligence.Index` (TF-IDF) serviría para mejorarla.
+- La memoria no entrena ni ajusta el modelo de IA ni el clasificador de señales.
+- La valoración 👎 se guarda pero todavía no cambia nada: falta un informe de respuestas no útiles.
+- Faltan enlaces «Preguntar al asistente» en tecnologías, fuentes, expedientes y boletines.
+- El chat del grafo del tablero no usa adjuntos ni muestra las referencias nuevas.

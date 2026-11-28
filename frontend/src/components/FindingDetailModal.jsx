@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import Modal from "./Modal";
 import Button from "./Button";
 import HintButton from "./HintButton";
@@ -53,6 +54,11 @@ export default function FindingDetailModal({
         {finding.summary && (
           <p style={{ color: "#475569", fontSize: 14, marginBottom: 12, lineHeight: 1.6 }}>{finding.summary}</p>
         )}
+        <p style={{ margin: "0 0 12px" }}>
+          <Link to={`/chat?adjuntar=finding:${finding.id}`} data-testid="finding-ask-assistant" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "#1D4ED8" }}>
+            <Icon name="spark" size={14} /> {t("Preguntar al asistente sobre esta señal")}
+          </Link>
+        </p>
         <DL label={t("Tecnología")} value={finding.technology} />
         <DL label={t("Área terapéutica")} value={finding.therapeutic_area} />
         <DL label={t("Fase de desarrollo")} value={finding.phase} />

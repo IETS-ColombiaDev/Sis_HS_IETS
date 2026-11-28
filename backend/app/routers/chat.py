@@ -6,17 +6,24 @@ import logging
 import re
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from .. import ai_service, rbac
+from .. import ai_service, assistant_service, rbac
+from ..audit import record_action
 from ..database import get_db
-from ..deps import get_current_user
+from ..deps import get_current_user, require_permission
 from .. import graph_service
-from ..models import ChatMessage, ChatSession, Cycle, Finding, Source, User
+from ..models import AssistantKnowledge, ChatMessage, ChatSession, Cycle, Finding, Source, User
+from ..rbac import P_NOTE_WRITE, P_RESTRICTED_ANALYTICS, has_permission
 from ..schemas import (
+    AssistantMemoryIn,
+    AssistantMemoryUpdate,
+    ChatContextIn,
+    ChatFeedbackIn,
     ChatMessageOut,
+    ChatRememberIn,
     ChatSendIn,
     ChatSendOut,
     ChatSessionDetail,
@@ -60,7 +67,10 @@ def _rank(rows: list, keywords: list[str], fields, limit: int) -> list:
     return [r for _h, _i, r in scored[:limit]]
 
 
-def _retrieve_context(db: Session, question: str, max_findings: int = 8, max_sources: int = 5) -> tuple[str, list[str]]:
+def _retrieve_context(
+    db: Session, question: str, max_findings: int = 8, max_sources: int = 5, refs: list[dict] | None = None
+) -> tuple[str, list[str]]:
+    """Señales y fuentes parecidas a la pregunta. Si se pasa `refs`, agrega ahí cada registro usado."""
     keywords = _keywords(question)
     used: list[str] = []
     parts: list[str] = []
@@ -88,6 +98,8 @@ def _retrieve_context(db: Session, question: str, max_findings: int = 8, max_sou
                 f"({src}). {f.summary[:200]}"
             )
             used.append(f.title)
+            if refs is not None:
+                refs.append({"type": "finding", "id": f.id, "title": (f.title or "")[:200], "type_label": "Señal", "to": "/senales", "origin": "encontrado"})
 
     s_query = db.query(Source)
     if keywords:
@@ -105,6 +117,8 @@ def _retrieve_context(db: Session, question: str, max_findings: int = 8, max_sou
         for s in sources:
             parts.append(f"- {s.title} [{s.category}] ({s.url}). {s.description[:200]}")
             used.append(s.title)
+            if refs is not None:
+                refs.append({"type": "source", "id": s.id, "title": (s.title or "")[:200], "type_label": "Fuente", "to": "/fuentes", "origin": "encontrado"})
 
     return "\n".join(parts), used
 
@@ -148,6 +162,23 @@ def _sessions_out(db: Session, sessions: list[ChatSession]) -> list[ChatSessionO
         item = ChatSessionOut.model_validate(s)
         item.message_count = int(counts.get(s.id, 0))
         item.preview = previews.get(s.id, "")
+        out.append(item)
+    return out
+
+
+def _messages_out(db: Session, messages: list[ChatMessage]) -> list[ChatMessageOut]:
+    ids = [m.id for m in messages if m.role == "assistant"]
+    remembered = (
+        {row[0] for row in db.query(AssistantKnowledge.message_id).filter(AssistantKnowledge.message_id.in_(ids)).all()}
+        if ids
+        else set()
+    )
+    out = []
+    for m in messages:
+        item = ChatMessageOut.model_validate(m)
+        item.refs = m.refs or []
+        item.feedback = m.feedback or ""
+        item.remembered = m.id in remembered
         out.append(item)
     return out
 
@@ -198,7 +229,9 @@ def delete_all_sessions(db: Session = Depends(get_db), user: User = Depends(get_
 def get_session(session_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     session = _own_session(db, user, session_id)
     out = ChatSessionDetail.model_validate(session)
+    out.messages = _messages_out(db, list(session.messages))
     out.message_count = len(out.messages)
+    out.context = assistant_service.resolve_refs(db, session.context_refs or [])
     return out
 
 
@@ -253,7 +286,24 @@ def delete_session(session_id: int, db: Session = Depends(get_db), user: User = 
 def _answer(db: Session, session: ChatSession, question: str, user: User, language: str) -> tuple[ChatMessage, str]:
     """Genera y guarda la respuesta a `question`. La pregunta ya está guardada."""
     history = [{"role": m.role, "content": m.content} for m in session.messages][-HISTORY_FOR_AI:]
-    context, used = _retrieve_context(db, question)
+    chosen = assistant_service.resolve_refs(db, session.context_refs or [])
+    memory = assistant_service.memory_retrieve(db, question, user)
+    refs: list[dict] = [*chosen, *assistant_service.memory_refs(memory)]
+    found_refs: list[dict] = []
+    # Con elementos elegidos, lo encontrado por palabras clave es apoyo: menos registros.
+    found, used = _retrieve_context(db, question, max_findings=3 if chosen else 8, max_sources=2 if chosen else 5, refs=found_refs)
+    seen = {(r["type"], r["id"]) for r in refs}
+    refs += [r for r in found_refs if (r["type"], r["id"]) not in seen]
+    context = "\n\n".join(
+        part
+        for part in (
+            assistant_service.context_for_refs(db, chosen, user),
+            assistant_service.memory_context(memory),
+            found,
+        )
+        if part
+    )
+    used = [*(r["title"] for r in chosen), *(m.title for m in memory), *used]
     if session.cycle_id and session.node_key:
         cycle = db.get(Cycle, session.cycle_id)
         if cycle is not None:
@@ -282,8 +332,10 @@ def _answer(db: Session, session: ChatSession, question: str, user: User, langua
         role="assistant",
         content=answer_text,
         sources_used=", ".join(used[:8]),
+        refs=refs[:24],
     )
     db.add(assistant_msg)
+    assistant_service.memory_mark_used(db, memory)
     session.title = session.title or question[:80]
     session.updated_at = datetime.now(timezone.utc)
     db.commit()
@@ -305,10 +357,19 @@ def send_message(
     if len(message) > MESSAGE_MAX:
         raise HTTPException(status_code=422, detail=f"El mensaje admite hasta {MESSAGE_MAX} caracteres.")
 
+    try:
+        chosen = assistant_service.resolve_refs(db, payload.context) if payload.context is not None else None
+    except assistant_service.AssistantError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     if payload.session_id:
         session = _own_session(db, user, payload.session_id)
     else:
         title = message[:80]
+        if chosen:
+            # Con adjuntos, la conversación se reconoce mejor por lo que se analiza que por la pregunta.
+            more = f" y {len(chosen) - 1} más" if len(chosen) > 1 else ""
+            title = f"{chosen[0]['title'][: 76 - len(more)]}{more}"
         if payload.node_key:
             title = f"Grafo · {payload.node_key}"[:80]
         session = ChatSession(
@@ -322,6 +383,8 @@ def send_message(
         db.add(session)
         db.flush()
 
+    if chosen is not None:
+        session.context_refs = [{"type": r["type"], "id": r["id"]} for r in chosen]
     user_msg = ChatMessage(session_id=session.id, role="user", content=message)
     db.add(user_msg)
     # Confirmado antes de esperar a la IA (~25 s): con un flush la escritura quedaba
@@ -331,7 +394,7 @@ def send_message(
     assistant_msg, model = _answer(db, session, message, user, ui_language)
     return ChatSendOut(
         session=_sessions_out(db, [session])[0],
-        answer=ChatMessageOut.model_validate(assistant_msg),
+        answer=_messages_out(db, [assistant_msg])[0],
         model_used=model,
     )
 
@@ -356,9 +419,185 @@ def retry_answer(
     assistant_msg, model = _answer(db, session, last_user.content, user, ui_language)
     return ChatSendOut(
         session=_sessions_out(db, [session])[0],
-        answer=ChatMessageOut.model_validate(assistant_msg),
+        answer=_messages_out(db, [assistant_msg])[0],
         model_used=model,
     )
+
+
+# --------------------------------------------------------------------------- #
+#  Contexto elegido, valoración de respuestas y memoria del asistente
+# --------------------------------------------------------------------------- #
+def _own_message(db: Session, user: User, message_id: int) -> tuple[ChatMessage, ChatSession]:
+    message = db.get(ChatMessage, message_id)
+    session = db.get(ChatSession, message.session_id) if message else None
+    if not message or not session or session.user_email != user.email or message.role != "assistant":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Respuesta no encontrada")
+    return message, session
+
+
+def _question_of(session: ChatSession, message: ChatMessage) -> str:
+    """La pregunta que respondió `message`: el mensaje del usuario inmediatamente anterior."""
+    previous = [m for m in session.messages if m.id < message.id and m.role == "user"]
+    return previous[-1].content if previous else ""
+
+
+@router.get("/context/search")
+def search_context(
+    q: str = "",
+    types: str = "",
+    limit: int = 8,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Señales, tecnologías, fuentes, informes, expedientes, notas y boletines que se pueden adjuntar."""
+    wanted = [t for t in types.split(",") if t] or None
+    return assistant_service.search_refs(db, q, wanted, limit)
+
+
+@router.put("/sessions/{session_id}/context")
+def set_session_context(
+    session_id: int,
+    payload: ChatContextIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Fija los elementos que el asistente debe leer en esta conversación."""
+    session = _own_session(db, user, session_id)
+    try:
+        refs = assistant_service.resolve_refs(db, payload.context)
+    except assistant_service.AssistantError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    session.context_refs = [{"type": r["type"], "id": r["id"]} for r in refs]
+    db.commit()
+    return refs
+
+
+@router.post("/messages/{message_id}/feedback", response_model=ChatMessageOut)
+def rate_answer(
+    message_id: int,
+    payload: ChatFeedbackIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Marca una respuesta como útil o no útil (o quita la marca)."""
+    message, _session = _own_message(db, user, message_id)
+    if payload.feedback not in ("", "util", "no_util"):
+        raise HTTPException(status_code=422, detail="La valoración debe ser útil o no útil.")
+    message.feedback = payload.feedback
+    db.commit()
+    db.refresh(message)
+    return _messages_out(db, [message])[0]
+
+
+@router.post("/messages/{message_id}/remember")
+def remember_answer(
+    message_id: int,
+    payload: ChatRememberIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_NOTE_WRITE)),
+):
+    """Guarda una respuesta en la memoria del asistente, para que la use en preguntas futuras de todo el equipo."""
+    message, session = _own_message(db, user, message_id)
+    refs = message.refs or []
+    try:
+        entry = assistant_service.memory_create(
+            db,
+            user,
+            title=payload.title,
+            content=payload.content if payload.content is not None else message.content,
+            kind="respuesta",
+            question=_question_of(session, message),
+            refs=refs,
+            # Lo que salió de un expediente o del grafo con montos solo lo recibe quien puede verlos.
+            restricted=has_permission(user, P_RESTRICTED_ANALYTICS)
+            and (assistant_service.uses_restricted(refs) or bool(session.scope)),
+            session_id=session.id,
+            message_id=message.id,
+        )
+    except assistant_service.AssistantError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    message.feedback = "util"
+    record_action(db, entity_type="assistant_knowledge", entity_id=entry.id, action="assistant:remember", new_value={"title": entry.title, "restricted": entry.restricted})
+    db.commit()
+    db.refresh(entry)
+    return assistant_service.memory_out(entry, user)
+
+
+@router.get("/memory")
+def list_memory(
+    q: str = "",
+    status_filter: str = Query("activa", alias="status"),
+    mine: bool = False,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Lo que el asistente sabe porque el equipo se lo marcó o se lo enseñó."""
+    rows = assistant_service.memory_list(db, user, q=q, status=status_filter, mine=mine)
+    return {"items": [assistant_service.memory_out(r, user) for r in rows], "stats": assistant_service.memory_stats(db, user)}
+
+
+@router.post("/memory", status_code=201)
+def teach_memory(
+    payload: AssistantMemoryIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_NOTE_WRITE)),
+):
+    """Enseña un dato al asistente, escrito por una persona."""
+    try:
+        entry = assistant_service.memory_create(db, user, title=payload.title, content=payload.content)
+    except assistant_service.AssistantError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    record_action(db, entity_type="assistant_knowledge", entity_id=entry.id, action="assistant:teach", new_value={"title": entry.title})
+    db.commit()
+    db.refresh(entry)
+    return assistant_service.memory_out(entry, user)
+
+
+def _own_memory(db: Session, user: User, entry_id: int) -> AssistantKnowledge:
+    entry = db.get(AssistantKnowledge, entry_id)
+    if entry is None or (entry.restricted and not has_permission(user, P_RESTRICTED_ANALYTICS)):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entrada no encontrada")
+    if not assistant_service.can_manage(user, entry):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo quien guardó la entrada o un superadministrador puede cambiarla.",
+        )
+    return entry
+
+
+@router.put("/memory/{entry_id}")
+def update_memory(
+    entry_id: int,
+    payload: AssistantMemoryUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_NOTE_WRITE)),
+):
+    entry = _own_memory(db, user, entry_id)
+    try:
+        changed = assistant_service.memory_update(db, entry, title=payload.title, content=payload.content, status=payload.status)
+    except assistant_service.AssistantError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if changed:
+        record_action(db, entity_type="assistant_knowledge", entity_id=entry.id, action="assistant:memory_edit", new_value={"fields": changed, "status": entry.status})
+    db.commit()
+    db.refresh(entry)
+    return assistant_service.memory_out(entry, user)
+
+
+@router.delete("/memory/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_memory(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission(P_NOTE_WRITE)),
+):
+    entry = _own_memory(db, user, entry_id)
+    record_action(db, entity_type="assistant_knowledge", entity_id=entry.id, action="assistant:forget", old_value={"title": entry.title, "created_by": entry.created_by})
+    db.delete(entry)
+    db.commit()
+    return None
 
 
 # --------------------------------------------------------------------------- #
