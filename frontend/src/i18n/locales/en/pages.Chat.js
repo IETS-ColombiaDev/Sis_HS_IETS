@@ -41,4 +41,28 @@ export default {
   "Registros del sistema que se usaron como contexto para esta respuesta":
     "System records used as context for this answer",
   "Fuentes: {list}": "Sources: {list}",
+
+  // Asistente robusto (7.18.0)
+  "Últimos 7 días": "Last 7 days",
+  "{n} conversación(es) eliminadas.": "{n} conversation(s) deleted.",
+  "No se pudieron eliminar las conversaciones": "The conversations could not be deleted",
+  "Título actualizado.": "Title updated.",
+  "No se pudo cambiar el título": "The title could not be changed",
+  "No se pudo descargar la conversación": "The conversation could not be downloaded",
+  "Respuesta copiada.": "Answer copied.",
+  "No se pudo responder": "It could not answer",
+  "Buscar en mis conversaciones...": "Search my conversations...",
+  "Buscar en mis conversaciones": "Search my conversations",
+  "Ninguna conversación coincide.": "No conversation matches.",
+  "{n} mensaje(s)": "{n} message(s)",
+  "Cambiar el título de {title}": "Change the title of {title}",
+  "Cambiar el título": "Change the title",
+  "Eliminar todas mis conversaciones": "Delete all my conversations",
+  "La última pregunta quedó sin respuesta.": "The last question was left unanswered.",
+  "Su pregunta está guardada. Puede volver a pedir la respuesta sin escribirla de nuevo.": "Your question is saved. You can ask for the answer again without retyping it.",
+  "Es un apoyo: verifique cada dato en la fuente antes de usarlo.": "It is an aid: check every fact at the source before using it.",
+  "Cambiar el título de la conversación": "Change the conversation title",
+  "Se eliminarán sus {n} conversaciones con el asistente y todos sus mensajes. Las conversaciones del grafo del tablero se conservan. Esta acción no se puede deshacer.": "Your {n} conversations with the assistant and all their messages will be deleted. The dashboard graph conversations are kept. This action cannot be undone.",
+  "Eliminar todas": "Delete all",
+  "Volver a responder": "Answer again",
 };

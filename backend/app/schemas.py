@@ -491,6 +491,13 @@ class ChatSessionOut(BaseModel):
     graph_id: int | None = None
     created_at: datetime
     updated_at: datetime
+    message_count: int = 0
+    # Comienzo del último mensaje, para reconocer la conversación en la lista.
+    preview: str = ""
+
+
+class ChatSessionUpdate(BaseModel):
+    title: str
 
 
 class ChatSessionDetail(ChatSessionOut):
