@@ -1396,3 +1396,35 @@ Traducciones en `pages.Dashboard.js` y `server.activity.js` (nuevo).
 
 - `get_workbench` no tiene la misma tolerancia a fallos: si falla, la pantalla muestra «No se pudo cargar la bandeja».
 - «Lo último que hice» no agrupa varias calificaciones seguidas de tecnologías distintas.
+
+## Notas robustas: filtros, recorrido, vínculo perdido y bitácora (27-11-2026, versión 7.17.0)
+
+**Por qué.** Las notas no estaban en `AUDITED_MODELS` ni registraban acciones: crear, editar o borrar una nota no dejaba
+rastro. La lista hacía una consulta por nota para el nombre del elemento vinculado, la descarga ignoraba los filtros y
+el formulario se cerraba con un clic afuera perdiendo el texto.
+
+**Servidor** (`routers/notes.py`; sin migración).
+
+- Registra `note:create`, `note:edit` (`fields`, y `ai` cuando fue la mejora con IA), `note:pin`, `note:unpin`,
+  `note:delete` (con título y autor) y `note:export`. No se copia el contenido a la bitácora.
+- `GET /api/notes`: suma `mine`, `pinned`, `author` y `sort` (`recientes`, `antiguas`, `titulo`). Las fijadas van primero
+  en cualquier orden.
+- `GET /api/notes/summary` y `GET /api/notes/{id}/history`.
+- `NoteOut` suma `entity_missing` y `edited`. `edited` sale de los eventos `note:edit`; para notas anteriores se estima
+  por la diferencia de fechas (y no se estima en las fijadas, porque fijar también mueve `updated_at`).
+- Los nombres de los elementos vinculados se leen en una consulta por tipo (`_labels`).
+- `GET /api/notes/export` acepta los filtros de la lista, suma `vinculada_a` y `creada`, y neutraliza fórmulas.
+- Contenido de más de 20.000 caracteres responde 422; el título se limpia de espacios.
+
+**Interfaz** (`pages/Notes.jsx`, `pages/notes.css`): indicadores, filtros, orden, resumen y marca «editada», aviso de
+vínculo perdido, `NoteHistory`, copiar, confirmación al cerrar con texto, buscador de elementos y contador.
+`activity_service` suma las acciones de notas a «Lo último que hice». Traducciones en `pages.Notes.js` y
+`server.notes.js` (nuevo).
+
+**Pruebas.** `tests/test_notas_robustas.py` (6) y `e2e/notas_robustas.spec.js` (1).
+
+**Pendientes.**
+
+- El panel de notas incrustado (`components/NotesPanel.jsx`) no tiene el recorrido ni la confirmación al cerrar.
+- La prueba `crud_notes.spec.js:15` falló de forma intermitente en dos baterías completas (el detalle mostraba el
+  contenido anterior a la edición). No se reprodujo corriéndola sola y la causa sigue sin identificar.
