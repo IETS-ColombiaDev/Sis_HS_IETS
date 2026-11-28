@@ -533,6 +533,8 @@ class WorkbenchStats(BaseModel):
     needs_characterization: int  # priorizado o revisado sin ficha completa
     pending_recommendations: int  # priorizado sin recomendacion IA
     findings_last_7d: int
+    # Señales capturadas por día en los últimos 7 días (fecha de Colombia), del más antiguo a hoy.
+    findings_by_day: list[dict] = []
     sources_enabled: int
     last_scan: ScrapeLogOut | None = None
     queue: list[FindingOut]  # cola de trabajo (nuevos + alta prioridad)
