@@ -395,6 +395,18 @@ class NoteOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     entity_label: str = ""
+    # El elemento vinculado ya no existe (se eliminó después de escribir la nota).
+    entity_missing: bool = False
+    # El texto cambió después de crearla.
+    edited: bool = False
+
+
+class NoteHistoryEvent(BaseModel):
+    kind: str
+    label: str
+    detail: str = ""
+    at: str = ""
+    by: str = ""
 
 
 class AiEnhanceOut(BaseModel):

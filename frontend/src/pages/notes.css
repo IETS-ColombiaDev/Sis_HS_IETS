@@ -1,0 +1,92 @@
+/* Notas del equipo: indicadores, resumen de cada nota, detalle y recorrido. */
+
+.nt-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.nt-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #2563eb;
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  font: inherit;
+}
+.nt-tile.is-button {
+  cursor: pointer;
+}
+.nt-tile.is-button:hover {
+  border-color: #93c5fd;
+  border-left-color: #2563eb;
+}
+.nt-tile.is-active {
+  background: #eff6ff;
+  border-color: #2563eb;
+}
+.nt-tile > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+.nt-tile strong {
+  font-size: 24px;
+  line-height: 1.15;
+  color: #0f172a;
+}
+.nt-tile em {
+  font-style: normal;
+  font-size: 12px;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+.nt-snippet {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+.nt-missing {
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #b45309;
+}
+.nt-edited {
+  display: block;
+  font-size: 11px;
+  color: #b45309;
+}
+.nt-detail-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+  font-size: 12px;
+  color: #94a3b8;
+}
+.nt-history {
+  margin-top: 12px;
+}
+.nt-history li.is-created .prio-history-dot {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.nt-history li.is-edited .prio-history-dot {
+  background: #fef3c7;
+  color: #92400e;
+}
+.nt-history li.is-pinned .prio-history-dot {
+  background: #d1fae5;
+  color: #065f46;
+}
