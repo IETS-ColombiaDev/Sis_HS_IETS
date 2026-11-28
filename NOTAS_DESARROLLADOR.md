@@ -1367,3 +1367,32 @@ la misma regla de `fmtDateTime` (sin zona = UTC). Traducciones en `pages.Alerts.
 - No hay preferencia por persona para apagar el correo: necesita una columna nueva.
 - «Ver más» llega hasta 200 alertas; para las anteriores hay que filtrar.
 - El enlace a la tecnología usa su estado global, no el de un ciclo en particular.
+
+## Bandeja de trabajo robusta: bloques tolerantes a fallos, fases, ciclo y actividad propia (27-11-2026, versión 7.16.0)
+
+**Por qué.** Si una sola tarjeta de la bandeja fallaba al calcularse, `GET /api/dashboard/my-work` respondía 500 y la
+pantalla de inicio quedaba sin pendientes para ese perfil. Además la bandeja no decía cuándo se calculó ni permitía
+retomar lo último que la persona hizo.
+
+**Servidor** (`routers/dashboard.py`, `activity_service.py` nuevo; sin migración).
+
+- `build_my_work` calcula cada bloque dentro de un `try`: el que falla se registra en el log, se omite y su llave va en
+  `degraded` (la cola de trabajo usa la llave `queue`). Se hace `rollback` para no dejar la sesión rota.
+- `MyWorkOut` suma `degraded`, `by_phase` (pendientes «por hacer» y avisos por fase; `ITEM_PHASE` dice la fase de cada
+  bloque), `active_cycle_schedule` (fechas, días al corte y al cierre, porcentaje transcurrido) y `generated_at`.
+  `WorkItem` suma `phase`.
+- `WorkbenchStats.findings_by_day`: señales por día de los últimos 7 días, con fecha de Colombia (`signals_by_day`).
+- `GET /api/dashboard/my-activity?limit=`: últimas acciones de quien consulta, desde la bitácora. Una fila por
+  petición (`request_id`), prefiriendo la acción de negocio sobre la genérica; no muestra `auth:*` ni entidades de
+  tareas automáticas. Lee las últimas 400 filas del usuario.
+
+**Interfaz** (`pages/Dashboard.jsx`, `pages/dashboards.css` con prefijo `bw-`): hora del cálculo y «Actualizar», aviso de
+bloques caídos, filtros de tarjetas, avance del ciclo, cifra por fase, barras de la semana y «Lo último que hice».
+Traducciones en `pages.Dashboard.js` y `server.activity.js` (nuevo).
+
+**Pruebas.** `tests/test_bandeja_robusta.py` (5) y `e2e/bandeja_robusta.spec.js` (2).
+
+**Pendientes.**
+
+- `get_workbench` no tiene la misma tolerancia a fallos: si falla, la pantalla muestra «No se pudo cargar la bandeja».
+- «Lo último que hice» no agrupa varias calificaciones seguidas de tecnologías distintas.

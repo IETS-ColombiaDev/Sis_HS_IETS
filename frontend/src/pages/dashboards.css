@@ -1444,3 +1444,166 @@ button.dc-tile-btn:focus-visible {
     flex-basis: 100%;
   }
 }
+
+/* ------------------------------------------------------------------------ */
+/* Bandeja de trabajo: actualizar, filtros, avance del ciclo, semana y actividad */
+/* ------------------------------------------------------------------------ */
+.bw-actions {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.bw-updated {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.82);
+}
+.bw-degraded {
+  margin-bottom: 16px;
+}
+.bw-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+.bw-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+}
+.bw-chip span {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  font-size: 11.5px;
+  text-align: center;
+}
+.bw-chip:hover {
+  border-color: #93c5fd;
+}
+.bw-chip.is-active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1e40af;
+}
+.bw-chip.is-active span {
+  background: #dbeafe;
+}
+.bw-schedule {
+  margin-top: 12px;
+}
+.bw-schedule-track {
+  height: 6px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+.bw-schedule-track > div {
+  height: 100%;
+  border-radius: 999px;
+  background: #10b981;
+}
+.bw-schedule p {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: #334155;
+}
+.bw-schedule p span {
+  color: #94a3b8;
+}
+.bw-schedule.is-idle .bw-schedule-track > div { background: #cbd5e1; }
+.bw-schedule.is-soon .bw-schedule-track > div { background: #f59e0b; }
+.bw-schedule.is-soon p { color: #92400e; }
+.bw-schedule.is-late .bw-schedule-track > div { background: #dc2626; }
+.bw-schedule.is-late p { color: #b91c1c; font-weight: 600; }
+.bw-phase-count {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.bw-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px 0 2px;
+}
+.bw-week-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.bw-week-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+}
+.bw-week-track {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  max-width: 26px;
+  height: 44px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+.bw-week-track i {
+  display: block;
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  background: #3b82f6;
+}
+.bw-week-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+.bw-activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.bw-activity li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13.5px;
+}
+.bw-activity li:last-child {
+  border-bottom: none;
+}
+.bw-activity strong {
+  display: block;
+  color: #0f172a;
+}
+.bw-activity-name {
+  display: block;
+  color: #475569;
+}
+.bw-activity small {
+  color: #94a3b8;
+}

@@ -106,4 +106,16 @@ export default {
   "Ir a vigilancia de fuentes": "Go to source surveillance",
   "La vigilancia la ejecuta el equipo técnico; aquí ve su estado.":
     "Surveillance is run by the technical team; here you can see its status.",
+
+  // Bandeja de trabajo robusta (7.16.0)
+  "Señales capturadas por día en los últimos 7 días": "Signals captured per day over the last 7 days",
+  "Actualizado a las {hora}": "Updated at {hora}",
+  "No se pudieron cargar sus pendientes.": "Your pending tasks could not be loaded.",
+  "{n} bloque(s) de la bandeja no se pudieron calcular.": "{n} block(s) of the inbox could not be calculated.",
+  "Los indicadores de abajo sí están al día. Pulse Actualizar; si se repite, avise al equipo técnico.": "The indicators below are up to date. Press Refresh; if it happens again, tell the technical team.",
+  "El resto de la bandeja está completo. Pulse Actualizar; si se repite, avise al equipo técnico.": "The rest of the inbox is complete. Press Refresh; if it happens again, tell the technical team.",
+  "Filtrar mis pendientes": "Filter my pending tasks",
+  "Sus últimas acciones en el sistema, de la más reciente a la más antigua. Sirve para retomar el trabajo donde lo dejó. Solo usted ve esta lista.": "Your latest actions in the system, most recent first. It helps you pick up where you left off. Only you see this list.",
+  "Lo último que hice": "What I did last",
+  "Retomar": "Resume",
 };
