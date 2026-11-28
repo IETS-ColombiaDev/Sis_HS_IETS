@@ -1459,3 +1459,35 @@ ajustado (el título de la conversación ahora también está en la cabecera).
 
 - Los registros usados como contexto siguen guardados como texto (`sources_used`), sin enlace a la señal o la fuente.
 - El chat del grafo del tablero (`components/StrategyGraph.jsx`) no tiene reintento ni exporte.
+
+## Auditoría robusta: integridad verificada, búsqueda, resumen y exporte (27-11-2026, versión 7.19.0)
+
+**Por qué.** La pantalla afirmaba que el motor rechaza modificar la bitácora, pero nada lo comprobaba:
+`harden_audit_log` solo deja una advertencia en el log si falla. La consulta solo filtraba por campos exactos, mostraba
+el código de las acciones sin nombre y no había forma de sacar un rango de registros.
+
+**Servidor** (`audit_view.py` nuevo, `routers/audit.py`; sin migración).
+
+- `GET /api/audit/integrity`: en SQLite busca los disparadores de `audit_log`; en PostgreSQL consulta
+  `has_table_privilege(current_user, 'audit_log', 'UPDATE' | 'DELETE')`. Devuelve `protected`, `engine`, `detail`,
+  `total` y `first_at`.
+- `GET /api/audit` suma `q` (usuario, acción, entidad, id, ruta y los JSON de valores), `request_id` e `ip`. Cada
+  registro trae `action_label` y `entity_label`.
+- `GET /api/audit/summary` (mismos filtros), `GET /api/audit/catalog` (acciones y entidades con nombre y cantidad) y
+  `GET /api/audit/export` (CSV, hasta 10.000 filas; registra `audit:export` con el filtro).
+- `ACTION_LABELS` y `ENTITY_LABELS` viven en `audit_view.py`; las de negocio se toman de `activity_service`.
+- `/actions` y `/entities` se conservan.
+
+**Interfaz** (`pages/Audit.jsx` reescrita, `pages/audit.css`): aviso de integridad, indicadores, búsqueda, rangos
+rápidos, nombres de acciones, «Ver toda la operación», filtros en la dirección (`entidad`, `id`, `accion`, `usuario`,
+`desde`, `hasta`, `peticion`, `q`), descarga y tamaño de página. Las fechas usan `fmtDateTime`. Traducciones en
+`pages.Audit.js` y `server.audit.js` (nuevo).
+
+**Pruebas.** `tests/test_auditoria_robusta.py` (6) y `e2e/auditoria_robusta.spec.js` (1).
+
+**Pendientes.**
+
+- `summary` y la búsqueda `q` recorren la tabla completa del filtro: con cientos de miles de registros conviene acotar
+  por fechas o agregar índices.
+- En PostgreSQL, si la aplicación se conecta con el dueño de la tabla, `REVOKE` puede no bastar: la pantalla lo
+  mostrará en amarillo y habría que usar un rol aparte para la aplicación.

@@ -1,0 +1,130 @@
+/* Auditoría: protección verificada, indicadores, búsqueda rápida y detalle. */
+
+.au-integrity {
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.au-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.au-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #2563eb;
+  border-radius: 12px;
+  background: #fff;
+}
+.au-tile > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+.au-tile strong {
+  font-size: 24px;
+  line-height: 1.15;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+.au-tile strong.au-tile-text {
+  font-size: 15px;
+  line-height: 1.35;
+}
+.au-tile em {
+  font-style: normal;
+  font-size: 12px;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+.au-days {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 52px;
+  margin-top: 4px;
+}
+.au-day {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+}
+.au-day-track {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  max-width: 16px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+.au-day-track i {
+  display: block;
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: #3b82f6;
+}
+.au-day-label {
+  font-size: 9.5px;
+  color: #94a3b8;
+}
+
+.au-quick {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.au-quick > :first-child {
+  flex: 1;
+  min-width: 220px;
+}
+.au-ranges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.au-request {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #1e3a8a;
+  overflow-wrap: anywhere;
+}
+.au-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: #1d4ed8;
+  cursor: pointer;
+}
+.au-link:hover {
+  text-decoration: underline;
+}
+.au-action-label {
+  margin-bottom: 3px;
+  font-size: 13px;
+  color: #0f172a;
+}
+.au-nodiff {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+.audit-diff td {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

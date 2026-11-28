@@ -742,6 +742,8 @@ class AuditLogOut(BaseModel):
     new_value: dict | None = None
     request_id: str
     request_path: str
+    action_label: str = ""
+    entity_label: str = ""
 
 
 class AuditPage(BaseModel):
